@@ -1,0 +1,3 @@
+drawtext=fontfile='C\:/Windows/Fonts/impact.ttf':text='WAIT FOR IT...':fontsize=68:fontcolor=white:borderw=6:bordercolor=black:x=(w-text_w)/2:y=150:enable='between(t\,0.1\,2.3)',
+drawtext=fontfile='C\:/Windows/Fonts/impact.ttf':text='DOUBLE KILL':fontsize=98:fontcolor=0x33FFFF:borderw=8:bordercolor=black:x=(w-text_w)/2:y=190:enable='between(t\,15.7\,19.9)',
+drawtext=fontfile='C\:/Windows/Fonts/impact.ttf':text='EASY W':fontsize=120:fontcolor=white:borderw=9:bordercolor=black:x=(w-text_w)/2:y=210:enable='between(t\,20.3\,24.2)'
