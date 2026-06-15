@@ -131,15 +131,18 @@ def extract_highlight_anchors(transcripts: list[dict], limit: int = 12) -> list[
             low1 = one.lower().strip(".,!?;:")
             two = (one + " " + (rw[i + 1].get("text") or "").strip()) if i + 1 < len(rw) else one
             low2 = two.lower().strip(".,!?;:")
+            # Store the CANONICAL callout phrase (title-cased keyword), not the raw
+            # 2-gram window — keeps the anchor library clean ("Double Kill", not
+            # "assist. Legendary."). Timestamp stays the matched word's start.
             label, matched = None, False
             for c in EMPHASIS_WORDS:
                 if c in low2:                     # prefer the 2-word match (e.g. "double kill")
-                    label, matched = two.strip(), True
+                    label, matched = c.title(), True
                     break
             if not matched:
                 for c in EMPHASIS_WORDS:
                     if c == low1 or (c in low1 and " " not in c):
-                        label, matched = one, True
+                        label, matched = c.title(), True
                         break
             if matched:
                 anchors.append({"t": round(float(w["start"]), 2), "label": label, "kind": "callout"})
