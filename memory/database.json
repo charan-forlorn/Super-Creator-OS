@@ -1,0 +1,20 @@
+[
+  {
+    "project_name": "PetGlow Smart Collar Launch",
+    "product_niche": "Pet Accessories",
+    "hook_successful": "เปิดด้วยสุนัขใส่ปลอกคอเรืองแสงวิ่งกลางคืน + ตั้งคำถาม \"ปลอกคอนี้ทำอะไรได้บ้าง?\"",
+    "editing_specs": "9:16, ตัดทุก ~1.5s, whip-pan transition, punch-in zoom จุด peak, subtitle ใน bottom safe-zone",
+    "retention_score": 78,
+    "lesson_learned": "ปรับ subtitle ขึ้น 80px กัน UI แพลตฟอร์มบัง; ลด volume music -3dB | TikTok 3 วินาทีแรกต้องเห็นแสงเรืองทันที; โพสต์ 19:00 ได้ engagement สูงสุด",
+    "created_at": "2026-06-15T10:59:48.921Z"
+  },
+  {
+    "project_name": "MOBA Pentakill — Hype Flex Edit (RoV)",
+    "product_niche": "Gaming (MOBA)",
+    "hook_successful": "Cold-open 2.5s teaser ของจังหวะ Double Kill (timecode 65s) ก่อน แล้วตัดกลับไป build จาก teamfight แรก → ไต่ขึ้นจบที่ Double Kill + ace flex ('มงลงแล้วจ้า'). Hook = โชว์ของดีก่อนแล้วค่อยเฉลยที่มา",
+    "editing_specs": "Source RoV จริง 1560x720 landscape 27fps 71.85s → reframe เป็น 9:16 1080x1920 30fps ด้วย center-crop (405px กว้างที่ z=1.0) + progressive punch-in zoom (z 1.05->1.25 ไต่ตามความ hype), grade eq contrast 1.12 / saturation 1.32 + vignette, slo-mo 0.65x ที่จังหวะ Double Kill, audio loudnorm -14 LUFS, ข้อความ Impact font (WAIT FOR IT / DOUBLE KILL / EASY W). Output ~24s",
+    "retention_score": 84,
+    "lesson_learned": "เทคนิคหา highlight อัตโนมัติ: วิเคราะห์ RMS เสียงรายวินาที → peak = kill/teamfight (คลิปนี้เจอ 40s push, 66s DOUBLE KILL, 70s ace) แล้วยืนยันด้วยการดึงเฟรมมาดูจริง; landscape MOBA reframe เป็น vertical ใช้ center-crop ได้เพราะ action อยู่กลางจอ-UI อยู่ขอบ (ตัด minimap/ปุ่มสกิลทิ้งได้สะอาด); content ดีสุดมักอยู่ช่วงท้ายเกม (finale teamfight) → เอามาเปิดเป็น hook; ยังไม่มีไฟล์เพลง = ส่ง master เสียงเกมไป duck ไว้ ให้เติม Phonk ใน TikTok native; โพสต์ 20:00-22:00",
+    "created_at": "2026-06-15T12:25:50.000Z"
+  }
+]

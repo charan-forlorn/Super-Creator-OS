@@ -1,0 +1,29 @@
+# --- Media & heavy artifacts (not tracked; rollback safety net is for SYSTEM files) ---
+input/raw/*.mp4
+input/raw/*.mov
+input/raw/*.MP4
+input/raw/*.MOV
+input/frames/*.png
+input/frames/*.jpg
+output/*.mp4
+work/*.mp4
+work/*.png
+
+# --- Secrets ---
+.env
+**/.env
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# --- Node ---
+node_modules/
+
+# --- video-use engine cache (regenerated per project) ---
+**/edit/transcripts/
+**/edit/clips_graded/
+**/edit/preview.mp4
+**/edit/final.mp4
