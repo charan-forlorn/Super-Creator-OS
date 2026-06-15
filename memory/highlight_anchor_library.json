@@ -1,0 +1,58 @@
+{
+  "_schema": "highlight_anchor_library v1 — niche -> {anchors:[{phrase,kind,frequency,retention_sum,retention_count,success_count,use_count,last_used}]}. Derived: retention_avg=retention_sum/retention_count, success_rate=success_count/use_count.",
+  "Gaming (MOBA)": {
+    "anchors": [
+      {"phrase": "Double Kill", "kind": "callout", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null},
+      {"phrase": "Triple Kill", "kind": "callout", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null},
+      {"phrase": "Pentakill", "kind": "callout", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null},
+      {"phrase": "Legendary", "kind": "callout", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null},
+      {"phrase": "Ace", "kind": "callout", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null},
+      {"phrase": "Shut down", "kind": "callout", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null}
+    ]
+  },
+  "Podcast": {
+    "anchors": [
+      {"phrase": "Wait...", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null},
+      {"phrase": "Here's the thing", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null},
+      {"phrase": "Let me tell you", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null}
+    ]
+  },
+  "Interview": {
+    "anchors": [
+      {"phrase": "The truth is", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null},
+      {"phrase": "Honestly", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null}
+    ]
+  },
+  "Education": {
+    "anchors": [
+      {"phrase": "The reason is", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null},
+      {"phrase": "Here's why", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null},
+      {"phrase": "Most importantly", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null}
+    ]
+  },
+  "Finance": {
+    "anchors": [
+      {"phrase": "Most people don't know", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null},
+      {"phrase": "The biggest mistake", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null}
+    ]
+  },
+  "Sales": {
+    "anchors": [
+      {"phrase": "Biggest mistake", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null},
+      {"phrase": "Nobody talks about this", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null},
+      {"phrase": "Here's the secret", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null}
+    ]
+  },
+  "Motivation": {
+    "anchors": [
+      {"phrase": "This changed my life", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null},
+      {"phrase": "Never give up", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null}
+    ]
+  },
+  "Short-form": {
+    "anchors": [
+      {"phrase": "Wait for it", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null},
+      {"phrase": "You won't believe", "kind": "verbal_hook", "frequency": 0, "retention_sum": 0, "retention_count": 0, "success_count": 0, "use_count": 0, "last_used": null}
+    ]
+  }
+}
