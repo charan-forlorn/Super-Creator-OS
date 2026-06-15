@@ -48,17 +48,33 @@ def extract_frames(video: Path, start: float, end: float, n: int, dest_dir: Path
     paths: list[Path] = []
     for i, t in enumerate(times):
         out = dest_dir / f"f_{i:03d}.jpg"
-        cmd = [
-            "ffmpeg", "-y",
-            "-ss", f"{t:.3f}",
-            "-i", str(video),
-            "-frames:v", "1",
-            "-q:v", "4",
-            "-vf", "scale=320:-2",
-            str(out),
-        ]
-        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        paths.append(out)
+        # [super-creator-os integration] Robustness: a seek past the last decodable
+        # video frame (common when a clip's audio outlasts its video, or near EOF)
+        # makes ffmpeg write nothing and exit non-zero — which used to crash the
+        # whole timeline_view. Retry once a hair earlier, then skip the frame if it
+        # still yields nothing, instead of aborting. Compositing tolerates < n frames.
+        wrote = False
+        for seek in (t, max(start, t - 0.30), max(start, t - 0.80)):
+            cmd = [
+                "ffmpeg", "-y",
+                "-ss", f"{seek:.3f}",
+                "-i", str(video),
+                "-frames:v", "1",
+                "-q:v", "4",
+                "-vf", "scale=320:-2",
+                str(out),
+            ]
+            r = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if r.returncode == 0 and out.exists() and out.stat().st_size > 0:
+                wrote = True
+                break
+        if wrote:
+            paths.append(out)
+    if not paths:
+        raise RuntimeError(
+            f"extract_frames: no decodable video frame in [{start:.2f}, {end:.2f}] "
+            f"of {video} (range may be entirely past the video stream's end)"
+        )
     return paths
 
 

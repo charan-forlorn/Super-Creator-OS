@@ -25,8 +25,27 @@ import sys
 from pathlib import Path
 
 HELPERS = Path(__file__).resolve().parent / "engine" / "helpers"
+ENV_FILE = Path(__file__).resolve().parent / ".env"
 VALID = {"transcribe", "transcribe_batch", "pack_transcripts",
          "timeline_view", "render", "grade"}
+
+
+def _load_env() -> None:
+    """Load integrations/video-use/.env into os.environ.
+
+    The vendored helpers look for .env at helpers/../.env (== engine/.env) because
+    upstream they sit at repo root. In this integration helpers live under engine/,
+    so that path misses our .env one level up. Loading it here into the environment
+    makes the helpers' os.environ fallback resolve the key regardless of nesting.
+    """
+    if not ENV_FILE.exists():
+        return
+    for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 
 def _force_utf8() -> None:
@@ -50,6 +69,7 @@ def main() -> int:
         return 2
 
     _force_utf8()
+    _load_env()
     target = HELPERS / f"{tool}.py"
     if not target.exists():
         print(f"ERROR: helper not found: {target}", file=sys.stderr)
