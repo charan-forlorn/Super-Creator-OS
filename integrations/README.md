@@ -19,8 +19,27 @@ integrations/
 │       ├── ENGINE_SKILL.md       ← original video-use SKILL.md (full craft + 12 hard rules)
 │       └── LICENSE               ← MIT (Browser Use)
 └── adapter/
-    └── timeline_to_edl.py        ← bridge: Super Creator OS timeline_format.md → video-use edl.json (+SRT)
+    ├── timeline_to_edl.py        ← forward bridge: timeline_format.md → video-use edl.json (+SRT)
+    └── render_to_memory.py       ← return bridge: render results → memory/database.json (append-only)
 ```
+
+## Closing the learning loop (return adapter)
+
+After a render, write the result back into memory so the next project gets smarter:
+
+```bash
+python integrations/adapter/render_to_memory.py \
+    --edl work/edit/edl.json \
+    --render work/edit/final.mp4 \
+    --transcripts-dir work/edit/transcripts \
+    --project-name "<name>" --product-niche "<niche>" \
+    --retention-score <0-100> [--qa work/edit/qa.json] [--dry-run]
+```
+
+It auto-derives editing_specs, clip_type, grade_used, cut_padding_ms,
+subtitle_style, render_success, highlight_anchors, and retention_signals, then
+**appends** one record (never overwrites), backing up database.json into
+`memory/_db_backups/` first. Always `--dry-run` once to preview the record.
 
 ## How the two systems connect
 
