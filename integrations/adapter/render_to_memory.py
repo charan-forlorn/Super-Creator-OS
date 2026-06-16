@@ -208,7 +208,8 @@ def assess_render_success(edl: dict, render: dict) -> tuple[bool, str]:
 # ----------------------------------------------------------------------------
 # Record builder
 # ----------------------------------------------------------------------------
-def build_record(args, edl: dict, transcripts: list[dict], render: dict, qa: dict) -> dict:
+def build_record(args, edl: dict, transcripts: list[dict], render: dict, qa: dict,
+                 provenance: dict | None = None) -> dict:
     clip_type = detect_clip_type(transcripts, edl)
     anchors = extract_highlight_anchors(transcripts)
     signals = compute_retention_signals(edl, transcripts, render)
@@ -253,7 +254,7 @@ def build_record(args, edl: dict, transcripts: list[dict], render: dict, qa: dic
     created = args.created_at or _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     retention = args.retention_score if args.retention_score is not None else 0
 
-    return {
+    rec = {
         # ---- v1 (required) ----
         "project_name": args.project_name,
         "product_niche": args.product_niche,
@@ -280,6 +281,11 @@ def build_record(args, edl: dict, transcripts: list[dict], render: dict, qa: dic
             "output_duration_s": signals.get("output_duration_s"),
         },
     }
+    # ---- v3 (optional, additive): provenance — only stamped when supplied ----
+    if provenance is not None:
+        rec["schema_version"] = "v3"
+        rec["provenance"] = provenance
+    return rec
 
 
 # ----------------------------------------------------------------------------

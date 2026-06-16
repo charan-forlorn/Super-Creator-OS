@@ -29,6 +29,7 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import datetime as _dt
 import json
 import os
 import sys
@@ -44,6 +45,8 @@ from event_bus import EventBus                       # noqa: E402
 from memory_writer import safe_append                # noqa: E402
 from archive_manager import archive_project          # noqa: E402
 import anchor_library                                # noqa: E402
+import seed_store                                     # noqa: E402  (STEP 1.5 -> 15 handoff)
+import recommendation_service as rsvc                 # noqa: E402  (provenance builder)
 import render_to_memory as rtm                       # noqa: E402  (forward reuse)
 
 
@@ -59,7 +62,10 @@ def _force_utf8() -> None:
 def process_project(edl_path, project_name, product_niche, *, render=None,
                     transcripts_dir=None, qa_pass=None, qa_notes="",
                     retention_score=None, db=None, created_at=None,
-                    dry_run=False, bus: EventBus | None = None) -> dict:
+                    dry_run=False, bus: EventBus | None = None,
+                    seed=None, hooks_actually_used=None,
+                    reused_editing_specs=None, storytelling_decision=None,
+                    lib_path=None) -> dict:
     bus = bus or EventBus()
     edl_path = Path(edl_path)
     edl = json.loads(edl_path.read_text(encoding="utf-8"))
@@ -79,11 +85,22 @@ def process_project(edl_path, project_name, product_niche, *, render=None,
     bus.emit("PROJECT_QA_PASSED", pid, {"notes": qa_notes})
 
     # ---- build structured record (reuse adapter logic) ----
+    # Resolve created_at HERE so the record's timestamp and the provenance
+    # loop_run_id share one identity (the telemetry sidecar joins on it).
+    resolved_created = created_at or _dt.datetime.now(_dt.timezone.utc).strftime(
+        "%Y-%m-%dT%H:%M:%S.000Z")
     ns = SimpleNamespace(edl=str(edl_path), project_name=project_name,
                          product_niche=product_niche, retention_score=retention_score,
-                         created_at=created_at)
+                         created_at=resolved_created)
     qa = {"pass": qa_pass, "notes": qa_notes} if qa_pass is not None else {}
-    record = rtm.build_record(ns, edl, transcripts, render_meta, qa)
+
+    # ---- provenance: link this result to the recommendation that seeded it ----
+    provenance = rsvc.build_provenance(
+        seed, hooks_actually_used=hooks_actually_used,
+        reused_editing_specs=reused_editing_specs,
+        storytelling_decision=storytelling_decision,
+        created_at=resolved_created, project_name=project_name)
+    record = rtm.build_record(ns, edl, transcripts, render_meta, qa, provenance=provenance)
 
     if not record.get("render_success"):
         bus.emit("RENDER_FAILURE_DETECTED", pid,
@@ -111,18 +128,24 @@ def process_project(edl_path, project_name, product_niche, *, render=None,
     discovered: list[str] = []
     anc_ok, anc_info, discovered = anchor_library.record_project_anchors(
         product_niche, record.get("highlight_anchors", []),
-        record["retention_score"], record["render_success"])
+        record["retention_score"], record["render_success"], path=lib_path)
     if discovered:
         bus.emit("HIGHLIGHT_PATTERN_DISCOVERED", pid,
                  {"niche": product_niche, "new_phrases": discovered})
 
+    prov = record.get("provenance", {})
     bus.emit("PROJECT_COMPLETE", pid, {"memory": info, "archive": arch_dest,
-                                       "anchors": anc_info})
+                                       "anchors": anc_info,
+                                       "loop_run_id": prov.get("loop_run_id"),
+                                       "match_quality": prov.get("recommended", {}).get("match_quality"),
+                                       "hook_adoption": prov.get("decided", {}).get("hook_adoption")})
     return {
         "status": "complete", "memory_written": True, "memory_info": info,
         "archive": arch_dest, "anchor_update": anc_info, "discovered": discovered,
         "clip_type": record["clip_type"], "render_success": record["render_success"],
-        "suggested_hooks_next_time": anchor_library.suggest_hooks(product_niche),
+        "loop_run_id": prov.get("loop_run_id"),
+        "provenance": prov,
+        "suggested_hooks_next_time": anchor_library.suggest_hooks(product_niche, path=lib_path),
     }
 
 
@@ -146,13 +169,58 @@ def main() -> int:
     ap.add_argument("--db", default=None)
     ap.add_argument("--created-at", default=None)
     ap.add_argument("--dry-run", action="store_true")
+    # --- provenance inputs (all optional; absence => cold_start provenance) ---
+    ap.add_argument("--seed-json", default=None,
+                    help="path to the creative_seed JSON produced by recommendation_service")
+    ap.add_argument("--hooks-used", default=None,
+                    help="comma-separated hooks actually used by storytelling")
+    ap.add_argument("--reused-editing-specs", default=None, help="true/false")
+    ap.add_argument("--storytelling-decision", default=None,
+                    help="free-text note: chosen arc / why it deviated from the seed")
+    # --- seed auto-resolution (closes the STEP 1.5 -> STEP 15 human gap) ---
+    ap.add_argument("--seeds-dir", default=None,
+                    help="seed store dir (else $SCOS_SEEDS_DIR or work/seeds)")
+    ap.add_argument("--no-auto-seed", action="store_true",
+                    help="do not auto-load a persisted seed by project name")
+    ap.add_argument("--keep-seed", action="store_true",
+                    help="do not move the consumed seed to _consumed/ after writing")
+    # --- environment isolation ---
+    ap.add_argument("--lib-path", default=None,
+                    help="anchor library path (else $SCOS_ANCHOR_LIB or default)")
     a = ap.parse_args()
+
+    # seed resolution: explicit --seed-json wins; else auto-resolve from the store
+    seed = None
+    seed_src = None
+    if a.seed_json and Path(a.seed_json).exists():
+        seed = json.loads(Path(a.seed_json).read_text(encoding="utf-8"))
+        seed_src = a.seed_json
+    elif not a.no_auto_seed:
+        seed = seed_store.resolve_seed(a.project_name, seeds_dir=a.seeds_dir)
+        if seed is not None:
+            seed_src = f"auto:{a.project_name}"
+    if seed_src:
+        print(f"[seed] using {seed_src} (recommendation_id={seed.get('recommendation_id')})")
+
+    hooks_used = ([h.strip() for h in a.hooks_used.split(",") if h.strip()]
+                  if a.hooks_used is not None else None)
+    reused = _b(a.reused_editing_specs) if a.reused_editing_specs is not None else None
 
     result = process_project(
         a.edl, a.project_name, a.product_niche, render=a.render,
         transcripts_dir=a.transcripts_dir, qa_pass=_b(a.qa_pass), qa_notes=a.qa_notes,
         retention_score=a.retention_score, db=a.db, created_at=a.created_at,
-        dry_run=a.dry_run)
+        dry_run=a.dry_run, seed=seed, hooks_actually_used=hooks_used,
+        reused_editing_specs=reused, storytelling_decision=a.storytelling_decision,
+        lib_path=a.lib_path)
+
+    # archive the consumed seed (audit) once memory is actually written
+    if (result.get("status") == "complete" and seed is not None
+            and not a.keep_seed and not a.dry_run):
+        moved = seed_store.consume_seed(a.project_name, seeds_dir=a.seeds_dir)
+        if moved:
+            print(f"[seed] consumed -> {moved}")
+
     print("\n=== LEARNING MANAGER RESULT ===")
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result["status"] in {"complete", "dry_run", "qa_failed"} else 1

@@ -9,11 +9,21 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+import os
 import re
 import shutil
 from pathlib import Path
 
 ARCHIVE_ROOT = Path(__file__).resolve().parent / "archive"
+ENV_ARCHIVE = "SCOS_ARCHIVE"  # redirect the archive root (test/staging isolation)
+
+
+def resolve_archive_root(explicit: str | os.PathLike | None = None) -> Path:
+    """explicit arg > $SCOS_ARCHIVE > default archive/."""
+    if explicit:
+        return Path(explicit)
+    env = os.environ.get(ENV_ARCHIVE)
+    return Path(env) if env else ARCHIVE_ROOT
 
 
 def slugify(name: str) -> str:
@@ -21,14 +31,16 @@ def slugify(name: str) -> str:
     return s[:80] or "project"
 
 
-def archive_project(project_id: str, artifacts: dict, record: dict | None = None) -> tuple[bool, str]:
+def archive_project(project_id: str, artifacts: dict, record: dict | None = None,
+                    archive_root: str | os.PathLike | None = None) -> tuple[bool, str]:
     """artifacts: {edl: path, packed: path, qa: path, render: path}. All optional."""
+    root = resolve_archive_root(archive_root)
     pid = slugify(project_id)
-    dest = ARCHIVE_ROOT / pid
+    dest = root / pid
     if dest.exists():
         # write-once: don't clobber an existing archive; version it
         stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-        dest = ARCHIVE_ROOT / f"{pid}__{stamp}"
+        dest = root / f"{pid}__{stamp}"
     dest.mkdir(parents=True, exist_ok=True)
 
     copied = {}

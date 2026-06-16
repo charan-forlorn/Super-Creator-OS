@@ -23,6 +23,19 @@ from pathlib import Path
 from validators import validate_anchor_library
 
 LIB_PATH = Path(__file__).resolve().parents[2] / "memory" / "highlight_anchor_library.json"
+ENV_LIB = "SCOS_ANCHOR_LIB"
+
+
+def resolve_lib_path(explicit: str | os.PathLike | None = None) -> Path:
+    """Which anchor library to touch: explicit arg > $SCOS_ANCHOR_LIB > production default.
+
+    The env var lets a whole test/staging session redirect writes away from
+    production with one export — closing the 'tests can mutate prod state' gap.
+    """
+    if explicit:
+        return Path(explicit)
+    env = os.environ.get(ENV_LIB)
+    return Path(env) if env else LIB_PATH
 
 
 def _now() -> str:
@@ -45,7 +58,7 @@ def _norm(s: str) -> str:
 
 def suggest_hooks(niche: str, top_n: int = 3, path: Path | None = None) -> list[dict]:
     """Return best-performing anchors for a niche, ranked by (success_rate, retention_avg, frequency)."""
-    lib = _load(Path(path) if path else LIB_PATH)
+    lib = _load(resolve_lib_path(path))
     payload = lib.get(niche)
     if not payload:
         return []
@@ -64,7 +77,7 @@ def suggest_hooks(niche: str, top_n: int = 3, path: Path | None = None) -> list[
 def record_project_anchors(niche: str, anchors: list[dict], retention_score: int,
                            success: bool, path: Path | None = None) -> tuple[bool, str, list[str]]:
     """Update the library from a finished project. Returns (ok, info, newly_discovered_phrases)."""
-    p = Path(path) if path else LIB_PATH
+    p = resolve_lib_path(path)
     lib = _load(p)
     errs = validate_anchor_library(lib) if lib else []
     if errs:

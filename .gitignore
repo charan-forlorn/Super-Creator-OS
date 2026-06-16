@@ -5,6 +5,7 @@ input/raw/*.MP4
 input/raw/*.MOV
 input/frames/*.png
 input/frames/*.jpg
+input/reference/
 output/*.mp4
 work/*.mp4
 work/*.png
@@ -27,3 +28,11 @@ node_modules/
 **/edit/clips_graded/
 **/edit/preview.mp4
 **/edit/final.mp4
+
+# --- learning layer: transient handoff + safety backups (data infra phase) ---
+work/seeds/
+memory/_db_backups/
+memory/_telemetry_backups/
+integrations/learning/_*_backups/
+integrations/learning/archive/
+integrations/learning/events.jsonl
