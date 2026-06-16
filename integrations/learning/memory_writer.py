@@ -18,7 +18,7 @@ import os
 import shutil
 from pathlib import Path
 
-from validators import validate_record, validate_db
+from validators import validate_record, validate_db, validate_provenance
 
 DEFAULT_DB = Path(__file__).resolve().parents[2] / "memory" / "database.json"
 
@@ -35,6 +35,11 @@ def safe_append(record: dict, db_path: Path | None = None) -> tuple[bool, str]:
     errs = validate_record(record)
     if errs:
         return False, "record invalid: " + "; ".join(errs)
+
+    # provenance is optional; if present it must be well-formed (backward compatible)
+    perrs = validate_provenance(record.get("provenance"))
+    if perrs:
+        return False, "provenance invalid: " + "; ".join(perrs)
 
     db = json.loads(db_path.read_text(encoding="utf-8")) if db_path.exists() else []
     db_errs = validate_db(db)

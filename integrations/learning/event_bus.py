@@ -23,6 +23,7 @@ from typing import Callable
 from validators import validate_event
 
 DEFAULT_LOG = Path(__file__).resolve().parent / "events.jsonl"
+ENV_EVENTS = "SCOS_EVENTS"  # redirect the event log (test/staging isolation)
 
 
 def _now_iso() -> str:
@@ -31,7 +32,11 @@ def _now_iso() -> str:
 
 class EventBus:
     def __init__(self, log_path: Path | None = None):
-        self.log_path = Path(log_path) if log_path else DEFAULT_LOG
+        # resolution: explicit arg > $SCOS_EVENTS > default events.jsonl
+        import os
+        self.log_path = (Path(log_path) if log_path
+                         else Path(os.environ[ENV_EVENTS]) if os.environ.get(ENV_EVENTS)
+                         else DEFAULT_LOG)
         self._subs: dict[str, list[Callable]] = {}
 
     def subscribe(self, event_type: str, handler: Callable[[dict], None]) -> None:
