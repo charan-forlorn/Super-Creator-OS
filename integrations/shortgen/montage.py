@@ -220,18 +220,231 @@ def render_montage(source: str | Path, music: str | Path, out: str | Path,
             "shot_climaxes": [s["climax_t"] for s in shots], "tmp": str(tmp)}
 
 
+# ===========================================================================
+# DIRECTOR MODE — 60s hype highlight (cold-open peak + effects + bass-drop finale)
+# ===========================================================================
+def _music_drop(music: Path) -> float:
+    """Time of the biggest energy jump in the track (the drop) — for the finale sync."""
+    hc = HighlightConfig(window_s=0.25)
+    times, energy = extract_audio_energy(music, hc)
+    if len(energy) < 4:
+        return 0.0
+    rise = onset(energy)
+    # smooth-ish: pick the strongest sustained rise in the back 2/3 (drops rarely at the very start)
+    lo = len(rise) // 5
+    idx = lo + int(np.argmax(rise[lo:]))
+    return float(times[idx])
+
+
+def select_highlight_shots(source: Path, target_s: float, coldopen_s: float,
+                           speed: float) -> tuple[dict | None, list[dict]]:
+    """finale = best-arc fight (shown last + teased at the open); mids = other top
+    non-overlapping fights, chronological, filling the time budget."""
+    eps = detect_episodes(source, NarrativeConfig())
+    if not eps:
+        return None, []
+    finale = max(eps, key=lambda e: (e["arc_score"], e["climax_t"]))
+    chosen: list[dict] = []
+    used = [finale]
+    fin_dur = (finale["end"] - finale["start"]) / speed
+    for e in sorted(eps, key=lambda x: -x["arc_score"]):
+        if e is finale:
+            continue
+        if any(not (e["end"] <= u["start"] or e["start"] >= u["end"]) for u in used):
+            continue
+        used.append(e); chosen.append(e)
+        tot = coldopen_s + fin_dur + sum((c["end"] - c["start"]) / speed for c in chosen)
+        if tot >= target_s:
+            break
+    return finale, sorted(chosen, key=lambda x: x["climax_t"])
+
+
+def _fx_chain(in_lbl: str, out_lbl: str, cfg: MontageConfig, climax_rel: float,
+              text: str | None, font: str | None) -> str:
+    """grade -> shake(around kill) -> white flash(at kill) -> timed text. (No zoompan:
+    keeps the time base intact so flash/text land exactly on the kill.)"""
+    c0, c1 = max(0.0, climax_rel - 0.15), climax_rel + 0.20
+    parts = [f"[{in_lbl}]{GRADE_PUNCH}[g0]"]
+    # subtle shake via crop oscillation, active only around the kill
+    parts.append(
+        f"[g0]crop=w=iw-6:h=ih-6:"
+        f"x='3+3*sin(2*PI*18*t)*between(t,{c0:.2f},{c1:.2f})':"
+        f"y='3+3*sin(2*PI*15*t)*between(t,{c0:.2f},{c1:.2f})',scale={cfg.tw}:{cfg.th}[g1]")
+    # quick white flash at the kill
+    parts.append(f"[g1]drawbox=x=0:y=0:w=iw:h=ih:color=white@0.6:t=fill:"
+                 f"enable='between(t,{climax_rel:.2f},{climax_rel + 0.05:.2f})'[g2]")
+    if text and font:
+        parts.append(f"[g2]drawtext=fontfile='{_esc_path(font)}':text='{text}':"
+                     f"fontcolor=white:fontsize=86:borderw=7:bordercolor=black@0.9:"
+                     f"x=(w-text_w)/2:y=h*0.10:enable='between(t,{climax_rel - 0.05:.2f},{climax_rel + 1.5:.2f})'[{out_lbl}]")
+    else:
+        parts.append(f"[g2]null[{out_lbl}]")
+    return ";".join(parts)
+
+
+def _render_fight(source: Path, ep: dict, cfg: MontageConfig, out: Path,
+                  is_finale: bool, text: str | None) -> bool:
+    """One full fight (engagement->kill->resolution). Finale gets slow-mo on the
+    ~0.6s leading into the kill (2-segment concat) for the clutch payoff."""
+    font = _find_font(cfg_opts())
+    total = _ffprobe_duration(source)
+    start = max(0.0, ep["start"]); end = min(ep["end"], total)
+    climax = ep["climax_t"]
+    vchain = build_video_chain(cfg.reframe, cfg.tw, cfg.th, 0.5)
+
+    if not is_finale:
+        climax_rel = (climax - start) / cfg.speed
+        fc = (f"{vchain};{_fx_chain('vr', 'vout', cfg, climax_rel, text, font)};"
+              f"[0:a]atempo={cfg.speed},afade=t=in:st=0:d=0.02[aout]")
+        cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+               "-ss", f"{start:.3f}", "-t", f"{end - start:.3f}", "-i", str(source),
+               "-filter_complex", fc, "-map", "[vout]", "-map", "[aout]",
+               "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+               "-r", str(cfg.fps), "-c:a", "aac", "-ar", "48000", str(out)]
+        return subprocess.run(cmd, capture_output=True, text=True).returncode == 0
+
+    # FINALE: slow-mo the pre-kill window, then apply fx on the assembled clip.
+    sm_start = max(start, climax - 0.5)
+    slow = 0.55
+    tmp = out.parent
+    raw = tmp / (out.stem + "_raw.mp4")
+    # one filtergraph: normal head + slowed tail, concat (video+audio)
+    fc = (f"[0:v]trim={start:.3f}:{sm_start:.3f},setpts=PTS-STARTPTS[v0];"
+          f"[0:v]trim={sm_start:.3f}:{end:.3f},setpts=(PTS-STARTPTS)/{slow}[v1];"
+          f"[0:a]atrim={start:.3f}:{sm_start:.3f},asetpts=PTS-STARTPTS[a0];"
+          f"[0:a]atrim={sm_start:.3f}:{end:.3f},asetpts=PTS-STARTPTS,atempo={slow}[a1];"
+          f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[vc][ac]")
+    r1 = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(source),
+                         "-filter_complex", fc, "-map", "[vc]", "-map", "[ac]",
+                         "-c:v", "libx264", "-crf", "20", "-preset", "veryfast",
+                         "-pix_fmt", "yuv420p", "-r", str(cfg.fps), "-c:a", "aac", "-ar", "48000",
+                         str(raw)], capture_output=True, text=True)
+    if r1.returncode != 0:
+        return False
+    # kill now sits at: (sm_start-start) + 0.5/slow
+    climax_rel = (sm_start - start) + 0.5 / slow
+    fc2 = f"{vchain.replace('[0:v]', '[0:v]')};{_fx_chain('vr', 'vout', cfg, climax_rel, text, font)}"
+    r2 = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(raw),
+                         "-filter_complex", fc2, "-map", "[vout]", "-map", "0:a",
+                         "-c:v", "libx264", "-crf", "20", "-preset", "veryfast",
+                         "-pix_fmt", "yuv420p", "-r", str(cfg.fps), "-c:a", "aac", "-ar", "48000",
+                         str(out)], capture_output=True, text=True)
+    return r2.returncode == 0
+
+
+def _render_coldopen(source: Path, ep: dict, cfg: MontageConfig, out: Path, text: str) -> bool:
+    """~2.5s slow-mo teaser of the finale kill + flash + text."""
+    font = _find_font(cfg_opts())
+    total = _ffprobe_duration(source)
+    climax = ep["climax_t"]
+    start = max(0.0, climax - 1.4); end = min(total, climax + 0.6)
+    vchain = build_video_chain(cfg.reframe, cfg.tw, cfg.th, 0.5)
+    climax_rel = (climax - start) / 0.6                       # after 0.6x slow
+    tx = (f"[g2]drawtext=fontfile='{_esc_path(font)}':text='{text}':fontcolor=white:fontsize=78:"
+          f"borderw=7:bordercolor=black@0.9:x=(w-text_w)/2:y=h*0.10[vout]") if font else "[g2]null[vout]"
+    fc = (f"{vchain};[vr]setpts=PTS/0.6,{GRADE_PUNCH}[g0];"
+          f"[g0]drawbox=x=0:y=0:w=iw:h=ih:color=white@0.7:t=fill:enable='lt(t,0.06)'[g2];{tx};"
+          f"[0:a]atempo=0.6,volume=0.6[aout]")
+    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+           "-ss", f"{start:.3f}", "-t", f"{end - start:.3f}", "-i", str(source),
+           "-filter_complex", fc, "-map", "[vout]", "-map", "[aout]",
+           "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+           "-r", str(cfg.fps), "-c:a", "aac", "-ar", "48000", str(out)]
+    return subprocess.run(cmd, capture_output=True, text=True).returncode == 0
+
+
+def cfg_opts() -> ShortOptions:
+    return ShortOptions()
+
+
+def render_highlight_60s(source: str | Path, music: str | Path, out: str | Path,
+                         target_s: float = 60.0, cfg: MontageConfig | None = None,
+                         kill_text: str = "KILL", finale_text: str = "GG") -> dict:
+    cfg = cfg or MontageConfig(speed=1.0)
+    source, music, out = Path(source), Path(music), Path(out)
+    if not source.exists() or not music.exists():
+        return {"ok": False, "info": "source or music not found"}
+    coldopen_s = 2.5
+    finale, mids = select_highlight_shots(source, target_s, coldopen_s, cfg.speed)
+    if finale is None:
+        return {"ok": False, "info": "no fights detected"}
+
+    tmp = Path(tempfile.mkdtemp(prefix="scos_hl60_"))
+    parts: list[Path] = []
+    # 1) cold-open teaser of the finale kill
+    co = tmp / "coldopen.mp4"
+    if not _render_coldopen(source, finale, cfg, co, "ดูจังหวะนี้"):
+        return {"ok": False, "info": "cold-open failed", "tmp": str(tmp)}
+    parts.append(co)
+    # 2) mid fights (chronological)
+    for i, ep in enumerate(mids):
+        f = tmp / f"fight_{i}.mp4"
+        if not _render_fight(source, ep, cfg, f, is_finale=False, text=kill_text):
+            return {"ok": False, "info": f"fight {i} failed", "tmp": str(tmp)}
+        parts.append(f)
+    # 3) finale (full, slow-mo into kill)
+    fin = tmp / "finale.mp4"
+    if not _render_fight(source, finale, cfg, fin, is_finale=True, text=finale_text):
+        return {"ok": False, "info": "finale failed", "tmp": str(tmp)}
+    parts.append(fin)
+
+    # concat all
+    listf = tmp / "list.txt"
+    listf.write_text("".join(f"file '{p.as_posix()}'\n" for p in parts), encoding="utf-8")
+    base = tmp / "base.mp4"
+    if subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "concat",
+                       "-safe", "0", "-i", str(listf), "-c", "copy", str(base)],
+                      capture_output=True, text=True).returncode != 0:
+        inp = []
+        for p in parts:
+            inp += ["-i", str(p)]
+        n = len(parts)
+        fc = "".join(f"[{i}:v][{i}:a]" for i in range(n)) + f"concat=n={n}:v=1:a=1[v][a]"
+        subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *inp,
+                        "-filter_complex", fc, "-map", "[v]", "-map", "[a]",
+                        "-c:v", "libx264", "-crf", "20", "-preset", "veryfast",
+                        "-pix_fmt", "yuv420p", "-c:a", "aac", str(base)], capture_output=True, text=True)
+
+    total = _ffprobe_duration(base)
+    # music: align so the DROP lands on the finale kill; game 0.5 under music
+    drop = _music_drop(music)
+    fin_dur = _ffprobe_duration(parts[-1])
+    fin_kill_in_montage = total - fin_dur + ((finale["climax_t"] - finale["start"]) / cfg.speed)
+    m_start = max(0.0, drop - fin_kill_in_montage)
+    fade_out = max(0.0, total - 0.5)
+    amix = (f"[0:a]volume={cfg.game_volume}[g];"
+            f"[1:a]volume={cfg.music_volume},afade=t=out:st={fade_out:.3f}:d=0.5[m];"
+            f"[g][m]amix=inputs=2:duration=first:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11[aout]")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    r = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                        "-i", str(base), "-ss", f"{m_start:.3f}", "-t", f"{total:.3f}", "-i", str(music),
+                        "-filter_complex", amix, "-map", "0:v", "-map", "[aout]",
+                        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out)],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        return {"ok": False, "info": f"final mix failed: {r.stderr.strip()[-300:]}", "tmp": str(tmp)}
+    return {"ok": True, "out": str(out), "total_s": round(total, 2), "mid_fights": len(mids),
+            "finale_climax": finale["climax_t"], "music_drop_s": round(drop, 2),
+            "music_start_s": round(m_start, 2), "tmp": str(tmp)}
+
+
 def main() -> int:
     os.environ.setdefault("PYTHONUTF8", "1")
-    ap = argparse.ArgumentParser(description="WF-2 Music Montage")
+    ap = argparse.ArgumentParser(description="WF-2 Music Montage / Highlight Director")
     ap.add_argument("--video", required=True)
     ap.add_argument("--music", required=True)
     ap.add_argument("--out", default="work/video/montage_hgb_v1.mp4")
+    ap.add_argument("--mode", choices=["montage", "director"], default="montage")
+    ap.add_argument("--target", type=float, default=60.0)
     ap.add_argument("--shots", type=int, default=4)
     ap.add_argument("--speed", type=float, default=1.0)
     ap.add_argument("--game-volume", type=float, default=0.5)
     a = ap.parse_args()
     cfg = MontageConfig(n_shots=a.shots, speed=a.speed, game_volume=a.game_volume)
-    res = render_montage(a.video, a.music, a.out, cfg)
+    if a.mode == "director":
+        res = render_highlight_60s(a.video, a.music, a.out, a.target, cfg)
+    else:
+        res = render_montage(a.video, a.music, a.out, cfg)
     print(json.dumps({k: v for k, v in res.items() if k != "tmp"}, ensure_ascii=False, indent=2))
     return 0 if res.get("ok") else 1
 
