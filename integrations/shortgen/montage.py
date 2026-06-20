@@ -32,7 +32,8 @@ _HERE = Path(__file__).resolve().parent
 import sys
 sys.path.insert(0, str(_HERE))
 sys.path.insert(0, str(_HERE.parent / "highlight"))
-from short_generator import build_video_chain, _find_font, _esc_path, ShortOptions  # noqa: E402
+from short_generator import (build_video_chain, _find_font, _esc_path, ShortOptions,  # noqa: E402
+                             action_center_frac)
 from narrative_engine import detect_episodes, NarrativeConfig  # noqa: E402
 from highlight_engine import HighlightConfig, extract_audio_energy, onset, _ffprobe_duration  # noqa: E402
 
@@ -237,26 +238,34 @@ def _music_drop(music: Path) -> float:
 
 
 def select_highlight_shots(source: Path, target_s: float, coldopen_s: float,
-                           speed: float) -> tuple[dict | None, list[dict]]:
-    """finale = best-arc fight (shown last + teased at the open); mids = other top
-    non-overlapping fights, chronological, filling the time budget."""
+                           window_s: float) -> tuple[dict | None, list[dict]]:
+    """finale = best-arc COMBAT moment (teased at open, shown last). mids = other top
+    combat moments whose climaxes are >= window_s apart (zoomed windows don't repeat)."""
     eps = detect_episodes(source, NarrativeConfig())
     if not eps:
         return None, []
     finale = max(eps, key=lambda e: (e["arc_score"], e["climax_t"]))
-    chosen: list[dict] = []
-    used = [finale]
-    fin_dur = (finale["end"] - finale["start"]) / speed
+    n_needed = max(2, int((target_s - coldopen_s) / window_s))
+    chosen = [finale]
     for e in sorted(eps, key=lambda x: -x["arc_score"]):
         if e is finale:
             continue
-        if any(not (e["end"] <= u["start"] or e["start"] >= u["end"]) for u in used):
-            continue
-        used.append(e); chosen.append(e)
-        tot = coldopen_s + fin_dur + sum((c["end"] - c["start"]) / speed for c in chosen)
-        if tot >= target_s:
+        if all(abs(e["climax_t"] - c["climax_t"]) >= window_s for c in chosen):
+            chosen.append(e)
+        if len(chosen) >= n_needed:
             break
-    return finale, sorted(chosen, key=lambda x: x["climax_t"])
+    mids = sorted([c for c in chosen if c is not finale], key=lambda x: x["climax_t"])
+    return finale, mids
+
+
+def _zoom_chain(frac: float, tw: int, th: int, bottom_cut: float = 0.11) -> str:
+    """ZOOM into the action: crop a 9:16 strip from the source (excluding the bottom
+    replay-scrubber strip), centered on the motion `frac`, then upscale + light sharpen.
+    Makes the combat BIG and removes the replay UI."""
+    keep = 1.0 - bottom_cut
+    return (f"[0:v]crop=w='ih*{keep:.3f}*9/16':h='ih*{keep:.3f}':"
+            f"x='(iw-ih*{keep:.3f}*9/16)*{frac:.4f}':y=0,"
+            f"scale={tw}:{th},unsharp=5:5:0.7,setsar=1[vr]")
 
 
 def _fx_chain(in_lbl: str, out_lbl: str, cfg: MontageConfig, climax_rel: float,
@@ -283,19 +292,20 @@ def _fx_chain(in_lbl: str, out_lbl: str, cfg: MontageConfig, climax_rel: float,
 
 
 def _render_fight(source: Path, ep: dict, cfg: MontageConfig, out: Path,
-                  is_finale: bool, text: str | None) -> bool:
-    """One full fight (engagement->kill->resolution). Finale gets slow-mo on the
-    ~0.6s leading into the kill (2-segment concat) for the clutch payoff."""
-    font = _find_font(cfg_opts())
+                  is_finale: bool, text: str | None, pre: float = 4.5, post: float = 1.5) -> bool:
+    """One COMBAT shot: the action window around the kill, ZOOMED into the fight (replay
+    bar cropped out). Finale gets slow-mo into the kill."""
+    font = _thai_font()
     total = _ffprobe_duration(source)
-    start = max(0.0, ep["start"]); end = min(ep["end"], total)
     climax = ep["climax_t"]
-    vchain = build_video_chain(cfg.reframe, cfg.tw, cfg.th, 0.5)
+    start = max(0.0, climax - pre); end = min(total, climax + post)
+    frac = action_center_frac(source, start, end - start)
+    zc = _zoom_chain(frac, cfg.tw, cfg.th)
 
     if not is_finale:
-        climax_rel = (climax - start) / cfg.speed
-        fc = (f"{vchain};{_fx_chain('vr', 'vout', cfg, climax_rel, text, font)};"
-              f"[0:a]atempo={cfg.speed},afade=t=in:st=0:d=0.02[aout]")
+        climax_rel = climax - start
+        fc = (f"{zc};{_fx_chain('vr', 'vout', cfg, climax_rel, text, font)};"
+              f"[0:a]afade=t=in:st=0:d=0.02[aout]")
         cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
                "-ss", f"{start:.3f}", "-t", f"{end - start:.3f}", "-i", str(source),
                "-filter_complex", fc, "-map", "[vout]", "-map", "[aout]",
@@ -303,50 +313,50 @@ def _render_fight(source: Path, ep: dict, cfg: MontageConfig, out: Path,
                "-r", str(cfg.fps), "-c:a", "aac", "-ar", "48000", str(out)]
         return subprocess.run(cmd, capture_output=True, text=True).returncode == 0
 
-    # FINALE: slow-mo the pre-kill window, then apply fx on the assembled clip.
-    sm_start = max(start, climax - 0.5)
-    slow = 0.55
-    tmp = out.parent
-    raw = tmp / (out.stem + "_raw.mp4")
-    # one filtergraph: normal head + slowed tail, concat (video+audio)
-    fc = (f"[0:v]trim={start:.3f}:{sm_start:.3f},setpts=PTS-STARTPTS[v0];"
-          f"[0:v]trim={sm_start:.3f}:{end:.3f},setpts=(PTS-STARTPTS)/{slow}[v1];"
-          f"[0:a]atrim={start:.3f}:{sm_start:.3f},asetpts=PTS-STARTPTS[a0];"
-          f"[0:a]atrim={sm_start:.3f}:{end:.3f},asetpts=PTS-STARTPTS,atempo={slow}[a1];"
-          f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[vc][ac]")
-    r1 = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(source),
-                         "-filter_complex", fc, "-map", "[vc]", "-map", "[ac]",
-                         "-c:v", "libx264", "-crf", "20", "-preset", "veryfast",
-                         "-pix_fmt", "yuv420p", "-r", str(cfg.fps), "-c:a", "aac", "-ar", "48000",
-                         str(raw)], capture_output=True, text=True)
-    if r1.returncode != 0:
+    # FINALE: slow-mo into the kill, then zoom+fx on the assembled clip
+    sm = max(start, climax - 0.5); slow = 0.6
+    raw = out.parent / (out.stem + "_raw.mp4")
+    fcr = (f"[0:v]trim={start:.3f}:{sm:.3f},setpts=PTS-STARTPTS[v0];"
+           f"[0:v]trim={sm:.3f}:{end:.3f},setpts=(PTS-STARTPTS)/{slow}[v1];"
+           f"[0:a]atrim={start:.3f}:{sm:.3f},asetpts=PTS-STARTPTS[a0];"
+           f"[0:a]atrim={sm:.3f}:{end:.3f},asetpts=PTS-STARTPTS,atempo={slow}[a1];"
+           f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[vc][ac]")
+    if subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(source),
+                       "-filter_complex", fcr, "-map", "[vc]", "-map", "[ac]",
+                       "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+                       "-r", str(cfg.fps), "-c:a", "aac", "-ar", "48000", str(raw)],
+                      capture_output=True, text=True).returncode != 0:
         return False
-    # kill now sits at: (sm_start-start) + 0.5/slow
-    climax_rel = (sm_start - start) + 0.5 / slow
-    fc2 = f"{vchain.replace('[0:v]', '[0:v]')};{_fx_chain('vr', 'vout', cfg, climax_rel, text, font)}"
-    r2 = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(raw),
-                         "-filter_complex", fc2, "-map", "[vout]", "-map", "0:a",
-                         "-c:v", "libx264", "-crf", "20", "-preset", "veryfast",
-                         "-pix_fmt", "yuv420p", "-r", str(cfg.fps), "-c:a", "aac", "-ar", "48000",
-                         str(out)], capture_output=True, text=True)
-    return r2.returncode == 0
+    climax_rel = (sm - start) + 0.5 / slow
+    fc2 = f"{zc};{_fx_chain('vr', 'vout', cfg, climax_rel, text, font)}"
+    return subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(raw),
+                           "-filter_complex", fc2, "-map", "[vout]", "-map", "0:a",
+                           "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+                           "-r", str(cfg.fps), "-c:a", "aac", "-ar", "48000", str(out)],
+                          capture_output=True, text=True).returncode == 0
 
 
 def _render_coldopen(source: Path, ep: dict, cfg: MontageConfig, out: Path, text: str) -> bool:
-    """~2.5s slow-mo teaser of the finale kill + flash + text."""
-    font = _find_font(cfg_opts())
+    """Cold-open: ZOOM into the finale kill, play it, then FREEZE on the win frame and
+    pop a cheeky caption ('ฟอนต์ข้อความกวนๆ')."""
+    font = _thai_font()
     total = _ffprobe_duration(source)
     climax = ep["climax_t"]
-    start = max(0.0, climax - 1.4); end = min(total, climax + 0.6)
-    vchain = build_video_chain(cfg.reframe, cfg.tw, cfg.th, 0.5)
-    climax_rel = (climax - start) / 0.6                       # after 0.6x slow
-    tx = (f"[g2]drawtext=fontfile='{_esc_path(font)}':text='{text}':fontcolor=white:fontsize=78:"
-          f"borderw=7:bordercolor=black@0.9:x=(w-text_w)/2:y=h*0.10[vout]") if font else "[g2]null[vout]"
-    fc = (f"{vchain};[vr]setpts=PTS/0.6,{GRADE_PUNCH}[g0];"
-          f"[g0]drawbox=x=0:y=0:w=iw:h=ih:color=white@0.7:t=fill:enable='lt(t,0.06)'[g2];{tx};"
-          f"[0:a]atempo=0.6,volume=0.6[aout]")
+    start = max(0.0, climax - 1.7); end = min(total, climax + 0.4)
+    dur = end - start
+    frac = action_center_frac(source, start, dur)
+    zc = _zoom_chain(frac, cfg.tw, cfg.th)
+    kill_rel = climax - start
+    freeze = 1.4
+    tx = (f",drawtext=fontfile='{_esc_path(font)}':text='{text}':fontcolor=white:fontsize=98:"
+          f"borderw=10:bordercolor=black:x=(w-text_w)/2:y=h*0.13:"
+          f"enable='gte(t,{dur + 0.05:.2f})'") if font else ""
+    fc = (f"{zc};[vr]{GRADE_PUNCH},"
+          f"drawbox=w=iw:h=ih:color=white@0.6:t=fill:enable='between(t,{kill_rel:.2f},{kill_rel + 0.05:.2f})',"
+          f"tpad=stop_mode=clone:stop_duration={freeze}{tx}[vout];"
+          f"[0:a]afade=t=out:st={max(0.0, dur - 0.1):.2f}:d=0.1,apad=pad_dur={freeze}[aout]")
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-           "-ss", f"{start:.3f}", "-t", f"{end - start:.3f}", "-i", str(source),
+           "-ss", f"{start:.3f}", "-t", f"{dur:.3f}", "-i", str(source),
            "-filter_complex", fc, "-map", "[vout]", "-map", "[aout]",
            "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p",
            "-r", str(cfg.fps), "-c:a", "aac", "-ar", "48000", str(out)]
@@ -357,15 +367,29 @@ def cfg_opts() -> ShortOptions:
     return ShortOptions()
 
 
+# Thai-capable fonts (Arial has no Thai glyphs -> tofu boxes). Tahoma ships with Windows.
+THAI_FONTS = ["C:/Windows/Fonts/tahomabd.ttf", "C:/Windows/Fonts/tahoma.ttf",
+              "C:/Windows/Fonts/leelawadeebold.ttf", "C:/Windows/Fonts/LeelaUIb.ttf",
+              "C:/Windows/Fonts/Leelawadee.ttf", "C:/Windows/Fonts/angsab.ttf"]
+
+
+def _thai_font() -> str | None:
+    for f in THAI_FONTS:
+        if Path(f).exists():
+            return f
+    return _find_font(cfg_opts())
+
+
 def render_highlight_60s(source: str | Path, music: str | Path, out: str | Path,
-                         target_s: float = 60.0, cfg: MontageConfig | None = None,
-                         kill_text: str = "KILL", finale_text: str = "GG") -> dict:
+                         target_s: float = 56.0, cfg: MontageConfig | None = None,
+                         kill_text: str = "เอาอยู่!", finale_text: str = "จบเกม",
+                         coldopen_text: str = "ง่ายไป๊", window_s: float = 6.0) -> dict:
     cfg = cfg or MontageConfig(speed=1.0)
     source, music, out = Path(source), Path(music), Path(out)
     if not source.exists() or not music.exists():
         return {"ok": False, "info": "source or music not found"}
-    coldopen_s = 2.5
-    finale, mids = select_highlight_shots(source, target_s, coldopen_s, cfg.speed)
+    coldopen_s = 3.5
+    finale, mids = select_highlight_shots(source, target_s, coldopen_s, window_s)
     if finale is None:
         return {"ok": False, "info": "no fights detected"}
 
@@ -373,7 +397,7 @@ def render_highlight_60s(source: str | Path, music: str | Path, out: str | Path,
     parts: list[Path] = []
     # 1) cold-open teaser of the finale kill
     co = tmp / "coldopen.mp4"
-    if not _render_coldopen(source, finale, cfg, co, "ดูจังหวะนี้"):
+    if not _render_coldopen(source, finale, cfg, co, coldopen_text):
         return {"ok": False, "info": "cold-open failed", "tmp": str(tmp)}
     parts.append(co)
     # 2) mid fights (chronological)
@@ -408,8 +432,7 @@ def render_highlight_60s(source: str | Path, music: str | Path, out: str | Path,
     total = _ffprobe_duration(base)
     # music: align so the DROP lands on the finale kill; game 0.5 under music
     drop = _music_drop(music)
-    fin_dur = _ffprobe_duration(parts[-1])
-    fin_kill_in_montage = total - fin_dur + ((finale["climax_t"] - finale["start"]) / cfg.speed)
+    fin_kill_in_montage = max(0.0, total - 2.0)               # finale kill ~2s before the end
     m_start = max(0.0, drop - fin_kill_in_montage)
     fade_out = max(0.0, total - 0.5)
     amix = (f"[0:a]volume={cfg.game_volume}[g];"
