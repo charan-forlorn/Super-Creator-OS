@@ -26,4 +26,17 @@ Coordinate storytelling, editing, QA, and distribution skills.
   - `notes` → อ่านก่อนเสมอ: บอกว่าเป็น exact / near / cold-start และให้ "adapt, don't copy" เมื่อเป็น near-niche
 
   Bridge นี้ emit events `BRIEF_RECEIVED → REFERENCE_MATCHED → HOOKS_RECOMMENDED → CREATIVE_SEED_READY` ลง Event Bus เพื่อให้ Skill อนาคต (Video Analyst / Pattern Discovery) subscribe ได้โดยไม่ต้องแก้ loop
-- STEP 15 (WRITE / บันทึกความจำใหม่): เมื่อจบงาน (หลัง Archive) ระบบต้อง Extract ข้อมูลโปรเจกต์ปัจจุบันให้ครบทุก Field ตามโครงสร้างใน `memory/schema.md` แล้วต่อท้าย (Append) Object นั้นลงใน Array ของ `memory/database.json` เสมอ ด้วยขั้นตอน: อ่าน Array เดิม → push record ใหม่ → เขียนกลับทั้งไฟล์ (ห้ามเขียนทับข้อมูลเดิม)
+- STEP 15 (WRITE / บันทึกความจำใหม่): เมื่อจบงาน (หลัง Archive) ต้องบันทึก 1 record ต่อ 1 โปรเจกต์ลง `memory/database.json` แบบ **append-only เสมอ** โดย **ห้ามแก้ไฟล์ด้วยมือ / ห้ามเขียนทับทั้งไฟล์เอง** — ให้เขียนผ่าน "the only safe path" ที่มีอยู่แล้วเท่านั้น (มันทำ validate → backup → atomic write → append-only post-condition → duplicate guard ให้ครบ กัน DB พัง/เขียนครึ่งทาง):
+
+  - **ทางหลัก (engine path, แนะนำ):** รัน learning loop controller — มันสร้าง record (v1 + v2 fields อัตโนมัติ), ผ่าน QA gate, archive, อัปเดต anchor library และ emit events ให้เสร็จในตัว:
+    ```bash
+    python integrations/learning/learning_manager.py \
+        --edl work/edit/edl.json --render work/edit/final.mp4 \
+        --transcripts-dir work/edit/transcripts \
+        --project-name "<name>" --product-niche "<niche>" \
+        --qa-pass true --retention-score <0-100>
+    ```
+    (มี `--dry-run` ไว้ preview record ก่อนเขียนจริงได้)
+  - **ทางรอง (สร้าง record เอง):** ถ้าจำเป็นต้องประกอบ record เอง ให้เขียนผ่าน `integrations/learning/memory_writer.py` → `safe_append(record, db_path)` เท่านั้น **ห้าม** `json.dump` ทับ `database.json` ตรง ๆ
+  - **โครงสร้าง record:** v1 ตาม `memory/schema.md` (required) + v2 optional ตาม `memory/schema_v2_extension.md` (clip_type / highlight_anchors / retention_signals / render_specs ฯลฯ — จำเป็นต่อ forward loop ใน STEP 1.5 ให้ใส่เมื่อมีข้อมูล)
+  - คงสัญญาเดิมทุกประการ: append เท่านั้น, ไม่แตะ record เก่า, 1 โปรเจกต์ = 1 object

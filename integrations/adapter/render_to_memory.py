@@ -362,34 +362,22 @@ def main() -> int:
         return 0
 
     db_path = Path(args.db)
-    db = _load_json(db_path) if db_path.exists() else []
-    db_errs = validate_db(db)
-    if db_errs:
-        print("EXISTING DB INVALID — refusing to write:", *db_errs, sep="\n  ", file=sys.stderr)
+
+    # WRITE GUARD: route the actual disk write through the single approved safe
+    # path (memory_writer.safe_append). This legacy CLI must NOT write
+    # database.json directly — safe_append owns backup, dup-guard, append-only,
+    # atomic replace, and the tamper-evident integrity marker. Lazy import keeps
+    # this CLI-time only, so learning_manager's module-level reuse stays cycle-free.
+    _LEARN = Path(__file__).resolve().parents[1] / "learning"
+    if str(_LEARN) not in sys.path:
+        sys.path.insert(0, str(_LEARN))
+    from memory_writer import safe_append
+
+    ok, info = safe_append(rec, db_path)
+    if not ok:
+        print(f"WRITE BLOCKED / NOT WRITTEN — {info}", file=sys.stderr)
         return 4
-
-    # Guard: never duplicate an identical (project_name, created_at) record
-    if any(r.get("project_name") == rec["project_name"] and r.get("created_at") == rec["created_at"] for r in db):
-        print("WARN: a record with same project_name + created_at exists; aborting to avoid dup.", file=sys.stderr)
-        return 5
-
-    # Backup before write (rollback safety)
-    backup_dir = db_path.parent / "_db_backups"
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup = backup_dir / f"database.{stamp}.json"
-    if db_path.exists():
-        shutil.copy2(db_path, backup)
-
-    new_db = db + [rec]                      # APPEND ONLY — never mutate existing
-    # Post-condition check: every old record must survive byte-for-byte
-    if new_db[:len(db)] != db:
-        print("ABORT: append would alter existing records.", file=sys.stderr)
-        return 6
-
-    atomic_write_json(db_path, new_db)
-    print(f"\nAPPENDED record #{len(new_db)} to {db_path}")
-    print(f"backup: {backup}")
+    print(f"\n{info}")
     print(f"clip_type={rec['clip_type']} render_success={rec['render_success']} anchors={len(rec['highlight_anchors'])}")
     return 0
 
