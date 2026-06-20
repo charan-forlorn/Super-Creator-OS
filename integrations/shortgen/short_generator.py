@@ -153,10 +153,26 @@ def build_hook(label_in: str, label_out: str, hook: str, secs: float,
 # ---------------------------------------------------------------------------
 # render
 # ---------------------------------------------------------------------------
+def render_story_short(video, episode: dict, out, opts: ShortOptions | None = None, *,
+                       anticipation: str = "WAIT FOR IT", payoff: str = "DOUBLE KILL") -> dict:
+    """WF-1 v2 path: render a NARRATIVE episode with an anticipation hook over the
+    buildup and a payoff callout timed to the climax (climax_offset)."""
+    opts = opts or ShortOptions()
+    co = float(episode.get("climax_offset", max(0.0, episode["climax_t"] - episode["start"])))
+    hook_events = [
+        {"text": anticipation, "start": 0.0, "end": max(2.0, co - 0.4), "fontsize": 66},
+        {"text": payoff, "start": max(0.0, co - 0.2), "end": co + 2.4, "fontsize": 88},
+    ]
+    cand = {"start": episode["start"], "end": episode["end"]}
+    return render_short(video, cand, out, opts, hook_events=hook_events)
+
+
 def render_short(video: str | Path, candidate: dict, out: str | Path,
-                 opts: ShortOptions | None = None) -> dict:
+                 opts: ShortOptions | None = None, *, hook_events: list[dict] | None = None) -> dict:
     """Render one candidate to a vertical short. Returns
-    {ok, out, render_seconds, clip_seconds, reframe, hook_applied, info}."""
+    {ok, out, render_seconds, clip_seconds, reframe, hook_applied, info}.
+    hook_events (optional): timed overlays [{text,start,end,fontsize?}] — used by the
+    v2 story path; falls back to the single opts.hook when not provided."""
     opts = opts or ShortOptions()
     video, out = Path(video), Path(out)
     if not video.exists():
@@ -174,11 +190,22 @@ def render_short(video: str | Path, candidate: dict, out: str | Path,
 
     font = _find_font(opts)
     hook_applied = False
-    tmptxt = Path(tempfile.gettempdir()) / f"_scos_hook_{os.getpid()}.txt"
+    tmp_txts: list[Path] = []
     last = "vr"
-    if opts.hook and font:
-        chain += ";" + build_hook("vr", "vout", opts.hook, opts.hook_seconds, font, tmptxt)
-        last = "vout"
+    events = hook_events
+    if events is None and opts.hook:
+        events = [{"text": opts.hook, "start": 0.0, "end": opts.hook_seconds}]
+    if events and font:
+        for k, ev in enumerate(events):
+            tf = Path(tempfile.gettempdir()) / f"_scos_hook_{os.getpid()}_{k}.txt"
+            tf.write_text(str(ev["text"]), encoding="utf-8")
+            tmp_txts.append(tf)
+            out_lbl = "vout" if k == len(events) - 1 else f"vh{k}"
+            chain += (f";[{last}]drawtext=fontfile='{_esc_path(font)}':"
+                      f"textfile='{_esc_path(str(tf))}':fontcolor=white:fontsize={ev.get('fontsize', 72)}:"
+                      f"borderw=6:bordercolor=black@0.9:x=(w-text_w)/2:y={ev.get('y', 'h*0.10')}:"
+                      f"enable='between(t,{ev['start']},{ev['end']})'[{out_lbl}]")
+            last = out_lbl
         hook_applied = True
 
     fc = chain
@@ -198,15 +225,15 @@ def render_short(video: str | Path, candidate: dict, out: str | Path,
     t0 = time.perf_counter()
     p = subprocess.run(cmd, capture_output=True, text=True)
     elapsed = time.perf_counter() - t0
-    if tmptxt.exists():
-        try: tmptxt.unlink()
+    for tf in tmp_txts:
+        try: tf.unlink()
         except OSError: pass
 
     if p.returncode != 0:
-        # graceful degradation: retry once without the hook overlay
+        # graceful degradation: retry once without any hook overlay
         if hook_applied:
             opts2 = ShortOptions(**{**opts.__dict__, "hook": None})
-            return render_short(video, candidate, out, opts2)
+            return render_short(video, candidate, out, opts2, hook_events=None)
         return {"ok": False, "info": f"ffmpeg failed: {p.stderr.strip()[-300:]}",
                 "render_seconds": round(elapsed, 2)}
 
