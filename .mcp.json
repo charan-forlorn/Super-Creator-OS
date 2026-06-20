@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "scos-video": {
+      "command": "python",
+      "args": ["integrations/mcp/scos_video_mcp.py"],
+      "env": {}
+    }
+  }
+}
