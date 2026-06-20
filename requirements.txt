@@ -1,0 +1,21 @@
+# Super Creator OS — root dependency manifest (H1 · Batch 2)
+# Minimal pinned deps to reproduce the EXECUTION LAYER (the local MCP server).
+#
+# The learning layer (integrations/learning, integrations/adapter) is stdlib-only
+# and requires NOTHING here. The video-use engine declares its own deps in
+# integrations/video-use/engine/pyproject.toml (kept separate).
+#
+# Tested on: CPython 3.11.15 (Windows).
+#
+# SYSTEM PREREQUISITE (not pip-installable): ffmpeg + ffprobe must be on PATH.
+#   e.g.  winget install Gyan.FFmpeg      (validated with ffmpeg 8.1.1)
+
+# --- core: local MCP server (integrations/mcp/scos_video_mcp.py) ---
+mcp==1.26.0
+numpy==2.4.3
+
+# --- optional: work/uigen UI-edit generators (HEAVY; not part of the core loop) ---
+# Uncomment to run the fake-UI lyric / B-roll / music tooling. openai-whisper
+# pulls in torch (large download). Tested versions:
+#   Pillow==12.2.0
+#   openai-whisper==20250625
