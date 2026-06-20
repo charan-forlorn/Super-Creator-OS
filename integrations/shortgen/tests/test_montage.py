@@ -32,7 +32,7 @@ def test_config():
     print("\n[1] config defaults match the approved plan")
     c = MG.MontageConfig()
     check("4 shots", c.n_shots == 4)
-    check("speed 1.2x (video only)", c.speed == 1.2)
+    check("speed 1.0x (full detail, no skipping)", c.speed == 1.0)
     check("game volume 0.5 (reduced 50%)", c.game_volume == 0.5)
     check("fit reframe", c.reframe == "fit")
 
