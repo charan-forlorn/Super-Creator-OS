@@ -42,7 +42,7 @@ GRADE_PUNCH = "eq=contrast=1.12:saturation=1.28:brightness=0.01"
 @dataclass
 class MontageConfig:
     n_shots: int = 4
-    speed: float = 1.2              # video sped up; music untouched
+    speed: float = 1.0              # 1.0 = full detail, no skipping; music untouched
     target_shot_s: float = 3.3      # snapped to a beat multiple
     game_volume: float = 0.5        # "เบาเสียงเกมลง 50%"
     music_volume: float = 1.0
@@ -227,7 +227,7 @@ def main() -> int:
     ap.add_argument("--music", required=True)
     ap.add_argument("--out", default="work/video/montage_hgb_v1.mp4")
     ap.add_argument("--shots", type=int, default=4)
-    ap.add_argument("--speed", type=float, default=1.2)
+    ap.add_argument("--speed", type=float, default=1.0)
     ap.add_argument("--game-volume", type=float, default=0.5)
     a = ap.parse_args()
     cfg = MontageConfig(n_shots=a.shots, speed=a.speed, game_volume=a.game_volume)
