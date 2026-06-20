@@ -112,15 +112,20 @@ def analyze_music(music: Path, want_s: float) -> tuple[float, float]:
 # ---------------------------------------------------------------------------
 # 3. per-shot render
 # ---------------------------------------------------------------------------
-def _render_shot(source: Path, climax_t: float, out_dur: float, cfg: MontageConfig,
+def _render_shot(source: Path, src_start: float, src_end: float, cfg: MontageConfig,
                  out: Path, is_finale: bool) -> bool:
-    src_dur = out_dur * cfg.speed
-    src_dur_total = _ffprobe_duration(source)
-    start = max(0.0, min(climax_t - src_dur * 0.75, src_dur_total - src_dur))
+    """Render ONE full-fight shot: the whole episode span (engagement -> kill ->
+    brief resolution), sped up. Showing the full fight is what builds the
+    win-or-lose suspense the viewer wants."""
+    total = _ffprobe_duration(source)
+    start = max(0.0, src_start)
+    src_dur = max(0.5, min(src_end, total) - start)
+    out_dur = src_dur / cfg.speed
     vchain = build_video_chain(cfg.reframe, cfg.tw, cfg.th, 0.5)   # ...[vr]
     post = f"setpts=PTS/{cfg.speed},{GRADE_PUNCH}"
     if is_finale:
-        post += (f",zoompan=z='min(pzoom+0.0011,1.12)':d=1:"
+        zinc = max(0.0003, 0.12 / max(1.0, out_dur * cfg.fps))    # push-in peaks at the kill
+        post += (f",zoompan=z='min(pzoom+{zinc:.5f},1.12)':d=1:"
                  f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={cfg.tw}x{cfg.th}:fps={cfg.fps}")
     post += f",fade=t=in:st=0:d={cfg.flash_s}:color=white"
     fc = f"{vchain};[vr]{post}[vout];[0:a]atempo={cfg.speed},afade=t=in:st=0:d=0.02,afade=t=out:st={max(0,out_dur-0.03):.3f}:d=0.03[aout]"
@@ -161,16 +166,16 @@ def render_montage(source: str | Path, music: str | Path, out: str | Path,
     if not shots:
         return {"ok": False, "info": "no episodes detected"}
 
-    hype_t, beat = analyze_music(music, cfg.n_shots * cfg.target_shot_s)
-    beats_per_shot = max(1, round(cfg.target_shot_s / beat))
-    shot_dur = round(beats_per_shot * beat, 3)             # beat-synced, equal per shot
-    total = round(shot_dur * len(shots), 3)
+    src_total = _ffprobe_duration(source)
+    out_durs = [round((min(e["end"], src_total) - max(0.0, e["start"])) / cfg.speed, 3) for e in shots]
+    total = round(sum(out_durs), 3)
+    hype_t, beat = analyze_music(music, total)             # music section to cover the montage
 
     tmp = Path(tempfile.mkdtemp(prefix="scos_montage_"))
     shot_files: list[Path] = []
     for i, ep in enumerate(shots):
         sf = tmp / f"shot_{i}.mp4"
-        ok = _render_shot(source, ep["climax_t"], shot_dur, cfg, sf, is_finale=(i == len(shots) - 1))
+        ok = _render_shot(source, ep["start"], ep["end"], cfg, sf, is_finale=(i == len(shots) - 1))
         if not ok:
             return {"ok": False, "info": f"shot {i} render failed", "tmp": str(tmp)}
         shot_files.append(sf)
@@ -209,9 +214,10 @@ def render_montage(source: str | Path, music: str | Path, out: str | Path,
     if p.returncode != 0:
         return {"ok": False, "info": f"final mix failed: {p.stderr.strip()[-300:]}", "tmp": str(tmp)}
 
-    return {"ok": True, "out": str(out), "shots": len(shots), "shot_dur_s": shot_dur,
-            "total_s": total, "beat_period_s": round(beat, 3), "music_hype_start_s": round(hype_t, 2),
-            "speed": cfg.speed, "shot_climaxes": [s["climax_t"] for s in shots], "tmp": str(tmp)}
+    return {"ok": True, "out": str(out), "shots": len(shots), "shot_durs_s": out_durs,
+            "shot_spans": [[s["start"], s["end"]] for s in shots],
+            "total_s": total, "music_hype_start_s": round(hype_t, 2), "speed": cfg.speed,
+            "shot_climaxes": [s["climax_t"] for s in shots], "tmp": str(tmp)}
 
 
 def main() -> int:
