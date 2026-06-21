@@ -1,0 +1,79 @@
+# automation_blueprint.yaml — end-to-end build spec for SCOS / Claude Code / n8n / AI agents
+# Goal: take N raw match recordings -> output a @mark9m_-style montage automatically.
+
+blueprint:
+  id: mlbb_montage_autopilot
+  consumes: [creator_style_profile.yaml, editing_rules.yaml, retention_rules.yaml,
+             psychology_rules.yaml, timeline_rules.yaml, ../10_creator_rules.yaml]
+
+inputs:
+  required:
+    - raw_clips: [path...]          # one or many MLBB match recordings
+    - creator_handle: string
+  optional:
+    - music_track: path (else pick trending by mood=phonk/hiphop 80-85bpm)
+    - target_platforms: [tiktok, reels, shorts, youtube]
+    - hero_filter: string
+
+stages:
+  1_probe:
+    tool: scos-video.probe / ffprobe
+    out: per_clip {fps, res, duration, audio}
+  2_event_detection:
+    method: [scene_cuts(low_thresh), luma_spike, ocr_hud(timer,score,banners)]
+    detect: [kill_banner, ult_cast, immune, multikill, score_state, map_id, hero_id]
+    note: OCR the top-right HUD to read timer+score (this is how match boundaries were proven)
+    out: event_table per clip
+  3_highlight_select:
+    apply: editing_rules.highlight_detection + creator_rules[3,7,10,13]
+    keep: clips_with_payoff_within_11s
+  4_trim:
+    tool: scos-video.trim
+    apply: editing_rules.clip_trim (8-11s, speed 1.0)
+  5_order:
+    apply: editing_rules.ordering (escalate, climax@40-55%, dedupe)
+  6_masked_concat:
+    tool: scos-video.concat_list
+    apply: editing_rules.masked_concat
+    guard: scene_score_max < 0.40 (else add dissolve / move seam)
+  7_punch_in:
+    tool: keyframe scale (ffmpeg zoompan / NLE)
+    apply: editing_rules.punch_in (1.0->1.25 on kill/3+enemies/ult)
+  8_reframe_vertical:
+    when: target in [tiktok, reels, shorts]
+    apply: creator_rules[52,53] keep hero+score, 1080x1920
+  9_look:
+    tool: scos-video.grade
+    apply: editing_rules.look (native +5/5, optional upscale+sharpen, no LUT)
+  10_audio:
+    tools: [scos-video.extract_audio, mux_audio, volume_stats]
+    apply: editing_rules.audio (beat1@frame1, continuous, -14LUFS, submix sfx)
+  11_endcard:
+    apply: black+logo+@handle, 3s, silent
+  12_export:
+    apply: editing_rules.export (h264 high, >=6Mbps, dual aspect)
+  13_qc:
+    apply: editing_rules.qc_gate (5 asserts) + retention_rules.scoring_function>=0.85
+    on_fail: auto-retry stage 5-7 with adjusted params (max 3 attempts)
+  14_learn:
+    action: append outcome to memory/database.json + archive provenance
+  15_cleanup:
+    apply: creator_rules[110] (delete input/raw after output+memory+archive confirmed)
+
+orchestration_targets:
+  scos: "register as wf-2 montage style-preset 'mark9m_mlbb'"
+  claude_code: "callable as a skill; stages map to scos-video MCP tools"
+  n8n: "nodes = stages; QC gate = IF node; retry = loop"
+  ai_video_agent: "feed creator_style_profile.yaml as system constraints"
+
+success_metrics:
+  - scene_score_max < 0.40
+  - reward_gap_max_s <= 11
+  - retention_score >= 0.85
+  - hud_score_visible == true
+  - endcard_silent_with_handle == true
+
+confidence_flags:
+  high: [multi_match_stitch, invisible_cut, cold_open, endcard, hud_keep, speed_1.0]
+  medium: [zoom_factor_exact, bpm, ai_upscale_step]
+  needs_data: [exact_seam_timestamps, music_id, caption/hashtag_strategy, true_source_resolution]

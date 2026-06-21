@@ -1,0 +1,51 @@
+# psychology_rules.yaml — emotional intent mapped to executable triggers
+
+emotion_curve:
+  shape: plateau_not_arc
+  target: sustained_high_arousal
+  rationale: short_form_rewards_watch_time_over_catharsis
+
+drivers:
+  anticipation:
+    trigger: ult_cast / "Ultimate" banner
+    action: keep_buildup + begin_zoom_ramp
+    payoff_within_s: 2
+    because: dopamine_fires_on_predicted_reward
+  tension:
+    trigger: losing_score OR low_hp_fight
+    action: include_clip_then_resolve
+    because: outcome_uncertainty_raises_arousal
+  relief:
+    trigger: kill_banner / immune_proc
+    action: let_banner_play_unobscured
+    because: tension_release_cycle_is_core_pleasure
+  dopamine_loop:
+    trigger: each_clip
+    action: novel_payoff_per_match (different enemies/score)
+    because: variable_ratio_schedule_beats_fixed
+  competence_display:
+    trigger: clutch / 1vN / immune_dodge
+    action: real_speed_no_ramp + punch_in
+    because: legible_skill_drives_vicarious_mastery
+  status_signaling:
+    trigger: high_kill_score
+    action: keep_score_visible
+    because: viewer_borrows_player_status -> shares
+  power_fantasy:
+    trigger: tank_survives_and_kills
+    action: prefer_winning_dominant_clips
+    because: wish_fulfillment_of_invulnerability
+  validation:
+    trigger: end_card
+    action: handle_visible -> invite_praise/comments
+    because: parasocial_reciprocity
+
+trust_layer:
+  keep: [full_hud, real_speed, native_vfx]
+  because: authenticity_lets_power_fantasy_land
+  violating_these: reduces_believability -> lowers_share+follow
+
+closing_psychology:
+  technique: abrupt_silent_black
+  effect: micro_withdrawal -> action(follow/replay)
+  rule: never_fade_out_soft

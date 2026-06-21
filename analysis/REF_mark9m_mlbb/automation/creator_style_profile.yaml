@@ -1,0 +1,91 @@
+# creator_style_profile.yaml — machine-readable style fingerprint
+# Master profile other SCOS systems load to reproduce the @mark9m_ MLBB-montage style.
+
+profile:
+  id: mark9m_mlbb_montage
+  version: 1.0
+  derived_from: Download.mp4
+  game: mobile_legends_bang_bang
+  content_type: multi_match_kill_compilation
+  platform_primary: tiktok
+  language_ui: th
+
+format:
+  fps: 30
+  aspect_source: "16:9"
+  aspect_recommended: "9:16"      # reframe target (reference leaked 16:9)
+  resolution_source: [1024, 576]
+  resolution_target: [1080, 1920]
+  runtime_target_s: [100, 120]
+  color: native_no_lut
+
+structure:
+  cold_open: true
+  intro_title: false
+  first_reward_max_s: 8
+  clip_len_s: [8, 11]
+  source_matches: [6, 9]
+  pacing: flat_high_plateau
+  reward_gap_max_s: 11
+  end_card: {style: black_silent_handle, duration_s: 3}
+
+cuts:
+  visible_hard_cuts: 0
+  technique: masked_invisible
+  mask_on: max_luma_vfx_frame
+  require_same: [game, map, hud_layout, fps, resolution]
+  scene_score_ceiling: 0.40
+  fallback_dissolve_frames: [2, 4]
+
+camera:
+  moves: [punch_in]
+  zoom_range: [1.15, 1.30]
+  zoom_trigger: [kill, enemies_gte_3, ult_cast]
+  zoom_release_s: 0.5
+  ease: in_out
+  anchor: player_hero_centroid
+  speed: 1.0
+  forbidden: [slow_motion, speed_ramp, reverse, shake, motion_blur]
+
+vfx:
+  post_effects: none
+  source_of_spectacle: in_game_only
+  upscale: optional
+  sharpen: light_after_upscale
+  forbidden: [chromatic_aberration, light_leak, vignette, editor_particles, glitch]
+
+hud:
+  keep_visible: [minimap, timer, kill_score, kda, skills, spells]
+  never_crop: [kill_score, timer]
+
+audio:
+  track_count: 1
+  bpm: [80, 85]            # confidence: medium
+  feel: half_time_phonk_hiphop
+  beat1_on_frame1: true
+  continuous_until_endcard: true
+  endcard_silence: true
+  game_sfx: submix_-6_to_-10dB
+  loudness_lufs: -14
+  prefer_trending_sound: true
+
+text:
+  body_text: none
+  end_card_handle: true
+  optional_hook_text: recommended   # gap vs reference
+
+export:
+  vcodec: h264_high
+  pix_fmt: yuv420p
+  vbitrate_min_mbps: 6
+  acodec: aac
+  abitrate_kbps: 128
+  samplerate: 44100
+
+confidence:
+  multi_match_stitch: high
+  invisible_cut_technique: high
+  punch_in_dynamic: medium_high
+  zoom_exact_factor: medium
+  bpm: medium
+  ai_enhance_pipeline: medium_high

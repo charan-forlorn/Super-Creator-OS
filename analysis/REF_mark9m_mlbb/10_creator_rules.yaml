@@ -1,0 +1,143 @@
+# 10 · Creator Rules (Phase 9)
+# Reverse-engineered decision logic for the @mark9m_ MLBB-montage style.
+# Format: IF / THEN / BECAUSE. 110 rules. Evidence-grounded; confidence noted where <HIGH.
+# Consumed by: editing_rules.yaml, retention_rules.yaml, automation_blueprint.yaml.
+
+meta:
+  style_id: mark9m_mlbb_montage
+  source: Download.mp4
+  game: Mobile Legends Bang Bang
+  platform: tiktok
+  fps: 30
+  aspect_source: "16:9"
+  clip_len_s: [8, 11]
+  bpm_estimate: [80, 85]   # confidence MEDIUM
+  reward_gap_max_s: 11
+
+rules:
+
+  # ---- A. STRUCTURE & CLIP SELECTION (1-20) ----
+  - {id: 1,  if: "video_start", then: "open_on_gameplay_frame(no_title)", because: "TikTok scores the first 1-2s; a title wastes the hook."}
+  - {id: 2,  if: "video_start", then: "first_reward_before(8s)", because: "Front-loading value kills the scroll early."}
+  - {id: 3,  if: "candidate_clip has_no_kill_or_standout within 11s", then: "drop_clip", because: "Every clip must pay off; dead clips invite exits."}
+  - {id: 4,  if: "assembling_body", then: "clip_length_between(8s,11s)", because: "Matches the ~9s reward comb / 8-bar phrase."}
+  - {id: 5,  if: "two_clips_adjacent and both_low_energy", then: "reorder_or_cut", because: "Never let two boring seconds touch."}
+  - {id: 6,  if: "source = multiple_matches", then: "concatenate_best_segments", because: "No single match has enough back-to-back highlights."}
+  - {id: 7,  if: "clip_pool_large", then: "select_top_n_by_action_density", because: "Concentrate value; discard filler."}
+  - {id: 8,  if: "ordering_clips", then: "escalate_vfx_density_over_time", because: "Rising spectacle resists fatigue."}
+  - {id: 9,  if: "total_runtime > 130s", then: "trim_to ~120s", because: "~2min holds watch-time without decay."}
+  - {id: 10, if: "clip_has_pre_kill_buildup", then: "keep_buildup(<=2s)", because: "Anticipation cue (ult cast) primes dopamine."}
+  - {id: 11, if: "clip_outcome = player_loss_fight", then: "usually_exclude unless_close", because: "Power fantasy needs wins; near-losses add tension only if resolved."}
+  - {id: 12, if: "match_score_is_climbing", then: "preserve_score_visible", because: "Live score = macro open loop."}
+  - {id: 13, if: "highlight = multikill_or_clutch", then: "place_as_climax(~40-55% mark)", because: "Densest payoff mid-run sustains the plateau."}
+  - {id: 14, if: "clip_start", then: "begin_just_before_engagement", because: "Skip walking/farming; start at value."}
+  - {id: 15, if: "clip_end", then: "cut_right_after_payoff", because: "Trailing seconds bleed energy."}
+  - {id: 16, if: "intro_branding_requested", then: "reject_pre_roll_logo", because: "Cold open outperforms branded intro on retention."}
+  - {id: 17, if: "narrative_requested", then: "prefer_plateau_over_arc", because: "Short-form rewards uninterrupted arousal over catharsis."}
+  - {id: 18, if: "clip_has_item_purchase_toast", then: "keep_visible", because: "Build reference drives saves/comments."}
+  - {id: 19, if: "duplicate_similar_highlights", then: "keep_one_most_dense", because: "Variety prevents habituation."}
+  - {id: 20, if: "runtime_padding_needed", then: "add_another_match_clip not_slow_motion", because: "Length via more wins, never via ramps."}
+
+  # ---- B. INVISIBLE / MASKED CUTS (21-40) ----
+  - {id: 21, if: "cut_between_clips", then: "require_same_game_and_map", because: "Shared backdrop keeps pixel-delta low → seam invisible."}
+  - {id: 22, if: "cut_between_clips", then: "require_same_hud_layout", because: "HUD continuity hides the transition."}
+  - {id: 23, if: "placing_a_cut", then: "land_on_max_luma_vfx_frame", because: "A bright flash saturates the eye and masks the seam (evidence: cut hidden in kill-flash @~0:52)."}
+  - {id: 24, if: "pixel_delta_at_cut > 0.30", then: "insert_2_4frame_dissolve", because: "Keep scene-score under the visible-cut threshold."}
+  - {id: 25, if: "no_vfx_flash_available_at_seam", then: "shift_cut_to_nearest_flash(+-0.3s)", because: "Prefer masking over a clean visible cut."}
+  - {id: 26, if: "hero_differs_across_clips", then: "prefer_same_hero_clips", because: "Same hero strengthens the 'one run' illusion."}
+  - {id: 27, if: "map_differs_across_clips", then: "group_by_map", because: "Cross-map cuts are visible; keep within-map runs together."}
+  - {id: 28, if: "audio_continuous_across_cut", then: "allow_cut", because: "Unbroken music masks the video seam."}
+  - {id: 29, if: "audio_would_break_at_cut", then: "crossfade_audio(50-100ms)", because: "An audio gap exposes the edit."}
+  - {id: 30, if: "cut_target_frame_is_dark/static", then: "avoid", because: "Low-VFX frames make seams obvious."}
+  - {id: 31, if: "transition_fx_requested(whip/zoom/glitch)", then: "reject", because: "Decorative transitions break the seamless fantasy."}
+  - {id: 32, if: "more_than_9_source_matches", then: "still_hide_all_seams", because: "Quantity must not reveal the compilation."}
+  - {id: 33, if: "seam_quality_uncertain", then: "prefer_kill_banner_frame", because: "'Kill'/'Immune' banners are reliable luma+attention masks."}
+  - {id: 34, if: "cut_creates_hud_jump(score/timer)", then: "accept_if_masked", because: "Viewers don't read the timer when VFX peaks."}
+  - {id: 35, if: "two_clips_have_matching_camera_position", then: "cut_there", because: "Spatial match lowers perceived discontinuity."}
+  - {id: 36, if: "rendering_final", then: "verify scene_score_max < 0.40", because: "Confirms cuts stayed invisible (matches reference)."}
+  - {id: 37, if: "color_grade_differs_between_clips", then: "normalize_before_concat", because: "A color pop at the seam reveals the cut."}
+  - {id: 38, if: "fps_differs_between_clips", then: "conform_to_30fps", because: "Frame-cadence change is a visible tell."}
+  - {id: 39, if: "resolution_differs", then: "conform_scale_first", because: "Scale pops expose seams."}
+  - {id: 40, if: "seam_lands_mid_damage_number", then: "accept", because: "Floating numbers are dense visual noise that hides cuts."}
+
+  # ---- C. ZOOM / FRAMING (41-58) ----
+  - {id: 41, if: "enemy_count >= 3 in_frame", then: "zoom_in(1.25)", because: "Visual density increases viewer focus on the fight."}
+  - {id: 42, if: "kill_event", then: "punch_in(1.20-1.30) center_on_player_hero", because: "Directs the eye to the payoff; pseudo-cut without a cut."}
+  - {id: 43, if: "ult_cast_detected", then: "begin_zoom_ramp_in(0.3s)", because: "Anticipate the kill; intensify."}
+  - {id: 44, if: "fight_ends / lull", then: "ease_zoom_out_to(1.0) over(0.5s)", because: "Release tension, reset for next spike."}
+  - {id: 45, if: "zoom_active", then: "keep_player_hero_centered", because: "Hero is the eye anchor."}
+  - {id: 46, if: "zoom_factor > 1.35", then: "clamp(1.30)", because: "Beyond ~1.3x the HUD/text becomes unreadable and pixelated."}
+  - {id: 47, if: "important_hud(score/timer)_would_crop_out", then: "reduce_zoom or reframe", because: "Score must stay visible (it's the story)."}
+  - {id: 48, if: "no_action", then: "hold_zoom(1.0)", because: "Don't zoom on nothing; save the move for impact."}
+  - {id: 49, if: "rapid_repeated_kills", then: "stagger_punch_ins not_continuous_max_zoom", because: "Constant max zoom flattens the spike dynamic."}
+  - {id: 50, if: "subject_moves_off_center", then: "pan_track_to_follow", because: "Keep anchor centered during motion."}
+  - {id: 51, if: "clip_is_calm_setup(cold_open)", then: "frame_wider(1.0-1.05)", because: "Wide calm frame orients before the storm (evidence: 0:00 wider than fights)."}
+  - {id: 52, if: "vertical_target_required", then: "reframe_9x16_keeping_hero_and_score", because: "Vertical fit is the biggest distribution win."}
+  - {id: 53, if: "reframing_vertical", then: "prioritize center+right_hud(skills,score)", because: "These carry credibility + stakes."}
+  - {id: 54, if: "zoom_keyframes_added", then: "use_ease_in_out not_linear", because: "Organic accel feels like intent, not a glitch."}
+  - {id: 55, if: "minimap_critical_moment(gank_incoming)", then: "do_not_crop_minimap", because: "Tension cue lives on the minimap."}
+  - {id: 56, if: "damage_numbers_peak", then: "hold_or_slightzoom", because: "Numbers are micro-rewards; keep legible."}
+  - {id: 57, if: "shake_requested", then: "reject", because: "Camera shake is an editor tell; not in the reference."}
+  - {id: 58, if: "framing_final", then: "center_of_mass = action_centroid", because: "Compose on where the fight is, not screen-center blindly."}
+
+  # ---- D. SPEED & MOTION (59-66) ----
+  - {id: 59, if: "any_clip", then: "timescale = 1.0", because: "Real speed proves mechanical skill = credibility."}
+  - {id: 60, if: "slow_motion_requested", then: "reject", because: "Slow-mo signals hyping a weak play."}
+  - {id: 61, if: "speed_ramp_requested", then: "reject", because: "Ramps hide the competence being sold."}
+  - {id: 62, if: "reverse_requested", then: "reject", because: "Breaks authenticity + continuity illusion."}
+  - {id: 63, if: "clip_too_long_to_fit", then: "trim_not_speedup", because: "Cut content, never alter speed."}
+  - {id: 64, if: "stutter/freeze_requested", then: "reject", because: "No freeze frames in this style."}
+  - {id: 65, if: "motion_blur_post_requested", then: "reject", because: "Native render only."}
+  - {id: 66, if: "frame_interpolation_offered", then: "skip", because: "30fps native is the look."}
+
+  # ---- E. VFX / COLOR / LOOK (67-78) ----
+  - {id: 67, if: "spectacle_needed", then: "select_clip_with_peak_ingame_vfx not_add_post_vfx", because: "The game ships dopamine-grade VFX; curation > addition."}
+  - {id: 68, if: "editor_vfx_requested(CA,flash,leak,particles)", then: "reject", because: "Post-VFX buries the legible in-game read."}
+  - {id: 69, if: "color_grade", then: "keep_native +optional(+5% contrast,+5% sat)", because: "Game art is already feed-legible; avoid muddying neon."}
+  - {id: 70, if: "creative_LUT_requested", then: "reject", because: "Heavy LUT dulls skill VFX and breaks seam-color matching."}
+  - {id: 71, if: "footage_soft_after_upscale", then: "light_sharpen", because: "Restore edge crispness post-AI-upscale."}
+  - {id: 72, if: "source_is_SD(1024x576)", then: "optional_AI_upscale_to_720/1080", because: "Cleaner feed presentation (reference is AIGC-labeled)."}
+  - {id: 73, if: "banner_event(Kill/Immune/Ultimate)", then: "never_obscure_with_overlay", because: "Banners are the primary reward cues."}
+  - {id: 74, if: "vignette_requested", then: "reject", because: "Not present in reference; darkens HUD."}
+  - {id: 75, if: "noise_visible_around_vfx", then: "mild_denoise_before_reencode", because: "2.4Mbps over particles mosquito-noises; clean it."}
+  - {id: 76, if: "hud_text_small", then: "preserve_resolution_on_hud_region", because: "Score/timer must stay readable."}
+  - {id: 77, if: "brand_overlay_requested", then: "corner_only_low_opacity", because: "Don't compete with gameplay anchor."}
+  - {id: 78, if: "watermark_present_from_source", then: "accept_or_reframe_out", because: "Native bouncing TikTok mark is a rip-tell; reframe if reposting."}
+
+  # ---- F. AUDIO / MUSIC (79-90) ----
+  - {id: 79, if: "project_start", then: "lay_single_track bpm(80-85,half-time)", because: "One continuous bed glues hidden cuts."}
+  - {id: 80, if: "music_laid", then: "align_beat1_to_frame1", because: "Drop-on-open is the audio hook (evidence: −33→−15dB @0.7s)."}
+  - {id: 81, if: "video_body_playing", then: "music_never_stops", because: "Continuous audio = no auditory stop cue."}
+  - {id: 82, if: "approaching_end_card", then: "hard_cut_audio_to_silence", because: "Dead-air is the pattern interrupt that drives the CTA."}
+  - {id: 83, if: "game_sfx_present", then: "submix_under_music(-6..-10dB)", because: "Hit/kill SFX add texture without masking the track."}
+  - {id: 84, if: "phrase_boundary(8bar)", then: "align_clip_cut_or_punch_in", because: "Audio+visual spikes reinforce (~9s comb)."}
+  - {id: 85, if: "track_has_drop", then: "place_climax_kill_on_drop", because: "Max payoff on max music energy."}
+  - {id: 86, if: "loudness_target", then: "normalize ~ -14LUFS", because: "Platform-safe, consistent feed loudness."}
+  - {id: 87, if: "music_choice", then: "prefer_trending_sound_if_available", because: "Trending audio boosts distribution + 'what's the song' comments."}
+  - {id: 88, if: "audio_clipping_detected", then: "limit/-1dBTP", because: "Distortion reads as low quality."}
+  - {id: 89, if: "track_too_short", then: "loop_seamlessly not_silence_gap", because: "Any gap exposes the edit."}
+  - {id: 90, if: "voiceover_requested", then: "optional_off_by_default", because: "Reference has none; music carries it."}
+
+  # ---- G. HUD / TEXT / OVERLAYS (91-98) ----
+  - {id: 91, if: "any_frame", then: "keep_score_and_timer_visible", because: "HUD = authenticity + built-in progress bar."}
+  - {id: 92, if: "reframing_or_zoom", then: "protect_hud_safe_zones", because: "Cropped HUD loses credibility + stakes."}
+  - {id: 93, if: "text_hook_opportunity(first 2s)", then: "consider_adding_short_text_hook", because: "Reference omits it = a gap; text lifts retention+search."}
+  - {id: 94, if: "captions_requested", then: "optional not_core_style", because: "Reference is text-free; add only for reach."}
+  - {id: 95, if: "username_known", then: "render_end_card_search_bar(@handle)", because: "Converts view→follow."}
+  - {id: 96, if: "end_card", then: "black_bg + platform_logo + @handle, ~3s", because: "Matches reference CTA template."}
+  - {id: 97, if: "hashtag/caption_metadata", then: "add_hero+game+rank_keywords", because: "Search discoverability (out-of-frame, in post copy)."}
+  - {id: 98, if: "on_screen_emoji/sticker_requested", then: "reject_in_body", because: "Clutters the action read."}
+
+  # ---- H. PLATFORM / DELIVERY / QC (99-110) ----
+  - {id: 99,  if: "export", then: "h264_high yuv420p 30fps", because: "Matches reference; broad compatibility."}
+  - {id: 100, if: "export", then: "video_bitrate >= 6Mbps_at_720p", because: "Beat the reference's noisy 2.4Mbps for cleaner VFX."}
+  - {id: 101, if: "export", then: "aac 44.1k stereo >=128k", because: "Reference-equivalent audio."}
+  - {id: 102, if: "target_platform = tiktok/reels/shorts", then: "render_9x16_reframe", because: "Vertical fit is the #1 distribution fix (reference leaked 16:9)."}
+  - {id: 103, if: "also_youtube", then: "keep_16x9_master", because: "Landscape suits YT; dual-export."}
+  - {id: 104, if: "runtime", then: "target 100-120s", because: "Sweet spot for hype montage watch-time."}
+  - {id: 105, if: "qc", then: "assert no_visible_hard_cut(scene_max<0.40)", because: "Seamlessness is the signature."}
+  - {id: 106, if: "qc", then: "assert reward_gap <= 11s everywhere", because: "No valley deep enough to scroll."}
+  - {id: 107, if: "qc", then: "assert music_unbroken_until_endcard", because: "Audio continuity requirement."}
+  - {id: 108, if: "qc", then: "assert hud_score_visible_throughout", because: "Open loop must persist."}
+  - {id: 109, if: "qc", then: "assert end_card_silent_and_has_handle", because: "CTA integrity."}
+  - {id: 110, if: "raw_inputs_after_render_and_archive_saved", then: "delete input/raw clips", because: "SCOS standing cleanup authorization once output+memory+archive confirmed."}

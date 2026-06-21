@@ -1,0 +1,106 @@
+# editing_rules.yaml — executable editing pipeline for the montage assembler
+# Stage order is authoritative. Each stage cites the source rule ids (10_creator_rules.yaml).
+
+pipeline:
+  - stage: ingest
+    rules: [6, 38, 39, 37]
+    actions:
+      - conform_all_clips: {fps: 30, resolution: [1080, 1920_or_1024x576], colorspace: bt709_normalize}
+      - tag_each_clip: {match_id, in_game_timer, kill_score, hero, map}
+
+  - stage: highlight_detection
+    rules: [3, 7, 10, 13, 67]
+    detect:
+      kill_event: ["Kill" banner OR enemy_hp->0 OR floating_gold_gain]
+      vfx_peak: luma_spike + particle_density
+      ult_cast: skill_banner("Ultimate"/named_skill)
+    score_clip: action_density * vfx_peak * has_kill
+    keep_if: has_kill_or_standout_within(11s)
+
+  - stage: clip_trim
+    rules: [4, 14, 15, 20, 63]
+    actions:
+      - start: engagement_minus(0.5s)
+      - end: payoff_plus(0.3s)
+      - clamp_length: [8s, 11s]
+      - speed: 1.0   # never ramp
+
+  - stage: ordering
+    rules: [8, 13, 19, 12]
+    actions:
+      - escalate_vfx_density_over_time
+      - place_top_climax_at: 0.40_to_0.55_of_runtime
+      - dedupe_similar_highlights
+
+  - stage: cold_open
+    rules: [1, 2, 16, 51]
+    actions:
+      - first_clip: calm_setup_frame -> fast_into_first_fight
+      - no_title_card
+      - frame_wider(1.0-1.05) on open
+
+  - stage: masked_concat
+    rules: [21, 22, 23, 24, 25, 28, 29, 36, 105]
+    actions:
+      - for_each_seam:
+          require_same: [game, map, hud]
+          place_cut_on: max_luma_vfx_frame
+          if pixel_delta > 0.30: insert_dissolve(2-4 frames)
+          crossfade_audio: 50-100ms
+      - verify: scene_score_max < 0.40
+
+  - stage: punch_in
+    rules: [41, 42, 43, 44, 45, 46, 47, 54, 58]
+    keyframes:
+      on_trigger(kill|enemies>=3|ult): scale 1.0 -> 1.25 ease_in(0.3s)
+      on_release(lull): scale 1.25 -> 1.0 ease_out(0.5s)
+      clamp: 1.30
+      anchor: action_centroid (keep hero + score in frame)
+
+  - stage: look
+    rules: [69, 70, 71, 72, 75, 76]
+    actions:
+      - grade: native (+5% contrast, +5% sat optional)
+      - upscale: optional_to_1080
+      - sharpen: light
+      - denoise: mild_around_vfx
+      - lut: none
+
+  - stage: audio
+    rules: [79, 80, 81, 82, 83, 84, 86, 87]
+    actions:
+      - lay_track: single, bpm 80-85, align_beat1_to_frame1
+      - submix_game_sfx: -6..-10dB
+      - align_phrase_boundaries_to_seams
+      - loudness: -14LUFS
+      - end: hard_cut_to_silence at endcard
+
+  - stage: end_card
+    rules: [95, 96, 109]
+    actions:
+      - append: black_bg + platform_logo + search_bar("@"+handle)
+      - duration: 3s
+      - audio: silent
+
+  - stage: export
+    rules: [99, 100, 101, 102, 103, 104]
+    actions:
+      - render_vertical: 1080x1920 (tiktok/reels/shorts)
+      - render_landscape_master: 1024x576+ (youtube optional)
+      - vcodec: h264_high, pix_fmt: yuv420p, vbitrate: >=6Mbps
+      - acodec: aac 128k 44.1k
+
+  - stage: qc_gate
+    rules: [105, 106, 107, 108, 109]
+    assert:
+      - scene_score_max < 0.40        # cuts invisible
+      - max_reward_gap_s <= 11
+      - music_unbroken_until_endcard
+      - hud_score_visible_throughout
+      - endcard_silent_with_handle
+    on_fail: reject_and_log
+
+forbidden_globally:
+  rules: [31, 57, 60, 61, 62, 64, 65, 68, 70, 74, 98]
+  list: [visible_hard_cut, transition_fx, slow_motion, speed_ramp, reverse,
+         freeze_frame, motion_blur, editor_vfx, creative_lut, vignette, body_text_clutter]
