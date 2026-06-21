@@ -1,0 +1,43 @@
+# timeline_rules.yaml — how to lay out the timeline (slot model)
+
+timeline:
+  total_s: [100, 120]
+  fps: 30
+  audio_track: continuous_single_bed
+  silence_zone: [runtime_minus_3, runtime]   # endcard only
+
+slots:
+  - name: cold_open
+    span_s: [0, 8]
+    content: calm_setup -> first_fight
+    must: [no_title, first_reward_before_8s, beat1_at_0.7s, frame_wider]
+  - name: body
+    span_s: [8, runtime_minus_3]
+    content: stitched_highlight_clips
+    clip_len_s: [8, 11]
+    each_clip_must: [contain_payoff, end_on_payoff, masked_seam]
+    climax_at_fraction: [0.40, 0.55]
+    escalate: vfx_density_up_over_time
+  - name: end_card
+    span_s: [runtime_minus_3, runtime]
+    content: black + logo + "@handle" search_bar
+    audio: silent
+
+seam_grid:
+  spacing_s: [8, 11]          # one cut per highlight
+  align_to: music_phrase_8bar
+  place_on: max_luma_vfx_frame
+  verify: scene_score < 0.40
+
+beat_grid:
+  bpm: [80, 85]
+  phrase_bars: 8
+  phrase_len_s_approx: [9.0, 9.6]  # at ~84 BPM half-time, derived
+  align: [clip_cuts, punch_ins] to phrase_boundaries
+  drop_alignment: climax_kill_on_track_drop
+
+invariants:
+  - reward_gap_max_s: 11
+  - no_mid_video_silence: true
+  - hud_score_visible: always
+  - music_unbroken_until: end_card

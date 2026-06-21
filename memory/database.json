@@ -16,5 +16,122 @@
     "retention_score": 84,
     "lesson_learned": "เทคนิคหา highlight อัตโนมัติ: วิเคราะห์ RMS เสียงรายวินาที → peak = kill/teamfight (คลิปนี้เจอ 40s push, 66s DOUBLE KILL, 70s ace) แล้วยืนยันด้วยการดึงเฟรมมาดูจริง; landscape MOBA reframe เป็น vertical ใช้ center-crop ได้เพราะ action อยู่กลางจอ-UI อยู่ขอบ (ตัด minimap/ปุ่มสกิลทิ้งได้สะอาด); content ดีสุดมักอยู่ช่วงท้ายเกม (finale teamfight) → เอามาเปิดเป็น hook; ยังไม่มีไฟล์เพลง = ส่ง master เสียงเกมไป duck ไว้ ให้เติม Phonk ใน TikTok native; โพสต์ 20:00-22:00",
     "created_at": "2026-06-15T12:25:50.000Z"
+  },
+  {
+    "project_name": "RoV Double Kill - WF-1/2 Auto Short",
+    "product_niche": "Gaming (MOBA)",
+    "hook_successful": "Cold-open the Double Kill climax (WF-1 peak ~50s, audio announcer cue) with a 'DOUBLE KILL' text overlay",
+    "editing_specs": "WF-2: 848x384 (20:9) -> 1080x1920 9:16 fit/blur-pad, segment 47-52s (5.0s) from WF-1, loudnorm I=-13.2 LUFS, 'DOUBLE KILL' drawtext hook, h264 crf20 30fps",
+    "retention_score": 70,
+    "lesson_learned": "First WF-1->WF-2 auto-produced short. WF-1 isolated the Double Kill via audio+motion fusion. Fit-reframe leaves heavy blur on 20:9 source; 5s is short. Predicted retention 70 to be calibrated vs observed.",
+    "created_at": "2026-06-20T10:06:35.000Z",
+    "schema_version": "v3",
+    "engine": "wf-1+wf-2",
+    "clip_type": "gaming_moba",
+    "transcribed": false,
+    "render_success": true,
+    "qa_pass": true,
+    "edl_path": "work/edit/edl.json",
+    "grade_used": "none",
+    "subtitle_style": "none",
+    "render_specs": {
+      "resolution": "1080x1920",
+      "fps": 30,
+      "output_duration_s": 5.0,
+      "loudness_lufs": -13.2
+    },
+    "highlight_anchors": [
+      {
+        "t": 50.0,
+        "label": "Double Kill",
+        "kind": "callout",
+        "source": "wf-1 audio+motion peak"
+      }
+    ],
+    "provenance": {
+      "schema": "provenance/v3",
+      "loop_run_id": "2026-06-20T10:06:35.000Z::rov-double-kill-wf-1-2-auto-short",
+      "recommended": {
+        "recommendation_id": null,
+        "recommendation_timestamp": null,
+        "reference_project": null,
+        "match_quality": "cold_start",
+        "match_score": null,
+        "suggested_hooks": [],
+        "retention_benchmark": null,
+        "reused_editing_specs_source": null
+      },
+      "decided": {
+        "hooks_actually_used": [
+          "Double Kill"
+        ],
+        "hook_adoption": "none_suggested",
+        "reused_editing_specs": false,
+        "storytelling_decision": "cold-open WF-1 Double Kill peak (~50s), 9:16 fit reframe, 'DOUBLE KILL' text hook"
+      },
+      "linkage": {
+        "recommendation_available": false,
+        "is_cold_start": true
+      }
+    }
+  },
+  {
+    "project_name": "RoV Double Kill - WF-1 v2 Story Short",
+    "product_niche": "Gaming (MOBA)",
+    "hook_successful": "Anticipation hook 'WAIT FOR IT' over the buildup, then 'DOUBLE KILL' reveal timed to the climax (~9.5s into the render); NOT spoiled at t=0 (supersedes the v1 peak-only cut)",
+    "editing_specs": "WF-1 v2 Narrative Episode Engine: episode 40.5-52.5s (12.0s), buildup->climax->resolution, climax source~50s / render~9.5s; WF-2 fit/blur-pad 848x384->1080x1920, loudnorm target -14 LUFS, timed hooks (anticipation+payoff), h264 crf20 30fps",
+    "retention_score": 70,
+    "lesson_learned": "v2 supersedes the v1 peak-only cut. Narrative Episode Engine produces buildup->payoff so the story-structure confound is removed from the learning signal. fit-reframe preserves the story-telling HUD (score/callouts); blur is the tradeoff. Predicted retention 70 to be calibrated vs observed. Old v1 record left untouched (append-only).",
+    "created_at": "2026-06-20T12:46:04.000Z",
+    "schema_version": "v3",
+    "engine": "wf-1-v2+wf-2",
+    "clip_type": "gaming_moba",
+    "transcribed": false,
+    "render_success": true,
+    "qa_pass": true,
+    "edl_path": "work/episode_dk.json",
+    "grade_used": "none",
+    "subtitle_style": "none",
+    "render_specs": {
+      "resolution": "1080x1920",
+      "fps": 30,
+      "output_duration_s": 12.0,
+      "loudness_target_lufs": -14.0,
+      "asset": "work/story_short_v2.mp4"
+    },
+    "highlight_anchors": [
+      {
+        "t": 50.0,
+        "label": "Double Kill",
+        "kind": "callout",
+        "source": "wf-1 v2 climax"
+      }
+    ],
+    "provenance": {
+      "schema": "provenance/v3",
+      "loop_run_id": "2026-06-20T12:46:04.000Z::rov-double-kill-wf-1-v2-story-short",
+      "recommended": {
+        "recommendation_id": null,
+        "recommendation_timestamp": null,
+        "reference_project": null,
+        "match_quality": "cold_start",
+        "match_score": null,
+        "suggested_hooks": [],
+        "retention_benchmark": null,
+        "reused_editing_specs_source": null
+      },
+      "decided": {
+        "hooks_actually_used": [
+          "Double Kill"
+        ],
+        "hook_adoption": "none_suggested",
+        "reused_editing_specs": false,
+        "storytelling_decision": "WF-1 v2 Narrative Episode: buildup 40.5-50s -> Double Kill climax@50s -> resolution to 52.5s; anticipation hook over buildup then payoff reveal at ~9.5s render"
+      },
+      "linkage": {
+        "recommendation_available": false,
+        "is_cold_start": true
+      }
+    }
   }
 ]

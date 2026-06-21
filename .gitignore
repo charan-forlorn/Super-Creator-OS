@@ -52,3 +52,8 @@ work/assets_mcp/
 *.egg-info/
 .vscode/
 _backup_pre_integration_2026-06-15/
+# Organized work/ scratch subfolders (generated per job: videos / frames / data / edit)
+work/video/
+work/frames/
+work/data/
+work/edit/

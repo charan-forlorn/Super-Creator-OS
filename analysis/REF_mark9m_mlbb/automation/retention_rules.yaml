@@ -1,0 +1,47 @@
+# retention_rules.yaml — pacing & attention constraints the assembler must satisfy
+
+targets:
+  reward_interval_s: {ideal: 9, max: 11}
+  curiosity_interval_s: {ideal: 17, max: 22}
+  attention_spike_interval_s: {ideal: 9, max: 11}
+  hook_first_reward_max_s: 8
+  beat_drop_at_s: 0.7
+  dead_air_allowed: only_at_endcard
+
+mechanics:
+  open_loop_macro:
+    signal: rising_kill_score
+    rule: keep_score_visible_entire_video
+    resolve_at: never_until_end   # sustains the "how high" question
+  open_loop_micro:
+    signal: ult_cast_banner
+    rule: keep_2s_buildup_before_kill
+  curiosity_trigger:
+    signal: losing_or_close_score_clip
+    rule: include_some_comeback_fights
+  pattern_interrupt:
+    signal: new_match_clip
+    rule: introduce_fresh_scene_every_8_11s
+    plus: final_black_silent_frame
+  micro_reward:
+    signal: [kill_banner, damage_burst, immune_proc, multikill]
+    rule: at_least_one_per_clip
+  escalation:
+    rule: increase_vfx_density_and_stakes_over_runtime
+  payoff:
+    rule: place_densest_kill_as_mid_climax
+  attention_reset:
+    rule: punch_in_each_clip (pseudo-cut without visible cut)
+
+constraints:
+  - no_valley_longer_than_s: 11        # else viewer scrolls
+  - never_two_low_energy_clips_adjacent: true
+  - climax_position_fraction: [0.40, 0.55]
+  - ending: hard_stop_not_loop        # optimize follow over replay
+
+scoring_function:
+  retention_score = (rewards_within_target / total_seconds_windows)
+                  - penalty(valley_gt_11s)
+                  - penalty(visible_cut)
+                  - penalty(mid_video_silence)
+  pass_threshold: 0.85
