@@ -36,10 +36,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-# ---- Required v1 contract (must never be broken) ----
-V1_REQUIRED = ["project_name", "product_niche", "hook_successful",
-               "editing_specs", "retention_score", "lesson_learned", "created_at"]
-
 # ---- clip_type detection signals ----
 MOBA_CALLOUTS = ["double kill", "triple kill", "quadra", "pentakill", "penta kill",
                  "ace", "shut down", "defeated an enemy", "legendary", "ultimate",
@@ -289,33 +285,13 @@ def build_record(args, edl: dict, transcripts: list[dict], render: dict, qa: dic
 
 
 # ----------------------------------------------------------------------------
-# Validation + safe write
+# Safe write
 # ----------------------------------------------------------------------------
-def validate_record(rec: dict) -> list[str]:
-    errs = []
-    for k in V1_REQUIRED:
-        if k not in rec:
-            errs.append(f"missing v1 field: {k}")
-    if not isinstance(rec.get("retention_score"), int):
-        errs.append("retention_score must be int")
-    if not (0 <= rec.get("retention_score", -1) <= 100):
-        errs.append("retention_score out of range 0-100")
-    if not rec.get("project_name"):
-        errs.append("project_name empty")
-    return errs
-
-
-def validate_db(db) -> list[str]:
-    errs = []
-    if not isinstance(db, list):
-        return ["database root is not a JSON array"]
-    for i, r in enumerate(db):
-        for k in V1_REQUIRED:
-            if k not in r:
-                errs.append(f"existing record {i} missing v1 field {k}")
-    return errs
-
-
+# Record / DB schema validation is NOT redefined here. The canonical, single
+# source of truth is integrations/learning/validators.py (V1_REQUIRED +
+# validate_record + validate_db), which memory_writer.safe_append re-enforces on
+# the actual write. main() imports validate_record from there for its pre-check —
+# keeping the v1 contract defined in exactly one place.
 def atomic_write_json(path: Path, data) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -360,6 +336,7 @@ def main() -> int:
     if str(_LEARN) not in sys.path:
         sys.path.insert(0, str(_LEARN))
     import recommendation_service as RS
+    from validators import validate_record       # canonical v1 contract (single source)
 
     provenance = RS.build_provenance(
         None, created_at=args.created_at, project_name=args.project_name)
