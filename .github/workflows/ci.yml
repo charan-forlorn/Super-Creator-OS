@@ -1,0 +1,60 @@
+name: CI
+
+# Resolves audit finding T1 (no-CI). Runs the full test matrix on the pinned
+# runtime (CPython 3.11, matching requirements.txt "Tested on: CPython 3.11.15")
+# so dependency / Windows-compat / loop-closure regressions are caught on every
+# push and PR — not just on a developer's machine.
+#
+# Note on the smoke test (integrations/shortgen/tests/test_smoke_pipeline.py):
+# it exercises a REAL clip from input/reference/, which is .gitignored and so is
+# absent in CI. The test is written to SKIP cleanly (exit 0) when no asset is
+# present, so CI stays green without shipping media. Real-render verification
+# stays a local/manual gate.
+
+on:
+  push:
+    branches: [master, h1-foundation]
+  pull_request:
+    branches: [master]
+
+# Cancel an in-flight run when a newer commit is pushed to the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ffmpeg (ffprobe/ffmpeg on PATH — used by adapter + render)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffprobe -version | head -1
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Learning layer suite (stdlib spine + DQ + e2e closed-loop)
+        run: python integrations/learning/tests/run_suite.py
+
+      - name: Highlight engine tests
+        run: |
+          python integrations/highlight/tests/test_highlight_engine.py
+          python integrations/highlight/tests/test_narrative_engine.py
+
+      - name: Short-gen tests (montage, short generator, render smoke)
+        run: |
+          python integrations/shortgen/tests/test_montage.py
+          python integrations/shortgen/tests/test_short_generator.py
+          python integrations/shortgen/tests/test_smoke_pipeline.py
