@@ -57,3 +57,6 @@ work/video/
 work/frames/
 work/data/
 work/edit/
+
+# --- P0 cleanup: generated audit reports (not source) ---
+project_audit/
