@@ -294,6 +294,18 @@ def test_dq_suite_subprocess():
     check("DQ suite exits 0 (all its checks pass)", proc.returncode == 0)
 
 
+def test_e2e_loop_subprocess():
+    print("\n[8] delegate to end-to-end loop closure suite (test_e2e_loop.py)")
+    suite = _HERE / "test_e2e_loop.py"
+    env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
+    proc = subprocess.run([sys.executable, str(suite)], capture_output=True,
+                          text=True, env=env)
+    tail = "\n".join(proc.stdout.strip().splitlines()[-3:])
+    print("        " + tail.replace("\n", "\n        "))
+    check("e2e loop suite exits 0 (recommend->render->telemetry->evaluator closes)",
+          proc.returncode == 0)
+
+
 def main():
     os.environ.setdefault("PYTHONUTF8", "1")
     for s in (sys.stdout, sys.stderr):
@@ -313,6 +325,7 @@ def main():
     test_memory_writer_safe_append()
     test_write_guard()
     test_dq_suite_subprocess()
+    test_e2e_loop_subprocess()
     print("\n" + "=" * 64)
     print(f" RESULT: {_PASS} passed, {_FAIL} failed")
     print("=" * 64)
