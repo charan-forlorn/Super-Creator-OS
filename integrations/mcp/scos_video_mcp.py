@@ -31,7 +31,9 @@ def probe(path: str) -> str:
     v = next((s for s in data.get("streams",[]) if s.get("codec_type")=="video"), {})
     a = next((s for s in data.get("streams",[]) if s.get("codec_type")=="audio"), {})
     fr = v.get("r_frame_rate","0/1")
-    try: fps = round(eval(fr)) if "/" in fr else float(fr)
+    try:
+        num, den = (fr.split("/") + ["1"])[:2]
+        fps = round(float(num) / float(den)) if float(den) else None
     except Exception: fps = fr
     return json.dumps({
         "width": v.get("width"), "height": v.get("height"), "fps": fps,
