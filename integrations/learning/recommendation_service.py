@@ -44,6 +44,7 @@ sys.path.insert(0, str(_HERE))
 from event_bus import EventBus            # noqa: E402
 import anchor_library                     # noqa: E402
 import seed_store                         # noqa: E402
+import learning_evaluator as LE           # noqa: E402
 
 DB_PATH = _HERE.parents[1] / "memory" / "database.json"
 
@@ -184,7 +185,9 @@ def recommend(product_niche: str, project_name: str = "", *, db=None,
         # forward intelligence the downstream skills consume:
         "suggested_hooks_next_time": hooks,                       # -> Storytelling
         "hook_successful_prior": ref.get("hook_successful") if ref else None,  # -> Storytelling
-        "retention_benchmark": ref.get("retention_score") if ref else None,    # -> Retention Expert
+        "retention_benchmark": LE.calibrated_benchmark(            # -> Retention Expert
+            product_niche, default=ref.get("retention_score") if ref else None,
+            db_path=db),
         "retention_signals": ref.get("retention_signals") if ref else None,    # -> Retention Expert
         "highlight_patterns": ref.get("highlight_anchors", []) if ref else [],  # -> Timeline / cold-open
         "editing_specs_to_reuse": ref.get("editing_specs") if ref else None,   # -> Video Editor

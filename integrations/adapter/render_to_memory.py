@@ -347,7 +347,24 @@ def main() -> int:
     render = ffprobe_meta(Path(args.render)) if args.render else {}
     qa = _load_json(Path(args.qa)) if args.qa and Path(args.qa).exists() else {}
 
-    rec = build_record(args, edl, transcripts, render, qa)
+    # Fix the creation timestamp once so build_record and the provenance block
+    # (loop_run_id = created_at::project_name) agree on the same value.
+    args.created_at = args.created_at or _dt.datetime.now(_dt.timezone.utc).strftime(
+        "%Y-%m-%dT%H:%M:%S.000Z")
+
+    # PROVENANCE: stamp a loop_run_id on every CLI-written record so it can be
+    # joined to its forward-loop seed (if any) and to telemetry later. No seed
+    # is threaded through this legacy CLI yet, so build_provenance runs cold-start
+    # (seed=None) — it still derives a real loop_run_id from created_at+project_name.
+    _LEARN = Path(__file__).resolve().parents[1] / "learning"
+    if str(_LEARN) not in sys.path:
+        sys.path.insert(0, str(_LEARN))
+    import recommendation_service as RS
+
+    provenance = RS.build_provenance(
+        None, created_at=args.created_at, project_name=args.project_name)
+
+    rec = build_record(args, edl, transcripts, render, qa, provenance=provenance)
 
     errs = validate_record(rec)
     if errs:
