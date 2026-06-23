@@ -16,6 +16,7 @@ on:
     branches: [master, h1-foundation]
   pull_request:
     branches: [master]
+  workflow_dispatch:        # manual "Run workflow" button (bootstraps the first run)
 
 # Cancel an in-flight run when a newer commit is pushed to the same ref.
 concurrency:
