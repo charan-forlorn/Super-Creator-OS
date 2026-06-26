@@ -34,6 +34,7 @@ work/seeds/
 memory/_db_backups/
 memory/_telemetry_backups/
 memory/.*.integrity.json
+memory/.*.lock 
 integrations/learning/_*_backups/
 integrations/learning/archive/
 integrations/learning/events.jsonl

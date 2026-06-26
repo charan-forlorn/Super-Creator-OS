@@ -133,5 +133,119 @@
         "is_cold_start": true
       }
     }
+  },
+  {
+    "project_name": "RoV Double Kill - WF-1/2 Auto Short",
+    "product_niche": "Gaming (MOBA)",
+    "hook_successful": "Cold-open anchor @69.82s (Triple Kill)",
+    "editing_specs": "?, 1 segments (avg 5.0s, kept 7% of source), grade=none, subtitle=none",
+    "retention_score": 0,
+    "lesson_learned": "RENDER ISSUE: no render metadata (ffprobe failed or file missing) | highlight anchors from transcript confirm RMS peaks; climax callout 'Triple Kill' @69.82s -> use as cold-open hook | kept 7% speech (cut 93% dead/silence)",
+    "created_at": "2026-06-23T19:00:52.000Z",
+    "engine": "video-use",
+    "clip_type": "gaming_moba",
+    "transcribed": true,
+    "edl_path": "work\\edit\\edl.json",
+    "grade_used": "none",
+    "cut_padding_ms": null,
+    "subtitle_style": "none",
+    "render_success": false,
+    "qa_pass": true,
+    "highlight_anchors": [
+      {
+        "t": 0.1,
+        "label": "(music)",
+        "kind": "audio_event"
+      },
+      {
+        "t": 19.5,
+        "label": "(game sounds)",
+        "kind": "audio_event"
+      },
+      {
+        "t": 30.38,
+        "label": "Double Kill",
+        "kind": "callout"
+      },
+      {
+        "t": 37.36,
+        "label": "(game sounds)",
+        "kind": "audio_event"
+      },
+      {
+        "t": 54.9,
+        "label": "(game sounds)",
+        "kind": "audio_event"
+      },
+      {
+        "t": 58.54,
+        "label": "Legendary",
+        "kind": "callout"
+      },
+      {
+        "t": 60.78,
+        "label": "Legendary",
+        "kind": "callout"
+      },
+      {
+        "t": 62.98,
+        "label": "Ultimate",
+        "kind": "callout"
+      },
+      {
+        "t": 65.38,
+        "label": "Shut Down",
+        "kind": "callout"
+      },
+      {
+        "t": 69.56,
+        "label": "Double Kill",
+        "kind": "callout"
+      },
+      {
+        "t": 69.82,
+        "label": "Triple Kill",
+        "kind": "callout"
+      }
+    ],
+    "retention_signals": {
+      "num_segments": 1,
+      "avg_segment_s": 5.0,
+      "kept_speech_s": 5.0,
+      "source_total_s": 71.79,
+      "kept_ratio_pct": 7,
+      "output_duration_s": null,
+      "has_cold_open": false
+    },
+    "render_specs": {
+      "resolution": "?",
+      "fps": null,
+      "output_duration_s": null
+    },
+    "schema_version": "v3",
+    "provenance": {
+      "schema": "provenance/v3",
+      "loop_run_id": "2026-06-23T19:00:52.000Z::rov-double-kill-wf-1-2-auto-short",
+      "recommended": {
+        "recommendation_id": null,
+        "recommendation_timestamp": null,
+        "reference_project": null,
+        "match_quality": "cold_start",
+        "match_score": null,
+        "suggested_hooks": [],
+        "retention_benchmark": null,
+        "reused_editing_specs_source": null
+      },
+      "decided": {
+        "hooks_actually_used": null,
+        "hook_adoption": "none_suggested",
+        "reused_editing_specs": null,
+        "storytelling_decision": null
+      },
+      "linkage": {
+        "recommendation_available": false,
+        "is_cold_start": true
+      }
+    }
   }
 ]

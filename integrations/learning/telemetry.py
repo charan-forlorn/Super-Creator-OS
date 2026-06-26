@@ -28,11 +28,13 @@ import json
 import os
 import shutil
 import sys
+import uuid
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
 
+from _filelock import LockTimeout, atomic_replace, file_lock  # noqa: E402
 from validators import validate_telemetry, validate_telemetry_store  # noqa: E402
 
 DEFAULT_TELEMETRY = _HERE.parents[1] / "memory" / "telemetry.json"
@@ -49,9 +51,11 @@ def resolve_path(explicit: str | os.PathLike | None = None) -> Path:
 
 def _atomic_write(path: Path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    # Unique temp name (pid + uuid) — never share a fixed "telemetry.json.tmp"
+    # between concurrent writers (audit scenario 3.3).
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(tmp, path)
+    atomic_replace(tmp, path)
 
 
 def load_telemetry(path: str | os.PathLike | None = None) -> list[dict]:
@@ -72,27 +76,35 @@ def append_telemetry(entry: dict, path: str | os.PathLike | None = None) -> tupl
     if errs:
         return False, "telemetry invalid: " + "; ".join(errs)
 
-    store = load_telemetry(p)
-    serrs = validate_telemetry_store(store)
-    if serrs:
-        return False, "existing telemetry store invalid (refusing to write): " + "; ".join(serrs)
+    # CONCURRENCY GUARD (P0-4): lock read -> validate -> dedup -> append -> write
+    # so concurrent telemetry writers can't lose a row (audit scenario 3.5).
+    try:
+        with file_lock(p):
+            store = load_telemetry(p)
+            serrs = validate_telemetry_store(store)
+            if serrs:
+                return False, ("existing telemetry store invalid (refusing to write): "
+                               + "; ".join(serrs))
 
-    key = (entry["loop_run_id"], entry["platform"], entry["collected_at"])
-    if any((r.get("loop_run_id"), r.get("platform"), r.get("collected_at")) == key for r in store):
-        return False, "duplicate (loop_run_id+platform+collected_at) — aborted"
+            key = (entry["loop_run_id"], entry["platform"], entry["collected_at"])
+            if any((r.get("loop_run_id"), r.get("platform"), r.get("collected_at")) == key
+                   for r in store):
+                return False, "duplicate (loop_run_id+platform+collected_at) — aborted"
 
-    if p.exists():
-        bdir = p.parent / "_telemetry_backups"
-        bdir.mkdir(parents=True, exist_ok=True)
-        stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        shutil.copy2(p, bdir / f"telemetry.{stamp}.json")
+            if p.exists():
+                bdir = p.parent / "_telemetry_backups"
+                bdir.mkdir(parents=True, exist_ok=True)
+                stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                shutil.copy2(p, bdir / f"telemetry.{stamp}.json")
 
-    new_store = store + [entry]
-    if new_store[:len(store)] != store:           # post-condition: never alter old rows
-        return False, "append would alter existing telemetry — aborted"
+            new_store = store + [entry]
+            if new_store[:len(store)] != store:   # post-condition: never alter old rows
+                return False, "append would alter existing telemetry — aborted"
 
-    _atomic_write(p, new_store)
-    return True, f"appended telemetry row #{len(new_store)} for {entry['loop_run_id']}"
+            _atomic_write(p, new_store)
+            return True, f"appended telemetry row #{len(new_store)} for {entry['loop_run_id']}"
+    except LockTimeout as e:
+        return False, f"lock busy: {e}"
 
 
 def derive(entry: dict, output_duration_s: float | None = None) -> dict:

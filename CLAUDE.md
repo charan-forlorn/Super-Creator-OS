@@ -67,10 +67,15 @@ shift into the designated mode and execute until completion.
 
 ## ─── RAW INPUT CLEANUP PROTOCOL (standing authorization) ───
 
-The user has durably authorized automatic deletion of raw source clips in `input/raw/`
+> 🔒 **LOCKED SOURCE-VIDEO FOLDER — `input/reference/`** (set 2026-06-22 by user).
+> The folder where the user places the ORIGINAL/source video for an edit job is
+> `input/reference/` (formerly `input/raw/`). **Do NOT change this folder path
+> anywhere in the code/config/docs until the user explicitly approves the change.**
+
+The user has durably authorized automatic deletion of source clips in `input/reference/`
 after each completed edit job — no per-time confirmation needed. Rationale: the user
 already has the rendered output, and the system has already learned + persisted everything
-it needs; the raw is redundant and only causes ambiguity + disk bloat on the next job.
+it needs; the source is redundant and only causes ambiguity + disk bloat on the next job.
 
 **Run as the FINAL step of every edit job, but ONLY when ALL of these are confirmed true
 (learn & save FIRST, delete LAST):**
@@ -79,10 +84,10 @@ it needs; the raw is redundant and only causes ambiguity + disk bloat on the nex
 2. The learning record was appended to `memory/database.json` (Step 15 / Archive done).
 3. The provenance/archive snapshot exists in `integrations/learning/archive/<project>/`.
 
-Then delete the raw media files in `input/raw/` that were the input for THIS job
+Then delete the source media files in `input/reference/` that were the input for THIS job
 (`*.mp4 *.mov *.MP4 *.MOV` and job-specific sidecars like a matching `rms.txt`).
 
-**Hard stops — do NOT delete if any apply (raw is still needed):**
+**Hard stops — do NOT delete if any apply (source is still needed):**
 
 - Render failed, QA failed, or the job did not complete.
 - Any of the 3 preconditions above is unverified.

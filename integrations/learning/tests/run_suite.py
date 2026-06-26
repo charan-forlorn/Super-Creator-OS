@@ -306,6 +306,18 @@ def test_e2e_loop_subprocess():
           proc.returncode == 0)
 
 
+def test_concurrency_subprocess():
+    print("\n[9] delegate to memory concurrency regression (test_concurrency.py)")
+    suite = _HERE / "test_concurrency.py"
+    env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
+    proc = subprocess.run([sys.executable, str(suite)], capture_output=True,
+                          text=True, env=env)
+    tail = "\n".join(proc.stdout.strip().splitlines()[-3:])
+    print("        " + tail.replace("\n", "\n        "))
+    check("concurrency suite exits 0 (no lost-update / temp-collision under N writers)",
+          proc.returncode == 0)
+
+
 def main():
     os.environ.setdefault("PYTHONUTF8", "1")
     for s in (sys.stdout, sys.stderr):
@@ -326,6 +338,7 @@ def main():
     test_write_guard()
     test_dq_suite_subprocess()
     test_e2e_loop_subprocess()
+    test_concurrency_subprocess()
     print("\n" + "=" * 64)
     print(f" RESULT: {_PASS} passed, {_FAIL} failed")
     print("=" * 64)
