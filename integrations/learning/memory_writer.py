@@ -17,8 +17,10 @@ import hashlib
 import json
 import os
 import shutil
+import uuid
 from pathlib import Path
 
+from _filelock import LockTimeout, atomic_replace, file_lock
 from validators import validate_record, validate_db, validate_provenance
 
 DEFAULT_DB = Path(__file__).resolve().parents[2] / "memory" / "database.json"
@@ -82,14 +84,31 @@ def _atomic_write_json(path: Path, data, _token=None) -> None:
     if _token is not _WRITE_TOKEN:
         raise PermissionError(
             "direct DB write blocked — use memory_writer.safe_append() (the approved safe path)")
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    # Unique temp name (pid + uuid) so two concurrent writers never share the same
+    # "database.json.tmp" and clobber each other's bytes (audit scenario 3.3).
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(tmp, path)
+    atomic_replace(tmp, path)
 
 
 def safe_append(record: dict, db_path: Path | None = None) -> tuple[bool, str]:
     db_path = Path(db_path) if db_path else DEFAULT_DB
+    # CONCURRENCY GUARD (P0-4): hold an exclusive cross-process lock across the
+    # whole read -> validate -> append -> atomic write -> marker section. Without
+    # it, two writers can both read N records and the last os.replace() drops one
+    # (silent lost update). The lock makes the critical section serializable; the
+    # integrity marker is now refreshed INSIDE the lock, so a concurrent reader can
+    # never observe the os.replace()/marker gap (audit scenarios 3.1 + 3.2).
+    try:
+        with file_lock(db_path):
+            return _safe_append_locked(record, db_path)
+    except LockTimeout as e:
+        # Surface contention as a normal rejection — preserve the (ok, info)
+        # contract (safe_append never raises on a non-exceptional outcome).
+        return False, f"lock busy: {e}"
 
+
+def _safe_append_locked(record: dict, db_path: Path) -> tuple[bool, str]:
     # WRITE GUARD (layer 2): refuse to append onto a DB that was changed
     # out-of-band (raw open()/manual edit) since the last safe_append. This makes
     # any direct write tamper-evident and keeps safe_append the source of truth.

@@ -18,8 +18,10 @@ import datetime as _dt
 import json
 import os
 import shutil
+import uuid
 from pathlib import Path
 
+from _filelock import LockTimeout, atomic_replace, file_lock
 from validators import validate_anchor_library
 
 LIB_PATH = Path(__file__).resolve().parents[2] / "memory" / "highlight_anchor_library.json"
@@ -47,9 +49,11 @@ def _load(path: Path) -> dict:
 
 
 def _atomic_write(path: Path, data) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    # Unique temp name (pid + uuid) so concurrent writers don't share a fixed
+    # "highlight_anchor_library.json.tmp" (audit scenario 3.3).
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(tmp, path)
+    atomic_replace(tmp, path)
 
 
 def _norm(s: str) -> str:
@@ -78,42 +82,50 @@ def record_project_anchors(niche: str, anchors: list[dict], retention_score: int
                            success: bool, path: Path | None = None) -> tuple[bool, str, list[str]]:
     """Update the library from a finished project. Returns (ok, info, newly_discovered_phrases)."""
     p = resolve_lib_path(path)
-    lib = _load(p)
-    errs = validate_anchor_library(lib) if lib else []
-    if errs:
-        return False, "library invalid: " + "; ".join(errs), []
+    # CONCURRENCY GUARD (P0-4): lock load -> mutate counters -> backup -> write so
+    # two concurrent updates can't lose each other's increments (audit scenario
+    # 3.5 — this store has no integrity marker, so loss would be undetectable).
+    try:
+        with file_lock(p):
+            lib = _load(p)
+            errs = validate_anchor_library(lib) if lib else []
+            if errs:
+                return False, "library invalid: " + "; ".join(errs), []
 
-    meta = {k: v for k, v in lib.items() if k.startswith("_")}
-    lib.setdefault(niche, {"anchors": []})
-    existing = {_norm(a["phrase"]): a for a in lib[niche]["anchors"]}
-    discovered: list[str] = []
+            meta = {k: v for k, v in lib.items() if k.startswith("_")}
+            lib.setdefault(niche, {"anchors": []})
+            existing = {_norm(a["phrase"]): a for a in lib[niche]["anchors"]}
+            discovered: list[str] = []
 
-    for anc in anchors:
-        phrase = (anc.get("label") or anc.get("phrase") or "").strip()
-        if not phrase:
-            continue
-        key = _norm(phrase)
-        rec = existing.get(key)
-        if rec is None:
-            rec = {"phrase": phrase, "kind": anc.get("kind", "callout"),
-                   "frequency": 0, "retention_sum": 0, "retention_count": 0,
-                   "success_count": 0, "use_count": 0, "last_used": None}
-            existing[key] = rec
-            lib[niche]["anchors"].append(rec)
-            discovered.append(phrase)
-        rec["frequency"] += 1
-        rec["use_count"] += 1
-        rec["retention_sum"] += int(retention_score)
-        rec["retention_count"] += 1
-        if success:
-            rec["success_count"] += 1
-        rec["last_used"] = _now()
+            for anc in anchors:
+                phrase = (anc.get("label") or anc.get("phrase") or "").strip()
+                if not phrase:
+                    continue
+                key = _norm(phrase)
+                rec = existing.get(key)
+                if rec is None:
+                    rec = {"phrase": phrase, "kind": anc.get("kind", "callout"),
+                           "frequency": 0, "retention_sum": 0, "retention_count": 0,
+                           "success_count": 0, "use_count": 0, "last_used": None}
+                    existing[key] = rec
+                    lib[niche]["anchors"].append(rec)
+                    discovered.append(phrase)
+                rec["frequency"] += 1
+                rec["use_count"] += 1
+                rec["retention_sum"] += int(retention_score)
+                rec["retention_count"] += 1
+                if success:
+                    rec["success_count"] += 1
+                rec["last_used"] = _now()
 
-    # backup + atomic write
-    if p.exists():
-        bdir = p.parent / "_db_backups"
-        bdir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(p, bdir / f"anchor_library.{_dt.datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.json")
-    out = {**meta, **{k: v for k, v in lib.items() if not k.startswith("_")}}
-    _atomic_write(p, out)
-    return True, f"updated niche '{niche}' ({len(anchors)} anchors, {len(discovered)} new)", discovered
+            # backup + atomic write
+            if p.exists():
+                bdir = p.parent / "_db_backups"
+                bdir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(p, bdir / f"anchor_library.{_dt.datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.json")
+            out = {**meta, **{k: v for k, v in lib.items() if not k.startswith("_")}}
+            _atomic_write(p, out)
+            return (True, f"updated niche '{niche}' ({len(anchors)} anchors, "
+                    f"{len(discovered)} new)", discovered)
+    except LockTimeout as e:
+        return False, f"lock busy: {e}", []
