@@ -59,3 +59,6 @@ jobs:
           python integrations/shortgen/tests/test_montage.py
           python integrations/shortgen/tests/test_short_generator.py
           python integrations/shortgen/tests/test_smoke_pipeline.py
+
+      - name: Module 2 — real FFmpeg renderer (synthetic lavfi fixtures, real render)
+        run: python scos/render/tests/test_renderer.py
