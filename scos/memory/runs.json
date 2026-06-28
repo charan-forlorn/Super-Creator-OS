@@ -1,0 +1,71 @@
+[
+  {
+    "input": "a dog learns to skateboard",
+    "output_summary": {
+      "status": "success",
+      "video_path": "scos/work/video/4f7c92b48a77.mp4"
+    },
+    "qa_result": {
+      "sync": true,
+      "duration": true,
+      "missing_assets": [
+        "scos/work/frames/4f7c92b48a77_d3e57532.png",
+        "scos/work/frames/4f7c92b48a77_a7d064af.png"
+      ],
+      "passed": true
+    },
+    "timestamp": "2026-06-27T12:45:43.924244+00:00"
+  },
+  {
+    "input": "a dog learns to skateboard",
+    "output_summary": {
+      "status": "success",
+      "video_path": "scos/work/video/4f7c92b48a77.mp4"
+    },
+    "qa_result": {
+      "sync": true,
+      "duration": true,
+      "missing_assets": [
+        "scos/work/frames/4f7c92b48a77_d3e57532.png",
+        "scos/work/frames/4f7c92b48a77_a7d064af.png"
+      ],
+      "passed": true
+    },
+    "timestamp": "2026-06-27T12:45:48.506102+00:00"
+  },
+  {
+    "input": "a dog learns to skateboard",
+    "output_summary": {
+      "status": "success",
+      "video_path": "scos/work/video/4f7c92b48a77.mp4"
+    },
+    "qa_result": {
+      "sync": true,
+      "duration": true,
+      "missing_assets": [
+        "scos/work/frames/4f7c92b48a77_d3e57532.png",
+        "scos/work/frames/4f7c92b48a77_a7d064af.png"
+      ],
+      "passed": true
+    },
+    "timestamp": "2026-06-27T12:45:48.520647+00:00"
+  },
+  {
+    "input": "force a failure case",
+    "output_summary": {
+      "status": "failed",
+      "video_path": null
+    },
+    "qa_result": null,
+    "timestamp": "2026-06-27T12:45:57.103003+00:00"
+  },
+  {
+    "input": "test!",
+    "output_summary": {
+      "status": "failed",
+      "video_path": null
+    },
+    "qa_result": null,
+    "timestamp": "2026-06-27T13:49:18.305093+00:00"
+  }
+]
