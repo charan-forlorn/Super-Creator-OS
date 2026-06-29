@@ -1,0 +1,10 @@
+# git status --porcelain @ certification freeze (pre-commit), Stage 3.8
+# Branch: main   HEAD: 2b84cd3   describe: scos-stage-3.7-certified-1-g2b84cd3
+ M README.md
+?? scos/knowledge/explain_facade.py
+?? scos/knowledge/insight_engine.py
+?? scos/knowledge/insight_models.py
+?? scos/knowledge/tests/test_insight_engine.py
+
+# Included in Stage 3.8 commit (explicit pathspec): the 4 scos/knowledge/* files above.
+# Excluded: README.md (pre-existing modification, present at session start, NOT Stage 3.8 work).

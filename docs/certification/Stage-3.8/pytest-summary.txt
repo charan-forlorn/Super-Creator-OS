@@ -1,0 +1,24 @@
+# Fresh regression run — Stage 3.8 certification (plain-assert suites, not pytest)
+# Python 3.11.15 | MINGW64_NT-10.0-26200 | duration ~237s
+
+Truth Runner ............................ PASS (status)
+Qualification ........................... 10
+YouTube Adapter ......................... 25
+Analytics Translator .................... 28
+FeedbackEngine .......................... 16
+LearningCoordinator ..................... 26
+StyleMemory ............................. 19
+AssetBuilder ............................ 21
+AssetBuilderV2 .......................... 15
+Renderer ................................ 18
+LearningPipeline ........................ 63
+Replay Engine ........................... 46
+CI learning-layer suite (aggregate) ..... 58
+Stage 3.5 test_learning_index.py ........ 47
+---------------------------------------------------
+Certified baseline subtotal ............. 392   (>= 392 required: PASS)
+Stage 3.6 test_query_engine.py .......... 75
+Stage 3.7 test_explain_engine.py ........ 39
+Stage 3.8 test_insight_engine.py ........ 47
+===================================================
+TOTAL ................................... 553   (0 failed)

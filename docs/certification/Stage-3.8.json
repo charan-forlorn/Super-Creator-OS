@@ -1,0 +1,16 @@
+{
+  "stage": "3.8",
+  "status": "PASS",
+  "score": 99,
+  "tag": "scos-stage-3.8-certified",
+  "implementation_commit": "583f6f0",
+  "documentation_commit": null,
+  "regression_total": 553,
+  "regression_baseline": 392,
+  "technical_debt": 3,
+  "blocking": false,
+  "previous_tag": "scos-stage-3.7-certified",
+  "next_stage": "3.9",
+  "certification_id": "cert_b5e30a7c9d14",
+  "date": "2026-06-29"
+}

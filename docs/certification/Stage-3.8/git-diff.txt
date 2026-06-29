@@ -1,0 +1,9 @@
+# git diff --stat HEAD @ certification freeze, Stage 3.8
+# The 4 Stage 3.8 files are untracked (new), so they do not appear in `git diff HEAD`.
+# The only tracked-file diff is the pre-existing, EXCLUDED README.md:
+
+ README.md | 259 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 258 insertions(+), 1 deletion(-)
+
+# Conclusion: zero certified-core / Stage 3.5-3.7 / replay / analytics / renderer /
+# persistence file changed by Stage 3.8.

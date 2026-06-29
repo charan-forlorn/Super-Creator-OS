@@ -1,0 +1,22 @@
+# Architecture/contract grep evidence — Stage 3.8 certification
+
+### Dependency: KnowledgeExplainEngine(...) construction repo-wide (scos/knowledge/*.py)
+scos/knowledge/explain_facade.py:154:        self._engine = KnowledgeExplainEngine(index)
+# -> constructed ONLY in the facade. Insight never constructs it.
+
+### Dependency: `import explain_models` repo-wide (scos/knowledge/*.py)
+scos/knowledge/explain_engine.py:34:import explain_models as em      # defines/uses the models
+scos/knowledge/explain_facade.py:39:import explain_models as _em     # adapts them (quarantine point)
+# -> NOT imported by insight_engine.py / insight_models.py.
+
+### Contract leakage in insight files: metrics|quality_score|retention_score|supporting_events|startswith(|.split(
+# grep over insight_engine.py + insight_models.py -> 0 matches (exit 1).
+
+### Facade re-export probe: `=\s*_em.` in explain_facade.py
+# -> 0 matches (exit 1). Facade defines its own ConfidenceFact/EventFact/Reference/ExplainFact
+#    + REF_CATEGORY_ORDER + CONFIDENCE_*/ERROR_* constants; re-exports nothing.
+
+### Drift containment
+# Upstream Explain shape knowledge confined to explain_facade.py
+# (_to_fact / _event_fact / _reference / _confidence + _K_* key constants).
+# Files outside explain_facade.py requiring change on Explain drift = 0.

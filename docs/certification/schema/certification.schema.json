@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scos/docs/certification/schema/certification.schema.json",
+  "title": "SCOS Stage Certification Manifest",
+  "description": "Machine-readable manifest emitted by each SCOS stage certification. One instance per stage (e.g. docs/certification/Stage-3.8.json). Consumed by dashboards, CLI, and release tooling without parsing the human Markdown report.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "stage",
+    "status",
+    "score",
+    "tag",
+    "implementation_commit",
+    "regression_total",
+    "regression_baseline",
+    "technical_debt",
+    "blocking"
+  ],
+  "properties": {
+    "stage": {
+      "type": "string",
+      "description": "Stage identifier, e.g. \"3.8\".",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["PASS", "FAIL"]
+    },
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "tag": {
+      "type": "string",
+      "description": "Annotated git tag on the implementation commit, e.g. \"scos-stage-3.8-certified\"."
+    },
+    "implementation_commit": {
+      "type": "string",
+      "description": "Short or full SHA of the implementation commit the tag points at."
+    },
+    "documentation_commit": {
+      "type": ["string", "null"],
+      "description": "SHA of the certification-docs commit. Null when the manifest is committed inside that same commit (a file cannot contain its own commit hash); the value is then recoverable from git log."
+    },
+    "regression_total": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total passing tests across all suites at certification time."
+    },
+    "regression_baseline": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Certified baseline that regression_total must meet or exceed."
+    },
+    "technical_debt": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Count of recorded (non-blocking) technical-debt backlog items."
+    },
+    "blocking": {
+      "type": "boolean",
+      "description": "True if any blocking issue remains (must be false for a PASS closure)."
+    },
+    "previous_tag": {
+      "type": ["string", "null"],
+      "description": "Prior stage's certified tag."
+    },
+    "next_stage": {
+      "type": ["string", "null"],
+      "description": "Next planned stage (not started under this certification)."
+    },
+    "certification_id": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string"
+    }
+  }
+}
