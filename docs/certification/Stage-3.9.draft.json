@@ -1,0 +1,20 @@
+{
+  "stage": "3.9",
+  "status": "DRAFT_NOT_CERTIFIED",
+  "scope": [
+    "scos/knowledge/knowledge_service.py",
+    "scos/knowledge/knowledge_view_models.py",
+    "scos/knowledge/tests/test_knowledge_service.py",
+    "docs/certification/Stage-3.9.md",
+    "docs/certification/Stage-3.9.draft.json",
+    "docs/certification/Stage-3.9/architecture_spec.md",
+    "docs/certification/Stage-3.9/README.md",
+    "scos/repository/ENTRY_POINTS.md",
+    "scos/repository/NAVIGATION_MODEL.md"
+  ],
+  "previous_certified_tag": "scos-stage-3.8-certified",
+  "certification_manifest": "not_emitted",
+  "certification_tag": null,
+  "commit": null,
+  "notes": "Draft preparation only. Do not consume as a formal certification manifest."
+}
