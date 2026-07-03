@@ -97,6 +97,13 @@ _LAZY_EXPORTS: dict[str, str] = {
     "FirstProspectMiniAuditHandoffResult": "mini_audit_handoff_models",
     "FirstProspectMiniAuditHandoffError": "mini_audit_handoff_models",
     "create_first_prospect_mini_audit_handoff": "first_prospect_mini_audit_handoff",
+    "FIRST_PROSPECT_MINI_AUDIT_DELIVERY_LOG_SCHEMA_VERSION": "mini_audit_delivery_models",
+    "MiniAuditDeliveryCheck": "mini_audit_delivery_models",
+    "MiniAuditDeliveryEvidence": "mini_audit_delivery_models",
+    "MiniAuditDeliveryNextAction": "mini_audit_delivery_models",
+    "FirstProspectMiniAuditDeliveryLogResult": "mini_audit_delivery_models",
+    "FirstProspectMiniAuditDeliveryLogError": "mini_audit_delivery_models",
+    "record_first_prospect_mini_audit_delivery": "first_prospect_mini_audit_delivery_log",
 }
 
 
@@ -198,4 +205,11 @@ __all__ = (
     "FirstProspectMiniAuditHandoffResult",
     "FirstProspectMiniAuditHandoffError",
     "create_first_prospect_mini_audit_handoff",
+    "FIRST_PROSPECT_MINI_AUDIT_DELIVERY_LOG_SCHEMA_VERSION",
+    "MiniAuditDeliveryCheck",
+    "MiniAuditDeliveryEvidence",
+    "MiniAuditDeliveryNextAction",
+    "FirstProspectMiniAuditDeliveryLogResult",
+    "FirstProspectMiniAuditDeliveryLogError",
+    "record_first_prospect_mini_audit_delivery",
 )
