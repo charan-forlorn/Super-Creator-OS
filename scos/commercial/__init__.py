@@ -91,6 +91,12 @@ _LAZY_EXPORTS: dict[str, str] = {
     "FirstProspectFollowUpDecisionResult": "follow_up_models",
     "FirstProspectFollowUpDecisionError": "follow_up_models",
     "decide_first_prospect_follow_up": "first_prospect_follow_up_decision",
+    "FIRST_PROSPECT_MINI_AUDIT_HANDOFF_SCHEMA_VERSION": "mini_audit_handoff_models",
+    "MiniAuditHandoffCheck": "mini_audit_handoff_models",
+    "MiniAuditHandoffArtifact": "mini_audit_handoff_models",
+    "FirstProspectMiniAuditHandoffResult": "mini_audit_handoff_models",
+    "FirstProspectMiniAuditHandoffError": "mini_audit_handoff_models",
+    "create_first_prospect_mini_audit_handoff": "first_prospect_mini_audit_handoff",
 }
 
 
@@ -186,4 +192,10 @@ __all__ = (
     "FirstProspectFollowUpDecisionResult",
     "FirstProspectFollowUpDecisionError",
     "decide_first_prospect_follow_up",
+    "FIRST_PROSPECT_MINI_AUDIT_HANDOFF_SCHEMA_VERSION",
+    "MiniAuditHandoffCheck",
+    "MiniAuditHandoffArtifact",
+    "FirstProspectMiniAuditHandoffResult",
+    "FirstProspectMiniAuditHandoffError",
+    "create_first_prospect_mini_audit_handoff",
 )
