@@ -48,6 +48,13 @@ _LAZY_EXPORTS: dict[str, str] = {
     "MonetizationReadinessResult": "monetization_models",
     "MonetizationReadinessError": "monetization_models",
     "review_monetization_readiness": "monetization_readiness",
+    "FIRST_PAID_CUSTOMER_DRY_RUN_SCHEMA_VERSION": "dry_run_models",
+    "SyntheticCustomerCase": "dry_run_models",
+    "DryRunStep": "dry_run_models",
+    "DryRunBlocker": "dry_run_models",
+    "FirstPaidCustomerDryRunResult": "dry_run_models",
+    "FirstPaidCustomerDryRunError": "dry_run_models",
+    "run_first_paid_customer_dry_run": "first_paid_customer_dry_run",
 }
 
 
@@ -100,4 +107,11 @@ __all__ = (
     "MonetizationReadinessResult",
     "MonetizationReadinessError",
     "review_monetization_readiness",
+    "FIRST_PAID_CUSTOMER_DRY_RUN_SCHEMA_VERSION",
+    "SyntheticCustomerCase",
+    "DryRunStep",
+    "DryRunBlocker",
+    "FirstPaidCustomerDryRunResult",
+    "FirstPaidCustomerDryRunError",
+    "run_first_paid_customer_dry_run",
 )
