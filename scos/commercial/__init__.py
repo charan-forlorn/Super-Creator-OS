@@ -42,6 +42,12 @@ _LAZY_EXPORTS: dict[str, str] = {
     "CustomerKitResult": "customer_kit_models",
     "CustomerKitError": "customer_kit_models",
     "generate_first_customer_kit": "customer_kit",
+    "MONETIZATION_READINESS_SCHEMA_VERSION": "monetization_models",
+    "MonetizationReadinessCheck": "monetization_models",
+    "MonetizationGap": "monetization_models",
+    "MonetizationReadinessResult": "monetization_models",
+    "MonetizationReadinessError": "monetization_models",
+    "review_monetization_readiness": "monetization_readiness",
 }
 
 
@@ -88,4 +94,10 @@ __all__ = (
     "CustomerKitResult",
     "CustomerKitError",
     "generate_first_customer_kit",
+    "MONETIZATION_READINESS_SCHEMA_VERSION",
+    "MonetizationReadinessCheck",
+    "MonetizationGap",
+    "MonetizationReadinessResult",
+    "MonetizationReadinessError",
+    "review_monetization_readiness",
 )
