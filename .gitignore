@@ -64,3 +64,6 @@ scos/work/
 
 # --- P0 cleanup: generated audit reports (not source) ---
 project_audit/
+.claude/
+.codex/
+.continue/
