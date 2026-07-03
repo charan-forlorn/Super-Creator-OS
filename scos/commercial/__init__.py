@@ -32,6 +32,11 @@ _LAZY_EXPORTS: dict[str, str] = {
     "CommercialRunResult": "run_models",
     "CommercialRunError": "run_models",
     "run_commercial_delivery": "run_orchestrator",
+    "COMMERCIAL_ACCEPTANCE_SCHEMA_VERSION": "acceptance_models",
+    "AcceptanceCheck": "acceptance_models",
+    "CommercialAcceptanceReport": "acceptance_models",
+    "CommercialAcceptanceError": "acceptance_models",
+    "run_commercial_acceptance_gate": "acceptance_gate",
 }
 
 
@@ -68,4 +73,9 @@ __all__ = (
     "CommercialRunResult",
     "CommercialRunError",
     "run_commercial_delivery",
+    "COMMERCIAL_ACCEPTANCE_SCHEMA_VERSION",
+    "AcceptanceCheck",
+    "CommercialAcceptanceReport",
+    "CommercialAcceptanceError",
+    "run_commercial_acceptance_gate",
 )
