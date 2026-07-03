@@ -62,6 +62,14 @@ _LAZY_EXPORTS: dict[str, str] = {
     "LaunchCertificationResult": "launch_certification_models",
     "LaunchCertificationError": "launch_certification_models",
     "create_commercial_launch_certification_pack": "launch_certification_pack",
+    "OPERATOR_PRACTICE_SCHEMA_VERSION": "practice_models",
+    "PracticeScenario": "practice_models",
+    "PracticeStep": "practice_models",
+    "PracticeObservation": "practice_models",
+    "OperatorPracticeResult": "practice_models",
+    "OperatorPracticeError": "practice_models",
+    "available_practice_scenarios": "operator_practice_lab",
+    "run_operator_practice_scenario": "operator_practice_lab",
 }
 
 
@@ -128,4 +136,12 @@ __all__ = (
     "LaunchCertificationResult",
     "LaunchCertificationError",
     "create_commercial_launch_certification_pack",
+    "OPERATOR_PRACTICE_SCHEMA_VERSION",
+    "PracticeScenario",
+    "PracticeStep",
+    "PracticeObservation",
+    "OperatorPracticeResult",
+    "OperatorPracticeError",
+    "available_practice_scenarios",
+    "run_operator_practice_scenario",
 )
