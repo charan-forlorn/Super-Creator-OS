@@ -1,0 +1,6 @@
+# Single-package project (not a monorepo). This file only declares build-script
+# approvals required by pnpm 11. These transitive native builds are not needed for
+# this frontend prototype, so they are intentionally disabled.
+allowBuilds:
+  sharp: false
+  unrs-resolver: false

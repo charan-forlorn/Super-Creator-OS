@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+/*
+  SCOS Agent Control Center — dark premium theme.
+  Tailwind v4: theme tokens are declared with @theme so they become utilities.
+*/
+
+@theme {
+  --color-canvas: #0a0b0f;
+  --color-surface: #12141c;
+  --color-surface-2: #171a24;
+  --color-border: #262b38;
+  --color-border-soft: #1e2230;
+  --color-ink: #e7e9ef;
+  --color-ink-muted: #9aa1b2;
+  --color-ink-faint: #6b7180;
+
+  --color-accent: #6366f1;
+
+  --color-agent-emerald: #34d399;
+  --color-agent-violet: #a78bfa;
+  --color-agent-sky: #38bdf8;
+  --color-agent-amber: #fbbf24;
+
+  --color-status-working: #f59e0b;
+  --color-status-blocked: #f43f5e;
+  --color-status-approved: #22c55e;
+  --color-status-review: #8b5cf6;
+  --color-status-idle: #64748b;
+
+  --radius-card: 16px;
+}
+
+html,
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Thin, unobtrusive scrollbars that suit the dark theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 9999px;
+}
+
+/* ---------- Mascot "Orbit" animations (CSS-only, no assets) ---------- */
+
+@keyframes orbit-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes orbit-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes orbit-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes orbit-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.orbit-float {
+  animation: orbit-float 4.5s ease-in-out infinite;
+}
+.orbit-glow {
+  animation: orbit-pulse 2.4s ease-in-out infinite;
+}
+.orbit-eye {
+  animation: orbit-blink 5.5s ease-in-out infinite;
+  transform-origin: center;
+}
+.orbit-ring {
+  animation: orbit-spin 9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orbit-float,
+  .orbit-glow,
+  .orbit-eye,
+  .orbit-ring {
+    animation: none;
+  }
+}
