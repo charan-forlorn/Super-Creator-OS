@@ -70,6 +70,13 @@ _LAZY_EXPORTS: dict[str, str] = {
     "OperatorPracticeError": "practice_models",
     "available_practice_scenarios": "operator_practice_lab",
     "run_operator_practice_scenario": "operator_practice_lab",
+    "FIRST_OUTREACH_LAUNCH_KIT_SCHEMA_VERSION": "outreach_models",
+    "OutreachLaunchProfile": "outreach_models",
+    "OutreachAsset": "outreach_models",
+    "OutreachReadinessCheck": "outreach_models",
+    "FirstOutreachLaunchKitResult": "outreach_models",
+    "FirstOutreachLaunchKitError": "outreach_models",
+    "create_first_outreach_launch_kit": "first_outreach_launch_kit",
 }
 
 
@@ -144,4 +151,11 @@ __all__ = (
     "OperatorPracticeError",
     "available_practice_scenarios",
     "run_operator_practice_scenario",
+    "FIRST_OUTREACH_LAUNCH_KIT_SCHEMA_VERSION",
+    "OutreachLaunchProfile",
+    "OutreachAsset",
+    "OutreachReadinessCheck",
+    "FirstOutreachLaunchKitResult",
+    "FirstOutreachLaunchKitError",
+    "create_first_outreach_launch_kit",
 )
