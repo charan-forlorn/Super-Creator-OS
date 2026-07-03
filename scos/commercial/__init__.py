@@ -77,6 +77,14 @@ _LAZY_EXPORTS: dict[str, str] = {
     "FirstOutreachLaunchKitResult": "outreach_models",
     "FirstOutreachLaunchKitError": "outreach_models",
     "create_first_outreach_launch_kit": "first_outreach_launch_kit",
+    "FIRST_PROSPECT_EXECUTION_LOG_SCHEMA_VERSION": "prospect_models",
+    "ProspectProfile": "prospect_models",
+    "ProspectOutreachAction": "prospect_models",
+    "ProspectResponseStatus": "prospect_models",
+    "ProspectExecutionCheck": "prospect_models",
+    "FirstProspectExecutionLogResult": "prospect_models",
+    "FirstProspectExecutionLogError": "prospect_models",
+    "record_first_prospect_execution": "first_prospect_execution_log",
 }
 
 
@@ -158,4 +166,12 @@ __all__ = (
     "FirstOutreachLaunchKitResult",
     "FirstOutreachLaunchKitError",
     "create_first_outreach_launch_kit",
+    "FIRST_PROSPECT_EXECUTION_LOG_SCHEMA_VERSION",
+    "ProspectProfile",
+    "ProspectOutreachAction",
+    "ProspectResponseStatus",
+    "ProspectExecutionCheck",
+    "FirstProspectExecutionLogResult",
+    "FirstProspectExecutionLogError",
+    "record_first_prospect_execution",
 )
