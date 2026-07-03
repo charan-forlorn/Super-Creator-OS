@@ -21,13 +21,16 @@ export function TaskBoard({
   onSelectTask: (taskId: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+    // Below xl: horizontal-scroll strip of fixed-width columns (the only intentional
+    // horizontal scroll region). At xl+: a 6-column grid. `min-w-0` keeps the scroll
+    // contained here so the page itself never overflows horizontally.
+    <div className="flex min-w-0 snap-x gap-3 overflow-x-auto pb-2 xl:grid xl:grid-cols-6 xl:overflow-visible xl:pb-0">
       {BOARD_COLUMNS.map((status) => {
         const columnTasks = tasks.filter((task) => task.status === status);
         return (
           <div
             key={status}
-            className="flex min-h-40 flex-col rounded-xl border border-border-soft bg-surface/50 p-2.5"
+            className="flex min-h-40 w-[80%] shrink-0 snap-start flex-col rounded-xl border border-border-soft bg-surface/50 p-2.5 sm:w-64 xl:w-auto xl:shrink"
           >
             <div className="mb-2 flex items-center justify-between px-1">
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-muted">

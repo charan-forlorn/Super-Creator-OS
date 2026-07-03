@@ -64,7 +64,23 @@ pnpm build
 └───────────┴─────────────────────────────────────────────┴──────────────┘
 ```
 
-The right rail (Task Detail + Orbit) is shown on wide (`xl`) desktop viewports.
+### Responsive layout matrix
+
+The layout adapts across breakpoints so selection feedback and the task board stay usable
+at every width (v0.1.1 responsive polish):
+
+| Width | Navigation | Task board | Task Detail + Orbit |
+| ----- | ---------- | ---------- | ------------------- |
+| **xl+** (≥1280) | Left sidebar | 6-column grid | Right rail (full Orbit) |
+| **lg** (1024–1279) | Left sidebar | Horizontal-scroll columns | In-flow below board (2-up, compact Orbit) |
+| **md** (768–1023) | Compact top-nav | Horizontal-scroll columns | In-flow below board (2-up, compact Orbit) |
+| **sm** (<768) | Compact top-nav | Horizontal-scroll columns (single col wide) | In-flow below board (stacked, compact Orbit) |
+
+The right rail (`hidden xl:block`) and the in-flow "Selected Task & Orbit" section
+(`xl:hidden`) render the same `TaskDetailPanel` + `MascotAssistant` from the same shared
+state — only one is painted per breakpoint (the other is `display:none`, so it is also
+excluded from the accessibility tree). Horizontal scrolling is intentionally confined to the
+task board; the page itself never overflows horizontally.
 
 ## Orbit, the mascot
 

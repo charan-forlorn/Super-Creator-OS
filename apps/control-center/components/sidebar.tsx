@@ -26,7 +26,7 @@ export function Sidebar({
   onSelect: (id: string) => void;
 }) {
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-surface/60">
+    <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-surface/60 lg:flex">
       <div className="flex items-center gap-2.5 px-5 py-5">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/20 text-accent ring-1 ring-inset ring-accent/40">
           <span className="text-base font-bold">S</span>
@@ -78,5 +78,51 @@ export function Sidebar({
         </p>
       </div>
     </aside>
+  );
+}
+
+/**
+ * Compact horizontal navigation shown below `lg`, where the vertical sidebar is hidden.
+ * Stateless: reuses NAV_SECTIONS and the same activeSection/onSelect props as Sidebar.
+ * No local state, no drawer, no routing.
+ */
+export function TopNav({
+  activeSection,
+  onSelect,
+}: {
+  activeSection: string;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <nav
+      aria-label="Sections"
+      className="flex gap-1.5 overflow-x-auto border-b border-border bg-surface/50 px-4 py-2"
+    >
+      {NAV_SECTIONS.map((section) => {
+        const active = section.id === activeSection;
+        return (
+          <button
+            key={section.id}
+            type="button"
+            onClick={() => onSelect(section.id)}
+            aria-current={active ? "true" : undefined}
+            className={cn(
+              "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+              active
+                ? "bg-accent/15 text-ink ring-1 ring-inset ring-accent/30"
+                : "text-ink-muted hover:bg-surface-2 hover:text-ink",
+            )}
+          >
+            <span
+              className={cn(active ? "text-accent" : "text-ink-faint")}
+              aria-hidden
+            >
+              {section.icon}
+            </span>
+            {section.label}
+          </button>
+        );
+      })}
+    </nav>
   );
 }

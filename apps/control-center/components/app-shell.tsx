@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { Sidebar } from "./sidebar";
+import { Sidebar, TopNav } from "./sidebar";
 import { Topbar } from "./topbar";
 import { AgentStatusCard } from "./agent-status-card";
 import { TaskBoard } from "./task-board";
@@ -115,6 +115,11 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar stage={STAGE_PROGRESS} activeAgent={activeAgent} />
 
+        {/* Compact horizontal nav replaces the sidebar below lg. */}
+        <div className="lg:hidden">
+          <TopNav activeSection={activeSection} onSelect={handleSelectSection} />
+        </div>
+
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* Main scrollable column */}
           <main className="min-w-0 flex-1 space-y-8 overflow-y-auto p-6">
@@ -143,6 +148,18 @@ export function AppShell() {
                 selectedTaskId={selectedTaskId}
                 onSelectTask={handleSelectTask}
               />
+            </section>
+
+            {/* 7 + 9 (below xl): in-flow Selected Task + Orbit, so selection feedback
+                stays visible when the right rail is hidden. The rail copy below is the
+                xl+ equivalent; only one is display:rendered per breakpoint (the CSS-hidden
+                copy is display:none, so it is excluded from the accessibility tree too). */}
+            <section id="selected" className="scroll-mt-6 space-y-3 xl:hidden">
+              <SectionHeading id="selected-h" title="Selected Task & Orbit" />
+              <div className="grid gap-4 md:grid-cols-2">
+                <TaskDetailPanel task={selectedTask} />
+                <MascotAssistant view={mascotView} compact />
+              </div>
             </section>
 
             {/* 4: Prompt builder */}

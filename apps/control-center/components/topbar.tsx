@@ -23,17 +23,18 @@ export function Topbar({
   activeAgent: Agent | undefined;
 }) {
   return (
-    <header className="flex items-center justify-between gap-4 border-b border-border bg-surface/40 px-6 py-4">
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight text-ink">
+    <header className="flex items-center justify-between gap-3 border-b border-border bg-surface/40 px-4 py-4 sm:px-6">
+      <div className="min-w-0">
+        <h1 className="truncate text-base font-semibold tracking-tight text-ink sm:text-lg">
           Agent Control Center
         </h1>
-        <p className="text-xs text-ink-faint">
+        {/* Long descriptive line adds clutter on small screens — desktop only. */}
+        <p className="hidden text-xs text-ink-faint sm:block">
           Coordinate ChatGPT, Claude Code, Codex &amp; Hermes across SCOS stages.
         </p>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         {/* Current stage */}
         <div className="hidden items-center gap-2 rounded-full border border-border bg-surface px-3.5 py-1.5 sm:flex">
           <span className="text-[11px] font-medium uppercase tracking-wide text-ink-faint">
@@ -57,7 +58,7 @@ export function Topbar({
               )}
               aria-hidden
             />
-            <span className="text-[11px] font-medium uppercase tracking-wide text-ink-faint">
+            <span className="hidden text-[11px] font-medium uppercase tracking-wide text-ink-faint sm:inline">
               Active
             </span>
             <span

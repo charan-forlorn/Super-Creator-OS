@@ -44,14 +44,20 @@ const MOOD_STYLES: Record<
   },
 };
 
-function OrbitMascot({ mood }: { mood: MascotMood }) {
+function OrbitMascot({ mood, compact }: { mood: MascotMood; compact?: boolean }) {
   const s = MOOD_STYLES[mood];
   return (
-    <div className="relative flex h-28 w-28 items-center justify-center">
+    <div
+      className={cn(
+        "relative flex items-center justify-center",
+        compact ? "h-20 w-20" : "h-28 w-28",
+      )}
+    >
       {/* Soft mood glow */}
       <div
         className={cn(
-          "orbit-glow absolute h-24 w-24 rounded-full blur-2xl opacity-60",
+          "orbit-glow absolute rounded-full blur-2xl opacity-60",
+          compact ? "h-16 w-16" : "h-24 w-24",
           s.glow,
         )}
         aria-hidden
@@ -69,7 +75,8 @@ function OrbitMascot({ mood }: { mood: MascotMood }) {
         {/* Orb body with layered gradient for a 3D feel */}
         <div
           className={cn(
-            "relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br shadow-[inset_-6px_-8px_16px_rgba(0,0,0,0.45),inset_4px_6px_12px_rgba(255,255,255,0.15)]",
+            "relative flex items-center justify-center rounded-full bg-gradient-to-br shadow-[inset_-6px_-8px_16px_rgba(0,0,0,0.45),inset_4px_6px_12px_rgba(255,255,255,0.15)]",
+            compact ? "h-14 w-14" : "h-20 w-20",
             s.body,
           )}
         >
@@ -89,12 +96,22 @@ function OrbitMascot({ mood }: { mood: MascotMood }) {
   );
 }
 
-export function MascotAssistant({ view }: { view: MascotView }) {
+export function MascotAssistant({
+  view,
+  compact,
+}: {
+  view: MascotView;
+  /** Visual density only — smaller orb, glow, and padding. Does not affect content/logic. */
+  compact?: boolean;
+}) {
   const s = MOOD_STYLES[view.mood];
   return (
     <section
       aria-label="Orbit assistant"
-      className="rounded-card border border-border bg-gradient-to-b from-surface-2 to-surface p-5 shadow-lg shadow-black/20"
+      className={cn(
+        "rounded-card border border-border bg-gradient-to-b from-surface-2 to-surface shadow-lg shadow-black/20",
+        compact ? "p-4" : "p-5",
+      )}
     >
       <div className="flex items-center justify-between">
         <div>
@@ -109,15 +126,15 @@ export function MascotAssistant({ view }: { view: MascotView }) {
         </span>
       </div>
 
-      <div className="mt-2 flex justify-center">
-        <OrbitMascot mood={view.mood} />
+      <div className={cn("flex justify-center", compact ? "mt-1" : "mt-2")}>
+        <OrbitMascot mood={view.mood} compact={compact} />
       </div>
 
       <p className="mt-1 text-center text-sm leading-relaxed text-ink">
         {view.message}
       </p>
 
-      <div className="mt-4 space-y-3">
+      <div className={cn("space-y-3", compact ? "mt-3" : "mt-4")}>
         <div className="rounded-xl border border-border-soft bg-surface p-3">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
             Recommended next action
