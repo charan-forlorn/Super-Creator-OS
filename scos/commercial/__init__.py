@@ -55,6 +55,13 @@ _LAZY_EXPORTS: dict[str, str] = {
     "FirstPaidCustomerDryRunResult": "dry_run_models",
     "FirstPaidCustomerDryRunError": "dry_run_models",
     "run_first_paid_customer_dry_run": "first_paid_customer_dry_run",
+    "COMMERCIAL_LAUNCH_CERTIFICATION_SCHEMA_VERSION": "launch_certification_models",
+    "LaunchCertificationCheck": "launch_certification_models",
+    "LaunchCertificationBlocker": "launch_certification_models",
+    "LaunchCertificationArtifact": "launch_certification_models",
+    "LaunchCertificationResult": "launch_certification_models",
+    "LaunchCertificationError": "launch_certification_models",
+    "create_commercial_launch_certification_pack": "launch_certification_pack",
 }
 
 
@@ -114,4 +121,11 @@ __all__ = (
     "FirstPaidCustomerDryRunResult",
     "FirstPaidCustomerDryRunError",
     "run_first_paid_customer_dry_run",
+    "COMMERCIAL_LAUNCH_CERTIFICATION_SCHEMA_VERSION",
+    "LaunchCertificationCheck",
+    "LaunchCertificationBlocker",
+    "LaunchCertificationArtifact",
+    "LaunchCertificationResult",
+    "LaunchCertificationError",
+    "create_commercial_launch_certification_pack",
 )
