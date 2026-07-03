@@ -85,6 +85,12 @@ _LAZY_EXPORTS: dict[str, str] = {
     "FirstProspectExecutionLogResult": "prospect_models",
     "FirstProspectExecutionLogError": "prospect_models",
     "record_first_prospect_execution": "first_prospect_execution_log",
+    "FIRST_PROSPECT_FOLLOW_UP_DECISION_SCHEMA_VERSION": "follow_up_models",
+    "FollowUpDecisionCheck": "follow_up_models",
+    "FollowUpDecisionAction": "follow_up_models",
+    "FirstProspectFollowUpDecisionResult": "follow_up_models",
+    "FirstProspectFollowUpDecisionError": "follow_up_models",
+    "decide_first_prospect_follow_up": "first_prospect_follow_up_decision",
 }
 
 
@@ -174,4 +180,10 @@ __all__ = (
     "FirstProspectExecutionLogResult",
     "FirstProspectExecutionLogError",
     "record_first_prospect_execution",
+    "FIRST_PROSPECT_FOLLOW_UP_DECISION_SCHEMA_VERSION",
+    "FollowUpDecisionCheck",
+    "FollowUpDecisionAction",
+    "FirstProspectFollowUpDecisionResult",
+    "FirstProspectFollowUpDecisionError",
+    "decide_first_prospect_follow_up",
 )
