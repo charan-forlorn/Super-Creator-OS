@@ -1,6 +1,13 @@
 import { VerdictBadge } from "./status-badge";
 import { cn, formatTimestamp, getAgentById } from "@/lib/utils";
-import type { ResultItem } from "@/lib/types";
+import type { ResultItem, ResultRouteStatus } from "@/lib/types";
+
+const ROUTE_STYLES: Record<ResultRouteStatus, string> = {
+  PASS: "bg-status-approved/15 text-status-approved ring-status-approved/30",
+  FAIL: "bg-status-blocked/15 text-status-blocked ring-status-blocked/30",
+  BLOCKED: "bg-status-working/15 text-status-working ring-status-working/30",
+  NEEDS_REVIEW: "bg-status-review/15 text-status-review ring-status-review/30",
+};
 
 export function ResultInbox({
   results,
@@ -23,6 +30,16 @@ export function ResultInbox({
           <span className="text-ink-faint">·</span>
           <span className="text-status-blocked">{failCount} FAIL</span>
         </div>
+      </div>
+
+      <div className="mt-3 rounded-xl border border-dashed border-border-soft bg-surface-2/40 p-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+          Manual paste area
+        </p>
+        <p className="mt-1 text-sm text-ink-muted">
+          Display-only placeholder. Paste results in your external workflow, then
+          review the static route guidance below.
+        </p>
       </div>
 
       <ul className="mt-3 space-y-2">
@@ -48,6 +65,24 @@ export function ResultInbox({
                 <p className="mt-1 text-xs leading-relaxed text-ink-muted">
                   {result.summary}
                 </p>
+                <div className="mt-3 rounded-lg border border-border-soft bg-surface/70 p-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset",
+                        ROUTE_STYLES[result.route.status],
+                      )}
+                    >
+                      {result.route.label}
+                    </span>
+                    <span className="text-[11px] text-ink-faint">
+                      Destination: {result.route.destination}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+                    {result.route.guidance}
+                  </p>
+                </div>
                 <div className="mt-2 flex items-center justify-between text-[11px] text-ink-faint">
                   <span>
                     {agent ? agent.name : result.producedBy} · {result.metric}

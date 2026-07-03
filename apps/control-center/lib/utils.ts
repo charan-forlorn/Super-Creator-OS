@@ -87,14 +87,16 @@ export function deriveMascotView(task: Task | undefined): MascotView {
       return {
         mood: "blocked",
         message: `${task.code} is blocked. ${task.blockedReason ?? "It needs a dependency before it can move."}`,
-        nextAction: "Clear the blocker or reassign, then re-run the audit.",
+        nextAction:
+          "Use Result Inbox to track the blocker, keep Merge Queue on Hold, then ask Codex after preflight is clean.",
         taskSummary,
       };
     case "in-review":
       return {
         mood: "review",
-        message: `${who} is verifying ${task.code}. Hold merges until the verdict lands.`,
-        nextAction: "Wait for Codex's verdict, then decide in the Merge Queue.",
+        message: `${who} is verifying ${task.code}. Do not approve the merge until review evidence is complete.`,
+        nextAction:
+          "Use Result Inbox for the review result, then follow Decision Guidance in Merge Queue.",
         taskSummary,
       };
     case "approved":
@@ -104,7 +106,7 @@ export function deriveMascotView(task: Task | undefined): MascotView {
         message: `${task.code} passed. Nice — this one is ready to move on.`,
         nextAction:
           task.status === "approved"
-            ? "Merge it from the Merge Queue when you're ready."
+            ? "Check Decision Guidance and approve only if required evidence is present."
             : "Nothing to do — it's already shipped.",
         taskSummary,
       };
@@ -112,14 +114,16 @@ export function deriveMascotView(task: Task | undefined): MascotView {
       return {
         mood: "working",
         message: `${who} is actively building ${task.code}.`,
-        nextAction: "Check the Result Inbox for the latest PASS/FAIL.",
+        nextAction:
+          "Copy the prepared prompt manually, then paste the builder result into Result Inbox.",
         taskSummary,
       };
     default:
       return {
         mood: "idle",
         message: `${task.code} is queued in the backlog.`,
-        nextAction: "Prioritize it or draft a prompt for the assigned agent.",
+        nextAction:
+          "Use Prompt Builder to prepare the next manual handoff before requesting review.",
         taskSummary,
       };
   }

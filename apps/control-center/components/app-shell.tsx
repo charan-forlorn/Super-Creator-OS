@@ -12,10 +12,14 @@ import { ResultInbox } from "./result-inbox";
 import { MergeQueue } from "./merge-queue";
 import { Timeline } from "./timeline";
 import { MascotAssistant } from "./mascot-assistant";
+import { NextActionPanel } from "./next-action-panel";
+import { HandoffStatusStrip } from "./handoff-status-strip";
 
 import {
   AGENTS,
+  HANDOFF_STEPS,
   MERGE_QUEUE,
+  PRIMARY_NEXT_ACTION,
   RESULT_INBOX,
   STAGE_PROGRESS,
   TASKS,
@@ -123,9 +127,17 @@ export function AppShell() {
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* Main scrollable column */}
           <main className="min-w-0 flex-1 space-y-8 overflow-y-auto p-6">
+            <section id="next-action" className="scroll-mt-6">
+              <NextActionPanel action={PRIMARY_NEXT_ACTION} />
+            </section>
+
+            <section id="handoff" className="scroll-mt-6">
+              <HandoffStatusStrip steps={HANDOFF_STEPS} />
+            </section>
+
             {/* 1 + 2: Agent status + stage overview */}
             <section id="overview" className="scroll-mt-6 space-y-3">
-              <SectionHeading id="overview-h" title="Overview" />
+              <SectionHeading id="overview-h" title="Agent Status" />
               <div className="grid gap-3 lg:grid-cols-3 xl:grid-cols-4">
                 <div className="grid gap-3 sm:grid-cols-2 lg:col-span-2 xl:col-span-3">
                   {AGENTS.map((agent) => (

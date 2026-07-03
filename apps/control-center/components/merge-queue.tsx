@@ -1,6 +1,6 @@
 import { VerdictBadge } from "./status-badge";
 import { cn, formatTimestamp, getAgentById } from "@/lib/utils";
-import type { MergeAction, MergeItem } from "@/lib/types";
+import type { MergeAction, MergeItem, RiskLevel } from "@/lib/types";
 
 const ACTIONS: { label: MergeAction; className: string }[] = [
   {
@@ -18,6 +18,12 @@ const ACTIONS: { label: MergeAction; className: string }[] = [
   },
   { label: "Hold", className: "bg-surface-2 text-ink-muted ring-border" },
 ];
+
+const RISK_STYLES: Record<RiskLevel, string> = {
+  low: "text-status-approved",
+  medium: "text-status-working",
+  high: "text-status-blocked",
+};
 
 export function MergeQueue({
   items,
@@ -69,6 +75,31 @@ export function MergeQueue({
                 <span className="text-status-blocked">−{item.deletions}</span>
                 <span>{item.filesChanged} files</span>
                 <span className="ml-auto">{formatTimestamp(item.submittedAt)}</span>
+              </div>
+
+              <div className="mt-3 rounded-lg border border-border-soft bg-surface-2/50 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+                    Decision Guidance
+                  </p>
+                  <span className="rounded-full bg-surface px-2 py-0.5 text-[10px] font-semibold text-ink ring-1 ring-inset ring-border">
+                    {item.decisionGuidance.recommendedDecision}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[11px] font-semibold",
+                      RISK_STYLES[item.decisionGuidance.riskLevel],
+                    )}
+                  >
+                    {item.decisionGuidance.riskLevel} risk
+                  </span>
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+                  {item.decisionGuidance.reason}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-ink-faint">
+                  Evidence: {item.decisionGuidance.requiredEvidence}
+                </p>
               </div>
 
               <div className="mt-3 grid grid-cols-4 gap-1.5">

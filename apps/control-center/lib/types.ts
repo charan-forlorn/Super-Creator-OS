@@ -25,6 +25,18 @@ export type Verdict = "PASS" | "FAIL";
 
 export type MergeAction = "Approve" | "Request Fix" | "Reject" | "Hold";
 
+export type WorkflowState =
+  | "ready"
+  | "working"
+  | "waiting_result"
+  | "needs_review"
+  | "blocked"
+  | "approved";
+
+export type ResultRouteStatus = "PASS" | "FAIL" | "BLOCKED" | "NEEDS_REVIEW";
+
+export type RiskLevel = "low" | "medium" | "high";
+
 export interface Agent {
   id: AgentId;
   name: string;
@@ -44,6 +56,12 @@ export interface ChecklistItem {
   done: boolean;
 }
 
+export interface OperatorChecklistItem {
+  id: string;
+  label: string;
+  done: boolean;
+}
+
 export interface Task {
   id: string;
   /** Human ticket code, e.g. "SCOS-412". */
@@ -57,8 +75,40 @@ export interface Task {
   /** Optional reason a task is blocked (only meaningful when status === "blocked"). */
   blockedReason?: string;
   checklist: ChecklistItem[];
+  operatorChecklist: OperatorChecklistItem[];
   /** Deterministic ISO-8601 timestamp. Never generated at runtime. */
   updatedAt: string;
+}
+
+export interface NextAction {
+  title: string;
+  owner: AgentId;
+  reason: string;
+  sourceItem: string;
+  urgency: "low" | "medium" | "high";
+  recommendedAction: string;
+}
+
+export interface HandoffStep {
+  id: string;
+  name: string;
+  role: string;
+  state: WorkflowState;
+  message: string;
+}
+
+export interface ResultRoute {
+  status: ResultRouteStatus;
+  label: string;
+  destination: string;
+  guidance: string;
+}
+
+export interface DecisionGuidance {
+  recommendedDecision: MergeAction;
+  reason: string;
+  requiredEvidence: string;
+  riskLevel: RiskLevel;
 }
 
 export interface TimelineEvent {
@@ -82,6 +132,7 @@ export interface MergeItem {
   additions: number;
   deletions: number;
   filesChanged: number;
+  decisionGuidance: DecisionGuidance;
   submittedAt: string;
 }
 
@@ -94,6 +145,7 @@ export interface ResultItem {
   summary: string;
   /** e.g. "18/18 checks" or "2 failing gates". */
   metric: string;
+  route: ResultRoute;
   at: string;
 }
 

@@ -1,41 +1,61 @@
-# SCOS Agent Control Center — v0.1 (Frontend Prototype)
+# SCOS Agent Control Center - v0.1.2 (Frontend Prototype)
 
-A dark-mode desktop dashboard for a solo operator coordinating the four SCOS agents
+A dark-mode dashboard for a solo operator coordinating the four SCOS agents
 during stage-gated development:
 
-| Agent        | Role                          |
-| ------------ | ----------------------------- |
-| ChatGPT      | Orchestrator                  |
-| Claude Code  | Builder                       |
-| Codex        | Reviewer / Verifier           |
-| Hermes       | Repo Health / Workflow Auditor|
+| Agent | Role |
+| --- | --- |
+| ChatGPT | Orchestrator |
+| Claude Code | Builder |
+| Codex | Reviewer / Verifier |
+| Hermes | Repo Health / Workflow Auditor |
 
 The interface is designed to answer, at a glance:
 
-1. **What stage are we on?** — top bar + Stage Progress panel.
-2. **Which agent is active?** — active-agent chip + Agent Status cards.
-3. **What task is blocked?** — Blocked column + red Orbit glow + Task Detail.
-4. **What result is ready for review?** — Result Inbox (PASS/FAIL) + Merge Queue.
-5. **What should the operator do next?** — Orbit's recommended next action.
+1. What should I do next?
+2. Which agent owns the next step?
+3. Is the latest result PASS, FAIL, BLOCKED, or NEEDS REVIEW?
+4. What prompt should I copy next?
+5. What result should I paste or review?
+6. Is this ready to merge, or does it need a fix?
 
-> **This is a frontend prototype only.** It is 100% local-first: static mock data,
-> React local state, and a CSS-only animated mascot ("Orbit"). There is **no backend,
-> no database, no API routes, no network requests, no auth.**
+## v0.1.2 - Operator Workflow Clarity
 
-## Tech stack
+v0.1.2 adds manual workflow guidance without adding integration behavior:
 
-- **Next.js 15** (App Router) + **React 19**
-- **TypeScript** (strict)
-- **Tailwind CSS v4** (`@tailwindcss/postcss`)
-- No external UI library, no 3D library, no remote assets.
+- Next Action panel: immediate operator action, owning agent, source item,
+  urgency, reason, and disabled visual affordances.
+- Handoff strip: static workflow chain from ChatGPT to Claude Code to Codex to
+  Hermes to Merge Decision.
+- Result routing: each Result Inbox item explains whether it routes to Merge
+  Queue, Request Fix, Preflight / Operator action, or review.
+- Decision Guidance: each Merge Queue item shows the recommended decision,
+  evidence requirement, reason, and risk level.
+- Manual copy flow: Prompt Builder and Result Inbox explain the manual prompt
+  and result handoff path.
+- Operator checklist: Task Detail separates task checklist progress from manual
+  operator gate readiness.
 
-## Getting started
+This is a frontend prototype only. It is 100% local-first: static mock data,
+React local state, and a CSS-only animated mascot ("Orbit"). There is no backend,
+database, API route, network request, auth, clipboard integration, storage, form
+submission, or real agent dispatch behavior. All action-looking workflow buttons
+are disabled/inert.
 
-All commands run **from this directory** (`apps/control-center/`):
+## Tech Stack
+
+- Next.js 15 App Router + React 19
+- TypeScript strict mode
+- Tailwind CSS v4 with `@tailwindcss/postcss`
+- No external UI library, no 3D library, no remote assets
+
+## Getting Started
+
+All commands run from this directory (`apps/control-center/`):
 
 ```bash
 pnpm install
-pnpm dev      # http://localhost:3000
+pnpm dev
 ```
 
 Validate:
@@ -45,76 +65,48 @@ pnpm lint
 pnpm build
 ```
 
-> If pnpm is unavailable, the identically-named scripts work with npm:
-> `npm install`, `npm run lint`, `npm run build`.
+Static validation should also confirm no hand-authored executable source contains
+network calls, server actions, runtime clocks/randomness, browser storage,
+clipboard APIs, timers, API routes, middleware, or route handlers.
 
-## Layout
+## Responsive Layout
 
-```
-┌───────────┬─────────────────────────────────────────────┬──────────────┐
-│  Sidebar  │  Top bar (title · stage · active agent)      │              │
-│  (nav)    ├─────────────────────────────────────────────┤  Task Detail │
-│           │  Overview: Agent cards + Stage Progress      │   (selected) │
-│  Overview │  Task Board (kanban by status)               │              │
-│  Board    │  Prompt Builder (target agent + template)    │  Orbit       │
-│  Prompt   │  Result Inbox    |    Merge Queue            │  (mascot)    │
-│  Inbox    │  Timeline (recent activity)                  │              │
-│  Merge    │                                             │              │
-│  Timeline │                                             │              │
-└───────────┴─────────────────────────────────────────────┴──────────────┘
-```
-
-### Responsive layout matrix
-
-The layout adapts across breakpoints so selection feedback and the task board stay usable
-at every width (v0.1.1 responsive polish):
+The layout adapts across breakpoints so selection feedback and the task board stay
+usable at every width:
 
 | Width | Navigation | Task board | Task Detail + Orbit |
-| ----- | ---------- | ---------- | ------------------- |
-| **xl+** (≥1280) | Left sidebar | 6-column grid | Right rail (full Orbit) |
-| **lg** (1024–1279) | Left sidebar | Horizontal-scroll columns | In-flow below board (2-up, compact Orbit) |
-| **md** (768–1023) | Compact top-nav | Horizontal-scroll columns | In-flow below board (2-up, compact Orbit) |
-| **sm** (<768) | Compact top-nav | Horizontal-scroll columns (single col wide) | In-flow below board (stacked, compact Orbit) |
+| --- | --- | --- | --- |
+| xl+ (1280+) | Left sidebar | 6-column grid | Right rail with full Orbit |
+| lg (1024-1279) | Left sidebar | Horizontal-scroll columns | In-flow below board |
+| md (768-1023) | Compact top-nav | Horizontal-scroll columns | In-flow below board |
+| sm (<768) | Compact top-nav | Horizontal-scroll columns | Stacked in-flow |
 
-The right rail (`hidden xl:block`) and the in-flow "Selected Task & Orbit" section
-(`xl:hidden`) render the same `TaskDetailPanel` + `MascotAssistant` from the same shared
-state — only one is painted per breakpoint (the other is `display:none`, so it is also
-excluded from the accessibility tree). Horizontal scrolling is intentionally confined to the
-task board; the page itself never overflows horizontally.
-
-## Orbit, the mascot
-
-`components/mascot-assistant.tsx` renders a friendly CSS-only floating orb whose glow
-reacts to the **selected task's** status:
-
-| Task status  | Orbit mood        | Glow            |
-| ------------ | ----------------- | --------------- |
-| in-progress  | working           | amber pulse     |
-| blocked      | blocked           | red warning     |
-| in-review    | review / thinking | violet          |
-| approved/done| approved          | green success   |
-| backlog/none | idle              | calm grey       |
-
-Orbit's panel shows its name, a short status message, a recommended next operator
-action, and a one-line summary of the selected task — all derived deterministically in
-`lib/utils.ts` (`deriveMascotView`).
+The right rail and in-flow selected-task section render from the same selected task
+state. Horizontal scrolling is intentionally confined to the task board.
 
 ## Interactions
 
-- **Click any task** (board card, agent card, inbox/merge/timeline row) → updates the
-  Task Detail Panel **and** Orbit's mood/message/next action.
-- **Prompt Builder** → pick a target agent + template; the preview updates. Sending is
-  intentionally disabled (prototype).
-- **Merge Queue** → Approve / Request Fix / Reject / Hold are rendered disabled; no
-  action ever executes.
+- Click any task from the board, agent cards, inbox, merge queue, or timeline to
+  update Task Detail and Orbit.
+- Prompt Builder lets the operator choose a target agent and template; the prompt
+  preview is read-only and sending is disabled.
+- Result Inbox includes a display-only manual paste placeholder and static route
+  guidance.
+- Merge Queue shows disabled Approve / Request Fix / Reject / Hold controls plus
+  static Decision Guidance.
 
-## Data & determinism rules (enforced)
+## Orbit
 
-All mock data lives in [`lib/mock-data.ts`](lib/mock-data.ts); all types in
-[`lib/types.ts`](lib/types.ts). The source performs **no** network calls, uses **no**
-runtime clock or randomness, and defines **no** API routes or server actions — so the
-UI is fully deterministic. Timestamps are hardcoded ISO-8601 strings.
+`components/mascot-assistant.tsx` renders a CSS-only floating orb whose mood
+reacts to the selected task. Orbit now gives workflow advice: what panel to use,
+when to ask Codex, when to hold merge, and when not to proceed.
 
-Includes: 4 agents · 9 tasks (one blocked, one approved, tasks in review assigned to
-Codex, tasks assigned to Claude Code and Hermes) · 6 timeline events · 4 merge items ·
-4 result items.
+## Data & Determinism
+
+All mock data lives in `lib/mock-data.ts`; all shared types live in `lib/types.ts`.
+The source performs no network calls, uses no runtime clock or randomness, and
+defines no API routes or server actions. Timestamps are hardcoded ISO-8601 strings.
+
+Includes: 4 agents, 9 tasks, one primary next action, 5 handoff steps, 6 timeline
+events, 4 merge items with Decision Guidance, and 4 result items with route
+guidance.

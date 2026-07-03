@@ -4,7 +4,9 @@
 
 import type {
   Agent,
+  HandoffStep,
   MergeItem,
+  NextAction,
   ResultItem,
   StageProgress,
   Task,
@@ -66,6 +68,13 @@ export const TASKS: Task[] = [
       { id: "c2", label: "Assign owners", done: true },
       { id: "c3", label: "Confirm acceptance gates", done: false },
     ],
+    operatorChecklist: [
+      { id: "op1", label: "Preflight clean", done: true },
+      { id: "op2", label: "Prompt prepared", done: true },
+      { id: "op3", label: "Builder result received", done: false },
+      { id: "op4", label: "Codex review complete", done: false },
+      { id: "op5", label: "Merge decision ready", done: false },
+    ],
     updatedAt: "2026-07-04T09:12:00Z",
   },
   {
@@ -83,6 +92,13 @@ export const TASKS: Task[] = [
       { id: "c2", label: "Write append + read API", done: true },
       { id: "c3", label: "Unit tests", done: false },
     ],
+    operatorChecklist: [
+      { id: "op1", label: "Preflight clean", done: true },
+      { id: "op2", label: "Prompt prepared", done: true },
+      { id: "op3", label: "Builder result received", done: true },
+      { id: "op4", label: "Codex review complete", done: true },
+      { id: "op5", label: "Merge decision ready", done: false },
+    ],
     updatedAt: "2026-07-04T10:05:00Z",
   },
   {
@@ -99,6 +115,13 @@ export const TASKS: Task[] = [
       { id: "c1", label: "Re-run gate suite", done: true },
       { id: "c2", label: "Check edge cases", done: false },
       { id: "c3", label: "Sign verdict", done: false },
+    ],
+    operatorChecklist: [
+      { id: "op1", label: "Preflight clean", done: true },
+      { id: "op2", label: "Prompt prepared", done: true },
+      { id: "op3", label: "Builder result received", done: true },
+      { id: "op4", label: "Codex review complete", done: false },
+      { id: "op5", label: "Merge decision ready", done: false },
     ],
     updatedAt: "2026-07-04T10:41:00Z",
   },
@@ -118,6 +141,13 @@ export const TASKS: Task[] = [
       { id: "c2", label: "Validate handoff schema", done: false },
       { id: "c3", label: "Publish audit report", done: false },
     ],
+    operatorChecklist: [
+      { id: "op1", label: "Preflight clean", done: false },
+      { id: "op2", label: "Prompt prepared", done: true },
+      { id: "op3", label: "Builder result received", done: false },
+      { id: "op4", label: "Codex review complete", done: false },
+      { id: "op5", label: "Merge decision ready", done: false },
+    ],
     updatedAt: "2026-07-04T08:30:00Z",
   },
   {
@@ -135,6 +165,13 @@ export const TASKS: Task[] = [
       { id: "c2", label: "Verifier sign-off", done: true },
       { id: "c3", label: "Operator approval", done: true },
     ],
+    operatorChecklist: [
+      { id: "op1", label: "Preflight clean", done: true },
+      { id: "op2", label: "Prompt prepared", done: true },
+      { id: "op3", label: "Builder result received", done: true },
+      { id: "op4", label: "Codex review complete", done: true },
+      { id: "op5", label: "Merge decision ready", done: true },
+    ],
     updatedAt: "2026-07-03T17:20:00Z",
   },
   {
@@ -150,6 +187,13 @@ export const TASKS: Task[] = [
     checklist: [
       { id: "c1", label: "Outline sections", done: false },
       { id: "c2", label: "Fill invariants", done: false },
+    ],
+    operatorChecklist: [
+      { id: "op1", label: "Preflight clean", done: true },
+      { id: "op2", label: "Prompt prepared", done: false },
+      { id: "op3", label: "Builder result received", done: false },
+      { id: "op4", label: "Codex review complete", done: false },
+      { id: "op5", label: "Merge decision ready", done: false },
     ],
     updatedAt: "2026-07-04T07:55:00Z",
   },
@@ -167,6 +211,13 @@ export const TASKS: Task[] = [
       { id: "c2", label: "Verify", done: true },
       { id: "c3", label: "Archive", done: true },
     ],
+    operatorChecklist: [
+      { id: "op1", label: "Preflight clean", done: true },
+      { id: "op2", label: "Prompt prepared", done: true },
+      { id: "op3", label: "Builder result received", done: true },
+      { id: "op4", label: "Codex review complete", done: true },
+      { id: "op5", label: "Merge decision ready", done: true },
+    ],
     updatedAt: "2026-07-02T14:10:00Z",
   },
   {
@@ -183,6 +234,13 @@ export const TASKS: Task[] = [
       { id: "c1", label: "Diff against baseline", done: true },
       { id: "c2", label: "Confirm no drift", done: false },
     ],
+    operatorChecklist: [
+      { id: "op1", label: "Preflight clean", done: true },
+      { id: "op2", label: "Prompt prepared", done: true },
+      { id: "op3", label: "Builder result received", done: true },
+      { id: "op4", label: "Codex review complete", done: false },
+      { id: "op5", label: "Merge decision ready", done: false },
+    ],
     updatedAt: "2026-07-04T11:02:00Z",
   },
   {
@@ -198,7 +256,62 @@ export const TASKS: Task[] = [
       { id: "c1", label: "Collect duplicate rules", done: false },
       { id: "c2", label: "Propose merged config", done: false },
     ],
+    operatorChecklist: [
+      { id: "op1", label: "Preflight clean", done: true },
+      { id: "op2", label: "Prompt prepared", done: false },
+      { id: "op3", label: "Builder result received", done: false },
+      { id: "op4", label: "Codex review complete", done: false },
+      { id: "op5", label: "Merge decision ready", done: false },
+    ],
     updatedAt: "2026-07-04T06:48:00Z",
+  },
+];
+
+export const PRIMARY_NEXT_ACTION: NextAction = {
+  title: "Hold blocked task until preflight is clean",
+  owner: "hermes",
+  reason: "Stage 4.14 repo-health audit cannot pass until the missing fixture lands.",
+  sourceItem: "SCOS-409 - Stage 4.14 repo-health audit",
+  urgency: "high",
+  recommendedAction:
+    "Keep merge decisions on hold, request the missing fixture, then paste the verification result into Result Inbox.",
+};
+
+export const HANDOFF_STEPS: HandoffStep[] = [
+  {
+    id: "handoff-chatgpt",
+    name: "ChatGPT",
+    role: "Orchestrator",
+    state: "ready",
+    message: "Stage slice is sequenced; next prompt is ready to copy.",
+  },
+  {
+    id: "handoff-claude",
+    name: "Claude Code",
+    role: "Builder",
+    state: "working",
+    message: "Builder output exists, but one FAIL result needs a fix route.",
+  },
+  {
+    id: "handoff-codex",
+    name: "Codex",
+    role: "Reviewer",
+    state: "needs_review",
+    message: "Review PASS/FAIL evidence before any merge approval.",
+  },
+  {
+    id: "handoff-hermes",
+    name: "Hermes",
+    role: "Repo Health",
+    state: "blocked",
+    message: "Preflight is blocked by the missing handoff fixture.",
+  },
+  {
+    id: "handoff-merge",
+    name: "Merge Decision",
+    role: "Operator Gate",
+    state: "waiting_result",
+    message: "Hold merge until review evidence and fixture status are clean.",
   },
 ];
 
@@ -264,6 +377,12 @@ export const MERGE_QUEUE: MergeItem[] = [
     additions: 214,
     deletions: 36,
     filesChanged: 5,
+    decisionGuidance: {
+      recommendedDecision: "Hold",
+      reason: "PASS verdict is present, but edge-case review is still open.",
+      requiredEvidence: "Codex final edge-case sign-off attached to the result.",
+      riskLevel: "medium",
+    },
     submittedAt: "2026-07-04T10:38:00Z",
   },
   {
@@ -276,6 +395,12 @@ export const MERGE_QUEUE: MergeItem[] = [
     additions: 302,
     deletions: 12,
     filesChanged: 6,
+    decisionGuidance: {
+      recommendedDecision: "Request Fix",
+      reason: "Latest result has failing empty-log read tests.",
+      requiredEvidence: "Updated builder result plus Codex re-review showing PASS.",
+      riskLevel: "high",
+    },
     submittedAt: "2026-07-04T10:08:00Z",
   },
   {
@@ -288,6 +413,12 @@ export const MERGE_QUEUE: MergeItem[] = [
     additions: 128,
     deletions: 4,
     filesChanged: 3,
+    decisionGuidance: {
+      recommendedDecision: "Approve",
+      reason: "Final gate passed and operator approval is complete.",
+      requiredEvidence: "PASS result and completed operator checklist.",
+      riskLevel: "low",
+    },
     submittedAt: "2026-07-03T17:15:00Z",
   },
   {
@@ -300,6 +431,12 @@ export const MERGE_QUEUE: MergeItem[] = [
     additions: 47,
     deletions: 51,
     filesChanged: 2,
+    decisionGuidance: {
+      recommendedDecision: "Hold",
+      reason: "Regression sweep is still in review.",
+      requiredEvidence: "Codex confirmation that no drift remains.",
+      riskLevel: "medium",
+    },
     submittedAt: "2026-07-04T11:00:00Z",
   },
 ];
@@ -313,6 +450,12 @@ export const RESULT_INBOX: ResultItem[] = [
     verdict: "FAIL",
     summary: "Two tests fail on empty-log reads; append path is otherwise green.",
     metric: "16/18 checks",
+    route: {
+      status: "FAIL",
+      label: "Route to Request Fix",
+      destination: "Prompt Builder",
+      guidance: "Copy a fix prompt for Claude Code before this can return to review.",
+    },
     at: "2026-07-04T10:22:00Z",
   },
   {
@@ -323,6 +466,12 @@ export const RESULT_INBOX: ResultItem[] = [
     verdict: "PASS",
     summary: "Gate logic matches the contract; edge cases still under review.",
     metric: "22/22 checks",
+    route: {
+      status: "NEEDS_REVIEW",
+      label: "Route to Codex review",
+      destination: "Result Inbox",
+      guidance: "Keep the merge held until Codex signs the remaining edge cases.",
+    },
     at: "2026-07-04T10:40:00Z",
   },
   {
@@ -333,6 +482,12 @@ export const RESULT_INBOX: ResultItem[] = [
     verdict: "PASS",
     summary: "All content and schema gates pass; approved by the operator.",
     metric: "9/9 checks",
+    route: {
+      status: "PASS",
+      label: "Route to Merge Queue",
+      destination: "Merge Queue",
+      guidance: "Evidence is complete; the operator can approve when ready.",
+    },
     at: "2026-07-03T17:12:00Z",
   },
   {
@@ -343,6 +498,12 @@ export const RESULT_INBOX: ResultItem[] = [
     verdict: "FAIL",
     summary: "Audit incomplete — a required fixture is missing, so it cannot pass.",
     metric: "1 blocking gap",
+    route: {
+      status: "BLOCKED",
+      label: "Route to Preflight",
+      destination: "Operator action",
+      guidance: "Hold the merge and request the missing fixture before re-running audit.",
+    },
     at: "2026-07-04T08:31:00Z",
   },
 ];

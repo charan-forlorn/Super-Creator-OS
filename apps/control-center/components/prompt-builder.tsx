@@ -23,6 +23,13 @@ const TEMPLATES: { id: string; label: string; body: string }[] = [
   },
 ];
 
+const MANUAL_STEPS = [
+  "1. Select agent",
+  "2. Copy prompt manually",
+  "3. Paste result into Result Inbox",
+  "4. Send to Codex review",
+];
+
 export function PromptBuilder({
   selectedTask,
   targetAgentId,
@@ -80,6 +87,17 @@ export function PromptBuilder({
           })}
         </div>
       </div>
+
+      <ol className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {MANUAL_STEPS.map((step) => (
+          <li
+            key={step}
+            className="rounded-lg border border-border-soft bg-surface-2/50 px-3 py-2 text-xs font-medium text-ink-muted"
+          >
+            {step}
+          </li>
+        ))}
+      </ol>
 
       <div className="mt-4">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">

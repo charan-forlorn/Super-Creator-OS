@@ -90,6 +90,36 @@ export function TaskDetailPanel({ task }: { task: Task | undefined }) {
           ))}
         </ul>
       </div>
+
+      <div className="mt-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+          Operator checklist
+        </p>
+        <ul className="mt-2 space-y-1.5">
+          {task.operatorChecklist.map((item) => (
+            <li key={item.id} className="flex items-center gap-2.5 text-sm">
+              <span
+                className={cn(
+                  "flex h-4 w-4 items-center justify-center rounded-[5px] text-[10px]",
+                  item.done
+                    ? "bg-status-approved/20 text-status-approved ring-1 ring-inset ring-status-approved/40"
+                    : "border border-border-soft text-transparent",
+                )}
+                aria-hidden
+              >
+                ✓
+              </span>
+              <span
+                className={cn(
+                  item.done ? "text-ink-muted line-through" : "text-ink",
+                )}
+              >
+                {item.label}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }
