@@ -127,6 +127,66 @@ export const LIVE_EVENTS: LiveWorkEvent[] = [
     severity: "warning",
     route: "Merge Queue",
   },
+  {
+    id: "live-11",
+    timestamp: "2026-07-04T11:44:00Z",
+    agent: "Codex",
+    taskId: "task-06",
+    eventType: "review_passed",
+    message: "Codex review returned PASS for the operator commit gate.",
+    severity: "success",
+    route: "Operator Review Gate",
+  },
+  {
+    id: "live-12",
+    timestamp: "2026-07-04T11:47:00Z",
+    agent: "Hermes",
+    taskId: "task-06",
+    eventType: "changed_files_scope_validated",
+    message: "Changed files scope validated â€” one forbidden Stage 4 path blocks commit.",
+    severity: "warning",
+    route: "Operator Review Gate",
+  },
+  {
+    id: "live-13",
+    timestamp: "2026-07-04T11:51:00Z",
+    agent: "ChatGPT",
+    taskId: "task-06",
+    eventType: "commit_checklist_completed",
+    message: "Commit readiness checklist completed with HOLD verdict.",
+    severity: "warning",
+    route: "Operator Review Gate",
+  },
+  {
+    id: "live-14",
+    timestamp: "2026-07-04T11:55:00Z",
+    agent: "Hermes",
+    taskId: "task-06",
+    eventType: "remote_safety_checked",
+    message: "Remote safety check passed branch review, then blocked push on remote-only commits.",
+    severity: "error",
+    route: "Operator Review Gate",
+  },
+  {
+    id: "live-15",
+    timestamp: "2026-07-04T11:58:00Z",
+    agent: "ChatGPT",
+    taskId: "task-06",
+    eventType: "operator_decision_required",
+    message: "Operator approval required for commit gate disposition.",
+    severity: "warning",
+    route: "Operator Review Gate",
+  },
+  {
+    id: "live-16",
+    timestamp: "2026-07-04T12:02:00Z",
+    agent: "ChatGPT",
+    taskId: "task-06",
+    eventType: "push_decision_ready",
+    message: "Push decision ready, but Approve Push remains blocked until remote safety is clean.",
+    severity: "warning",
+    route: "Operator Review Gate",
+  },
 ];
 
 /** "2026-07-04T11:12:00Z" → "11:12 UTC" (pure string slicing, no Date). */
@@ -183,6 +243,10 @@ const NEXT_EXPECTED: Record<LiveWorkEvent["eventType"], TaskStatus | null> = {
   repo_warning: "in-progress",
   merge_queue_updated: "approved",
   operator_decision_required: "approved",
+  changed_files_scope_validated: "approved",
+  commit_checklist_completed: "approved",
+  remote_safety_checked: "approved",
+  push_decision_ready: "approved",
 };
 
 export interface DerivedLiveState {
@@ -298,6 +362,18 @@ export function deriveLiveState(eventIndex: number): DerivedLiveState {
         recommendedActionOverride =
           "Open Merge Queue, check the Decision Guidance evidence for SCOS-412, then Approve or Hold.";
         break;
+      case "changed_files_scope_validated":
+      case "commit_checklist_completed":
+      case "remote_safety_checked":
+      case "push_decision_ready":
+        actor.liveState = "waiting_for_operator";
+        actor.currentTaskId = event.taskId;
+        actor.waitingOn = "Operator review gate decision";
+        orbitMessageOverride =
+          "The commit gate is under operator review. Do not commit or push from the UI.";
+        recommendedActionOverride =
+          "Use Operator Review Gate to inspect scope, evidence, commit plan, and remote safety before deciding.";
+        break;
     }
   }
 
@@ -334,5 +410,13 @@ function labelFor(event: LiveWorkEvent): string {
       return "Updated merge queue";
     case "operator_decision_required":
       return "Escalated to operator";
+    case "changed_files_scope_validated":
+      return "Validated file scope";
+    case "commit_checklist_completed":
+      return "Completed checklist";
+    case "remote_safety_checked":
+      return "Checked remote safety";
+    case "push_decision_ready":
+      return "Prepared push decision";
   }
 }

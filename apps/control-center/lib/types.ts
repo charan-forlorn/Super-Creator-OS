@@ -177,7 +177,11 @@ export type LiveEventType =
   | "review_failed"
   | "repo_warning"
   | "merge_queue_updated"
-  | "operator_decision_required";
+  | "operator_decision_required"
+  | "changed_files_scope_validated"
+  | "commit_checklist_completed"
+  | "remote_safety_checked"
+  | "push_decision_ready";
 
 export type LiveSeverity = "info" | "success" | "warning" | "error";
 
@@ -185,7 +189,8 @@ export type LiveRoute =
   | "Prompt Builder"
   | "Result Inbox"
   | "Merge Queue"
-  | "Task Detail";
+  | "Task Detail"
+  | "Operator Review Gate";
 
 export type AgentLiveState =
   | "idle"
@@ -226,3 +231,91 @@ export interface TaskTransitionInfo {
 }
 
 export type LiveBadge = "New" | "Needs Review" | "Fix Required" | "Ready to Merge";
+
+// -- Operator Review & Commit Gate (frontend-only simulation) --
+
+export type ReviewGateStatus = "PASS" | "FAIL" | "BLOCKED" | "NEEDS_FIX" | "WAITING";
+
+export type ReviewGateVerdict =
+  | "COMMIT_READY"
+  | "HOLD"
+  | "REQUEST_FIX"
+  | "REJECT"
+  | "WAITING_FOR_REVIEW";
+
+export type ChangedFileScopeStatus = "allowed" | "warning" | "forbidden";
+
+export type ChangedFileReview = {
+  id: string;
+  filePath: string;
+  changeType: "added" | "modified" | "deleted";
+  scopeStatus: ChangedFileScopeStatus;
+  reason: string;
+  owningArea: string;
+};
+
+export type TestEvidenceResult = "PASS" | "FAIL" | "MISSING" | "SKIPPED";
+
+export type TestEvidence = {
+  id: string;
+  label: string;
+  command: string;
+  result: TestEvidenceResult;
+  required: boolean;
+  reason: string;
+};
+
+export type CommitChecklistStatus = "pass" | "fail" | "warning";
+
+export type CommitChecklistItem = {
+  id: string;
+  label: string;
+  status: CommitChecklistStatus;
+  reason: string;
+};
+
+export type CommitPlan = {
+  recommendedMessage: string;
+  stagedFiles: string[];
+  scope: string;
+  riskNotes: string[];
+  reminder: string;
+};
+
+export type RemoteSafetyVerdict = "REMOTE_SAFE" | "REMOTE_BLOCKED" | "NEEDS_REVIEW";
+
+export type RemoteSafetyCheck = {
+  verdict: RemoteSafetyVerdict;
+  branch: "main" | "other";
+  localAheadCommits: number;
+  remoteOnlyCommits: number;
+  workingTree: "clean" | "dirty_expected" | "dirty_unexpected";
+  evidence: Array<{
+    id: string;
+    label: string;
+    value: string;
+    result: TestEvidenceResult;
+  }>;
+};
+
+export type OperatorDecision =
+  | "none"
+  | "approve_commit"
+  | "request_fix"
+  | "hold"
+  | "reject"
+  | "approve_push";
+
+export type OperatorReviewGate = {
+  reviewStatus: ReviewGateStatus;
+  reviewer: LiveAgentName;
+  reviewedTaskId: string;
+  reviewSummary: string;
+  recommendedOperatorAction: string;
+  gateVerdict: ReviewGateVerdict;
+  changedFiles: ChangedFileReview[];
+  testEvidence: TestEvidence[];
+  checklist: CommitChecklistItem[];
+  commitPlan: CommitPlan;
+  remoteSafety: RemoteSafetyCheck;
+};

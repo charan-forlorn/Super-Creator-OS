@@ -15,6 +15,7 @@ import { MascotAssistant } from "./mascot-assistant";
 import { NextActionPanel } from "./next-action-panel";
 import { HandoffStatusStrip } from "./handoff-status-strip";
 import { LiveWorkUpdates } from "./live-work-updates";
+import { OperatorReviewGate } from "./operator-review-gate";
 
 import {
   AGENTS,
@@ -27,7 +28,12 @@ import {
   TIMELINE,
 } from "@/lib/mock-data";
 import { deriveLiveState, LIVE_EVENTS } from "@/lib/live-events";
+import {
+  deriveCommitGateAdvisor,
+  OPERATOR_REVIEW_GATE,
+} from "@/lib/review-gates";
 import { cn, deriveMascotView } from "@/lib/utils";
+import type { MascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
 
 const STAGE_META: Record<Stage["status"], { dot: string; text: string }> = {
@@ -114,15 +120,25 @@ export function AppShell() {
   const selectedTransition = selectedTask
     ? live.transitionHistory[selectedTask.id]
     : undefined;
-  const mascotView = useMemo(() => {
+  const mascotView = useMemo<MascotView>(() => {
     const view = deriveMascotView(selectedTask);
+    if (eventIndex >= 11) {
+      const advisor = deriveCommitGateAdvisor(OPERATOR_REVIEW_GATE);
+      return {
+        ...view,
+        mood: advisor.mood,
+        message: advisor.message,
+        nextAction: advisor.nextAction,
+        taskSummary: advisor.summary,
+      };
+    }
     if (!live.orbitMessageOverride) return view;
     return {
       ...view,
       message: live.orbitMessageOverride,
       nextAction: live.recommendedActionOverride ?? view.nextAction,
     };
-  }, [selectedTask, live]);
+  }, [selectedTask, live, eventIndex]);
 
   const activeAgent = AGENTS.find((agent) => agent.status === "active");
 
@@ -200,6 +216,10 @@ export function AppShell() {
                 onReset={handleResetLiveUpdates}
                 onSelectTask={handleSelectTask}
               />
+            </section>
+
+            <section id="operator-review" className="scroll-mt-6">
+              <OperatorReviewGate gate={OPERATOR_REVIEW_GATE} />
             </section>
 
             {/* 3: Kanban board */}
