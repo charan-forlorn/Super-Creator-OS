@@ -14,6 +14,7 @@ import { Timeline } from "./timeline";
 import { MascotAssistant } from "./mascot-assistant";
 import { NextActionPanel } from "./next-action-panel";
 import { HandoffStatusStrip } from "./handoff-status-strip";
+import { LiveWorkUpdates } from "./live-work-updates";
 
 import {
   AGENTS,
@@ -25,7 +26,8 @@ import {
   TASKS,
   TIMELINE,
 } from "@/lib/mock-data";
-import { cn, deriveMascotView, getTaskById } from "@/lib/utils";
+import { deriveLiveState, LIVE_EVENTS } from "@/lib/live-events";
+import { cn, deriveMascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
 
 const STAGE_META: Record<Stage["status"], { dot: string; text: string }> = {
@@ -92,13 +94,45 @@ export function AppShell() {
   const [activeSection, setActiveSection] = useState<string>("overview");
   const [targetAgentId, setTargetAgentId] = useState<AgentId>("claude-code");
 
-  const selectedTask = getTaskById(selectedTaskId);
-  const mascotView = useMemo(
-    () => deriveMascotView(selectedTask),
-    [selectedTask],
+  // Deterministic simulated realtime: the only state is an index into LIVE_EVENTS.
+  const [eventIndex, setEventIndex] = useState(0);
+  const live = useMemo(() => deriveLiveState(eventIndex), [eventIndex]);
+
+  const liveTasks = useMemo(
+    () =>
+      TASKS.map((task) =>
+        live.taskStatusOverrides[task.id]
+          ? { ...task, status: live.taskStatusOverrides[task.id] }
+          : task,
+      ),
+    [live],
   );
 
+  const selectedTask = selectedTaskId
+    ? liveTasks.find((task) => task.id === selectedTaskId)
+    : undefined;
+  const selectedTransition = selectedTask
+    ? live.transitionHistory[selectedTask.id]
+    : undefined;
+  const mascotView = useMemo(() => {
+    const view = deriveMascotView(selectedTask);
+    if (!live.orbitMessageOverride) return view;
+    return {
+      ...view,
+      message: live.orbitMessageOverride,
+      nextAction: live.recommendedActionOverride ?? view.nextAction,
+    };
+  }, [selectedTask, live]);
+
   const activeAgent = AGENTS.find((agent) => agent.status === "active");
+
+  function handleAdvanceLive() {
+    setEventIndex((index) => Math.min(index + 1, LIVE_EVENTS.length));
+  }
+
+  function handleResetLiveUpdates() {
+    setEventIndex(0);
+  }
 
   function handleSelectTask(taskId: string) {
     setSelectedTaskId(taskId);
@@ -144,6 +178,7 @@ export function AppShell() {
                     <AgentStatusCard
                       key={agent.id}
                       agent={agent}
+                      live={live.agentLive[agent.id]}
                       onSelectTask={handleSelectTask}
                     />
                   ))}
@@ -152,11 +187,26 @@ export function AppShell() {
               </div>
             </section>
 
+            {/* Live Work Updates: deterministic simulated feed. Single placement —
+                below the command/agent sections and above the board at every
+                breakpoint (the main column order is shared across breakpoints). */}
+            <section id="live" className="scroll-mt-6 space-y-3">
+              <SectionHeading id="live-h" title="Live Work Updates" />
+              <LiveWorkUpdates
+                events={live.feedEvents}
+                appliedCount={eventIndex}
+                totalCount={LIVE_EVENTS.length}
+                onAdvance={handleAdvanceLive}
+                onReset={handleResetLiveUpdates}
+                onSelectTask={handleSelectTask}
+              />
+            </section>
+
             {/* 3: Kanban board */}
             <section id="board" className="scroll-mt-6 space-y-3">
               <SectionHeading id="board-h" title="Task Board" />
               <TaskBoard
-                tasks={TASKS}
+                tasks={liveTasks}
                 selectedTaskId={selectedTaskId}
                 onSelectTask={handleSelectTask}
               />
@@ -169,7 +219,7 @@ export function AppShell() {
             <section id="selected" className="scroll-mt-6 space-y-3 xl:hidden">
               <SectionHeading id="selected-h" title="Selected Task & Orbit" />
               <div className="grid gap-4 md:grid-cols-2">
-                <TaskDetailPanel task={selectedTask} />
+                <TaskDetailPanel task={selectedTask} transition={selectedTransition} />
                 <MascotAssistant view={mascotView} compact />
               </div>
             </section>
@@ -192,6 +242,7 @@ export function AppShell() {
                   results={RESULT_INBOX}
                   selectedTaskId={selectedTaskId}
                   onSelectTask={handleSelectTask}
+                  badge={live.inboxBadge}
                 />
               </section>
 
@@ -201,6 +252,7 @@ export function AppShell() {
                   items={MERGE_QUEUE}
                   selectedTaskId={selectedTaskId}
                   onSelectTask={handleSelectTask}
+                  badge={live.mergeBadge}
                 />
               </section>
             </div>
@@ -218,7 +270,7 @@ export function AppShell() {
 
           {/* Right rail: task detail + mascot (7 + 9) */}
           <aside className="hidden w-80 shrink-0 space-y-6 overflow-y-auto border-l border-border bg-surface/40 p-5 xl:block">
-            <TaskDetailPanel task={selectedTask} />
+            <TaskDetailPanel task={selectedTask} transition={selectedTransition} />
             <MascotAssistant view={mascotView} />
           </aside>
         </div>

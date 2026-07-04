@@ -1,5 +1,5 @@
 import { cn, TASK_STATUS_LABEL } from "@/lib/utils";
-import type { TaskStatus, Verdict } from "@/lib/types";
+import type { LiveBadge, TaskStatus, Verdict } from "@/lib/types";
 
 const STATUS_STYLES: Record<TaskStatus, string> = {
   backlog: "bg-status-idle/15 text-ink-muted ring-status-idle/25",
@@ -56,6 +56,35 @@ export function VerdictBadge({
         )}
       />
       {verdict}
+    </span>
+  );
+}
+
+const LIVE_BADGE_STYLES: Record<LiveBadge, string> = {
+  New: "bg-accent/15 text-accent ring-accent/30",
+  "Needs Review": "bg-status-review/15 text-status-review ring-status-review/30",
+  "Fix Required": "bg-status-blocked/15 text-status-blocked ring-status-blocked/30",
+  "Ready to Merge":
+    "bg-status-approved/15 text-status-approved ring-status-approved/30",
+};
+
+/** Notification pill driven by the deterministic live-updates simulation. */
+export function LiveBadgePill({
+  badge,
+  className,
+}: {
+  badge: LiveBadge;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset",
+        LIVE_BADGE_STYLES[badge],
+        className,
+      )}
+    >
+      {badge}
     </span>
   );
 }

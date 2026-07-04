@@ -1,8 +1,19 @@
 import { StatusBadge } from "./status-badge";
-import { cn, formatTimestamp, getAgentById } from "@/lib/utils";
-import type { Task } from "@/lib/types";
+import {
+  cn,
+  formatTimestamp,
+  getAgentById,
+  TASK_STATUS_LABEL,
+} from "@/lib/utils";
+import type { Task, TaskTransitionInfo } from "@/lib/types";
 
-export function TaskDetailPanel({ task }: { task: Task | undefined }) {
+export function TaskDetailPanel({
+  task,
+  transition,
+}: {
+  task: Task | undefined;
+  transition?: TaskTransitionInfo;
+}) {
   if (!task) {
     return (
       <section className="rounded-card border border-border bg-surface p-5">
@@ -39,6 +50,43 @@ export function TaskDetailPanel({ task }: { task: Task | undefined }) {
             Blocked
           </p>
           <p className="mt-0.5 text-sm text-ink">{task.blockedReason}</p>
+        </div>
+      ) : null}
+
+      {transition ? (
+        <div className="mt-3 rounded-xl border border-border-soft bg-surface-2/50 px-3 py-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+            Status transition
+          </p>
+          <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="rounded-full bg-surface px-2 py-0.5 font-medium text-ink-muted ring-1 ring-inset ring-border">
+              {TASK_STATUS_LABEL[transition.previousStatus]}
+            </span>
+            <span className="text-ink-faint" aria-hidden>
+              →
+            </span>
+            <span className="rounded-full bg-accent/15 px-2 py-0.5 font-semibold text-accent ring-1 ring-inset ring-accent/30">
+              {TASK_STATUS_LABEL[transition.currentStatus]}
+            </span>
+            {transition.nextExpectedStatus ? (
+              <>
+                <span className="text-ink-faint" aria-hidden>
+                  →
+                </span>
+                <span className="rounded-full border border-dashed border-border px-2 py-0.5 text-ink-faint">
+                  next: {TASK_STATUS_LABEL[transition.nextExpectedStatus]}
+                </span>
+              </>
+            ) : null}
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-ink-muted">
+            <span className="font-medium text-ink">Latest update:</span>{" "}
+            {transition.latestEvent.message}
+          </p>
+          <p className="mt-1 text-[11px] text-ink-faint">
+            Responsible: {transition.responsibleAgent} ·{" "}
+            {formatTimestamp(transition.latestEvent.timestamp)}
+          </p>
         </div>
       ) : null}
 

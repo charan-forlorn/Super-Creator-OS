@@ -1,5 +1,5 @@
 import { cn, getTaskById } from "@/lib/utils";
-import type { Agent } from "@/lib/types";
+import type { Agent, AgentLiveMeta, AgentLiveState } from "@/lib/types";
 
 const ACCENT_RING: Record<Agent["accent"], string> = {
   emerald: "ring-agent-emerald/30",
@@ -22,15 +22,42 @@ const STATUS_META: Record<Agent["status"], { label: string; dot: string }> = {
   blocked: { label: "Blocked", dot: "bg-status-blocked" },
 };
 
+const LIVE_STATE_META: Record<AgentLiveState, { label: string; badge: string }> = {
+  idle: { label: "idle", badge: "bg-status-idle/15 text-status-idle ring-status-idle/30" },
+  working: {
+    label: "working",
+    badge: "bg-status-working/15 text-status-working ring-status-working/30",
+  },
+  reviewing: {
+    label: "reviewing",
+    badge: "bg-status-review/15 text-status-review ring-status-review/30",
+  },
+  blocked: {
+    label: "blocked",
+    badge: "bg-status-blocked/15 text-status-blocked ring-status-blocked/30",
+  },
+  result_ready: {
+    label: "result ready",
+    badge: "bg-status-approved/15 text-status-approved ring-status-approved/30",
+  },
+  waiting_for_operator: {
+    label: "waiting for operator",
+    badge: "bg-accent/15 text-accent ring-accent/30",
+  },
+};
+
 export function AgentStatusCard({
   agent,
+  live,
   onSelectTask,
 }: {
   agent: Agent;
+  live: AgentLiveMeta;
   onSelectTask: (taskId: string) => void;
 }) {
   const status = STATUS_META[agent.status];
-  const task = getTaskById(agent.currentTaskId);
+  const liveState = LIVE_STATE_META[live.liveState];
+  const task = getTaskById(live.currentTaskId ?? agent.currentTaskId);
   const initials = agent.name
     .split(" ")
     .map((part) => part[0])
@@ -68,7 +95,17 @@ export function AgentStatusCard({
               {status.label}
             </span>
           </div>
-          <p className="text-[11px] text-ink-faint">{agent.role}</p>
+          <div className="mt-0.5 flex items-center gap-2">
+            <p className="text-[11px] text-ink-faint">{agent.role}</p>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset",
+                liveState.badge,
+              )}
+            >
+              {liveState.label}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -99,6 +136,19 @@ export function AgentStatusCard({
           No task attached.
         </p>
       )}
+
+      <div className="mt-3 space-y-0.5 border-t border-border-soft pt-2 text-[11px] text-ink-faint">
+        <p>
+          <span className="font-medium text-ink-muted">Last update:</span>{" "}
+          {live.lastUpdateLabel}
+        </p>
+        {live.waitingOn ? (
+          <p>
+            <span className="font-medium text-ink-muted">Waiting on:</span>{" "}
+            {live.waitingOn}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
-import { VerdictBadge } from "./status-badge";
+import { LiveBadgePill, VerdictBadge } from "./status-badge";
 import { cn, formatTimestamp, getAgentById } from "@/lib/utils";
-import type { MergeAction, MergeItem, RiskLevel } from "@/lib/types";
+import type { LiveBadge, MergeAction, MergeItem, RiskLevel } from "@/lib/types";
 
 const ACTIONS: { label: MergeAction; className: string }[] = [
   {
@@ -29,15 +29,20 @@ export function MergeQueue({
   items,
   selectedTaskId,
   onSelectTask,
+  badge,
 }: {
   items: MergeItem[];
   selectedTaskId: string | null;
   onSelectTask: (taskId: string) => void;
+  badge?: LiveBadge | null;
 }) {
   return (
     <section className="rounded-card border border-border bg-surface p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-ink">Merge Queue</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-ink">Merge Queue</h2>
+          {badge ? <LiveBadgePill badge={badge} /> : null}
+        </div>
         <span className="text-[11px] text-ink-faint">{items.length} in queue</span>
       </div>
 

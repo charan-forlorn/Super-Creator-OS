@@ -1,6 +1,6 @@
-import { VerdictBadge } from "./status-badge";
+import { LiveBadgePill, VerdictBadge } from "./status-badge";
 import { cn, formatTimestamp, getAgentById } from "@/lib/utils";
-import type { ResultItem, ResultRouteStatus } from "@/lib/types";
+import type { LiveBadge, ResultItem, ResultRouteStatus } from "@/lib/types";
 
 const ROUTE_STYLES: Record<ResultRouteStatus, string> = {
   PASS: "bg-status-approved/15 text-status-approved ring-status-approved/30",
@@ -13,10 +13,12 @@ export function ResultInbox({
   results,
   selectedTaskId,
   onSelectTask,
+  badge,
 }: {
   results: ResultItem[];
   selectedTaskId: string | null;
   onSelectTask: (taskId: string) => void;
+  badge?: LiveBadge | null;
 }) {
   const passCount = results.filter((r) => r.verdict === "PASS").length;
   const failCount = results.length - passCount;
@@ -24,7 +26,10 @@ export function ResultInbox({
   return (
     <section className="rounded-card border border-border bg-surface p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-ink">Result Inbox</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-ink">Result Inbox</h2>
+          {badge ? <LiveBadgePill badge={badge} /> : null}
+        </div>
         <div className="flex items-center gap-2 text-[11px]">
           <span className="text-status-approved">{passCount} PASS</span>
           <span className="text-ink-faint">·</span>

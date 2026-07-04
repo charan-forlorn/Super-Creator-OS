@@ -161,3 +161,68 @@ export interface StageProgress {
   percentComplete: number;
   stages: Stage[];
 }
+
+// ── Live Work Updates (deterministic simulated realtime) ──
+// Driven only by a fixed ordered event list + an index in React state.
+// No clocks, no randomness, no network, no storage.
+
+export type LiveAgentName = "ChatGPT" | "Claude Code" | "Codex" | "Hermes";
+
+export type LiveEventType =
+  | "next_action_generated"
+  | "implementation_started"
+  | "implementation_result_ready"
+  | "review_requested"
+  | "review_passed"
+  | "review_failed"
+  | "repo_warning"
+  | "merge_queue_updated"
+  | "operator_decision_required";
+
+export type LiveSeverity = "info" | "success" | "warning" | "error";
+
+export type LiveRoute =
+  | "Prompt Builder"
+  | "Result Inbox"
+  | "Merge Queue"
+  | "Task Detail";
+
+export type AgentLiveState =
+  | "idle"
+  | "working"
+  | "reviewing"
+  | "blocked"
+  | "result_ready"
+  | "waiting_for_operator";
+
+export interface LiveWorkEvent {
+  id: string;
+  /** Deterministic ISO-8601 timestamp — never generated at runtime. */
+  timestamp: string;
+  agent: LiveAgentName;
+  taskId: string;
+  eventType: LiveEventType;
+  message: string;
+  severity: LiveSeverity;
+  /** UI area the operator should look at next. */
+  route: LiveRoute;
+}
+
+export interface AgentLiveMeta {
+  liveState: AgentLiveState;
+  currentTaskId: string | null;
+  /** e.g. "Started implementation · 11:12 UTC". */
+  lastUpdateLabel: string;
+  /** What the agent is waiting on, if anything. */
+  waitingOn: string | null;
+}
+
+export interface TaskTransitionInfo {
+  previousStatus: TaskStatus;
+  currentStatus: TaskStatus;
+  nextExpectedStatus: TaskStatus | null;
+  latestEvent: LiveWorkEvent;
+  responsibleAgent: LiveAgentName;
+}
+
+export type LiveBadge = "New" | "Needs Review" | "Fix Required" | "Ready to Merge";
