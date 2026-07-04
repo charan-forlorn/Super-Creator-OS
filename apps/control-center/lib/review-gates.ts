@@ -81,11 +81,11 @@ export const TEST_EVIDENCE: TestEvidence[] = [
   },
   {
     id: "te-5",
-    label: "latest UI commit",
+    label: "latest committed UI state",
     command: "git log --oneline -1",
     result: "PASS",
     required: true,
-    reason: "798c88b feat(ui): add operator review and commit gate flow.",
+    reason: "145d4d6 chore(ui): sync control center current state data. v0.2 draft is on top and uncommitted.",
   },
   {
     id: "te-6",
@@ -143,8 +143,8 @@ export const COMMIT_CHECKLIST: CommitChecklistItem[] = [
   {
     id: "cc-8",
     label: "remote state reviewed",
-    status: "pass",
-    reason: "Latest UI commit is present on main and deployed.",
+    status: "warning",
+    reason: "v0.2 UI changes are uncommitted; clean/synced (HEAD == origin/main) applies only after the v0.2 commit and push.",
   },
   {
     id: "cc-9",
@@ -154,12 +154,15 @@ export const COMMIT_CHECKLIST: CommitChecklistItem[] = [
   },
 ];
 
+// Pre-commit reality: the v0.2 working tree is NOT clean and NOT yet synced.
+// The HEAD/origin hashes below describe the last committed state only; they do
+// not prove the v0.2 draft is committed or pushed. Verdict stays NEEDS_REVIEW.
 export const REMOTE_SAFETY: RemoteSafetyCheck = {
-  verdict: "REMOTE_SAFE",
+  verdict: "NEEDS_REVIEW",
   branch: "main",
   localAheadCommits: 0,
   remoteOnlyCommits: 0,
-  workingTree: "clean",
+  workingTree: "dirty_expected",
   evidence: [
     {
       id: "rs-1",
@@ -170,20 +173,20 @@ export const REMOTE_SAFETY: RemoteSafetyCheck = {
     {
       id: "rs-2",
       label: "git status --short",
-      value: "clean",
-      result: "PASS",
+      value: "v0.2 working draft — uncommitted apps/control-center/ changes",
+      result: "SKIPPED",
     },
     {
       id: "rs-3",
       label: "git rev-parse HEAD",
-      value: "798c88b24f5ce28e30b26f458c1eedb16c6b7bec",
-      result: "PASS",
+      value: "last committed state only; v0.2 draft not yet committed",
+      result: "SKIPPED",
     },
     {
       id: "rs-4",
       label: "git rev-parse origin/main",
-      value: "798c88b24f5ce28e30b26f458c1eedb16c6b7bec",
-      result: "PASS",
+      value: "clean/synced (HEAD == origin/main) verifiable only after v0.2 commit/push",
+      result: "SKIPPED",
     },
   ],
 };
@@ -191,33 +194,35 @@ export const REMOTE_SAFETY: RemoteSafetyCheck = {
 export const OPERATOR_REVIEW_GATE: OperatorReviewGate = {
   reviewStatus: "PASS",
   reviewer: "Codex",
-  reviewedTaskId: "task-05",
+  reviewedTaskId: "task-06",
   reviewSummary:
-    "Control Center v0.1.4 review gate is complete and deployed. Latest UI commit: 798c88b feat(ui): add operator review and commit gate flow.",
+    "Control Center v0.2 evidence command center is a working draft — commit pending. Latest committed UI state: 145d4d6 chore(ui): sync control center current state data. The v0.2 changes shown here are uncommitted and not yet pushed.",
   recommendedOperatorAction:
-    "Keep the review gate visible as committed evidence; use Stage 4.17 or v0.1.5 for the next planning target.",
+    "Keep the review gate visible as committed evidence; use Stage 4.17 or archive evidence for the next planning target.",
   gateVerdict: "COMMIT_READY",
   changedFiles: CHANGED_FILE_REVIEWS,
   testEvidence: TEST_EVIDENCE,
   checklist: COMMIT_CHECKLIST,
   commitPlan: {
-    recommendedMessage: "feat(ui): add operator review and commit gate flow",
+    recommendedMessage: "feat(ui): add evidence command center v0.2",
     stagedFiles: [
-      "apps/control-center/components/operator-review-gate.tsx",
-      "apps/control-center/components/changed-files-review.tsx",
-      "apps/control-center/components/test-evidence-panel.tsx",
-      "apps/control-center/components/commit-readiness-checklist.tsx",
-      "apps/control-center/components/commit-plan-preview.tsx",
-      "apps/control-center/components/remote-safety-panel.tsx",
+      "apps/control-center/components/app-shell.tsx",
+      "apps/control-center/components/merge-queue.tsx",
+      "apps/control-center/components/commit-evidence-list.tsx",
+      "apps/control-center/components/evidence-cards.tsx",
+      "apps/control-center/components/project-state-snapshot.tsx",
+      "apps/control-center/components/review-archive.tsx",
+      "apps/control-center/components/task-commit-evidence-timeline.tsx",
+      "apps/control-center/lib/live-events.ts",
+      "apps/control-center/lib/mock-data.ts",
       "apps/control-center/lib/review-gates.ts",
       "apps/control-center/lib/types.ts",
-      "apps/control-center/components/app-shell.tsx",
     ],
-    scope: "Frontend-only Control Center review and commit gate simulation.",
+    scope: "Frontend-only Control Center evidence command center simulation.",
     riskNotes: [
-      "v0.1.4 is already committed and deployed.",
+      "v0.2 is frontend-only; no backend, API, or network behavior was added.",
       "The UI never executes git commands.",
-      "Next archive work belongs in Control Center v0.1.5.",
+      "Next work belongs in archive review or Stage 4.17 planning.",
     ],
     reminder: "This UI does not execute git commands.",
   },

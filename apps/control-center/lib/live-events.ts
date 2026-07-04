@@ -6,9 +6,14 @@ import { TASKS } from "./mock-data";
 import type {
   AgentId,
   AgentLiveMeta,
+  EvidenceCard,
   LiveAgentName,
   LiveBadge,
   LiveWorkEvent,
+  ProjectSnapshot,
+  CommitEvidence,
+  ReviewArchiveEntry,
+  TaskCommitEvidenceLink,
   TaskStatus,
   TaskTransitionInfo,
 } from "./types";
@@ -32,8 +37,8 @@ export const LIVE_EVENTS: LiveWorkEvent[] = [
     agent: "Claude Code",
     taskId: "task-04",
     eventType: "implementation_result_ready",
-    message: "SCOS-409 fixture handoff_sample.json added and pushed.",
-    severity: "success",
+    message: "SCOS-409 handoff fixture (simulated) — pending source proof, not verified in repository history.",
+    severity: "info",
     route: "Result Inbox",
   },
   {
@@ -98,9 +103,9 @@ function shortTime(iso: string): string {
 /** Baseline live metadata before any simulated event, mirroring the static AGENTS mock. */
 const BASELINE_AGENT_LIVE: Record<AgentId, AgentLiveMeta> = {
   chatgpt: {
-    liveState: "working",
+    liveState: "idle",
     currentTaskId: "task-01",
-    lastUpdateLabel: "Preparing Stage 4.17 plan",
+    lastUpdateLabel: "Stage 4.17 recommended next (planned)",
     waitingOn: null,
   },
   "claude-code": {
@@ -291,7 +296,7 @@ export function deriveLiveState(eventIndex: number): DerivedLiveState {
 }
 
 /** Short verb phrase for agent-card footers. */
-function labelFor(event: LiveWorkEvent): string {
+export function labelFor(event: LiveWorkEvent): string {
   switch (event.eventType) {
     case "next_action_generated":
       return "Generated next action";
@@ -321,3 +326,199 @@ function labelFor(event: LiveWorkEvent): string {
       return "Prepared push decision";
   }
 }
+
+export const PROJECT_SNAPSHOT: ProjectSnapshot = {
+  currentStage: "Stage 4.17 (planned — recommended next, no implementation evidence yet)",
+  latestCompletedStage: "Stage 4.16",
+  latestUiMilestone: "Control Center v0.1.4.1 — current-state sync complete",
+  activeBlocker: null,
+  repoState: "v0.2 working draft · uncommitted apps/control-center/ changes pending review",
+  nextAction: "Prepare Stage 4.17 conversion handoff plan",
+};
+
+export const COMMIT_EVIDENCE: CommitEvidence[] = [
+  {
+    shortHash: "145d4d6",
+    message: "chore(ui): sync control center current state data",
+    category: "Current State",
+    relatedTaskOrStage: "Control Center v0.1.4.1",
+    status: "pushed",
+    proofSummary: "Real UI-data-sync commit. Its mock content is simulated and does not assert SCOS-409 closure or Stage 4.17 implementation in repository history.",
+  },
+  {
+    shortHash: "f70e133",
+    message: "feat(ui): add deterministic live work updates",
+    category: "Live Simulation",
+    relatedTaskOrStage: "Control Center v0.1.3",
+    status: "pushed",
+    proofSummary: "Added deterministic index-driven updates with static evidence transitions.",
+  },
+  {
+    shortHash: "28c2eaf",
+    message: "test(commercial): add Stage 4.14 handoff fixture",
+    category: "Commercial Evidence",
+    relatedTaskOrStage: "Stage 4.14",
+    status: "pushed",
+    proofSummary: "Handoff fixture test passthrough supports staged handoff readiness.",
+  },
+  {
+    shortHash: "8e520e7",
+    message: "feat(commercial): add Stage 4.16 first prospect outcome review",
+    category: "Commercial Evidence",
+    relatedTaskOrStage: "Stage 4.16",
+    status: "pushed",
+    proofSummary: "First prospect outcome review is complete and supports downstream conversion planning.",
+  },
+  {
+    shortHash: "72ab3fe",
+    message: "fix(ui): update Next.js for Vercel deployment",
+    category: "Deployment Evidence",
+    relatedTaskOrStage: "Control Center v0.1.x",
+    status: "deployed",
+    proofSummary: "Updated for Vercel deployment compatibility and verifiable build output.",
+  },
+  {
+    shortHash: "63ef243",
+    message: "feat(ui): clarify control center operator workflow",
+    category: "Workflow Evidence",
+    relatedTaskOrStage: "Control Center v0.1.x",
+    status: "pushed",
+    proofSummary: "Operator review gates, merge decision guidance, and static review flow added.",
+  },
+];
+
+export const EVIDENCE_CARDS: EvidenceCard[] = [
+  {
+    id: "evd-1",
+    title: "SCOS-409 Closure (Simulated)",
+    sourceType: "Simulated Evidence",
+    relatedTaskOrStage: "SCOS-409",
+    status: "simulated",
+    proofSummary: "Simulated / pending source proof. Not verified in repository history. Operator review required before treating as closed.",
+    nextAction: "Obtain repository source proof for SCOS-409 before treating it as closed.",
+  },
+  {
+    id: "evd-2",
+    title: "Stage 4.16 Completion Evidence",
+    sourceType: "Stage Complete",
+    relatedTaskOrStage: "Stage 4.16",
+    status: "pushed",
+    proofSummary: "First prospect outcome review is complete and pushed.",
+    nextAction: "Prepare Stage 4.17 customer conversion handoff plan.",
+  },
+  {
+    id: "evd-3",
+    title: "Control Center v0.1.3 Completion Evidence",
+    sourceType: "UI Milestone",
+    relatedTaskOrStage: "Control Center v0.1.3",
+    status: "pushed",
+    proofSummary: "Deterministic live work updates were added and deployed.",
+    nextAction: "Retain evidence for v0.1.5 archive review.",
+  },
+  {
+    id: "evd-4",
+    title: "Control Center v0.1.4.1 Current-State Sync Evidence",
+    sourceType: "UI Milestone",
+    relatedTaskOrStage: "Control Center v0.1.4.1",
+    status: "pushed",
+    proofSummary: "Static mock data now syncs the current SCOS project state.",
+    nextAction: "Use current-state snapshot as the v0.2 evidence baseline.",
+  },
+  {
+    id: "evd-5",
+    title: "Vercel Deployment Evidence",
+    sourceType: "Deployment Evidence",
+    relatedTaskOrStage: "Control Center v0.1.x / v0.1.4",
+    status: "deployed",
+    proofSummary: "Next.js app builds and deploys to Vercel.",
+    nextAction: "Treat deployment export evidence as commit-readiness validation.",
+  },
+  {
+    id: "evd-6",
+    title: "Repo State — v0.2 Working Draft",
+    sourceType: "Draft Evidence",
+    relatedTaskOrStage: "Control Center v0.2",
+    status: "draft",
+    proofSummary: "v0.2 working draft: uncommitted apps/control-center/ UI changes pending review. Clean/synced state applies only after commit/push verification. Commit pending.",
+    nextAction: "Commit pending — verify clean/synced state only after the v0.2 commit and push.",
+  },
+];
+
+export const TASK_COMMIT_EVIDENCE_LINKS: TaskCommitEvidenceLink[] = [
+  {
+    taskId: "task-04",
+    result: "SCOS-409 handoff fixture is simulated / pending source proof — not verified in repository history.",
+    commit: null,
+    evidence: EVIDENCE_CARDS[0],
+    nextAction: "Obtain repository source proof for SCOS-409 before treating it as closed.",
+  },
+  {
+    taskId: "task-03",
+    result: "Stage 4.16 is complete and pushed.",
+    commit: COMMIT_EVIDENCE[3],
+    evidence: EVIDENCE_CARDS[1],
+    nextAction: "Prepare Stage 4.17 customer conversion handoff plan.",
+  },
+  {
+    taskId: "task-06",
+    result: "Current-state sync is complete for Control Center v0.1.4.1.",
+    commit: COMMIT_EVIDENCE[0],
+    evidence: EVIDENCE_CARDS[3],
+    nextAction: "Use current-state snapshot as the v0.2 evidence baseline.",
+  },
+  {
+    taskId: "task-05",
+    result: "Review gate flow is complete, committed, and deployed.",
+    commit: COMMIT_EVIDENCE[4],
+    evidence: EVIDENCE_CARDS[4],
+    nextAction: "Keep deployment evidence visible for commit-readiness.",
+  },
+];
+
+export const REVIEW_ARCHIVE: ReviewArchiveEntry[] = [
+  {
+    id: "arc-1",
+    label: "SCOS-409 handoff fixture (simulated)",
+    sourceType: "Simulated Evidence",
+    relatedTaskOrStage: "SCOS-409",
+    status: "simulated",
+    proofSummary: "Simulated / pending source proof. Not verified in repository history; operator review required before treating as closed.",
+    nextAction: "Obtain repository source proof for SCOS-409 before archiving it as closed.",
+  },
+  {
+    id: "arc-2",
+    label: "Stage 4.16 complete",
+    sourceType: "Stage Archive",
+    relatedTaskOrStage: "Stage 4.16",
+    status: "archived",
+    proofSummary: "First prospect outcome review was committed and pushed.",
+    nextAction: "Use Stage 4.16 as the latest completed stage.",
+  },
+  {
+    id: "arc-3",
+    label: "Control Center v0.1.3 pushed",
+    sourceType: "UI Archive",
+    relatedTaskOrStage: "Control Center v0.1.3",
+    status: "archived",
+    proofSummary: "Deterministic live updates were merged and deployed.",
+    nextAction: "Use as the baseline live-update evidence for v0.2.",
+  },
+  {
+    id: "arc-4",
+    label: "Control Center v0.1.4.1 data sync pushed",
+    sourceType: "UI Archive",
+    relatedTaskOrStage: "Control Center v0.1.4.1",
+    status: "archived",
+    proofSummary: "Current-state mock sync was committed and visible in the operator UI.",
+    nextAction: "Treat v0.1.4.1 as the current UI milestone evidence.",
+  },
+  {
+    id: "arc-5",
+    label: "Stale Stage 4.15 blocked state replaced",
+    sourceType: "State Replace",
+    relatedTaskOrStage: "Stage 4.15",
+    status: "archived",
+    proofSummary: "Old Stage 4.15 planning state was replaced with the archived done state.",
+    nextAction: "Use archived state for Stage 4.15 evidence review.",
+  },
+];

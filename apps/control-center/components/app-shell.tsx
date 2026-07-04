@@ -27,7 +27,15 @@ import {
   TASKS,
   TIMELINE,
 } from "@/lib/mock-data";
-import { deriveLiveState, LIVE_EVENTS } from "@/lib/live-events";
+import {
+  deriveLiveState,
+  LIVE_EVENTS,
+  PROJECT_SNAPSHOT,
+  COMMIT_EVIDENCE,
+  EVIDENCE_CARDS,
+  TASK_COMMIT_EVIDENCE_LINKS,
+  REVIEW_ARCHIVE,
+} from "@/lib/live-events";
 import {
   deriveCommitGateAdvisor,
   OPERATOR_REVIEW_GATE,
@@ -35,6 +43,11 @@ import {
 import { cn, deriveMascotView } from "@/lib/utils";
 import type { MascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
+import { ProjectStateSnapshot } from "@/components/project-state-snapshot";
+import { CommitEvidenceList } from "@/components/commit-evidence-list";
+import { EvidenceCards } from "@/components/evidence-cards";
+import { TaskCommitEvidenceTimeline } from "@/components/task-commit-evidence-timeline";
+import { ReviewArchive } from "@/components/review-archive";
 
 const STAGE_META: Record<Stage["status"], { dot: string; text: string }> = {
   done: { dot: "bg-status-approved", text: "text-ink-muted" },
@@ -95,7 +108,7 @@ function SectionHeading({ id, title }: { id: string; title: string }) {
 }
 
 export function AppShell() {
-  // Default selection: the ready Stage 4.17 planning target.
+  // Default selection: the recommended-next (planned) Stage 4.17 target.
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>("task-01");
   const [activeSection, setActiveSection] = useState<string>("overview");
   const [targetAgentId, setTargetAgentId] = useState<AgentId>("claude-code");
@@ -183,6 +196,48 @@ export function AppShell() {
 
             <section id="handoff" className="scroll-mt-6">
               <HandoffStatusStrip steps={HANDOFF_STEPS} />
+            </section>
+
+            <section id="evidence-identity" className="scroll-mt-6 space-y-3">
+              <div className="rounded-card border border-border bg-surface p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h1 className="text-sm font-semibold text-ink">
+                      Evidence Command Center
+                    </h1>
+                    <p className="mt-1 text-xs text-ink-faint">
+                      This dashboard organizes project evidence, task state, commit proof,
+                      review status, and next actions for deterministic operator review.
+                    </p>
+                  </div>
+                  <span className="text-[11px] text-ink-faint">Control Center v0.2</span>
+                </div>
+              </div>
+              <ProjectStateSnapshot snapshot={PROJECT_SNAPSHOT} />
+            </section>
+
+            <section id="evidence" className="scroll-mt-6 space-y-3">
+              <CommitEvidenceList
+                commits={COMMIT_EVIDENCE}
+                activeTaskId={selectedTaskId || undefined}
+                selectedTaskId={selectedTaskId || undefined}
+                onSelectTask={handleSelectTask}
+              />
+            </section>
+
+            <section id="evidence-cards" className="scroll-mt-6 space-y-3">
+              <EvidenceCards items={EVIDENCE_CARDS} />
+            </section>
+
+            <section id="task-timeline" className="scroll-mt-6 space-y-3">
+              <TaskCommitEvidenceTimeline
+                items={TASK_COMMIT_EVIDENCE_LINKS}
+                onSelectTask={handleSelectTask}
+              />
+            </section>
+
+            <section id="review-archive" className="scroll-mt-6 space-y-3">
+              <ReviewArchive items={REVIEW_ARCHIVE} />
             </section>
 
             {/* 1 + 2: Agent status + stage overview */}

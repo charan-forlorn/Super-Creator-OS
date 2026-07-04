@@ -134,6 +134,7 @@ export interface MergeItem {
   filesChanged: number;
   decisionGuidance: DecisionGuidance;
   submittedAt: string;
+  mergeState?: "ready-for-review" | "queued" | "blocked" | "merged" | "archived";
 }
 
 export interface ResultItem {
@@ -231,6 +232,81 @@ export interface TaskTransitionInfo {
 }
 
 export type LiveBadge = "New" | "Needs Review" | "Fix Required" | "Ready to Merge";
+
+// -- Evidence / command center shapes (v0.2) --
+
+export type MergeState =
+  | "ready-for-review"
+  | "queued"
+  | "blocked"
+  | "merged"
+  | "archived";
+
+export interface MergeItemV2 {
+  id: string;
+  taskId: string;
+  title: string;
+  branch: string;
+  author: AgentId;
+  verdict: Verdict;
+  additions: number;
+  deletions: number;
+  filesChanged: number;
+  decisionGuidance: DecisionGuidance;
+  submittedAt: string;
+  mergeState: MergeState;
+}
+
+export interface LayoutMetadata {
+  title: string;
+  description: string;
+}
+
+export interface ProjectSnapshot {
+  currentStage: string;
+  latestCompletedStage: string;
+  latestUiMilestone: string;
+  activeBlocker: string | null;
+  repoState: string;
+  nextAction: string;
+}
+
+export interface CommitEvidence {
+  shortHash: string;
+  message: string;
+  category: string;
+  relatedTaskOrStage: string;
+  status: string;
+  proofSummary: string;
+}
+
+export interface EvidenceCard {
+  id: string;
+  title: string;
+  sourceType: string;
+  relatedTaskOrStage: string;
+  status: string;
+  proofSummary: string;
+  nextAction: string;
+}
+
+export interface ReviewArchiveEntry {
+  id: string;
+  label: string;
+  sourceType: string;
+  relatedTaskOrStage: string;
+  status: string;
+  proofSummary: string;
+  nextAction: string;
+}
+
+export interface TaskCommitEvidenceLink {
+  taskId: string;
+  result: string;
+  commit?: CommitEvidence | null;
+  evidence?: EvidenceCard | null;
+  nextAction: string;
+}
 
 // -- Operator Review & Commit Gate (frontend-only simulation) --
 

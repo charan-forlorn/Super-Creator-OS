@@ -19,7 +19,7 @@ export const AGENTS: Agent[] = [
     name: "ChatGPT",
     role: "Orchestrator",
     status: "active",
-    activity: "Preparing the Stage 4.17 conversion handoff plan.",
+    activity: "Stage 4.17 conversion handoff is the recommended next planning target (planned, not started).",
     currentTaskId: "task-01",
     accent: "emerald",
   },
@@ -28,7 +28,8 @@ export const AGENTS: Agent[] = [
     name: "Claude Code",
     role: "Builder",
     status: "idle",
-    activity: "Ready for the next Control Center v0.1.5 archive slice.",
+    activity:
+      "Ready for the next Control Center v0.2/archive evidence slice.",
     currentTaskId: "task-02",
     accent: "violet",
   },
@@ -37,7 +38,7 @@ export const AGENTS: Agent[] = [
     name: "Codex",
     role: "Reviewer / Verifier",
     status: "waiting",
-    activity: "Latest v0.1.4 review gate evidence is archived for operator review.",
+    activity: "Latest v0.2 evidence command center review is archived for operator review.",
     currentTaskId: "task-05",
     accent: "sky",
   },
@@ -46,7 +47,7 @@ export const AGENTS: Agent[] = [
     name: "Hermes",
     role: "Repo Health / Workflow Auditor",
     status: "idle",
-    activity: "Repo health is clear after Stage 4.16 and SCOS-409 closure.",
+    activity: "Repo health is clear after Stage 4.16. SCOS-409 is a simulated demo, not verified in repository history.",
     currentTaskId: "task-03",
     accent: "amber",
   },
@@ -56,13 +57,13 @@ export const TASKS: Task[] = [
   {
     id: "task-01",
     code: "Stage 4.17",
-    title: "First Customer Conversion Handoff",
+    title: "First Customer Conversion Handoff — Recommended Next",
     stage: "Stage 4.17",
-    status: "in-progress",
+    status: "backlog",
     assignee: "chatgpt",
     priority: "high",
     summary:
-      "Prepare the manual close handoff plan now that Stage 4.16 outcome review is complete.",
+      "Recommended next / planned. No implementation evidence yet. Next action: prepare the conversion handoff plan now that Stage 4.16 outcome review is complete.",
     checklist: [
       { id: "c1", label: "Frame conversion handoff objective", done: false },
       { id: "c2", label: "Define manual close checklist", done: false },
@@ -128,23 +129,24 @@ export const TASKS: Task[] = [
   {
     id: "task-04",
     code: "SCOS-409",
-    title: "Close handoff fixture audit",
+    title: "Close handoff fixture audit (simulated)",
     stage: "Stage 4.16",
-    status: "done",
+    status: "in-review",
     assignee: "hermes",
     priority: "high",
-    summary: "SCOS-409 is closed; handoff_sample.json exists and was pushed.",
+    summary:
+      "Simulated / pending source proof. SCOS-409 is not verified in repository history; operator review required before treating as closed.",
     checklist: [
-      { id: "c1", label: "Add handoff_sample.json fixture", done: true },
-      { id: "c2", label: "Validate handoff schema", done: true },
-      { id: "c3", label: "Push closure evidence", done: true },
+      { id: "c1", label: "Add handoff_sample.json fixture (pending source proof)", done: false },
+      { id: "c2", label: "Validate handoff schema (pending)", done: false },
+      { id: "c3", label: "Push closure evidence (pending)", done: false },
     ],
     operatorChecklist: [
       { id: "op1", label: "Preflight clean", done: true },
       { id: "op2", label: "Prompt prepared", done: true },
-      { id: "op3", label: "Builder result received", done: true },
-      { id: "op4", label: "Codex review complete", done: true },
-      { id: "op5", label: "Merge decision ready", done: true },
+      { id: "op3", label: "Builder result received", done: false },
+      { id: "op4", label: "Codex review complete", done: false },
+      { id: "op5", label: "Merge decision ready", done: false },
     ],
     updatedAt: "2026-07-04T12:02:00Z",
   },
@@ -301,8 +303,8 @@ export const HANDOFF_STEPS: HandoffStep[] = [
     id: "handoff-hermes",
     name: "Hermes",
     role: "Repo Health",
-    state: "approved",
-    message: "SCOS-409 is closed and handoff_sample.json is present.",
+    state: "waiting_result",
+    message: "SCOS-409 is a simulated demo; not verified in repository history.",
   },
   {
     id: "handoff-merge",
@@ -360,8 +362,8 @@ export const TIMELINE: TimelineEvent[] = [
     at: "2026-07-04T11:44:00Z",
     agent: "claude-code",
     taskId: "task-04",
-    message: "SCOS-409 fixture handoff_sample.json added and pushed.",
-    kind: "success",
+    message: "SCOS-409 handoff fixture is a simulated demo — pending source proof, not verified in repository history.",
+    kind: "info",
   },
 ];
 
@@ -422,24 +424,28 @@ export const RESULT_INBOX: ResultItem[] = [
   {
     id: "res-3",
     taskId: "task-04",
-    title: "SCOS-409 handoff fixture",
+    title: "SCOS-409 handoff fixture (simulated)",
     producedBy: "hermes",
-    verdict: "PASS",
-    summary: "handoff_sample.json fixture exists and was pushed; SCOS-409 is closed.",
-    metric: "Closed",
+    verdict: "FAIL",
+    summary:
+      "Simulated / pending source proof. Not verified in repository history; operator review required before treating as closed.",
+    metric: "Needs source proof",
     route: {
-      status: "PASS",
-      label: "Route to Archive",
+      status: "NEEDS_REVIEW",
+      label: "Operator review required",
       destination: "Task Board",
-      guidance: "No blocked decision remains for SCOS-409.",
+      guidance: "SCOS-409 has no repository source proof; do not treat as closed.",
     },
     at: "2026-07-04T11:44:00Z",
   },
 ];
 
+// Progress reflects committed stages only (4.11–4.16 = 6 of 7 tracked stages).
+// Stage 4.17 is the recommended next stage and is marked "upcoming" — it has no
+// implementation evidence yet, so it is not counted as in-progress work.
 export const STAGE_PROGRESS: StageProgress = {
-  currentStageLabel: "Stage 4.17",
-  percentComplete: 84,
+  currentStageLabel: "Stage 4.17 — Recommended Next",
+  percentComplete: 86,
   stages: [
     { id: "s11", label: "4.11 Launch Kit", status: "done" },
     { id: "s12", label: "4.12 Execution Log", status: "done" },
@@ -447,6 +453,6 @@ export const STAGE_PROGRESS: StageProgress = {
     { id: "s14", label: "4.14 Handoff Package", status: "done" },
     { id: "s15", label: "4.15 Delivery Log", status: "done" },
     { id: "s16", label: "4.16 Outcome Review", status: "done" },
-    { id: "s17", label: "4.17 Conversion Handoff", status: "current" },
+    { id: "s17", label: "4.17 Conversion Handoff (planned)", status: "upcoming" },
   ],
 };
