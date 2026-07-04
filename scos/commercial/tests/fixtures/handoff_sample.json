@@ -1,0 +1,159 @@
+{
+  "artifacts": [
+    {
+      "artifact_name": "mini_audit_summary.md",
+      "artifact_type": "summary",
+      "description": "Human-readable mini-audit handoff summary.",
+      "metadata": {},
+      "path": "output/first_prospect/mini_audit_handoff/mini-audit-handoff-synthetic-prospect-001-2026-07-04t00-00-00z-8647068bb903/mini_audit_summary.md",
+      "required": true
+    },
+    {
+      "artifact_name": "operator_review_checklist.md",
+      "artifact_type": "checklist",
+      "description": "Operator pre-send review checklist.",
+      "metadata": {},
+      "path": "output/first_prospect/mini_audit_handoff/mini-audit-handoff-synthetic-prospect-001-2026-07-04t00-00-00z-8647068bb903/operator_review_checklist.md",
+      "required": true
+    },
+    {
+      "artifact_name": "prospect_context.json",
+      "artifact_type": "json",
+      "description": "Safe prospect context (no personal data).",
+      "metadata": {},
+      "path": "output/first_prospect/mini_audit_handoff/mini-audit-handoff-synthetic-prospect-001-2026-07-04t00-00-00z-8647068bb903/prospect_context.json",
+      "required": true
+    },
+    {
+      "artifact_name": "handoff_message_draft.md",
+      "artifact_type": "markdown",
+      "description": "Manual-review-first message draft.",
+      "metadata": {},
+      "path": "output/first_prospect/mini_audit_handoff/mini-audit-handoff-synthetic-prospect-001-2026-07-04t00-00-00z-8647068bb903/handoff_message_draft.md",
+      "required": true
+    },
+    {
+      "artifact_name": "evidence_index.json",
+      "artifact_type": "evidence",
+      "description": "Read-only evidence index.",
+      "metadata": {},
+      "path": "output/first_prospect/mini_audit_handoff/mini-audit-handoff-synthetic-prospect-001-2026-07-04t00-00-00z-8647068bb903/evidence_index.json",
+      "required": true
+    },
+    {
+      "artifact_name": "mini_audit_handoff_manifest.json",
+      "artifact_type": "manifest",
+      "description": "Mini-audit handoff manifest.",
+      "metadata": {},
+      "path": "output/first_prospect/mini_audit_handoff/mini-audit-handoff-synthetic-prospect-001-2026-07-04t00-00-00z-8647068bb903/mini_audit_handoff_manifest.json",
+      "required": true
+    }
+  ],
+  "blockers": [],
+  "checked_at": "2026-07-04T00:00:00Z",
+  "checks": [
+    {
+      "artifact_path": "output/first_prospect/first_prospect_follow_up_decision.json",
+      "check_name": "validate_inputs",
+      "error_detail": null,
+      "error_kind": null,
+      "metadata": {},
+      "severity": "info",
+      "status": "success"
+    },
+    {
+      "artifact_path": "output/first_prospect/first_prospect_follow_up_decision.json",
+      "check_name": "load_decision",
+      "error_detail": null,
+      "error_kind": null,
+      "metadata": {},
+      "severity": "info",
+      "status": "success"
+    },
+    {
+      "artifact_path": null,
+      "check_name": "validate_decision_contract",
+      "error_detail": null,
+      "error_kind": null,
+      "metadata": {
+        "action": "SEND_MINI_AUDIT",
+        "decision_id": "synthetic-decision-001"
+      },
+      "severity": "info",
+      "status": "success"
+    },
+    {
+      "artifact_path": null,
+      "check_name": "validate_decision_allows_handoff",
+      "error_detail": null,
+      "error_kind": null,
+      "metadata": {
+        "action": "SEND_MINI_AUDIT"
+      },
+      "severity": "info",
+      "status": "success"
+    },
+    {
+      "artifact_path": "output/first_prospect/first_prospect_execution_log.json",
+      "check_name": "load_execution_log_reference",
+      "error_detail": null,
+      "error_kind": null,
+      "metadata": {},
+      "severity": "info",
+      "status": "success"
+    },
+    {
+      "artifact_path": null,
+      "check_name": "validate_manual_only",
+      "error_detail": null,
+      "error_kind": null,
+      "metadata": {},
+      "severity": "info",
+      "status": "success"
+    },
+    {
+      "artifact_path": null,
+      "check_name": "validate_sensitive_metadata",
+      "error_detail": null,
+      "error_kind": null,
+      "metadata": {},
+      "severity": "info",
+      "status": "success"
+    },
+    {
+      "artifact_path": "output/first_prospect/mini_audit_handoff/mini-audit-handoff-synthetic-prospect-001-2026-07-04t00-00-00z-8647068bb903",
+      "check_name": "prepare_output_layout",
+      "error_detail": null,
+      "error_kind": null,
+      "metadata": {},
+      "severity": "info",
+      "status": "success"
+    },
+    {
+      "artifact_path": "output/first_prospect/mini_audit_handoff/mini-audit-handoff-synthetic-prospect-001-2026-07-04t00-00-00z-8647068bb903",
+      "check_name": "write_artifacts",
+      "error_detail": null,
+      "error_kind": null,
+      "metadata": {},
+      "severity": "info",
+      "status": "success"
+    }
+  ],
+  "decision_id": "synthetic-decision-001",
+  "execution_log_id": "synthetic-execution-log-001",
+  "handoff_id": "mini-audit-handoff-synthetic-prospect-001-2026-07-04t00-00-00z-8647068bb903",
+  "metadata": {
+    "accepted": true,
+    "action": "SEND_MINI_AUDIT",
+    "fixture": true,
+    "fixture_purpose": "deterministic Stage 4.14 mini-audit handoff manifest sample for audit and regression use",
+    "generator": "scos.commercial.first_prospect_mini_audit_handoff",
+    "manual_only": true,
+    "no_real_pii": true,
+    "synthetic": true
+  },
+  "prospect_id": "synthetic-prospect-001",
+  "schema_version": 1,
+  "source_decision_path": "output/first_prospect/first_prospect_follow_up_decision.json",
+  "source_execution_log_path": "output/first_prospect/first_prospect_execution_log.json"
+}
