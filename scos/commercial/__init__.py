@@ -104,6 +104,12 @@ _LAZY_EXPORTS: dict[str, str] = {
     "FirstProspectMiniAuditDeliveryLogResult": "mini_audit_delivery_models",
     "FirstProspectMiniAuditDeliveryLogError": "mini_audit_delivery_models",
     "record_first_prospect_mini_audit_delivery": "first_prospect_mini_audit_delivery_log",
+    "FIRST_PROSPECT_OUTCOME_REVIEW_SCHEMA_VERSION": "outcome_review_models",
+    "OutcomeReviewCheck": "outcome_review_models",
+    "OutcomeReviewAction": "outcome_review_models",
+    "FirstProspectOutcomeReviewResult": "outcome_review_models",
+    "FirstProspectOutcomeReviewError": "outcome_review_models",
+    "review_first_prospect_outcome": "first_prospect_outcome_review",
 }
 
 
@@ -212,4 +218,10 @@ __all__ = (
     "FirstProspectMiniAuditDeliveryLogResult",
     "FirstProspectMiniAuditDeliveryLogError",
     "record_first_prospect_mini_audit_delivery",
+    "FIRST_PROSPECT_OUTCOME_REVIEW_SCHEMA_VERSION",
+    "OutcomeReviewCheck",
+    "OutcomeReviewAction",
+    "FirstProspectOutcomeReviewResult",
+    "FirstProspectOutcomeReviewError",
+    "review_first_prospect_outcome",
 )
