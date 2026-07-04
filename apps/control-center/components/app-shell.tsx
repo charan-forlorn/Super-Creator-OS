@@ -95,8 +95,8 @@ function SectionHeading({ id, title }: { id: string; title: string }) {
 }
 
 export function AppShell() {
-  // Default selection: the blocked task, so the operator immediately sees what needs attention.
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>("task-04");
+  // Default selection: the ready Stage 4.17 planning target.
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>("task-01");
   const [activeSection, setActiveSection] = useState<string>("overview");
   const [targetAgentId, setTargetAgentId] = useState<AgentId>("claude-code");
 
