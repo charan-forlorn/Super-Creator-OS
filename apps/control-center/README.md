@@ -1,3 +1,8 @@
+# Control Center UI (Mock)
+
+This folder contains static mock components for the Cross-Agent Router panel used in Stage 5.6.
+
+No runtime, no API calls — static mock only.
 # SCOS Agent Control Center - v0.1.2 (Frontend Prototype)
 
 A dark-mode dashboard for a solo operator coordinating the four SCOS agents
