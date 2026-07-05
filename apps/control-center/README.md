@@ -42,6 +42,23 @@ database, API route, network request, auth, clipboard integration, storage, form
 submission, or real agent dispatch behavior. All action-looking workflow buttons
 are disabled/inert.
 
+## Stage 5.1 - Command Bridge Mock
+
+The "Command Bridge (Stage 5.1)" section previews the local command bridge
+implemented in `scos/control_center/` with static deterministic mock data only:
+
+- Command Draft panel: a validated draft and a rejected (unknown command type)
+  draft, with validation status and errors.
+- Operator Approval panel: one approved and one rejected decision, showing the
+  no-auto-approval rule and deterministic approval ids.
+- Command Event Log: the append-only JSONL lifecycle
+  (DRAFTED → VALIDATED → APPROVED → QUEUED → STARTED → COMPLETED, plus a
+  REJECTED example).
+
+Types live in `lib/command-types.ts`, data in `lib/command-mock-data.ts`. The
+UI never executes commands — real execution happens only in the Python bridge
+behind the operator approval gate.
+
 ## Tech Stack
 
 - Next.js 15 App Router + React 19

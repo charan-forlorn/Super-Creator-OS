@@ -16,6 +16,9 @@ import { NextActionPanel } from "./next-action-panel";
 import { HandoffStatusStrip } from "./handoff-status-strip";
 import { LiveWorkUpdates } from "./live-work-updates";
 import { OperatorReviewGate } from "./operator-review-gate";
+import { CommandDraftPanel } from "./command-draft-panel";
+import { OperatorApprovalPanel } from "./operator-approval-panel";
+import { CommandEventLog } from "./command-event-log";
 
 import {
   AGENTS,
@@ -40,6 +43,11 @@ import {
   deriveCommitGateAdvisor,
   OPERATOR_REVIEW_GATE,
 } from "@/lib/review-gates";
+import {
+  COMMAND_DRAFTS,
+  COMMAND_EVENTS,
+  OPERATOR_APPROVALS,
+} from "@/lib/command-mock-data";
 import { cn, deriveMascotView } from "@/lib/utils";
 import type { MascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
@@ -275,6 +283,18 @@ export function AppShell() {
 
             <section id="operator-review" className="scroll-mt-6">
               <OperatorReviewGate gate={OPERATOR_REVIEW_GATE} />
+            </section>
+
+            {/* Stage 5.1: local command bridge (static deterministic mock —
+                the UI never executes commands; execution lives in
+                scos/control_center behind the operator approval gate). */}
+            <section id="command-bridge" className="scroll-mt-6 space-y-3">
+              <SectionHeading id="command-bridge-h" title="Command Bridge (Stage 5.1)" />
+              <div className="grid gap-4 xl:grid-cols-2">
+                <CommandDraftPanel drafts={COMMAND_DRAFTS} />
+                <OperatorApprovalPanel approvals={OPERATOR_APPROVALS} />
+              </div>
+              <CommandEventLog events={COMMAND_EVENTS} />
             </section>
 
             {/* 3: Kanban board */}
