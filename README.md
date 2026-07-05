@@ -9,10 +9,17 @@ An **autonomous, AI-driven video creation and learning system** that transforms 
 
 ## 🎯 Current Status & Recent Milestones
 
-### Latest Progress (July 3-5, 2026)
+### Latest Progress (July 3-6, 2026)
+- ✅ **Control Center Stage 5.2**: AI Work Session Manager (deterministic local
+  task/runtime/status modeling for ChatGPT, Claude Code, Codex, Hermes — no AI
+  execution, no automation)
+- ✅ **Control Center Stage 5.1**: Local command bridge (draft → validate →
+  operator approval → JSONL queue → allowlisted runner → event log)
+- ✅ **Commercial Stage 4.19**: Final commercial release gate
 - ✅ **Commercial Stage 4.17**: First customer conversion handoff
 - ✅ **Commercial Stage 4.16**: First prospect outcome review  
 - 🎨 **UI Enhancements**: 
+  - AI Work Sessions, Agent Routing, and Agent Result Status panels (Stage 5.2 mock)
   - Evidence command center added
   - Operator review & commit gate flow
   - Deterministic live work updates

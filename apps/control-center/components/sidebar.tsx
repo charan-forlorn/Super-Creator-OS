@@ -13,6 +13,7 @@ export const NAV_SECTIONS: NavSection[] = [
   { id: "overview", label: "Overview", icon: "◎", hint: "Agents & stage" },
   { id: "live", label: "Live Updates", icon: "◉", hint: "Simulated feed" },
   { id: "command-bridge", label: "Command Bridge", icon: "⌘", hint: "Stage 5.1 mock" },
+  { id: "ai-work-sessions", label: "AI Work Sessions", icon: "◈", hint: "Stage 5.2 mock" },
   { id: "board", label: "Task Board", icon: "▤", hint: "Kanban" },
   { id: "prompt", label: "Prompt Builder", icon: "✎", hint: "Dispatch work" },
   { id: "inbox", label: "Result Inbox", icon: "✔", hint: "PASS / FAIL" },

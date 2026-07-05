@@ -19,6 +19,9 @@ import { OperatorReviewGate } from "./operator-review-gate";
 import { CommandDraftPanel } from "./command-draft-panel";
 import { OperatorApprovalPanel } from "./operator-approval-panel";
 import { CommandEventLog } from "./command-event-log";
+import { AIWorkSessionPanel } from "./ai-work-session-panel";
+import { AgentRoutingPanel } from "./agent-routing-panel";
+import { AgentResultStatusPanel } from "./agent-result-status-panel";
 
 import {
   AGENTS,
@@ -48,6 +51,7 @@ import {
   COMMAND_EVENTS,
   OPERATOR_APPROVALS,
 } from "@/lib/command-mock-data";
+import { AGENT_RUNTIMES, AI_WORK_SESSIONS } from "@/lib/ai-work-session-mock-data";
 import { cn, deriveMascotView } from "@/lib/utils";
 import type { MascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
@@ -295,6 +299,18 @@ export function AppShell() {
                 <OperatorApprovalPanel approvals={OPERATOR_APPROVALS} />
               </div>
               <CommandEventLog events={COMMAND_EVENTS} />
+            </section>
+
+            {/* Stage 5.2: AI Work Session Manager (static deterministic mock —
+                the UI never dispatches AI work itself; state modeling lives in
+                scos/control_center/work_session_manager.py, no execution). */}
+            <section id="ai-work-sessions" className="scroll-mt-6 space-y-3">
+              <SectionHeading id="ai-work-sessions-h" title="AI Work Sessions (Stage 5.2)" />
+              <AIWorkSessionPanel sessions={AI_WORK_SESSIONS} />
+              <div className="grid gap-4 xl:grid-cols-2">
+                <AgentRoutingPanel runtimes={AGENT_RUNTIMES} sessions={AI_WORK_SESSIONS} />
+                <AgentResultStatusPanel sessions={AI_WORK_SESSIONS} />
+              </div>
             </section>
 
             {/* 3: Kanban board */}
