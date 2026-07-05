@@ -22,6 +22,8 @@ import { CommandEventLog } from "./command-event-log";
 import { AIWorkSessionPanel } from "./ai-work-session-panel";
 import { AgentRoutingPanel } from "./agent-routing-panel";
 import { AgentResultStatusPanel } from "./agent-result-status-panel";
+import { AgentAdapterPanel } from "./agent-adapter-panel";
+import { AdapterSimulationPanel } from "./adapter-simulation-panel";
 
 import {
   AGENTS,
@@ -52,6 +54,11 @@ import {
   OPERATOR_APPROVALS,
 } from "@/lib/command-mock-data";
 import { AGENT_RUNTIMES, AI_WORK_SESSIONS } from "@/lib/ai-work-session-mock-data";
+import {
+  AGENT_ADAPTER_CARDS,
+  AGENT_ADAPTER_SIMULATION_EVENTS,
+  AGENT_ADAPTER_SIMULATION_REQUEST,
+} from "@/lib/agent-adapter-mock-data";
 import { cn, deriveMascotView } from "@/lib/utils";
 import type { MascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
@@ -311,6 +318,19 @@ export function AppShell() {
                 <AgentRoutingPanel runtimes={AGENT_RUNTIMES} sessions={AI_WORK_SESSIONS} />
                 <AgentResultStatusPanel sessions={AI_WORK_SESSIONS} />
               </div>
+            </section>
+
+            {/* Stage 5.3: AI Agent Adapter Contract Layer (static deterministic
+                mock — no adapter here calls an API, opens an app, or
+                automates anything; contracts live in
+                scos/control_center/agent_adapter_*.py). */}
+            <section id="agent-adapters" className="scroll-mt-6 space-y-3">
+              <SectionHeading id="agent-adapters-h" title="AI Agent Adapters (Stage 5.3)" />
+              <AgentAdapterPanel adapters={AGENT_ADAPTER_CARDS} />
+              <AdapterSimulationPanel
+                request={AGENT_ADAPTER_SIMULATION_REQUEST}
+                events={AGENT_ADAPTER_SIMULATION_EVENTS}
+              />
             </section>
 
             {/* 3: Kanban board */}

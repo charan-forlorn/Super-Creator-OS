@@ -59,6 +59,28 @@ Types live in `lib/command-types.ts`, data in `lib/command-mock-data.ts`. The
 UI never executes commands — real execution happens only in the Python bridge
 behind the operator approval gate.
 
+## Stage 5.3 - AI Agent Adapter Contract Layer Mock
+
+The "AI Agent Adapters (Stage 5.3)" section previews the adapter contract
+layer implemented in `scos/control_center/agent_adapter_*.py` with static
+deterministic mock data only:
+
+- Agent Adapter panel: one card per adapter (ChatGPT, Claude Code, Codex,
+  Hermes, manual clipboard fallback) showing declared runtime types,
+  supported task types, and the three capability flags (prompt delivery,
+  result capture, status check), plus a distinct "always-on fallback" badge
+  for manual clipboard.
+- Adapter Simulation panel: one fixed simulated lifecycle (request_created →
+  request_validated → adapter_selected → prompt_prepared → simulated_sent →
+  result_simulated → result_ready) and a note that real dispatch is
+  disabled, with a handoff pointer to Stage 5.4 — Unified Prompt & Result
+  Packet.
+
+Types live in `lib/agent-adapter-types.ts`, data in
+`lib/agent-adapter-mock-data.ts`. No adapter here calls an API, opens an
+app, drives a browser, or automates a clipboard — every card and lifecycle
+step is static, deterministic display data.
+
 ## Tech Stack
 
 - Next.js 15 App Router + React 19
