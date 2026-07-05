@@ -140,6 +140,13 @@ _LAZY_EXPORTS: dict[str, str] = {
     "build_artifact_record": "manifest_tools",
     "build_manifest_metadata": "manifest_tools",
     "ChecksumCache": "manifest_tools",
+    "STAGE4_FINAL_RELEASE_GATE_SCHEMA_VERSION": "release_gate_models",
+    "Stage4ReleaseCheck": "release_gate_models",
+    "Stage4ReleaseBlocker": "release_gate_models",
+    "Stage5HandoffItem": "release_gate_models",
+    "Stage4FinalReleaseGateResult": "release_gate_models",
+    "Stage4FinalReleaseGateError": "release_gate_models",
+    "run_stage4_final_release_gate": "stage4_final_release_gate",
 }
 
 
@@ -284,4 +291,11 @@ __all__ = (
     "build_artifact_record",
     "build_manifest_metadata",
     "ChecksumCache",
+    "STAGE4_FINAL_RELEASE_GATE_SCHEMA_VERSION",
+    "Stage4ReleaseCheck",
+    "Stage4ReleaseBlocker",
+    "Stage5HandoffItem",
+    "Stage4FinalReleaseGateResult",
+    "Stage4FinalReleaseGateError",
+    "run_stage4_final_release_gate",
 )
