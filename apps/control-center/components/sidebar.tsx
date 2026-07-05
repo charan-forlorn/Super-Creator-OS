@@ -16,6 +16,7 @@ export const NAV_SECTIONS: NavSection[] = [
   { id: "ai-work-sessions", label: "AI Work Sessions", icon: "◈", hint: "Stage 5.2 mock" },
   { id: "agent-adapters", label: "Agent Adapters", icon: "⇄", hint: "Stage 5.3 mock" },
   { id: "prompt-packets", label: "Prompt Packets", icon: "⇉", hint: "Stage 5.4 mock" },
+  { id: "packet-review", label: "Packet Review", icon: "PR", hint: "Stage 5.5 mock" },
   { id: "board", label: "Task Board", icon: "▤", hint: "Kanban" },
   { id: "prompt", label: "Prompt Builder", icon: "✎", hint: "Dispatch work" },
   { id: "inbox", label: "Result Inbox", icon: "✔", hint: "PASS / FAIL" },

@@ -25,6 +25,7 @@ import { AgentResultStatusPanel } from "./agent-result-status-panel";
 import { AgentAdapterPanel } from "./agent-adapter-panel";
 import { AdapterSimulationPanel } from "./adapter-simulation-panel";
 import { PromptResultPacketPanel } from "./prompt-result-packet-panel";
+import { OperatorPacketReviewPanel } from "./operator-packet-review-panel";
 
 import {
   AGENTS,
@@ -64,6 +65,7 @@ import {
   PACKET_ROUTING_FLOW,
   PACKET_SCENARIOS,
 } from "@/lib/prompt-result-packet-mock-data";
+import { OPERATOR_PACKET_REVIEWS } from "@/lib/operator-packet-review-mock-data";
 import { cn, deriveMascotView } from "@/lib/utils";
 import type { MascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
@@ -348,6 +350,17 @@ export function AppShell() {
                 title="Unified Prompt & Result Packets (Stage 5.4)"
               />
               <PromptResultPacketPanel scenarios={PACKET_SCENARIOS} flow={PACKET_ROUTING_FLOW} />
+            </section>
+
+            {/* Stage 5.5: Operator Packet Review & Manual Handoff Flow
+                (static deterministic mock - decisions update React local
+                state only; no backend, clipboard, dispatch, or app control). */}
+            <section id="packet-review" className="scroll-mt-6 space-y-3">
+              <SectionHeading
+                id="packet-review-h"
+                title="Operator Packet Review (Stage 5.5)"
+              />
+              <OperatorPacketReviewPanel reviews={OPERATOR_PACKET_REVIEWS} />
             </section>
 
             {/* 3: Kanban board */}

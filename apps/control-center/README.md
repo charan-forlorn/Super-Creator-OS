@@ -106,6 +106,26 @@ Types live in `lib/prompt-result-packet-types.ts`, data in
 no routing decision is executed — every card and flow stage is static,
 deterministic display data.
 
+## Stage 5.5 - Operator Packet Review Mock
+
+The "Packet Review" section previews the operator packet review and manual
+handoff layer implemented in `scos/control_center/operator_packet_review*.py`
+and `manual_handoff_package.py` with static deterministic mock data only:
+
+- Review queue: ChatGPT -> Claude Code approval, Claude Code -> Codex review,
+  Codex NEEDS_FIX -> Claude Code manual handoff, Hermes BLOCKED -> operator,
+  one rejected route, and one approved handoff preview.
+- Packet review cards show source/target agent, runtime, routing reason,
+  safety-check summary, blocked/warning state, and required operator decision.
+- Manual handoff panel shows target runtime, prompt preview, context preview,
+  deterministic steps, and an inert "copy manually outside SCOS" note.
+- Decision buttons update React local state only. They do not call the backend,
+  persist, dispatch, use clipboard APIs, or open apps.
+
+Types live in `lib/operator-packet-review-types.ts`, data in
+`lib/operator-packet-review-mock-data.ts`. The UI remains static and local:
+no packet is automatically dispatched and operator approval is always required.
+
 ## Tech Stack
 
 - Next.js 15 App Router + React 19
