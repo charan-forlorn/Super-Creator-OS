@@ -110,6 +110,13 @@ _LAZY_EXPORTS: dict[str, str] = {
     "FirstProspectOutcomeReviewResult": "outcome_review_models",
     "FirstProspectOutcomeReviewError": "outcome_review_models",
     "review_first_prospect_outcome": "first_prospect_outcome_review",
+    "FIRST_CUSTOMER_CONVERSION_HANDOFF_SCHEMA_VERSION": "conversion_handoff_models",
+    "ConversionHandoffCheck": "conversion_handoff_models",
+    "ConversionHandoffArtifact": "conversion_handoff_models",
+    "ConversionHandoffBlocker": "conversion_handoff_models",
+    "FirstCustomerConversionHandoffResult": "conversion_handoff_models",
+    "FirstCustomerConversionHandoffError": "conversion_handoff_models",
+    "create_first_customer_conversion_handoff": "first_customer_conversion_handoff",
 }
 
 
@@ -224,4 +231,11 @@ __all__ = (
     "FirstProspectOutcomeReviewResult",
     "FirstProspectOutcomeReviewError",
     "review_first_prospect_outcome",
+    "FIRST_CUSTOMER_CONVERSION_HANDOFF_SCHEMA_VERSION",
+    "ConversionHandoffCheck",
+    "ConversionHandoffArtifact",
+    "ConversionHandoffBlocker",
+    "FirstCustomerConversionHandoffResult",
+    "FirstCustomerConversionHandoffError",
+    "create_first_customer_conversion_handoff",
 )
