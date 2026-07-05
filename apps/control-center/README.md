@@ -156,6 +156,33 @@ Types live in `lib/result-intake-types.ts`, data in
 an AI agent, reads/writes a clipboard, or automates a browser/app — every
 result must be pasted in and every next action approved by the operator.
 
+## Stage 5.8 - Git Commit / Push Approval Gate Mock
+
+The "Commit/Push Gate" section previews the local commit/push approval gate
+implemented in `scos/control_center/git_approval_models.py`,
+`git_evidence_snapshot.py`, `git_approval_builder.py`, and
+`git_approval_store.py` with static deterministic mock data only:
+
+- Git Evidence Summary panel: branch, HEAD, origin/main, changed files, test
+  evidence (pass/fail), remote-only-commits flag, and risk flags.
+- Commit Proposal card: conventional-commit message, sorted files-to-commit,
+  evidence/test summaries, computed risk level, an always-visible
+  "approval required" badge, and inert Approve / Reject / Needs Changes
+  controls.
+- Push Approval panel: ahead/behind counts, remote/refspec, the proposed
+  `git push origin main` command, a note that force push/tags/releases can
+  never be generated, and an inert Approve Push control that stays disabled
+  until the commit decision above is approved.
+- Git Decision Log panel: the append-only event timeline mirroring
+  `GitApprovalStore`, showing the proposal lifecycle so far.
+
+Types live in `lib/git-approval-types.ts`, data in
+`lib/git-approval-mock-data.ts`. Nothing here calls a network/GitHub API,
+runs `git add`/`git commit`/`git push`, reads/writes a clipboard, or
+automates a terminal — every proposed command is inert guidance text the
+operator must type themselves, and the push proposal always stays locked
+until the operator's commit approval decision is recorded as approved.
+
 ## Tech Stack
 
 - Next.js 15 App Router + React 19

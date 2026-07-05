@@ -30,6 +30,7 @@ import { ResultIntakePanel } from "./result-intake-panel";
 import { ChatGPTStatusUpdatePanel } from "./chatgpt-status-update-panel";
 import { ProjectStateUpdatePanel } from "./project-state-update-panel";
 import { NextActionDecisionPanel } from "./next-action-decision-panel";
+import { GitApprovalPanel } from "./git-approval-panel";
 
 import {
   AGENTS,
@@ -76,6 +77,15 @@ import {
   PROJECT_STATE_UPDATE,
   RESULT_INTAKES,
 } from "@/lib/result-intake-mock-data";
+import {
+  COMMIT_APPROVAL_DECISION,
+  COMMIT_PROPOSAL,
+  GIT_APPROVAL_EVENTS,
+  GIT_EVIDENCE_SNAPSHOT,
+  PUSH_APPROVAL_DECISION,
+  PUSH_PROPOSAL,
+  PUSH_READINESS_SNAPSHOT,
+} from "@/lib/git-approval-mock-data";
 import { cn, deriveMascotView } from "@/lib/utils";
 import type { MascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
@@ -398,6 +408,26 @@ export function AppShell() {
                   <NextActionDecisionPanel decision={NEXT_ACTION_DECISION} />
                 </div>
               </div>
+            </section>
+
+            {/* Stage 5.8: Git Commit / Push Approval Gate (static
+                deterministic mock — no git command is ever read or run here;
+                contracts live in scos/control_center/git_approval_*.py and
+                git_evidence_snapshot.py). */}
+            <section id="git-approval" className="scroll-mt-6 space-y-3">
+              <SectionHeading
+                id="git-approval-h"
+                title="Git Commit / Push Approval Gate (Stage 5.8)"
+              />
+              <GitApprovalPanel
+                snapshot={GIT_EVIDENCE_SNAPSHOT}
+                proposal={COMMIT_PROPOSAL}
+                commitDecision={COMMIT_APPROVAL_DECISION}
+                pushReadiness={PUSH_READINESS_SNAPSHOT}
+                pushProposal={PUSH_PROPOSAL}
+                pushDecision={PUSH_APPROVAL_DECISION}
+                events={GIT_APPROVAL_EVENTS}
+              />
             </section>
 
             {/* 3: Kanban board */}
