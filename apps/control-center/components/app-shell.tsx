@@ -24,6 +24,7 @@ import { AgentRoutingPanel } from "./agent-routing-panel";
 import { AgentResultStatusPanel } from "./agent-result-status-panel";
 import { AgentAdapterPanel } from "./agent-adapter-panel";
 import { AdapterSimulationPanel } from "./adapter-simulation-panel";
+import { PromptResultPacketPanel } from "./prompt-result-packet-panel";
 
 import {
   AGENTS,
@@ -59,6 +60,10 @@ import {
   AGENT_ADAPTER_SIMULATION_EVENTS,
   AGENT_ADAPTER_SIMULATION_REQUEST,
 } from "@/lib/agent-adapter-mock-data";
+import {
+  PACKET_ROUTING_FLOW,
+  PACKET_SCENARIOS,
+} from "@/lib/prompt-result-packet-mock-data";
 import { cn, deriveMascotView } from "@/lib/utils";
 import type { MascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
@@ -331,6 +336,18 @@ export function AppShell() {
                 request={AGENT_ADAPTER_SIMULATION_REQUEST}
                 events={AGENT_ADAPTER_SIMULATION_EVENTS}
               />
+            </section>
+
+            {/* Stage 5.4: Unified Prompt & Result Packet (static deterministic
+                mock — no packet here is sent, no routing decision is
+                executed; contracts live in
+                scos/control_center/prompt_result_packet_*.py). */}
+            <section id="prompt-packets" className="scroll-mt-6 space-y-3">
+              <SectionHeading
+                id="prompt-packets-h"
+                title="Unified Prompt & Result Packets (Stage 5.4)"
+              />
+              <PromptResultPacketPanel scenarios={PACKET_SCENARIOS} flow={PACKET_ROUTING_FLOW} />
             </section>
 
             {/* 3: Kanban board */}

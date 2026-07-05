@@ -81,6 +81,31 @@ Types live in `lib/agent-adapter-types.ts`, data in
 app, drives a browser, or automates a clipboard — every card and lifecycle
 step is static, deterministic display data.
 
+## Stage 5.4 - Unified Prompt & Result Packet Mock
+
+The "Unified Prompt & Result Packets (Stage 5.4)" section previews the
+packet contract layer implemented in
+`scos/control_center/prompt_result_packet_*.py` with static deterministic
+mock data only:
+
+- 6 prompt/result scenario cards: ChatGPT planning → Claude Code
+  implementation, Claude Code implementation → Codex review, Codex
+  needs-fix → back to Claude Code, Codex pass → Hermes audit, Hermes audit
+  → ChatGPT status update, and one BLOCKED result escalated to the
+  operator.
+- Each card shows the prompt packet (source/target agent, objective,
+  context refs, status), the result packet (verdict, summary, artifacts,
+  blockers, recommended next agent), and the routing recommendation (next
+  agent, next packet type, whether operator approval is required).
+- Packet Routing Flow: the named 5-stage chain (ChatGPT → Claude Code →
+  Codex → Hermes → ChatGPT), each stage showing its packet type and result
+  verdict.
+
+Types live in `lib/prompt-result-packet-types.ts`, data in
+`lib/prompt-result-packet-mock-data.ts`. No packet here is sent anywhere and
+no routing decision is executed — every card and flow stage is static,
+deterministic display data.
+
 ## Tech Stack
 
 - Next.js 15 App Router + React 19
