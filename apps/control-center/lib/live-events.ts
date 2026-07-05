@@ -514,11 +514,12 @@ export const REVIEW_ARCHIVE: ReviewArchiveEntry[] = [
   },
   {
     id: "arc-5",
-    label: "Stale Stage 4.15 blocked state replaced",
+    label: "Archived mini-audit delivery-log evidence replaced",
     sourceType: "State Replace",
-    relatedTaskOrStage: "Stage 4.15",
+    relatedTaskOrStage: "Historical delivery-log stage",
     status: "archived",
-    proofSummary: "Old Stage 4.15 planning state was replaced with the archived done state.",
-    nextAction: "Use archived state for Stage 4.15 evidence review.",
+    proofSummary:
+      "Previous delivery-log planning state was replaced with archived completion evidence.",
+    nextAction: "Use archived delivery-log evidence for historical review.",
   },
 ];

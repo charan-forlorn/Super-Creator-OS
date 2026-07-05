@@ -199,13 +199,14 @@ export const TASKS: Task[] = [
   },
   {
     id: "task-07",
-    code: "Stage 4.15",
+    code: "Historical Delivery Log",
     title: "Delivery Log",
-    stage: "Stage 4.15",
+    stage: "Archived mini-audit delivery-log evidence",
     status: "done",
     assignee: "claude-code",
     priority: "medium",
-    summary: "Stage 4.15 is complete and archived before the Stage 4.16 outcome review.",
+    summary:
+      "Delivery-log evidence is complete and archived before the Stage 4.16 outcome review.",
     checklist: [
       { id: "c1", label: "Implement delivery log", done: true },
       { id: "c2", label: "Verify", done: true },
