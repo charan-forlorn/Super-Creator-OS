@@ -131,6 +131,31 @@ Types live in `lib/operator-packet-review-types.ts`, data in
 `lib/operator-packet-review-mock-data.ts`. The UI remains static and local:
 no packet is automatically dispatched and operator approval is always required.
 
+## Stage 5.7 - AI Result Intake & ChatGPT Status Update Loop Mock
+
+The "Result Intake" section previews the local result-intake loop implemented
+in `scos/control_center/result_intake_*.py`, `chatgpt_status_update.py`, and
+`project_state_update.py` with static deterministic mock data only:
+
+- Result Intake panel: pasted/imported results from Claude Code, Codex,
+  Hermes, ChatGPT, and the operator, each with a verdict badge (PASS / FAIL /
+  BLOCKED / NEEDS_FIX / NEEDS_REVIEW / PARTIAL), normalized summary,
+  blockers/warnings, artifacts/evidence, and an operator-review-required flag.
+- ChatGPT Status Update panel: the generated manual-handoff status update
+  body, requested ChatGPT action, and evidence references, with an inert
+  "copy manually — no clipboard access" control.
+- Project State Update panel: current stage, task status, stage status,
+  latest agent/verdict, and evidence references derived from the selected
+  intake.
+- Next Action Decision panel: recommended action, target agent/runtime,
+  priority, reason, and an always-visible operator-approval requirement.
+
+Selecting a card in the Result Intake list updates React local state only.
+Types live in `lib/result-intake-types.ts`, data in
+`lib/result-intake-mock-data.ts`. Nothing here calls a network API, dispatches
+an AI agent, reads/writes a clipboard, or automates a browser/app — every
+result must be pasted in and every next action approved by the operator.
+
 ## Tech Stack
 
 - Next.js 15 App Router + React 19

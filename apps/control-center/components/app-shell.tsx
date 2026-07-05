@@ -26,6 +26,10 @@ import { AgentAdapterPanel } from "./agent-adapter-panel";
 import { AdapterSimulationPanel } from "./adapter-simulation-panel";
 import { PromptResultPacketPanel } from "./prompt-result-packet-panel";
 import { OperatorPacketReviewPanel } from "./operator-packet-review-panel";
+import { ResultIntakePanel } from "./result-intake-panel";
+import { ChatGPTStatusUpdatePanel } from "./chatgpt-status-update-panel";
+import { ProjectStateUpdatePanel } from "./project-state-update-panel";
+import { NextActionDecisionPanel } from "./next-action-decision-panel";
 
 import {
   AGENTS,
@@ -66,6 +70,12 @@ import {
   PACKET_SCENARIOS,
 } from "@/lib/prompt-result-packet-mock-data";
 import { OPERATOR_PACKET_REVIEWS } from "@/lib/operator-packet-review-mock-data";
+import {
+  CHATGPT_STATUS_UPDATE,
+  NEXT_ACTION_DECISION,
+  PROJECT_STATE_UPDATE,
+  RESULT_INTAKES,
+} from "@/lib/result-intake-mock-data";
 import { cn, deriveMascotView } from "@/lib/utils";
 import type { MascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
@@ -138,6 +148,9 @@ export function AppShell() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>("task-01");
   const [activeSection, setActiveSection] = useState<string>("overview");
   const [targetAgentId, setTargetAgentId] = useState<AgentId>("claude-code");
+  const [selectedIntakeId, setSelectedIntakeId] = useState<string>(
+    RESULT_INTAKES[0]?.intakeId ?? "",
+  );
 
   // Deterministic simulated realtime: the only state is an index into LIVE_EVENTS.
   const [eventIndex, setEventIndex] = useState(0);
@@ -361,6 +374,30 @@ export function AppShell() {
                 title="Operator Packet Review (Stage 5.5)"
               />
               <OperatorPacketReviewPanel reviews={OPERATOR_PACKET_REVIEWS} />
+            </section>
+
+            {/* Stage 5.7: AI Result Intake & ChatGPT Status Update Loop
+                (static deterministic mock — results are pasted/imported by
+                the operator; no clipboard, network, or AI dispatch happens
+                here. Contracts live in scos/control_center/result_intake_*.py,
+                chatgpt_status_update.py, and project_state_update.py). */}
+            <section id="result-intake" className="scroll-mt-6 space-y-3">
+              <SectionHeading
+                id="result-intake-h"
+                title="AI Result Intake & ChatGPT Status Update Loop (Stage 5.7)"
+              />
+              <ResultIntakePanel
+                intakes={RESULT_INTAKES}
+                selectedIntakeId={selectedIntakeId}
+                onSelectIntake={setSelectedIntakeId}
+              />
+              <div className="grid gap-4 xl:grid-cols-2">
+                <ChatGPTStatusUpdatePanel packet={CHATGPT_STATUS_UPDATE} />
+                <div className="space-y-4">
+                  <ProjectStateUpdatePanel update={PROJECT_STATE_UPDATE} />
+                  <NextActionDecisionPanel decision={NEXT_ACTION_DECISION} />
+                </div>
+              </div>
             </section>
 
             {/* 3: Kanban board */}
