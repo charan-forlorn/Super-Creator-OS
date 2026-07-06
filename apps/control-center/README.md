@@ -214,6 +214,30 @@ Types live in `lib/operator-execution-types.ts`, data in
 `fetch`, no terminal, no timers, and no storage — the "copy" affordance is
 inert text, and every command is guidance the operator must run themselves.
 
+## Stage 5.10 - Stage 5 Final AI Command Center Certification Mock
+
+The "Stage 5 Final Certification" section previews the read-only Stage 5.10
+certification gate implemented in
+`scos/control_center/stage5_final_certification.py` with static
+deterministic mock data only. It answers: is Stage 5 complete, internally
+consistent, locally verifiable, and safe from real AI dispatch / network /
+automation overreach?
+
+- Verdict banner: GO / NO_GO badge plus the readiness score and level.
+- Blockers panel: every named, severity-ranked finding the gate surfaced,
+  including the two real, confirmed Stage 5.6 defects it does not fix (the
+  package export gap and the duplicate `ALLOWED_COMMAND_TYPES` lazy-export
+  key).
+- Check matrix: every Stage 5.1-5.9 certification check with its status,
+  category, and severity.
+- Stage 6 Handoff panel: the 10 deterministic handoff items the gate
+  generates for the next stage.
+
+Types live in `lib/stage5-certification-types.ts`, data in
+`lib/stage5-certification-mock-data.ts`. This panel never fixes a finding —
+it only mirrors what the read-only gate reported; nothing here dispatches
+AI work, calls a network API, or automates a browser/GUI/clipboard.
+
 ## Tech Stack
 
 - Next.js 15 App Router + React 19

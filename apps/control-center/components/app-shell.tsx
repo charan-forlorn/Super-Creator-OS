@@ -32,6 +32,7 @@ import { ProjectStateUpdatePanel } from "./project-state-update-panel";
 import { NextActionDecisionPanel } from "./next-action-decision-panel";
 import { GitApprovalPanel } from "./git-approval-panel";
 import { OperatorExecutionConsole } from "./operator-execution-console";
+import { Stage5CertificationPanel } from "./stage5-certification-panel";
 
 import {
   AGENTS,
@@ -88,6 +89,7 @@ import {
   PUSH_READINESS_SNAPSHOT,
 } from "@/lib/git-approval-mock-data";
 import { OPERATOR_EXECUTION_ROWS } from "@/lib/operator-execution-mock-data";
+import { STAGE5_FINAL_CERTIFICATION_RESULT } from "@/lib/stage5-certification-mock-data";
 import { cn, deriveMascotView } from "@/lib/utils";
 import type { MascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
@@ -443,6 +445,19 @@ export function AppShell() {
                 title="Operator Execution Console (Stage 5.9)"
               />
               <OperatorExecutionConsole rows={OPERATOR_EXECUTION_ROWS} />
+            </section>
+
+            {/* Stage 5.10: Stage 5 Final AI Command Center Certification.
+                Static deterministic mock. This is a read-only certification
+                mirror - SCOS does not dispatch AI work, execute a command, or
+                fix any finding here. Real contracts live in
+                scos/control_center/stage5_final_certification.py. */}
+            <section id="stage5-certification" className="scroll-mt-6 space-y-3">
+              <SectionHeading
+                id="stage5-certification-h"
+                title="Stage 5 Final Certification (Stage 5.10)"
+              />
+              <Stage5CertificationPanel result={STAGE5_FINAL_CERTIFICATION_RESULT} />
             </section>
 
             {/* 3: Kanban board */}

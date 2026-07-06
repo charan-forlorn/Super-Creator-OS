@@ -260,6 +260,14 @@ _LAZY_EXPORTS: dict[str, str] = {
     "load_manual_command_runbooks": "operator_execution_store",
     "load_command_execution_captures": "operator_execution_store",
     "load_operator_execution_outcomes": "operator_execution_store",
+    # Stage 5.10 - Stage 5 Final AI Command Center Certification
+    "STAGE5_FINAL_CERTIFICATION_SCHEMA_VERSION": "stage5_certification_models",
+    "Stage5CertificationCheck": "stage5_certification_models",
+    "Stage5CertificationBlocker": "stage5_certification_models",
+    "Stage6HandoffItem": "stage5_certification_models",
+    "Stage5FinalCertificationResult": "stage5_certification_models",
+    "Stage5FinalCertificationError": "stage5_certification_models",
+    "run_stage5_final_certification": "stage5_final_certification",
 }
 
 __all__ = sorted(_LAZY_EXPORTS)
