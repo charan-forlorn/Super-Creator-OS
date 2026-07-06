@@ -1,8 +1,3 @@
-# Control Center UI (Mock)
-
-This folder contains static mock components for the Cross-Agent Router panel used in Stage 5.6.
-
-No runtime, no API calls — static mock only.
 # SCOS Agent Control Center - v0.1.2 (Frontend Prototype)
 
 A dark-mode dashboard for a solo operator coordinating the four SCOS agents
@@ -130,6 +125,21 @@ and `manual_handoff_package.py` with static deterministic mock data only:
 Types live in `lib/operator-packet-review-types.ts`, data in
 `lib/operator-packet-review-mock-data.ts`. The UI remains static and local:
 no packet is automatically dispatched and operator approval is always required.
+
+## Stage 5.6 - Cross-Agent Workflow Router Mock
+
+The "Cross-Agent Router (Stage 5.6)" section previews the cross-agent
+workflow router implemented in `scos/control_center/workflow_router_models.py`,
+`workflow_router.py`, and `workflow_route_store.py` with static
+deterministic mock data only:
+
+- Workflow Router panel: a sample routing decision (source/target agent,
+  next packet type) computed by the default route rules.
+
+Types live in `lib/workflow-router-types.ts`, data in
+`lib/workflow-router-mock-data.ts`. No route plan here is dispatched or
+executed - the router only computes which agent/packet type should come
+next, and every step remains display-only data.
 
 ## Stage 5.7 - AI Result Intake & ChatGPT Status Update Loop Mock
 

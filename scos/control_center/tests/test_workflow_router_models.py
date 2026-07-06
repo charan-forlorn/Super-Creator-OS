@@ -1,4 +1,19 @@
-from scos.control_center import workflow_router_models as m
+"""test_workflow_router_models.py - SCOS Stage 5.6 workflow router models suite.
+
+Run: python scos/control_center/tests/test_workflow_router_models.py
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+_PACKAGE = _HERE.parent
+
+sys.path.insert(0, str(_PACKAGE))
+
+import workflow_router_models as m  # noqa: E402
 
 
 def test_frozenmap_immutable_and_to_dict_order():
@@ -39,3 +54,9 @@ def test_agent_route_rule_to_dict_key_order():
         "metadata",
     ]
     assert keys == expected
+
+
+if __name__ == "__main__":
+    test_frozenmap_immutable_and_to_dict_order()
+    test_agent_route_rule_to_dict_key_order()
+    print("RESULT: 2 passed, 0 failed")

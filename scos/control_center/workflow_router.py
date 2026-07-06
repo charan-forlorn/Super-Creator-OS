@@ -1,14 +1,32 @@
+"""SCOS Stage 5.6 cross-agent workflow router.
+
+Deterministic route rule defaults and next-agent route planning for the
+cross-agent workflow router.
+"""
+
 from __future__ import annotations
 from typing import Optional, Mapping, Any, Tuple, Dict
-from .workflow_router_models import (
-    AgentRouteRule,
-    CrossAgentRoutePlan,
-    RoutePlanStep,
-    RoutingDecision,
-    WorkflowRouterError,
-    CROSS_AGENT_WORKFLOW_ROUTER_SCHEMA_VERSION,
-    FrozenMap,
-)
+
+try:
+    from .workflow_router_models import (
+        AgentRouteRule,
+        CrossAgentRoutePlan,
+        RoutePlanStep,
+        RoutingDecision,
+        WorkflowRouterError,
+        CROSS_AGENT_WORKFLOW_ROUTER_SCHEMA_VERSION,
+        FrozenMap,
+    )
+except ImportError:  # direct-module execution (tests insert the package dir)
+    from workflow_router_models import (
+        AgentRouteRule,
+        CrossAgentRoutePlan,
+        RoutePlanStep,
+        RoutingDecision,
+        WorkflowRouterError,
+        CROSS_AGENT_WORKFLOW_ROUTER_SCHEMA_VERSION,
+        FrozenMap,
+    )
 import hashlib
 
 

@@ -1,4 +1,19 @@
-from scos.control_center import workflow_router as router
+"""test_workflow_router.py - SCOS Stage 5.6 cross-agent workflow router suite.
+
+Run: python scos/control_center/tests/test_workflow_router.py
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+_PACKAGE = _HERE.parent
+
+sys.path.insert(0, str(_PACKAGE))
+
+import workflow_router as router  # noqa: E402
 
 
 def _base_source(packet_id="p1", agent="chatgpt", packet_type="planning_prompt"):
@@ -55,3 +70,11 @@ def test_operator_rejected_blocks_route():
         created_at="2026-07-06T00:00:00Z",
     )
     assert plan.next_decision.target_agent == "operator"
+
+
+if __name__ == "__main__":
+    test_chatgpt_planning_routes_to_claude()
+    test_claude_impl_success_routes_to_codex()
+    test_claude_blocked_routes_to_chatgpt_status()
+    test_operator_rejected_blocks_route()
+    print("RESULT: 4 passed, 0 failed")

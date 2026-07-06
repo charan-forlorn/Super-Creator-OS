@@ -1,3 +1,9 @@
+"""SCOS Stage 5.6 cross-agent workflow router models.
+
+Deterministic route rules, routing decisions, and route plan dataclasses
+for the cross-agent workflow router.
+"""
+
 from __future__ import annotations
 from dataclasses import dataclass, field, asdict
 from typing import Mapping, Any, Tuple, Optional

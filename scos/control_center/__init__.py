@@ -231,7 +231,7 @@ _LAZY_EXPORTS: dict[str, str] = {
     "GitApprovalStore": "git_approval_store",
     # Stage 5.9 - Local Operator Execution Console / Manual Command Runbook
     "OPERATOR_EXECUTION_SCHEMA_VERSION": "operator_execution_models",
-    "ALLOWED_COMMAND_TYPES": "operator_execution_models",
+    "ALLOWED_RUNBOOK_COMMAND_TYPES": "operator_execution_models",
     "ALLOWED_SHELLS": "operator_execution_models",
     "ALLOWED_SAFETY_CHECK_STATUSES": "operator_execution_models",
     "ALLOWED_SAFETY_CHECK_SEVERITIES": "operator_execution_models",
@@ -260,6 +260,19 @@ _LAZY_EXPORTS: dict[str, str] = {
     "load_manual_command_runbooks": "operator_execution_store",
     "load_command_execution_captures": "operator_execution_store",
     "load_operator_execution_outcomes": "operator_execution_store",
+    # Stage 5.6 - Cross-Agent Workflow Router
+    "CROSS_AGENT_WORKFLOW_ROUTER_SCHEMA_VERSION": "workflow_router_models",
+    "AgentRouteRule": "workflow_router_models",
+    "CrossAgentRoutePlan": "workflow_router_models",
+    "RoutePlanStep": "workflow_router_models",
+    "RoutingDecision": "workflow_router_models",
+    "WorkflowRouterError": "workflow_router_models",
+    "create_default_agent_route_rules": "workflow_router",
+    "plan_next_agent_route": "workflow_router",
+    "append_route_plan": "workflow_route_store",
+    "load_route_plans": "workflow_route_store",
+    "find_route_plan": "workflow_route_store",
+    "load_latest_route_plan_for_session": "workflow_route_store",
     # Stage 5.10 - Stage 5 Final AI Command Center Certification
     "STAGE5_FINAL_CERTIFICATION_SCHEMA_VERSION": "stage5_certification_models",
     "Stage5CertificationCheck": "stage5_certification_models",

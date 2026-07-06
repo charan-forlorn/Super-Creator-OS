@@ -1,14 +1,30 @@
+"""SCOS Stage 5.6 cross-agent workflow router JSONL route store.
+
+Append-only JSONL persistence for cross-agent route plans.
+"""
+
 from __future__ import annotations
 from typing import Tuple, Optional, Mapping, Any
 import json
-from .workflow_router_models import (
-    CrossAgentRoutePlan,
-    RoutingDecision,
-    RoutePlanStep,
-    FrozenMap,
-    WorkflowRouterError,
-    CROSS_AGENT_WORKFLOW_ROUTER_SCHEMA_VERSION,
-)
+
+try:
+    from .workflow_router_models import (
+        CrossAgentRoutePlan,
+        RoutingDecision,
+        RoutePlanStep,
+        FrozenMap,
+        WorkflowRouterError,
+        CROSS_AGENT_WORKFLOW_ROUTER_SCHEMA_VERSION,
+    )
+except ImportError:  # direct-module execution (tests insert the package dir)
+    from workflow_router_models import (
+        CrossAgentRoutePlan,
+        RoutingDecision,
+        RoutePlanStep,
+        FrozenMap,
+        WorkflowRouterError,
+        CROSS_AGENT_WORKFLOW_ROUTER_SCHEMA_VERSION,
+    )
 import os
 
 

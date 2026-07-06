@@ -1181,15 +1181,23 @@ def run_stage5_final_certification(
                          "test_runner_present": test_runner_present})
 
     if run_frontend_checks:
+        import shutil as _shutil
+        # Resolve the full executable path (including the .CMD extension on
+        # Windows) rather than the bare "pnpm" name: subprocess.run cannot
+        # launch a Windows .cmd/.bat shim without shell=True unless given its
+        # resolved path, and this gate never uses shell=True. shutil.which is
+        # a pure PATH lookup - it executes nothing.
+        pnpm_exe = _shutil.which("pnpm")
         pnpm_probe = None
-        try:
-            pnpm_probe = subprocess.run(
-                ["pnpm", "--version"], cwd=str(fe_dir), capture_output=True,
-                text=True, timeout=30,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            pnpm_probe = None
-        if pnpm_probe is None or pnpm_probe.returncode != 0:
+        if pnpm_exe is not None:
+            try:
+                pnpm_probe = subprocess.run(
+                    [pnpm_exe, "--version"], cwd=str(fe_dir), capture_output=True,
+                    text=True, timeout=30,
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                pnpm_probe = None
+        if pnpm_exe is None or pnpm_probe is None or pnpm_probe.returncode != 0:
             _check("run_frontend_lint", "skipped", category="frontend_static_scope",
                    metadata={"reason": "pnpm not available"})
             _check("run_frontend_build", "skipped", category="frontend_static_scope",
@@ -1197,8 +1205,8 @@ def run_stage5_final_certification(
         else:
             env_note = {"NEXT_TELEMETRY_DISABLED": "1"}
             for check_name, args in (
-                ("run_frontend_lint", ["pnpm", "lint"]),
-                ("run_frontend_build", ["pnpm", "build"]),
+                ("run_frontend_lint", [pnpm_exe, "lint"]),
+                ("run_frontend_build", [pnpm_exe, "build"]),
             ):
                 try:
                     import os as _os

@@ -26,6 +26,7 @@ import { AgentAdapterPanel } from "./agent-adapter-panel";
 import { AdapterSimulationPanel } from "./adapter-simulation-panel";
 import { PromptResultPacketPanel } from "./prompt-result-packet-panel";
 import { OperatorPacketReviewPanel } from "./operator-packet-review-panel";
+import { WorkflowRouterPanel } from "./workflow-router-panel";
 import { ResultIntakePanel } from "./result-intake-panel";
 import { ChatGPTStatusUpdatePanel } from "./chatgpt-status-update-panel";
 import { ProjectStateUpdatePanel } from "./project-state-update-panel";
@@ -388,6 +389,18 @@ export function AppShell() {
                 title="Operator Packet Review (Stage 5.5)"
               />
               <OperatorPacketReviewPanel reviews={OPERATOR_PACKET_REVIEWS} />
+            </section>
+
+            {/* Stage 5.6: Cross-Agent Workflow Router (static deterministic
+                mock - routing decisions are display-only; no packet is
+                dispatched or routed automatically. Contracts live in
+                scos/control_center/workflow_router*.py). */}
+            <section id="workflow-router" className="scroll-mt-6 space-y-3">
+              <SectionHeading
+                id="workflow-router-h"
+                title="Cross-Agent Router (Stage 5.6)"
+              />
+              <WorkflowRouterPanel />
             </section>
 
             {/* Stage 5.7: AI Result Intake & ChatGPT Status Update Loop

@@ -39,7 +39,7 @@ except ImportError:  # direct-module execution (tests insert the package dir)
 
 OPERATOR_EXECUTION_SCHEMA_VERSION = 1
 
-ALLOWED_COMMAND_TYPES = (
+ALLOWED_RUNBOOK_COMMAND_TYPES = (
     "git_status",
     "git_diff",
     "git_add",
@@ -274,7 +274,7 @@ class RunbookCommandStep:
         _require_positive_int("step_order", self.step_order)
         _require_nonempty("title", self.title)
         _require_nonempty("command", self.command)
-        _require_allowed("command_type", self.command_type, ALLOWED_COMMAND_TYPES)
+        _require_allowed("command_type", self.command_type, ALLOWED_RUNBOOK_COMMAND_TYPES)
         _require_allowed("shell", self.shell, ALLOWED_SHELLS)
         _require_nonempty("working_directory", self.working_directory)
         _reject_url_like_path("working_directory", self.working_directory)

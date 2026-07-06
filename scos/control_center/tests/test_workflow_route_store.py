@@ -1,7 +1,22 @@
-import tempfile
+"""test_workflow_route_store.py - SCOS Stage 5.6 workflow route store suite.
+
+Run: python scos/control_center/tests/test_workflow_route_store.py
+"""
+
+from __future__ import annotations
+
 import os
-from scos.control_center import workflow_route_store as store
-from scos.control_center import workflow_router as router
+import sys
+import tempfile
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+_PACKAGE = _HERE.parent
+
+sys.path.insert(0, str(_PACKAGE))
+
+import workflow_route_store as store  # noqa: E402
+import workflow_router as router  # noqa: E402
 
 
 def test_append_and_load_and_find_and_latest():
@@ -30,3 +45,9 @@ def test_rejects_url_paths():
         assert False, "should have raised"
     except ValueError:
         pass
+
+
+if __name__ == "__main__":
+    test_append_and_load_and_find_and_latest()
+    test_rejects_url_paths()
+    print("RESULT: 2 passed, 0 failed")

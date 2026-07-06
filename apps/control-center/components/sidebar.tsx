@@ -17,6 +17,7 @@ export const NAV_SECTIONS: NavSection[] = [
   { id: "agent-adapters", label: "Agent Adapters", icon: "⇄", hint: "Stage 5.3 mock" },
   { id: "prompt-packets", label: "Prompt Packets", icon: "⇉", hint: "Stage 5.4 mock" },
   { id: "packet-review", label: "Packet Review", icon: "PR", hint: "Stage 5.5 mock" },
+  { id: "workflow-router", label: "Cross-Agent Router", icon: "⇄", hint: "Stage 5.6 mock" },
   { id: "result-intake", label: "Result Intake", icon: "⇊", hint: "Stage 5.7 mock" },
   { id: "git-approval", label: "Commit/Push Gate", icon: "⇑", hint: "Stage 5.8 mock" },
   { id: "operator-execution", label: "Execution Console", icon: "▶", hint: "Stage 5.9 mock" },
