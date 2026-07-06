@@ -34,6 +34,8 @@ import { NextActionDecisionPanel } from "./next-action-decision-panel";
 import { GitApprovalPanel } from "./git-approval-panel";
 import { OperatorExecutionConsole } from "./operator-execution-console";
 import { Stage5CertificationPanel } from "./stage5-certification-panel";
+import { LocalBackendStatusPanel } from "./local-backend-status-panel";
+import { CommandApiPanel } from "./command-api-panel";
 
 import {
   AGENTS,
@@ -91,6 +93,11 @@ import {
 } from "@/lib/git-approval-mock-data";
 import { OPERATOR_EXECUTION_ROWS } from "@/lib/operator-execution-mock-data";
 import { STAGE5_FINAL_CERTIFICATION_RESULT } from "@/lib/stage5-certification-mock-data";
+import {
+  BACKEND_HEALTH_SNAPSHOT,
+  COMMAND_API_ACTIONS,
+  REJECTED_COMMAND_EXAMPLE,
+} from "@/lib/local-backend-mock-data";
 import { cn, deriveMascotView } from "@/lib/utils";
 import type { MascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
@@ -471,6 +478,24 @@ export function AppShell() {
                 title="Stage 5 Final Certification (Stage 5.10)"
               />
               <Stage5CertificationPanel result={STAGE5_FINAL_CERTIFICATION_RESULT} />
+            </section>
+
+            {/* Stage 6.2: Local Control Center Backend & Command API.
+                Static deterministic mock. No fetch, socket, WebSocket, SSE,
+                polling, timer, real clock/random/uuid, or browser storage is
+                used anywhere in this section. Real contracts live in
+                scos/control_center/{backend_models,backend_validation,
+                command_api,local_backend,backend_response_builder}.py. */}
+            <section id="local-backend" className="scroll-mt-6 space-y-3">
+              <SectionHeading
+                id="local-backend-h"
+                title="Local Backend / Command API (Stage 6.2)"
+              />
+              <LocalBackendStatusPanel snapshot={BACKEND_HEALTH_SNAPSHOT} />
+              <CommandApiPanel
+                actions={COMMAND_API_ACTIONS}
+                rejectedExample={REJECTED_COMMAND_EXAMPLE}
+              />
             </section>
 
             {/* 3: Kanban board */}

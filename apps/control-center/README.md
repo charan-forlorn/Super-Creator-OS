@@ -248,6 +248,35 @@ Types live in `lib/stage5-certification-types.ts`, data in
 it only mirrors what the read-only gate reported; nothing here dispatches
 AI work, calls a network API, or automates a browser/GUI/clipboard.
 
+## Stage 6.2 - Local Control Center Backend & Command API Mock
+
+The "Local Backend / Command API (Stage 6.2)" section previews the first
+local backend command boundary implemented in `scos/control_center/`
+(`backend_models.py`, `backend_validation.py`, `command_api.py`,
+`local_backend.py`, `backend_response_builder.py`) with static
+deterministic mock data only. It answers: can SCOS expose a safe local
+backend command boundary that validates requests and produces
+deterministic responses, without yet adding SQLite, WebSocket, an event
+stream, or real AI dispatch?
+
+- Local Backend status panel: `Stage 6.2 Foundation Ready` banner, active
+  store (`in_memory_only`), event stream status
+  (`disabled_until_stage_6_4`), SQLite WAL status (disabled until Stage
+  6.3), and real adapter dispatch status (disabled).
+- Command API panel: four action cards -- Health Check, Preview Command,
+  Validate Command, Dry-run Enqueue -- each showing its request and a
+  rendered `BackendResponseCard`.
+- Rejected example: an unknown command type rejected deterministically,
+  with the `BackendError` detail and recommended action shown.
+- Operator approval notice: real queueing/execution still requires the
+  Stage 5.1 draft -> validate -> operator approval -> queue -> runner
+  pipeline; this panel only previews/validates/dry-runs.
+
+Types live in `lib/local-backend-types.ts`, data in
+`lib/local-backend-mock-data.ts`. This panel never calls `fetch`, opens a
+socket, starts a timer, reads a real clock/random value, or touches
+browser storage -- everything shown is a hand-authored constant.
+
 ## Tech Stack
 
 - Next.js 15 App Router + React 19
