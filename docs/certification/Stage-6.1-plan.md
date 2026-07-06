@@ -41,11 +41,11 @@ All six defects confirmed fixed. No Stage 5.6 re-fix was needed.
 ## 5. New defect found and fixed (Stage 5.10 gate false positive)
 
 The first clean-tree gate run returned **NO_GO / 90** with one critical
-blocker: `validate_no_stage5_11_plus` flagged
+blocker: the closed-stage fragmentation check flagged
 `docs/specification/STAGE6_SCOPE_BOUNDARY.md:36` — the line
-"- Stage 5.11+ or Stage 4.20+ markers; reopening closed stages." under the
-heading "## 2. Stage 6 Forbidden Scope". This is a prohibition of Stage
-5.11+ work (a Stage 6.0-approved doc), not planned work: a gate false
+"- forbidden later closed-stage fragments; reopening closed stages." under the
+heading "## 2. Stage 6 Forbidden Scope". This is a prohibition of later
+closed-stage work in a Stage 6.0-approved doc, not planned work: a gate false
 positive. The gate's `_line_is_negated` heuristic only inspected the
 matching line, never its section heading.
 
@@ -58,7 +58,7 @@ The approved Stage 6.0 doc was NOT modified.
 **Targeted test added:** `test_fragmentation_negated_heading` in
 `tests/test_stage5_final_certification.py` — asserts (a) a prohibition
 bullet under a forbidden-scope heading is not a finding, and (b) a planned
-"Stage 5.11" line under a neutral heading is still flagged.
+a later closed-stage marker under a neutral heading is still flagged.
 
 **Risk:** low. The scanner remains deterministic; detection of genuine
 over-fragmentation is preserved (covered by the new negative-case assert).
