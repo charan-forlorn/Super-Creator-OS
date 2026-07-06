@@ -272,6 +272,33 @@ stream, or real AI dispatch?
   Stage 5.1 draft -> validate -> operator approval -> queue -> runner
   pipeline; this panel only previews/validates/dry-runs.
 
+## Stage 6.3 - Durable Local State Store (SQLite WAL) Mock
+
+The "Durable State (SQLite) (Stage 6.3)" section previews the first
+durable local state layer implemented in `scos/control_center/`
+(`state_models.py`, `sqlite_state_schema.py`, `sqlite_state_store.py`,
+`state_repository.py`, `state_snapshot.py`) with static deterministic mock
+data only. It answers: can SCOS persist Control Center state locally and
+deterministically, so a future Stage 6.4 event stream/UI sync has real
+local state to read from?
+
+- Durable State status panel: store status (`ready_for_stage_6_4`),
+  database path (`scos/work/control_center/state/control_center.sqlite3`),
+  WAL mode (`enabled`), event stream status (`disabled_until_stage_6_4`),
+  real adapter dispatch status (disabled), and backend socket server
+  status (disabled).
+- State Snapshot panel: example deterministic snapshot with WAL
+  verification, per-table counts (commands/sessions/events/approvals/
+  results), and the explicit Stage 6.4 disabled-capabilities list
+  (websocket, sse, polling, real adapter dispatch, arbitrary command
+  execution, Next.js API routes).
+- Example persistence records: a `DurableCommandRecord` card and a
+  `DurableApprovalRecord` card showing the shape of what the real SQLite
+  store persists.
+- This panel never opens a database connection from the frontend -- the
+  real SQLite WAL store lives entirely in the Python backend behind the
+  Stage 6.2 command boundary.
+
 Types live in `lib/local-backend-types.ts`, data in
 `lib/local-backend-mock-data.ts`. This panel never calls `fetch`, opens a
 socket, starts a timer, reads a real clock/random value, or touches

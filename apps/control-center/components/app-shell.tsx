@@ -36,6 +36,9 @@ import { OperatorExecutionConsole } from "./operator-execution-console";
 import { Stage5CertificationPanel } from "./stage5-certification-panel";
 import { LocalBackendStatusPanel } from "./local-backend-status-panel";
 import { CommandApiPanel } from "./command-api-panel";
+import { DurableStateStatusPanel } from "./durable-state-status-panel";
+import { StateSnapshotPanel } from "./state-snapshot-panel";
+import { CommandRecordCard, ApprovalRecordCard } from "./state-record-card";
 
 import {
   AGENTS,
@@ -98,6 +101,12 @@ import {
   COMMAND_API_ACTIONS,
   REJECTED_COMMAND_EXAMPLE,
 } from "@/lib/local-backend-mock-data";
+import {
+  DURABLE_STATE_STATUS,
+  EXAMPLE_STATE_SNAPSHOT,
+  EXAMPLE_COMMAND_RECORD,
+  EXAMPLE_APPROVAL_RECORD,
+} from "@/lib/durable-state-mock-data";
 import { cn, deriveMascotView } from "@/lib/utils";
 import type { MascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
@@ -496,6 +505,25 @@ export function AppShell() {
                 actions={COMMAND_API_ACTIONS}
                 rejectedExample={REJECTED_COMMAND_EXAMPLE}
               />
+            </section>
+
+            {/* Stage 6.3: Durable Local State Store (SQLite WAL).
+                Static deterministic mock. No fetch, socket, WebSocket, SSE,
+                polling, timer, real clock/random/uuid, or browser storage is
+                used anywhere in this section. Real contracts live in
+                scos/control_center/{state_models,sqlite_state_schema,
+                sqlite_state_store,state_repository,state_snapshot}.py. */}
+            <section id="durable-state" className="scroll-mt-6 space-y-3">
+              <SectionHeading
+                id="durable-state-h"
+                title="Durable Local State (Stage 6.3)"
+              />
+              <DurableStateStatusPanel status={DURABLE_STATE_STATUS} />
+              <StateSnapshotPanel snapshot={EXAMPLE_STATE_SNAPSHOT} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <CommandRecordCard record={EXAMPLE_COMMAND_RECORD} />
+                <ApprovalRecordCard record={EXAMPLE_APPROVAL_RECORD} />
+              </div>
             </section>
 
             {/* 3: Kanban board */}
