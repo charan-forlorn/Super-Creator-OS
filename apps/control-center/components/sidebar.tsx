@@ -19,6 +19,7 @@ export const NAV_SECTIONS: NavSection[] = [
   { id: "packet-review", label: "Packet Review", icon: "PR", hint: "Stage 5.5 mock" },
   { id: "result-intake", label: "Result Intake", icon: "⇊", hint: "Stage 5.7 mock" },
   { id: "git-approval", label: "Commit/Push Gate", icon: "⇑", hint: "Stage 5.8 mock" },
+  { id: "operator-execution", label: "Execution Console", icon: "▶", hint: "Stage 5.9 mock" },
   { id: "board", label: "Task Board", icon: "▤", hint: "Kanban" },
   { id: "prompt", label: "Prompt Builder", icon: "✎", hint: "Dispatch work" },
   { id: "inbox", label: "Result Inbox", icon: "✔", hint: "PASS / FAIL" },

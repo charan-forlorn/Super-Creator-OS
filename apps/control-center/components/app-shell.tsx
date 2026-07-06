@@ -31,6 +31,7 @@ import { ChatGPTStatusUpdatePanel } from "./chatgpt-status-update-panel";
 import { ProjectStateUpdatePanel } from "./project-state-update-panel";
 import { NextActionDecisionPanel } from "./next-action-decision-panel";
 import { GitApprovalPanel } from "./git-approval-panel";
+import { OperatorExecutionConsole } from "./operator-execution-console";
 
 import {
   AGENTS,
@@ -86,6 +87,7 @@ import {
   PUSH_PROPOSAL,
   PUSH_READINESS_SNAPSHOT,
 } from "@/lib/git-approval-mock-data";
+import { OPERATOR_EXECUTION_ROWS } from "@/lib/operator-execution-mock-data";
 import { cn, deriveMascotView } from "@/lib/utils";
 import type { MascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
@@ -428,6 +430,19 @@ export function AppShell() {
                 pushDecision={PUSH_APPROVAL_DECISION}
                 events={GIT_APPROVAL_EVENTS}
               />
+            </section>
+
+            {/* Stage 5.9: Local Operator Execution Console / Manual Command
+                Runbook. Static deterministic mock. SCOS does not execute any
+                command, open a terminal, or touch the clipboard; the operator
+                runs each step manually and pastes the result back. Real
+                contracts live in scos/control_center/operator_execution_*.py. */}
+            <section id="operator-execution" className="scroll-mt-6 space-y-3">
+              <SectionHeading
+                id="operator-execution-h"
+                title="Operator Execution Console (Stage 5.9)"
+              />
+              <OperatorExecutionConsole rows={OPERATOR_EXECUTION_ROWS} />
             </section>
 
             {/* 3: Kanban board */}

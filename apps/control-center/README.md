@@ -183,6 +183,37 @@ automates a terminal — every proposed command is inert guidance text the
 operator must type themselves, and the push proposal always stays locked
 until the operator's commit approval decision is recorded as approved.
 
+## Stage 5.9 - Operator Execution Console / Manual Command Runbook Mock
+
+The "Execution Console" section previews the local operator execution layer
+implemented in `scos/control_center/operator_execution_models.py`,
+`operator_execution_runbook.py`, and `operator_execution_store.py` with static
+deterministic mock data only. It answers: once a manual/proposed command is
+approved, how does the operator safely see the exact command, run the required
+pre-checks, run it manually outside SCOS, paste the result back, classify the
+outcome, and preserve deterministic evidence?
+
+- Boundary banner: SCOS does not execute commands; the operator runs them
+  manually; approval is required; push approval is separate from commit
+  approval; results are pasted back manually; blocked/failed results route
+  back to review.
+- Manual Command Runbook panel: ordered command steps (shell, working
+  directory, risk badge, expected-result hint) with "Manual copy required" and
+  "Operator confirmation required" labels. One commit runbook (6 steps), one
+  push runbook (11 steps), and one blocked verification runbook are shown.
+- Execution Safety Checklist: required pre-checks with severity and
+  pending/passed/failed/requires_review status plus an operator instruction.
+- Command Result Capture panel: pasted output summary, raw output excerpt,
+  exit-status text, verdict (PASS / PASS_WITH_WARNINGS / NEEDS_REVIEW /
+  BLOCKED / FAIL / UNKNOWN), warnings/blockers, evidence paths, and the
+  recommended next action (e.g. update ChatGPT status, route to Codex, or
+  operator manual review).
+
+Types live in `lib/operator-execution-types.ts`, data in
+`lib/operator-execution-mock-data.ts`. There is no `navigator.clipboard`, no
+`fetch`, no terminal, no timers, and no storage — the "copy" affordance is
+inert text, and every command is guidance the operator must run themselves.
+
 ## Tech Stack
 
 - Next.js 15 App Router + React 19
