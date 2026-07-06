@@ -1,0 +1,285 @@
+{
+  "schema_version": 1,
+  "stage": "6.4",
+  "phase": "regression_triage",
+  "checked_at": "2026-07-07T00:00:00Z",
+  "base_commit": "51d54b6e426b51d3aa7b587be65eb92495adc5cf",
+  "origin_main": "51d54b6e426b51d3aa7b587be65eb92495adc5cf",
+  "working_tree_clean": true,
+  "known_regression_summary": {
+    "failed": 12,
+    "passed": 309,
+    "errors": 12,
+    "source": "Stage 6.3 development report"
+  },
+  "triage_items": [
+    {
+      "item_id": "46164ad95d272e1f6d44391fdc90bab63f9f4e6f5facfcf81a128af08f17e1d1",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_stage5_final_certification.py::test_certification_id",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Full-suite run raises AssertionError('subprocess.run must never be called in this suite') from _SubprocessGuard defined in test_command_runner.py (introduced Stage 5.1, commit f7fc236). That module performs an unscoped module-level monkeypatch `command_runner.subprocess.run = _GUARD` with no fixture teardown, which leaks into later-collected test modules within the same pytest session. Running `pytest scos/control_center/tests/test_stage5_final_certification.py -q` in isolation yields 14 passed, 0 failed -- confirming the failure is caused by cross-file test-order pollution, not by any code path this test exercises.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "File a Stage 6.x test-hygiene follow-up to scope the subprocess monkeypatch in test_command_runner.py to a fixture with teardown (e.g. monkeypatch.setattr) instead of a bare module-level assignment. Not required before Stage 6.4."
+    },
+    {
+      "item_id": "8487a5872138096c4c919ccdd20a9156a7aa4e5058f80cd6976f5b0cecc34617",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_stage5_final_certification.py::test_go_on_complete_fixture",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same _SubprocessGuard cross-file pollution as test_certification_id (see above). Passes in isolation.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared test_command_runner.py fixture-scoping follow-up."
+    },
+    {
+      "item_id": "620c9a341be389f5efaa0ab0d2404ac6f131ebb20c479f911161e6058c6d6aa7",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_stage5_final_certification.py::test_no_go_on_missing_artifact",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same _SubprocessGuard cross-file pollution as test_certification_id (see above). Passes in isolation.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared test_command_runner.py fixture-scoping follow-up."
+    },
+    {
+      "item_id": "0452a0c55d5c79ec0b4afd81eac5c817ed6fac36fbed8233dfe145e47a72e991",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_stage5_final_certification.py::test_fragmentation_negated_heading",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same _SubprocessGuard cross-file pollution as test_certification_id (see above). Passes in isolation.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared test_command_runner.py fixture-scoping follow-up."
+    },
+    {
+      "item_id": "d924070dd49d9ef51d76439685c6bba6ac71b7af7aa70ca80cb1e220381f76e4",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_stage5_final_certification.py::test_stage5_6_gap_reproduction",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same _SubprocessGuard cross-file pollution as test_certification_id (see above). Passes in isolation.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared test_command_runner.py fixture-scoping follow-up."
+    },
+    {
+      "item_id": "069a3bb5a11efe4afc861ce1fba23da547432bc86cb34f86f9b43953a5f746af",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_stage5_final_certification.py::test_output_artifact",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same _SubprocessGuard cross-file pollution as test_certification_id (see above). Passes in isolation.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared test_command_runner.py fixture-scoping follow-up."
+    },
+    {
+      "item_id": "62b13c580ce7754ab19b30e65402894aebada64ce61326d92fd15519b70650eb",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_stage5_final_certification.py::test_safety_scan_catches_injections",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same _SubprocessGuard cross-file pollution as test_certification_id (see above). Passes in isolation.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared test_command_runner.py fixture-scoping follow-up."
+    },
+    {
+      "item_id": "f81f706ef66e0d75a8c6f993fb725f02ebd2f16ba72cc5ce7a9005f1d90b186c",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_stage5_final_certification.py::test_command_runner_subprocess_allowlist",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same _SubprocessGuard cross-file pollution as test_certification_id (see above). Passes in isolation.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared test_command_runner.py fixture-scoping follow-up."
+    },
+    {
+      "item_id": "a86c1259e18a7fcc89f454925d584a0982289bd8bbb169bd66d52325783e0da2",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_stage5_final_certification.py::test_stage6_handoff_items",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same _SubprocessGuard cross-file pollution as test_certification_id (see above). Passes in isolation.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared test_command_runner.py fixture-scoping follow-up."
+    },
+    {
+      "item_id": "69f4c1a20cb9684f1c2120bb09a4c84f5427a942a07b03e8b3739050e2e7377f",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_stage5_final_certification.py::test_no_mutation",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same _SubprocessGuard cross-file pollution as test_certification_id (see above). Passes in isolation.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared test_command_runner.py fixture-scoping follow-up."
+    },
+    {
+      "item_id": "6ff18cff7270bf5670607de07aeaca2bb693690850adf020f0aa8d1c6fc8633d",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_stage5_final_certification.py::test_package_import_safe",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same _SubprocessGuard cross-file pollution as test_certification_id (see above). Passes in isolation.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared test_command_runner.py fixture-scoping follow-up."
+    },
+    {
+      "item_id": "aac9e70f137657be9876eac910460086b1632a287f65fb4c92e6949c731fd759",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_stage5_final_certification.py::test_real_repo_readonly",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same _SubprocessGuard cross-file pollution as test_certification_id (see above). Passes in isolation.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared test_command_runner.py fixture-scoping follow-up."
+    },
+    {
+      "item_id": "37870c564e6fe655c658dfb125f6624fa58b40b8755e6abb310be543763180e9",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_prompt_result_packet_store.py::test_append_and_load_prompt_packets_roundtrip",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "ERROR at setup: fixture 'tmp_dir' not found (available fixtures include tmp_path, tmp_path_factory, tmpdir but not tmp_dir). Test file last modified in Stage 5.4 (commit 93da717, 'add Stage 5.4 prompt result packets'), long before Stage 6.3's SQLite WAL work. The referenced local fixture was never defined/renamed in this file and the bug predates Stage 6.2/6.3/6.4 entirely.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "File a Stage 6.x test-hygiene follow-up to rename the `tmp_dir` fixture parameter to `tmp_path` (or add a local `tmp_dir` fixture alias) in test_prompt_result_packet_store.py. Not required before Stage 6.4."
+    },
+    {
+      "item_id": "7e19206118cb1c587dc225fc0cc3a6a33c576c51a5ef933fe481848b85cce720",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_prompt_result_packet_store.py::test_append_and_load_result_packets_roundtrip",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same missing 'tmp_dir' fixture defect as test_append_and_load_prompt_packets_roundtrip (see above). Pre-existing since Stage 5.4.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared tmp_dir/tmp_path fixture follow-up."
+    },
+    {
+      "item_id": "eadf94ad7925beb65eebafb93b02b1e49974db4886d185350e681b9067a0f30f",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_prompt_result_packet_store.py::test_append_and_load_routing_decisions_roundtrip",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same missing 'tmp_dir' fixture defect as test_append_and_load_prompt_packets_roundtrip (see above). Pre-existing since Stage 5.4.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared tmp_dir/tmp_path fixture follow-up."
+    },
+    {
+      "item_id": "81c4ee75fcd659914ff9a63e32ca8b7ce779ceecb6c00268d92d2b99ace409f0",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_prompt_result_packet_store.py::test_missing_file_returns_empty_tuple",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same missing 'tmp_dir' fixture defect as test_append_and_load_prompt_packets_roundtrip (see above). Pre-existing since Stage 5.4.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared tmp_dir/tmp_path fixture follow-up."
+    },
+    {
+      "item_id": "8623d96fbe16184d729a76d3b1a314462a06c085e66a0068a167d2a5435a7535",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_prompt_result_packet_store.py::test_malformed_line_raises_deterministic_error",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same missing 'tmp_dir' fixture defect as test_append_and_load_prompt_packets_roundtrip (see above). Pre-existing since Stage 5.4.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared tmp_dir/tmp_path fixture follow-up."
+    },
+    {
+      "item_id": "7c76812dfac12b99eaca6b33e8f923c0668be8dda2463614c8c3f05c10f02a73",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_prompt_result_packet_store.py::test_append_only_no_dedup",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same missing 'tmp_dir' fixture defect as test_append_and_load_prompt_packets_roundtrip (see above). Pre-existing since Stage 5.4.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared tmp_dir/tmp_path fixture follow-up."
+    },
+    {
+      "item_id": "33e9944a4565c9ad78e3e94b8e63966038f048f8ea55e6f08e75e7005530842f",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_prompt_result_packet_store.py::test_reject_non_dataclass_instance",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same missing 'tmp_dir' fixture defect as test_append_and_load_prompt_packets_roundtrip (see above). Pre-existing since Stage 5.4.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared tmp_dir/tmp_path fixture follow-up."
+    },
+    {
+      "item_id": "51d0ce33d35845c3e5651a2ddfa9a7af520f070819ba62e707c8d98627c860b3",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_work_session_store.py::test_append_and_load_round_trip",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "ERROR at setup: fixture 'tmp_dir' not found. Test file last modified in Stage 5.2 (commit d659abc, 'add Stage 5.2 AI work session manager'), long before Stage 6.3's SQLite WAL work. Same defect class as test_prompt_result_packet_store.py.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared tmp_dir/tmp_path fixture follow-up."
+    },
+    {
+      "item_id": "140769b3530fe4a3166b01b33d3349566c293195d631cea8fa509dd3c586a362",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_work_session_store.py::test_latest_snapshot_wins",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same missing 'tmp_dir' fixture defect as test_append_and_load_round_trip (see above). Pre-existing since Stage 5.2.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared tmp_dir/tmp_path fixture follow-up."
+    },
+    {
+      "item_id": "2a5aa3b4f191d0f822c796085a53a30b3b7610afaa824db188f52700a2bca4cd",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_work_session_store.py::test_missing_file_reads_empty",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same missing 'tmp_dir' fixture defect as test_append_and_load_round_trip (see above). Pre-existing since Stage 5.2.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared tmp_dir/tmp_path fixture follow-up."
+    },
+    {
+      "item_id": "7b280642e910a0667c61ea94b7249cebf11f0c69f48bc939c0e23c5299db67fc",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_work_session_store.py::test_append_event",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same missing 'tmp_dir' fixture defect as test_append_and_load_round_trip (see above). Pre-existing since Stage 5.2.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared tmp_dir/tmp_path fixture follow-up."
+    },
+    {
+      "item_id": "0d74a185250d0cc528bdd4a1a8191717a13c98a80cbcc7bcf4fbd951c319adaf",
+      "suite": "scos/control_center/tests",
+      "test_or_module": "test_work_session_store.py::test_invalid_line_raises",
+      "status": "NON_BLOCKING_PRE_EXISTING",
+      "evidence": "Same missing 'tmp_dir' fixture defect as test_append_and_load_round_trip (see above). Pre-existing since Stage 5.2.",
+      "related_to_stage6_4": false,
+      "related_to_stage6_3": false,
+      "recommended_action": "Covered by the shared tmp_dir/tmp_path fixture follow-up."
+    }
+  ],
+  "stage6_4_allowed_to_begin": true,
+  "blockers": [],
+  "non_blocking_items": [
+    "test_stage5_final_certification.py::test_certification_id",
+    "test_stage5_final_certification.py::test_go_on_complete_fixture",
+    "test_stage5_final_certification.py::test_no_go_on_missing_artifact",
+    "test_stage5_final_certification.py::test_fragmentation_negated_heading",
+    "test_stage5_final_certification.py::test_stage5_6_gap_reproduction",
+    "test_stage5_final_certification.py::test_output_artifact",
+    "test_stage5_final_certification.py::test_safety_scan_catches_injections",
+    "test_stage5_final_certification.py::test_command_runner_subprocess_allowlist",
+    "test_stage5_final_certification.py::test_stage6_handoff_items",
+    "test_stage5_final_certification.py::test_no_mutation",
+    "test_stage5_final_certification.py::test_package_import_safe",
+    "test_stage5_final_certification.py::test_real_repo_readonly",
+    "test_prompt_result_packet_store.py::test_append_and_load_prompt_packets_roundtrip",
+    "test_prompt_result_packet_store.py::test_append_and_load_result_packets_roundtrip",
+    "test_prompt_result_packet_store.py::test_append_and_load_routing_decisions_roundtrip",
+    "test_prompt_result_packet_store.py::test_missing_file_returns_empty_tuple",
+    "test_prompt_result_packet_store.py::test_malformed_line_raises_deterministic_error",
+    "test_prompt_result_packet_store.py::test_append_only_no_dedup",
+    "test_prompt_result_packet_store.py::test_reject_non_dataclass_instance",
+    "test_work_session_store.py::test_append_and_load_round_trip",
+    "test_work_session_store.py::test_latest_snapshot_wins",
+    "test_work_session_store.py::test_missing_file_reads_empty",
+    "test_work_session_store.py::test_append_event",
+    "test_work_session_store.py::test_invalid_line_raises"
+  ]
+}

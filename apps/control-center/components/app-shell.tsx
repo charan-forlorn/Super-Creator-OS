@@ -39,6 +39,10 @@ import { CommandApiPanel } from "./command-api-panel";
 import { DurableStateStatusPanel } from "./durable-state-status-panel";
 import { StateSnapshotPanel } from "./state-snapshot-panel";
 import { CommandRecordCard, ApprovalRecordCard } from "./state-record-card";
+import { EventStreamPanel } from "./event-stream-panel";
+import { EventSnapshotCard } from "./event-snapshot-card";
+import { UIStateSyncPanel } from "./ui-state-sync-panel";
+import { SyncHealthPanel } from "./sync-health-panel";
 
 import {
   AGENTS,
@@ -107,6 +111,10 @@ import {
   EXAMPLE_COMMAND_RECORD,
   EXAMPLE_APPROVAL_RECORD,
 } from "@/lib/durable-state-mock-data";
+import {
+  EXAMPLE_EVENT_STREAM_SNAPSHOT,
+  EXAMPLE_UI_STATE_SYNC_SNAPSHOT,
+} from "@/lib/event-stream-mock-data";
 import { cn, deriveMascotView } from "@/lib/utils";
 import type { MascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
@@ -523,6 +531,25 @@ export function AppShell() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <CommandRecordCard record={EXAMPLE_COMMAND_RECORD} />
                 <ApprovalRecordCard record={EXAMPLE_APPROVAL_RECORD} />
+              </div>
+            </section>
+
+            {/* Stage 6.4: Local Event Stream & UI State Sync Foundation.
+                Static deterministic mock. No fetch, socket, WebSocket, SSE,
+                polling, timer, real clock/random/uuid, or browser storage is
+                used anywhere in this section. Real contracts live in
+                scos/control_center/{event_stream_models,event_stream_builder,
+                event_stream_snapshot,ui_state_sync}.py. */}
+            <section id="event-stream" className="scroll-mt-6 space-y-3">
+              <SectionHeading
+                id="event-stream-h"
+                title="Event Stream & UI State Sync (Stage 6.4)"
+              />
+              <SyncHealthPanel snapshot={EXAMPLE_UI_STATE_SYNC_SNAPSHOT} />
+              <UIStateSyncPanel snapshot={EXAMPLE_UI_STATE_SYNC_SNAPSHOT} />
+              <div className="grid gap-3 lg:grid-cols-2">
+                <EventStreamPanel snapshot={EXAMPLE_EVENT_STREAM_SNAPSHOT} />
+                <EventSnapshotCard snapshot={EXAMPLE_EVENT_STREAM_SNAPSHOT} />
               </div>
             </section>
 

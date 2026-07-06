@@ -304,6 +304,38 @@ Types live in `lib/local-backend-types.ts`, data in
 socket, starts a timer, reads a real clock/random value, or touches
 browser storage -- everything shown is a hand-authored constant.
 
+## Stage 6.4 - Local Event Stream & UI State Sync Foundation Mock
+
+The "Event Stream / UI Sync (Stage 6.4)" section previews the first local
+event stream and UI state sync foundation implemented in
+`scos/control_center/` (`event_stream_models.py`, `event_stream_builder.py`,
+`event_stream_snapshot.py`, `ui_state_sync.py`) with static deterministic
+mock data only. It answers: can Control Center read durable local state,
+expose deterministic event snapshots, and prepare UI state sync without
+using WebSocket, SSE, polling, timers, backend sockets, network APIs, or
+real adapter dispatch?
+
+- Sync Health panel: a healthy/blocked banner plus any blockers/warnings
+  carried from the underlying snapshots.
+- UI State Sync panel: sync status, active stage/task, backend status,
+  durable state status, latest event id/sequence, and any pending operator
+  actions.
+- Event Stream panel: a deterministic cursor-based batch of 5 example local
+  events (command lifecycle, session, approval, UI-sync-ready) each with a
+  sequence number, type, entity, status, and timestamp.
+- Snapshot Metadata card: schema version, snapshot id, and status/source
+  counts derived from the same event batch.
+- This is a snapshot/summary foundation only, gated behind a Phase A
+  regression triage (`docs/certification/Stage-6.4-regression-triage.md`)
+  that confirmed no pre-existing Stage 5/6 regression blocks this stage.
+  See `docs/specification/STAGE6_EVENT_STREAM_BOUNDARY.md` for why
+  WebSocket/SSE/polling are deferred to a later stage.
+
+Types live in `lib/event-stream-types.ts` and `lib/ui-state-sync-types.ts`,
+data in `lib/event-stream-mock-data.ts`. This panel never calls `fetch`,
+opens a socket, starts a timer, reads a real clock/random value, or touches
+browser storage -- everything shown is a hand-authored constant.
+
 ## Tech Stack
 
 - Next.js 15 App Router + React 19
