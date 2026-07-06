@@ -193,6 +193,24 @@ def test_no_go_on_missing_artifact(tmp: Path):
     check("blocker recorded", any(b.blocker_id == "blk-stage5-7-artifacts" for b in r.blockers))
 
 
+def test_fragmentation_negated_heading(tmp: Path):
+    print("\n[08b] fragmentation scan respects negated headings")
+    fixture = _make_fixture_repo(tmp / "fx-frag")
+    boundary = fixture / "docs" / "specification" / "STAGE6_SCOPE_BOUNDARY.md"
+    _write(boundary,
+           "# Stage 6 Scope Boundary\n\n## Forbidden Scope\n\n"
+           "- Stage 5.11+ or Stage 4.20+ markers; reopening closed stages.\n")
+    r = _run_gate(fixture)
+    check("prohibition bullet under forbidden heading is not a finding",
+          _check_by_name(r, "validate_no_stage5_11_plus")[0].status == "success")
+    _write(boundary,
+           "# Stage 6 Scope Boundary\n\n## Upcoming Work\n\n"
+           "- Stage 5.11 packet router plan.\n")
+    r2 = _run_gate(fixture)
+    check("planned Stage 5.11 work under neutral heading still flagged",
+          _check_by_name(r2, "validate_no_stage5_11_plus")[0].status == "failure")
+
+
 def test_stage5_6_gap_reproduction(tmp: Path):
     print("\n[09] Stage 5.6 known-gap fixture")
     fixture = _make_fixture_repo(tmp / "fx-56-gap")
@@ -364,6 +382,7 @@ def main():
         test_certification_id(tmp)
         test_go_on_complete_fixture(tmp)
         test_no_go_on_missing_artifact(tmp)
+        test_fragmentation_negated_heading(tmp)
         test_stage5_6_gap_reproduction(tmp)
         test_output_artifact(tmp)
         test_safety_scan_catches_injections(tmp)

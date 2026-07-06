@@ -701,8 +701,15 @@ def _scan_stage_over_fragmentation(repo_root: Path) -> list[dict[str, Any]]:
             text = _read_text(path)
             if text is None:
                 continue
+            # A stage marker under a negated heading (e.g. "## Forbidden
+            # Scope") is a prohibition, not planned work, even when the
+            # bullet line itself carries no negation token.
+            heading_negated = False
             for line_no, line in enumerate(text.splitlines(), start=1):
-                if _STAGE_OVER_FRAGMENTATION_RE.search(line) and not _line_is_negated(line):
+                if line.lstrip().startswith("#"):
+                    heading_negated = _line_is_negated(line)
+                if (_STAGE_OVER_FRAGMENTATION_RE.search(line)
+                        and not _line_is_negated(line) and not heading_negated):
                     findings.append({"file": rel, "line": line_no, "kind": "content"})
     return findings
 
