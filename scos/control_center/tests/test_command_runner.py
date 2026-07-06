@@ -14,6 +14,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
+
 _HERE = Path(__file__).resolve().parent
 _PACKAGE = _HERE.parent
 
@@ -47,7 +49,23 @@ class _SubprocessGuard:
 
 
 _GUARD = _SubprocessGuard()
-command_runner.subprocess.run = _GUARD
+
+
+@pytest.fixture(autouse=True)
+def _guarded_subprocess():
+    """Patch command_runner.subprocess.run only for this module's tests.
+
+    The guard must not leak into other test modules that run later in the
+    same pytest session (e.g. test_stage5_final_certification.py's
+    read-only integration test, which spawns real subprocesses).
+    """
+    original_run = command_runner.subprocess.run
+    _GUARD.calls = 0
+    command_runner.subprocess.run = _GUARD
+    try:
+        yield
+    finally:
+        command_runner.subprocess.run = original_run
 
 
 def check(name: str, cond: bool) -> None:
@@ -197,15 +215,21 @@ def test_event_log_lifecycle_dry_run(tmp: Path) -> None:
 
 
 def main() -> int:
-    with tempfile.TemporaryDirectory() as d:
-        tmp = Path(d)
-        test_schema_version()
-        test_dry_run_never_executes()
-        test_dry_run_plan_metadata()
-        test_unapproved_command_rejected()
-        test_unknown_and_forbidden_types_blocked(tmp)
-        test_gate_requires_checked_at(tmp)
-        test_event_log_lifecycle_dry_run(tmp)
+    original_run = command_runner.subprocess.run
+    _GUARD.calls = 0
+    command_runner.subprocess.run = _GUARD
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d)
+            test_schema_version()
+            test_dry_run_never_executes()
+            test_dry_run_plan_metadata()
+            test_unapproved_command_rejected()
+            test_unknown_and_forbidden_types_blocked(tmp)
+            test_gate_requires_checked_at(tmp)
+            test_event_log_lifecycle_dry_run(tmp)
+    finally:
+        command_runner.subprocess.run = original_run
     print(f"\n RESULT: {_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
 
