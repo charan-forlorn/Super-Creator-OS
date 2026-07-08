@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SCOS Customer Portal</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
+  h1 { font-size: 1.6rem; }
+  .card { border: 1px solid #ddd; border-radius: 10px; padding: 1rem 1.25rem; margin: 1rem 0; }
+  label { display: block; font-weight: 600; margin: 0.5rem 0 0.25rem; }
+  input, textarea, select { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+  button { cursor: pointer; border: none; border-radius: 6px; padding: 0.55rem 1rem; font-weight: 600; }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-flag { background: #dc2626; color: #fff; }
+  .btn-loading { opacity: 0.6; cursor: progress; }
+  .status { margin-top: 0.5rem; font-size: 0.9rem; }
+  .status.ok { color: #15803d; }
+  .status.err { color: #b91c1c; }
+  .muted { color: #666; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+  <h1>ศูนย์ลูกค้า SCOS</h1>
+  <p class="muted">พอร์ทัลลูกค้า (frontend prototype — ไม่มี backend)</p>
+
+  <div class="card">
+    <h2>แจ้งปัญหาที่พบ</h2>
+    <label for="customerId">รหัสลูกค้า (customer id)</label>
+    <input id="customerId" type="text" placeholder="เช่น CUST-001" />
+
+    <label for="msg">รายละเอียดปัญหา</label>
+    <textarea id="msg" rows="3" placeholder="อธิบายสิ่งที่เกิดขึ้น"></textarea>
+
+    <label for="sev">ระดับความรุนแรง</label>
+    <select id="sev">
+      <option value="low">ต่ำ (low)</option>
+      <option value="medium" selected>ปานกลาง (medium)</option>
+      <option value="high">สูง (high)</option>
+    </select>
+
+    <p style="margin-top:1rem;">
+      <button id="reportBtn" class="btn-flag" onclick="submitReport()">🚩 รายงานข้อผิดพลาด</button>
+    </p>
+    <div id="reportStatus" class="status" role="status" aria-live="polite"></div>
+  </div>
+
+  <div class="card">
+    <h2>สถานะ</h2>
+    <p class="muted">หน้านี้จำลองการทำงานฝั่งลูกค้าเท่านั้น</p>
+  </div>
+
+<script>
+  async function submitReport() {
+    const btn = document.getElementById("reportBtn");
+    const status = document.getElementById("reportStatus");
+    const payload = {
+      customer_id: document.getElementById("customerId").value.trim(),
+      message: document.getElementById("msg").value.trim(),
+      url: location.href,
+      severity: document.getElementById("sev").value,
+    };
+    btn.disabled = true;
+    btn.classList.add("btn-loading");
+    status.className = "status";
+    status.textContent = "กำลังส่งรายงาน...";
+    try {
+      const res = await fetch("/api/report-error", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      status.className = "status ok";
+      status.textContent = "✅ ส่งรายงานเรียบร้อยแล้ว (ขอบคุณที่แจ้งมา)";
+    } catch (err) {
+      status.className = "status err";
+      status.textContent = "❌ ส่งไม่สำเร็จ: " + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove("btn-loading");
+    }
+  }
+</script>
+</body>
+</html>
