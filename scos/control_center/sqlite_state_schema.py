@@ -20,7 +20,7 @@ try:
 except ImportError:  # direct-module execution (tests insert the package dir)
     from state_models import DurableStateError
 
-SQLITE_STATE_SCHEMA_VERSION = 1
+SQLITE_STATE_SCHEMA_VERSION = 2
 
 DEFAULT_STATE_DB_RELATIVE_PATH = "scos/work/control_center/state/control_center.sqlite3"
 
@@ -120,6 +120,22 @@ def get_schema_statements() -> tuple[str, ...]:
             metadata_json TEXT NOT NULL
         )
         """,
+        """
+        CREATE TABLE IF NOT EXISTS audit_ledger (
+            entry_id TEXT PRIMARY KEY,
+            sequence INTEGER NOT NULL UNIQUE,
+            prev_hash TEXT NOT NULL,
+            entry_hash TEXT NOT NULL,
+            decision_id TEXT NOT NULL,
+            subject_type TEXT NOT NULL,
+            subject_id TEXT NOT NULL,
+            decision TEXT NOT NULL,
+            decided_by TEXT NOT NULL,
+            decided_at TEXT NOT NULL,
+            reason TEXT,
+            metadata_json TEXT NOT NULL
+        )
+        """,
     )
 
 
@@ -137,6 +153,14 @@ def get_index_statements() -> tuple[str, ...]:
         "CREATE INDEX IF NOT EXISTS ix_results_subject "
         "ON results(subject_type, subject_id)",
         "CREATE INDEX IF NOT EXISTS ix_results_verdict ON results(verdict)",
+        "CREATE INDEX IF NOT EXISTS ix_audit_ledger_sequence "
+        "ON audit_ledger(sequence)",
+        "CREATE INDEX IF NOT EXISTS ix_audit_ledger_subject "
+        "ON audit_ledger(subject_type, subject_id)",
+        "CREATE INDEX IF NOT EXISTS ix_audit_ledger_decision "
+        "ON audit_ledger(decision)",
+        "CREATE INDEX IF NOT EXISTS ix_audit_ledger_prev_hash "
+        "ON audit_ledger(prev_hash)",
     )
 
 
