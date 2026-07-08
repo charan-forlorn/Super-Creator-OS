@@ -2,5 +2,6 @@
 # approvals required by pnpm 11. These transitive native builds are not needed for
 # this frontend prototype, so they are intentionally disabled.
 allowBuilds:
+  esbuild: true
   sharp: false
   unrs-resolver: false
