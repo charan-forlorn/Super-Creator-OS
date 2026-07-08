@@ -193,3 +193,60 @@ Implemented in `approval_audit_store.py` on top of the
 - No new network ports, no Next.js/socket/API routes.
 - No changes to Stage 4/5 public contracts.
 - No UI surface in `apps/control-center/` (deferred; ledger is backend-only).
+
+## Stage 6.7 Integration — Execution-Grant Enforcement (additive)
+
+Stage 6.7 wires the Stage 6.6 ledger into the operator approval gate and the
+command executor. It adds **no new schema, no new API, and no new
+dependency**; it only changes who calls `append_decision` and who calls
+`is_execution_granted`.
+
+### Write ownership — approval gate only
+
+`operator_approval.py` is the SOLE writer of command approval-audit rows.
+
+- `approve_command(...)` and `reject_command(...)` accept optional
+  `repo_root` / `db_path`. When `repo_root` is provided they call
+  `append_decision(subject_type="command", subject_id=<command id>, ...)`,
+  persisting the decision exactly once, at the gate.
+- When `repo_root` is omitted the behavior is unchanged from pre-6.7
+  (in-memory only, no persistence) — existing callers/tests are unaffected.
+- The executor (`command_runner.py`) NEVER calls `append_decision`. This
+  guarantees no double persistence.
+
+### Read / enforcement ownership — command executor
+
+`command_runner.py` is the enforcement reader. `run_approved_command(...)`
+gains an opt-in `enforce_audit_grant: bool = False` flag (and optional
+`audit_repo_root` / `audit_db_path`). When `enforce_audit_grant=True`:
+
+1. It calls `verify_chain(...)` first. A broken chain blocks execution with a
+   deterministic `blocked` result (reason: `"audit ledger tamper detected:
+   hash chain invalid"`). **The chain is consulted, not just the latest
+   decision** — so a tampered `decision` column that still passes
+   `latest_decision` shape checks is caught.
+2. It calls `is_execution_granted(subject_type="command",
+   subject_id=<command id>, ...)`. Only a latest `approved` decision with an
+   intact chain grants execution. `denied`, `pending`, missing, or tampered
+   states block execution (deterministic `blocked` result).
+3. There is no bypass flag, no auto-approve, and no silent fallback to
+   in-memory approval. The ledger is the single execution-grant source.
+
+The flag defaults to `False` so pre-6.7 callers that do not wire a ledger are
+completely unchanged (backward compatibility preserved).
+
+### subject_type / subject_id mapping
+
+- `subject_type` is always `"command"`.
+- `subject_id` is the command's `command_id` — the same id on
+  `CommandDraft`, `OperatorApproval`, `ApprovedCommand`, and the ledger row.
+  The gate writes with `approval.command_id`; the runner reads with
+  `approved_command.command_id`. They match by construction.
+
+### Denial / pending / tamper blocking behavior
+
+- `denied` latest → blocked.
+- `pending` latest (or no decision) → blocked.
+- broken hash chain → blocked regardless of decision value.
+- A persisted denial survives a new store instance (reopen) and still blocks.
+

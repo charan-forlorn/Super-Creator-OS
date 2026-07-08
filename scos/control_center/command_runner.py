@@ -27,6 +27,11 @@ except ImportError:  # direct-module execution (tests insert the package dir)
     from command_models import ALLOWED_COMMAND_TYPES, ApprovedCommand, CommandResult
     from event_log import append_command_event, make_command_event
 
+try:
+    from .approval_audit_store import is_execution_granted, verify_chain
+except ImportError:  # direct-module execution (tests insert the package dir)
+    from approval_audit_store import is_execution_granted, verify_chain
+
 CONTROL_CENTER_COMMAND_RUNNER_SCHEMA_VERSION = 1
 
 COMMAND_TIMEOUT_SECONDS = 900
@@ -161,6 +166,9 @@ def run_approved_command(
     finished_at: str,
     event_log_path=None,
     dry_run: bool = False,
+    enforce_audit_grant: bool = False,
+    audit_repo_root=None,
+    audit_db_path=None,
 ) -> CommandResult:
     """Run one approved, allowlisted command and return its deterministic result.
 
@@ -169,6 +177,15 @@ def run_approved_command(
     blocked result (never an execution). When ``event_log_path`` is provided,
     the lifecycle is recorded as COMMAND_STARTED then COMMAND_COMPLETED /
     COMMAND_FAILED (or COMMAND_BLOCKED for a never-started command).
+
+    Stage 6.7: when ``enforce_audit_grant`` is True, the Stage 6.6
+    tamper-evident approval-audit ledger is the SINGLE source of execution
+    grant. The command is blocked unless the latest persisted decision for
+    its command id is ``approved`` AND the ledger hash chain is intact. This
+    is opt-in (default False) so pre-6.7 callers that do not wire a ledger
+    are unchanged. ``audit_repo_root``/``audit_db_path`` default to the same
+    ``repo_root`` used for persistence at the approval gate; pass them
+    explicitly only when storage locations differ.
     """
     if not isinstance(approved_command, ApprovedCommand):
         raise ValueError(
@@ -177,6 +194,30 @@ def run_approved_command(
     root = Path(repo_root)
     command_type = approved_command.command_type
     args = dict(approved_command.args)
+
+    if enforce_audit_grant:
+        _audit_repo = audit_repo_root if audit_repo_root is not None else root
+        if not verify_chain(repo_root=_audit_repo, db_path=audit_db_path):
+            return _blocked_result(
+                approved_command,
+                started_at,
+                finished_at,
+                "audit ledger tamper detected: hash chain invalid",
+                event_log_path,
+            )
+        if not is_execution_granted(
+            subject_type="command",
+            subject_id=approved_command.command_id,
+            repo_root=_audit_repo,
+            db_path=audit_db_path,
+        ):
+            return _blocked_result(
+                approved_command,
+                started_at,
+                finished_at,
+                "execution not granted by approval-audit ledger",
+                event_log_path,
+            )
 
     if command_type not in ALLOWED_COMMAND_TYPES:
         return _blocked_result(
