@@ -394,6 +394,19 @@ _LAZY_EXPORTS: dict[str, str] = {
     "Stage7ClosureResult": "stage7_closure_models",
     "Stage7ClosureError": "stage7_closure_models",
     "run_stage7_final_closure_gate": "stage7_closure_gate",
+    # Stage 8.1 - Local Transport Activation Decision & Safety Contract
+    "LOCAL_TRANSPORT_ACTIVATION_DECISION_SCHEMA_VERSION": "transport_activation_decision_models",
+    "TRANSPORT_ACTIVATION_OPTIONS": "transport_activation_decision_models",
+    "TRANSPORT_ACTIVATION_DECISIONS": "transport_activation_decision_models",
+    "TRANSPORT_ACTIVATION_GO_NO_GO": "transport_activation_decision_models",
+    "TRANSPORT_ACTIVATION_REQUIREMENT_STATUSES": "transport_activation_decision_models",
+    "TransportOptionAnalysis": "transport_activation_decision_models",
+    "TransportSafetyRequirement": "transport_activation_decision_models",
+    "TransportDecisionRecord": "transport_activation_decision_models",
+    "TransportDecisionBlocker": "transport_activation_decision_models",
+    "LocalTransportActivationDecisionResult": "transport_activation_decision_models",
+    "LocalTransportActivationDecisionError": "transport_activation_decision_models",
+    "run_local_transport_activation_decision_gate": "transport_activation_decision_gate",
 }
 
 __all__ = sorted(_LAZY_EXPORTS)
