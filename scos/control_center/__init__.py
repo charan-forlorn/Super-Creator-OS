@@ -320,6 +320,23 @@ _LAZY_EXPORTS: dict[str, str] = {
     "validate_read_surface_contract_alignment": "read_surface_coherence_gate",
     "compare_read_surface_to_stage6_artifacts": "read_surface_coherence_gate",
     "validate_read_surface_non_mutation_contract": "read_surface_coherence_gate",
+    # Stage 7.3 - Operator Health and Activity Read Models
+    "OPERATOR_READ_MODELS_SCHEMA_VERSION": "operator_read_models",
+    "FRESHNESS_LEVELS": "operator_read_models",
+    "HEALTH_SIGNAL_TYPES": "operator_read_models",
+    "HEALTH_STATUSES": "operator_read_models",
+    "HEALTH_SEVERITIES": "operator_read_models",
+    "ACTIVITY_TYPES": "operator_read_models",
+    "OperatorFreshnessStatus": "operator_read_models",
+    "OperatorHealthSignal": "operator_read_models",
+    "OperatorActivityRecord": "operator_read_models",
+    "OperatorReadModelSnapshot": "operator_read_models",
+    "OperatorReadModelResult": "operator_read_models",
+    "OperatorReadModelError": "operator_read_models",
+    "build_operator_health_activity_snapshot": "operator_health_activity",
+    "evaluate_operator_readiness": "operator_health_activity",
+    "query_operator_health_activity_read_models": "operator_health_activity_facade",
+    "validate_operator_read_models_are_read_only": "operator_health_activity_facade",
 }
 
 __all__ = sorted(_LAZY_EXPORTS)
