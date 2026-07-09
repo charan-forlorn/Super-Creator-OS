@@ -336,6 +336,29 @@ data in `lib/event-stream-mock-data.ts`. This panel never calls `fetch`,
 opens a socket, starts a timer, reads a real clock/random value, or touches
 browser storage -- everything shown is a hand-authored constant.
 
+## Stage 7.6 - Approval-Aware Command Views Mock
+
+The "Command Evidence" section previews the Stage 7.6 approval-aware command
+view and read-only execution evidence surface implemented in
+`scos/control_center/operator_command_view*.py` and
+`scos/control_center/execution_evidence_surface.py` with static deterministic
+mock data only.
+
+- Command evidence cards show command id, command type, approval state,
+  execution evidence state, audit state, terminal-state indicator, required
+  manual action, blockers, warnings, and evidence references.
+- The fixture includes pending, approved, denied, missing approval, executed,
+  and blocked command instances.
+- Denied and missing-approval examples are terminal for the current command
+  instance.
+- The execution evidence panel summarizes blocked and terminal instances
+  without offering any bypass action.
+
+Types live in `lib/operator-command-view-types.ts`, data in
+`lib/operator-command-view-mock-data.ts`. The UI remains static and local:
+there are no approval controls, no denial controls, no command-running
+controls, no network path, and no live transport behavior.
+
 ## Tech Stack
 
 - Next.js 15 App Router + React 19

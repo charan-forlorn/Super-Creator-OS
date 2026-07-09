@@ -349,6 +349,25 @@ _LAZY_EXPORTS: dict[str, str] = {
     "build_read_surface_transport_decision": "read_surface_transport_decision",
     "validate_transport_decision_gate": "read_surface_transport_decision",
     "export_transport_decision_markdown": "read_surface_transport_decision",
+    # Stage 7.6 - Approval-Aware Operator Command Views
+    "OPERATOR_COMMAND_VIEW_SCHEMA_VERSION": "operator_command_view_models",
+    "APPROVAL_STATES": "operator_command_view_models",
+    "EXECUTION_STATES": "operator_command_view_models",
+    "AUDIT_STATES": "operator_command_view_models",
+    "EVENT_STATES": "operator_command_view_models",
+    "OperatorCommandEvidenceReference": "operator_command_view_models",
+    "OperatorCommandApprovalState": "operator_command_view_models",
+    "ExecutionEvidenceRecord": "operator_command_view_models",
+    "OperatorCommandView": "operator_command_view_models",
+    "OperatorCommandViewTotals": "operator_command_view_models",
+    "OperatorCommandViewSnapshot": "operator_command_view_models",
+    "classify_execution_state": "execution_evidence_surface",
+    "build_execution_evidence_record": "execution_evidence_surface",
+    "classify_approval_state": "operator_command_views",
+    "build_operator_command_view": "operator_command_views",
+    "build_operator_command_view_snapshot": "operator_command_views",
+    "validate_operator_command_view_inputs": "operator_command_views",
+    "render_operator_command_view_markdown": "operator_command_views",
 }
 
 __all__ = sorted(_LAZY_EXPORTS)

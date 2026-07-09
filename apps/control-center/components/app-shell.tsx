@@ -44,6 +44,8 @@ import { EventSnapshotCard } from "./event-snapshot-card";
 import { UIStateSyncPanel } from "./ui-state-sync-panel";
 import { SyncHealthPanel } from "./sync-health-panel";
 import { OperatorReadSurfacePanel } from "./operator-read-surface-panel";
+import { OperatorCommandViewsPanel } from "./operator-command-views-panel";
+import { ExecutionEvidenceSurfacePanel } from "./execution-evidence-surface-panel";
 
 import {
   AGENTS,
@@ -117,6 +119,7 @@ import {
   EXAMPLE_UI_STATE_SYNC_SNAPSHOT,
 } from "@/lib/event-stream-mock-data";
 import { populatedOperatorReadSurfaceProjection } from "@/lib/operator-read-surface-mock-data";
+import { operatorCommandViewSnapshot } from "@/lib/operator-command-view-mock-data";
 import { cn, deriveMascotView } from "@/lib/utils";
 import type { MascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
@@ -566,6 +569,19 @@ export function AppShell() {
                 title="Operator Read Surface (Stage 7.4)"
               />
               <OperatorReadSurfacePanel projection={populatedOperatorReadSurfaceProjection} />
+            </section>
+
+            {/* Stage 7.6: Approval-aware operator command views.
+                Static deterministic fixture only. This read-only evidence
+                surface does not change approval, command, audit, event,
+                queue, state, or adapter behavior. */}
+            <section id="operator-command-views" className="scroll-mt-6 space-y-3">
+              <SectionHeading
+                id="operator-command-views-h"
+                title="Operator Command Views (Stage 7.6)"
+              />
+              <OperatorCommandViewsPanel snapshot={operatorCommandViewSnapshot} />
+              <ExecutionEvidenceSurfacePanel snapshot={operatorCommandViewSnapshot} />
             </section>
 
             {/* 3: Kanban board */}
