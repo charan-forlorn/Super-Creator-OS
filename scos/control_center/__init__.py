@@ -290,6 +290,26 @@ _LAZY_EXPORTS: dict[str, str] = {
     "Stage6FinalIntegrationError": "stage6_final_gate_models",
     "Stage7HandoffItem": "stage6_final_gate_models",
     "run_stage6_final_integration_gate": "stage6_final_integration_gate",
+    # Stage 7.1 - Local Control Center Read API / Query Surface
+    "READ_SURFACE_SCHEMA_VERSION": "read_surface_models",
+    "ALLOWED_READ_SURFACE_QUERY_TYPES": "read_surface_models",
+    "ReadSurfaceReference": "read_surface_models",
+    "ReadSurfaceQuery": "read_surface_models",
+    "ReadSurfaceRecord": "read_surface_models",
+    "ReadSurfaceSnapshot": "read_surface_models",
+    "ReadSurfaceResult": "read_surface_models",
+    "ReadSurfaceError": "read_surface_models",
+    "create_read_surface_query": "read_surface_query",
+    "build_read_surface_snapshot": "read_surface_snapshot",
+    "query_control_center_read_surface": "read_surface_facade",
+    "validate_read_surface_is_read_only": "read_surface_facade",
+    "validate_query_type": "read_surface_validation",
+    "validate_limit": "read_surface_validation",
+    "validate_requested_at": "read_surface_validation",
+    "validate_checked_at": "read_surface_validation",
+    "validate_repo_root_local": "read_surface_validation",
+    "validate_no_url_path": "read_surface_validation",
+    "validate_read_only_boundary": "read_surface_validation",
 }
 
 __all__ = sorted(_LAZY_EXPORTS)
