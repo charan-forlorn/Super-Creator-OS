@@ -407,6 +407,25 @@ _LAZY_EXPORTS: dict[str, str] = {
     "LocalTransportActivationDecisionResult": "transport_activation_decision_models",
     "LocalTransportActivationDecisionError": "transport_activation_decision_models",
     "run_local_transport_activation_decision_gate": "transport_activation_decision_gate",
+    # Stage 8.2 - File Snapshot Refresh Transport Foundation
+    "FILE_SNAPSHOT_TRANSPORT_SCHEMA_VERSION": "file_snapshot_transport_models",
+    "FILE_SNAPSHOT_SOURCE_TYPES": "file_snapshot_transport_models",
+    "FILE_SNAPSHOT_SOURCE_STATUSES": "file_snapshot_transport_models",
+    "FILE_SNAPSHOT_TRANSPORT_MODES": "file_snapshot_transport_models",
+    "FILE_SNAPSHOT_GO_NO_GO": "file_snapshot_transport_models",
+    "FileSnapshotTransportSource": "file_snapshot_transport_models",
+    "FileSnapshotTransportManifest": "file_snapshot_transport_models",
+    "FileSnapshotTransportResult": "file_snapshot_transport_models",
+    "FileSnapshotTransportError": "file_snapshot_transport_models",
+    "build_file_snapshot_transport_payload": "file_snapshot_refresh_transport",
+    "refresh_file_snapshot_transport": "file_snapshot_refresh_transport",
+    "validate_file_snapshot_transport_boundary": "file_snapshot_refresh_transport",
+    "validate_local_repo_root": "file_snapshot_transport_validation",
+    "validate_snapshot_output_path": "file_snapshot_transport_validation",
+    "validate_no_url_path": "file_snapshot_transport_validation",
+    "validate_path_contained": "file_snapshot_transport_validation",
+    "validate_payload_is_json_object": "file_snapshot_transport_validation",
+    "validate_no_forbidden_transport_behavior": "file_snapshot_transport_validation",
 }
 
 __all__ = sorted(_LAZY_EXPORTS)
