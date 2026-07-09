@@ -76,6 +76,8 @@ Do not install dependencies during Stage 7.8.
   failure/skip evidence is documented.
 - No implicit output report is written.
 - Explicit output writes only inside `repo_root`.
+- Optional runtime artifact gaps remain visible warnings but do not reduce the
+  closure score when required evidence is complete.
 - Stage 8 handoff exists and separates implemented, deferred, forbidden, and
   open-decision items.
 - No forbidden Stage 7.8 behavior is introduced.

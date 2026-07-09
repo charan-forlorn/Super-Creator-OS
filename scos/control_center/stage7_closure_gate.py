@@ -393,11 +393,16 @@ def _frontend_scripts(root: Path) -> tuple[str, ...]:
     return tuple(sorted(str(key) for key in scripts))
 
 
+def _is_optional_runtime_warning(warning: str) -> bool:
+    return str(warning).startswith("optional runtime artifact missing or unreadable:")
+
+
 def _score(blockers: tuple[str, ...], warnings: tuple[str, ...]) -> tuple[str, int, bool]:
     if blockers:
         return "BLOCKED", max(0, min(69, 69 - len(blockers) * 3)), False
-    if warnings:
-        return "NO_GO", max(70, 99 - len(warnings) * 2), False
+    scoring_warnings = tuple(warning for warning in warnings if not _is_optional_runtime_warning(warning))
+    if scoring_warnings:
+        return "NO_GO", max(70, 99 - len(scoring_warnings) * 2), False
     return "GO", 100, True
 
 

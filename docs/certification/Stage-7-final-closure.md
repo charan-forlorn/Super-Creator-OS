@@ -25,7 +25,9 @@ The closure score is computed by the Stage 7.8 gate:
 - `70-99` for `NO_GO`
 - `0-69` for `BLOCKED`
 
-Optional runtime evidence gaps may produce warnings without becoming blockers.
+Optional runtime evidence gaps may produce warnings without becoming blockers,
+without reducing the score, and without downgrading `GO` when all required
+evidence is present.
 
 ## Test and Security Evidence
 

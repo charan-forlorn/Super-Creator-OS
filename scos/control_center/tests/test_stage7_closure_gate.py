@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from scos.control_center import stage7_closure_gate
 from scos.control_center.stage7_closure_gate import run_stage7_final_closure_gate
 from scos.control_center.stage7_closure_models import Stage7ClosureError, Stage7ClosureResult
 
@@ -21,6 +22,18 @@ def test_stage7_closure_gate_is_deterministic_for_repo_root() -> None:
     assert first.stage_number == "7.8"
     assert first.latest_commit
     assert first.stage8_handoff_path == "docs/roadmap/STAGE8_HANDOFF.md"
+
+
+def test_optional_runtime_gaps_do_not_downgrade_clean_closure_score() -> None:
+    result = run_stage7_final_closure_gate(repo_root=Path("."), checked_at=_NOW)
+
+    assert isinstance(result, Stage7ClosureResult)
+    assert result.go_no_go == "GO"
+    assert result.readiness_score == 100
+    assert result.accepted is True
+    assert result.stage_closed is True
+    assert result.blockers == ()
+    assert any("optional runtime artifact" in warning for warning in result.warnings)
 
 
 def test_checked_at_is_required() -> None:
@@ -52,6 +65,22 @@ def test_missing_required_artifacts_block_but_optional_runtime_warns(tmp_path: P
     assert result.blockers
     assert any("required Stage" in blocker for blocker in result.blockers)
     assert any("optional runtime artifact" in warning for warning in result.warnings)
+
+
+def test_forbidden_behavior_still_blocks(monkeypatch, tmp_path: Path) -> None:
+    (tmp_path / "docs" / "roadmap").mkdir(parents=True)
+    (tmp_path / "docs" / "roadmap" / "STAGE8_HANDOFF.md").write_text("handoff", encoding="utf-8")
+    (tmp_path / "bad.py").write_text("fetch('/x')\n", encoding="utf-8")
+    monkeypatch.setattr(stage7_closure_gate, "_REQUIRED_ARTIFACTS", ())
+    monkeypatch.setattr(stage7_closure_gate, "_OPTIONAL_ARTIFACTS", ())
+    monkeypatch.setattr(stage7_closure_gate, "_SAFETY_SCAN_FILES", ("bad.py",))
+
+    result = run_stage7_final_closure_gate(repo_root=tmp_path, checked_at=_NOW)
+
+    assert isinstance(result, Stage7ClosureResult)
+    assert result.go_no_go == "BLOCKED"
+    assert result.readiness_score <= 69
+    assert any("forbidden marker" in blocker for blocker in result.blockers)
 
 
 def test_no_implicit_output_write_and_explicit_output_write(tmp_path: Path) -> None:

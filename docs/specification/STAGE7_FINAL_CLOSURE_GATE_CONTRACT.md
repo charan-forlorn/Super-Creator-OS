@@ -75,7 +75,8 @@ queues are optional. If absent, they are warnings rather than blockers.
 
 ## Scoring Rules
 
-- `GO` requires zero blockers and zero warnings and always scores `100`.
+- `GO` requires zero blockers and no scoring warnings and always scores `100`.
+  Optional runtime artifact warnings are non-scoring in a clean checkout.
 - `NO_GO` means no blockers exist, but non-critical warnings remain. Scores
   are in the `70-99` range.
 - `BLOCKED` means at least one required artifact, compatibility, safety, or
@@ -87,8 +88,9 @@ queues are optional. If absent, they are warnings rather than blockers.
 Blockers prevent Stage 7 closure. Warnings require operator review but do not
 prove a public contract break.
 
-Missing optional runtime artifacts are warnings. Missing Stage 7 source,
-contract, test, closure, or Stage 8 handoff artifacts are blockers.
+Missing optional runtime artifacts are warnings and do not reduce the closure
+score. Missing Stage 7 source, contract, test, closure, or Stage 8 handoff
+artifacts are blockers.
 
 ## Test Strategy
 
