@@ -25,6 +25,7 @@ export const NAV_SECTIONS: NavSection[] = [
   { id: "local-backend", label: "Local Backend / API", icon: "⌗", hint: "Stage 6.2 mock" },
   { id: "durable-state", label: "Durable State (SQLite)", icon: "⛁", hint: "Stage 6.3 mock" },
   { id: "event-stream", label: "Event Stream / UI Sync", icon: "⇶", hint: "Stage 6.4 mock" },
+  { id: "operator-read-surface", label: "Operator Read Surface", icon: "ORS", hint: "Stage 7.4 mock" },
   { id: "board", label: "Task Board", icon: "▤", hint: "Kanban" },
   { id: "prompt", label: "Prompt Builder", icon: "✎", hint: "Dispatch work" },
   { id: "inbox", label: "Result Inbox", icon: "✔", hint: "PASS / FAIL" },

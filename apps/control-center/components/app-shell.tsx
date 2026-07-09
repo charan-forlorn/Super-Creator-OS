@@ -43,6 +43,7 @@ import { EventStreamPanel } from "./event-stream-panel";
 import { EventSnapshotCard } from "./event-snapshot-card";
 import { UIStateSyncPanel } from "./ui-state-sync-panel";
 import { SyncHealthPanel } from "./sync-health-panel";
+import { OperatorReadSurfacePanel } from "./operator-read-surface-panel";
 
 import {
   AGENTS,
@@ -115,6 +116,7 @@ import {
   EXAMPLE_EVENT_STREAM_SNAPSHOT,
   EXAMPLE_UI_STATE_SYNC_SNAPSHOT,
 } from "@/lib/event-stream-mock-data";
+import { populatedOperatorReadSurfaceProjection } from "@/lib/operator-read-surface-mock-data";
 import { cn, deriveMascotView } from "@/lib/utils";
 import type { MascotView } from "@/lib/utils";
 import type { AgentId, Stage } from "@/lib/types";
@@ -551,6 +553,19 @@ export function AppShell() {
                 <EventStreamPanel snapshot={EXAMPLE_EVENT_STREAM_SNAPSHOT} />
                 <EventSnapshotCard snapshot={EXAMPLE_EVENT_STREAM_SNAPSHOT} />
               </div>
+            </section>
+
+            {/* Stage 7.4: Operator Read Surface UI Projection.
+                Static deterministic fixture only. No live sync transport,
+                backend route, browser request, direct SQLite read, or adapter
+                dispatch exists here; Stage 7.5 owns any future transport
+                decision. */}
+            <section id="operator-read-surface" className="scroll-mt-6 space-y-3">
+              <SectionHeading
+                id="operator-read-surface-h"
+                title="Operator Read Surface (Stage 7.4)"
+              />
+              <OperatorReadSurfacePanel projection={populatedOperatorReadSurfaceProjection} />
             </section>
 
             {/* 3: Kanban board */}
