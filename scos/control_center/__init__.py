@@ -384,6 +384,16 @@ _LAZY_EXPORTS: dict[str, str] = {
     "validate_output_path": "adapter_activation_preflight_validation",
     "validate_repo_root": "adapter_activation_preflight_validation",
     "run_adapter_activation_preflight": "adapter_activation_preflight_gate",
+    # Stage 7.8 - Stage 7 Closure Gate and Stage 8 Handoff
+    "STAGE7_CLOSURE_SCHEMA_VERSION": "stage7_closure_models",
+    "STAGE7_GO_NO_GO_VALUES": "stage7_closure_models",
+    "STAGE7_CLOSURE_STATUSES": "stage7_closure_models",
+    "STAGE7_CLOSURE_CATEGORIES": "stage7_closure_models",
+    "Stage7ClosureArtifact": "stage7_closure_models",
+    "Stage7ClosureCheck": "stage7_closure_models",
+    "Stage7ClosureResult": "stage7_closure_models",
+    "Stage7ClosureError": "stage7_closure_models",
+    "run_stage7_final_closure_gate": "stage7_closure_gate",
 }
 
 __all__ = sorted(_LAZY_EXPORTS)
