@@ -1,9 +1,11 @@
-"""SCOS security scan baseline — local static scan only (Stage 4.18).
+"""SCOS security scan baseline — local static scan only (Stage 6.8).
 
-Scans commercial executable source, the scripts directory, and root config
-files for suspicious patterns: credential/token indicators, money-provider
-imports, network libraries inside commercial source, external-service
-behavior indicators, committed environment files, and private key headers.
+Scans commercial executable source, Control Center backend source, Control
+Center frontend source, the scripts directory, and root config files for
+suspicious patterns: credential/token indicators, money-provider imports,
+network libraries, external-service behavior indicators, forbidden frontend
+runtime transport/state APIs, committed environment files, and private key
+headers.
 
 Design notes:
 - stdlib only; no network, no dependency installation, no external scanners,
@@ -28,10 +30,16 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parents[1]
 
 _COMMERCIAL_DIR = _ROOT / "scos" / "commercial"
+_CONTROL_CENTER_DIR = _ROOT / "scos" / "control_center"
+_FRONTEND_DIR = _ROOT / "apps" / "control-center"
 _SCRIPTS_DIR = _ROOT / "scripts"
 _ROOT_CONFIG_FILES = ("requirements.txt", "conftest.py")
 
 _SKIP_DIR_NAMES = {"__pycache__", ".venv", "node_modules", ".git", "dist", "build"}
+_FRONTEND_SKIP_DIR_NAMES = {
+    "node_modules", ".next", ".vercel", "dist", "build", "coverage",
+}
+_FRONTEND_SUFFIXES = {".ts", ".tsx", ".js", ".jsx"}
 
 _REDACT_KEEP = 12
 
@@ -60,6 +68,36 @@ _W_AIOHTTP = "aio" + "http"
 _W_HTTPX = "http" + "x"
 _W_SMTPLIB = "smtp" + "lib"
 _W_WEBSOCKET = "web" + "socket"
+_W_OPENAI = "open" + "ai"
+_W_ANTHROPIC = "anthro" + "pic"
+_W_SELENIUM = "sele" + "nium"
+_W_PLAYWRIGHT = "play" + "wright"
+_W_PYAUTOGUI = "pyauto" + "gui"
+_W_PYPERCLIP = "pyper" + "clip"
+_W_WIN32CLIPBOARD = "win32" + "clipboard"
+_W_SUBPROCESS = "sub" + "process"
+_W_OS_SYSTEM = "os." + "system"
+_W_SHELL_TRUE = "shell" + "=True"
+_W_PTY = "pty"
+_W_DELETE = "DELETE"
+_W_UPDATE = "UPDATE"
+_W_DROP = "DROP"
+_W_AUDIT_LEDGER = "audit" + "_ledger"
+_W_BIND_ADDR = "0." + "0." + "0." + "0"
+_W_FETCH = "fet" + "ch("
+_W_XML_HTTP_REQUEST = "XML" + "Http" + "Request"
+_W_AXIOS = "axi" + "os"
+_W_WEBSOCKET_FRONTEND = "Web" + "Socket"
+_W_EVENT_SOURCE = "Event" + "Source"
+_W_SET_INTERVAL = "set" + "Interval"
+_W_SET_TIMEOUT = "set" + "Timeout"
+_W_DATE_NOW = "Date." + "now"
+_W_MATH_RANDOM = "Math." + "random"
+_W_CRYPTO_RANDOM_UUID = "crypto." + "random" + "UUID"
+_W_LOCAL_STORAGE = "local" + "Storage"
+_W_SESSION_STORAGE = "session" + "Storage"
+_W_USE_SERVER = '"use' + ' server"'
+_W_NAVIGATOR_CLIPBOARD = "navigator." + "clip" + "board"
 _W_AKIA = "AK" + "IA"
 _W_GHP = "gh" + "p_"
 _W_XOX = "xo" + "x"
@@ -96,12 +134,87 @@ _PATTERNS = (
         _W_BEGIN + r"[A-Z ]*" + _W_PRIVATE_KEY + "-----")),
 )
 
+_CC_NETWORK_IMPORT_RE = re.compile(
+    r"^\s*(?:import|from)\s+("
+    + "|".join(
+        (
+            _W_REQUESTS,
+            re.escape(_W_URLLIB_REQ),
+            re.escape(_W_HTTP_CLIENT),
+            _W_SOCKET,
+            _W_AIOHTTP,
+            _W_HTTPX,
+            _W_SMTPLIB,
+            _W_WEBSOCKET + "s?",
+        )
+    )
+    + r")\b",
+    re.MULTILINE,
+)
+_CC_AI_IMPORT_RE = re.compile(
+    r"^\s*(?:import|from)\s+("
+    + "|".join((_W_OPENAI, _W_ANTHROPIC))
+    + r")\b",
+    re.MULTILINE | re.IGNORECASE,
+)
+_CC_GUI_IMPORT_RE = re.compile(
+    r"^\s*(?:import|from)\s+("
+    + "|".join(
+        (
+            _W_SELENIUM,
+            _W_PLAYWRIGHT,
+            _W_PYAUTOGUI,
+            _W_PYPERCLIP,
+            _W_WIN32CLIPBOARD,
+        )
+    )
+    + r")\b",
+    re.MULTILINE,
+)
+_SUBPROCESS_IMPORT_RE = re.compile(r"^\s*(?:import|from)\s+" + _W_SUBPROCESS + r"\b")
+_SUBPROCESS_USE_RE = re.compile(r"\b" + _W_SUBPROCESS + r"\.")
+_PTY_IMPORT_RE = re.compile(r"^\s*(?:import|from)\s+" + _W_PTY + r"\b")
+_PTY_USE_RE = re.compile(r"\b" + _W_PTY + r"\.")
+_REMOTE_HOST_ASSIGN_RE = re.compile(
+    r"\b(?:HOST|host)\s*=\s*[\"']" + re.escape(_W_BIND_ADDR) + r"[\"']"
+)
+_REMOTE_BIND_RE = re.compile(r"\.bind\(\s*\(\s*[\"'](?!127\.0\.0\.1|localhost)[^\"']+[\"']")
+_TRIPLE_QUOTED_RE = re.compile(r'"""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\'')
+_NEGATION_TOKENS = (
+    "no ", "not ", "never", "forbid", "refus", "do not", "must not", "non-goal",
+    "disabled",
+)
+_CONTROL_CENTER_SUBPROCESS_ALLOWLIST = {
+    "scos/control_center/command_runner.py",
+    "scos/control_center/stage5_final_certification.py",
+    "scripts/security_scan_baseline.py",
+}
+_FRONTEND_FORBIDDEN_TOKENS = (
+    ("frontend_transport", _W_FETCH),
+    ("frontend_transport", _W_XML_HTTP_REQUEST),
+    ("frontend_transport", _W_AXIOS),
+    ("frontend_transport", _W_WEBSOCKET_FRONTEND),
+    ("frontend_transport", _W_EVENT_SOURCE),
+    ("frontend_polling", _W_SET_INTERVAL),
+    ("frontend_polling", _W_SET_TIMEOUT),
+    ("frontend_nondeterminism", _W_DATE_NOW),
+    ("frontend_nondeterminism", _W_MATH_RANDOM),
+    ("frontend_nondeterminism", _W_CRYPTO_RANDOM_UUID),
+    ("frontend_storage", _W_LOCAL_STORAGE),
+    ("frontend_storage", _W_SESSION_STORAGE),
+    ("frontend_server_action", _W_USE_SERVER),
+    ("frontend_clipboard", _W_NAVIGATOR_CLIPBOARD),
+)
+_FRONTEND_PATH_MARKERS = ("route.ts", "middleware.ts")
+
 
 def _iter_scan_files():
     seen = set()
     roots = []
     if _COMMERCIAL_DIR.is_dir():
         roots.append(("commercial", _COMMERCIAL_DIR))
+    if _CONTROL_CENTER_DIR.is_dir():
+        roots.append(("control_center", _CONTROL_CENTER_DIR))
     if _SCRIPTS_DIR.is_dir():
         roots.append(("scripts", _SCRIPTS_DIR))
     for scope, root in roots:
@@ -118,6 +231,27 @@ def _iter_scan_files():
             yield "config", path
 
 
+def _iter_frontend_files():
+    if not _FRONTEND_DIR.is_dir():
+        return
+    for path in sorted(_FRONTEND_DIR.rglob("*")):
+        if not path.is_file() or path.suffix not in _FRONTEND_SUFFIXES:
+            continue
+        if any(part in _FRONTEND_SKIP_DIR_NAMES for part in path.parts):
+            continue
+        yield "frontend", path
+
+
+def _strip_docstrings(text: str) -> str:
+    """Mirror the Stage 5 gate's triple-quoted prose filter."""
+    return _TRIPLE_QUOTED_RE.sub("", text)
+
+
+def _line_is_negated(line: str) -> bool:
+    lowered = line.lower()
+    return any(token in lowered for token in _NEGATION_TOKENS)
+
+
 def _redact(text: str) -> str:
     flat = " ".join(text.split())
     if len(flat) <= _REDACT_KEEP:
@@ -125,13 +259,91 @@ def _redact(text: str) -> str:
     return flat[:_REDACT_KEEP] + "***"
 
 
+def _line_no(text: str, offset: int) -> int:
+    return text.count("\n", 0, offset) + 1
+
+
+def _code_lines(text: str):
+    for line_no, line in enumerate(_strip_docstrings(text).splitlines(), start=1):
+        stripped = line.strip()
+        if (
+            not stripped
+            or stripped.startswith("#")
+            or stripped.startswith("//")
+            or stripped.startswith("*")
+            or _line_is_negated(stripped)
+        ):
+            continue
+        yield line_no, stripped
+
+
+def _is_test_path(rel: str) -> bool:
+    parts = rel.split("/")
+    return "tests" in parts or Path(rel).name.startswith("test_")
+
+
+def _append_control_center_findings(findings, rel: str, text: str) -> None:
+    for category, pattern in (
+        ("network_library_in_control_center", _CC_NETWORK_IMPORT_RE),
+        ("real_ai_dispatch_import", _CC_AI_IMPORT_RE),
+        ("browser_gui_clipboard_automation", _CC_GUI_IMPORT_RE),
+    ):
+        for match in pattern.finditer(text):
+            findings.append((rel, _line_no(text, match.start()), category, _redact(match.group(0))))
+
+    runtime_module = not _is_test_path(rel)
+
+    for line_no, stripped in _code_lines(text):
+        if not runtime_module:
+            continue
+        if _SUBPROCESS_IMPORT_RE.search(stripped) and rel not in _CONTROL_CENTER_SUBPROCESS_ALLOWLIST:
+            findings.append((rel, line_no, "subprocess_outside_allowlist", _redact(stripped)))
+        if rel not in _CONTROL_CENTER_SUBPROCESS_ALLOWLIST:
+            if (
+                _SUBPROCESS_USE_RE.search(stripped)
+                or _PTY_IMPORT_RE.search(stripped)
+                or _PTY_USE_RE.search(stripped)
+            ):
+                findings.append((rel, line_no, "shell_or_arbitrary_execution", _redact(stripped)))
+        if _W_OS_SYSTEM in stripped or _W_SHELL_TRUE in stripped:
+            findings.append((rel, line_no, "shell_or_arbitrary_execution", _redact(stripped)))
+
+        upper = stripped.upper()
+        audit_upper = _W_AUDIT_LEDGER.upper()
+        if (
+            (_W_DELETE in upper and audit_upper in upper)
+            or (_W_UPDATE in upper and audit_upper in upper)
+            or (_W_DROP in upper and "TABLE" in upper and audit_upper in upper)
+        ):
+            findings.append((rel, line_no, "destructive_audit_ledger_sql", _redact(stripped)))
+
+        if _W_BIND_ADDR in stripped or _REMOTE_HOST_ASSIGN_RE.search(stripped) or _REMOTE_BIND_RE.search(stripped):
+            findings.append((rel, line_no, "remote_bind", _redact(stripped)))
+
+
+def _append_frontend_findings(findings, rel: str, text: str, path: Path) -> None:
+    if path.name in _FRONTEND_PATH_MARKERS:
+        findings.append((rel, 0, "frontend_route_or_middleware", _redact(path.name)))
+    if "/app/" in f"/{rel}" and "/api/" in f"{rel}/":
+        findings.append((rel, 0, "frontend_api_route", _redact("app/api")))
+
+    for line_no, stripped in _code_lines(text):
+        for category, token in _FRONTEND_FORBIDDEN_TOKENS:
+            if token in stripped:
+                if _is_test_path(rel) and token in (
+                    _W_DATE_NOW, _W_MATH_RANDOM, _W_CRYPTO_RANDOM_UUID,
+                ) and "monkeypatch" in stripped.lower():
+                    continue
+                findings.append((rel, line_no, category, _redact(stripped)))
+
+
 def main() -> int:
-    print("SECURITY SCAN BASELINE - local static scan (Stage 4.18)")
+    print("SECURITY SCAN BASELINE - local static scan (Stage 6.8)")
 
     findings = []  # (relpath, line_no, category, redacted_sample)
     files_scanned = 0
 
-    for scope, path in _iter_scan_files():
+    for scope, path in list(_iter_scan_files()) + list(_iter_frontend_files() or ()):
         files_scanned += 1
         try:
             text = path.read_text(encoding="utf-8")
@@ -146,6 +358,10 @@ def main() -> int:
             for match in pattern.finditer(text):
                 line_no = text.count("\n", 0, match.start()) + 1
                 findings.append((rel, line_no, category, _redact(match.group(0))))
+        if scope == "control_center":
+            _append_control_center_findings(findings, rel, text)
+        elif scope == "frontend":
+            _append_frontend_findings(findings, rel, text, path)
 
     # Committed environment-file indicator.
     for env_candidate in sorted(_ROOT.glob(".env*")):
