@@ -337,6 +337,18 @@ _LAZY_EXPORTS: dict[str, str] = {
     "evaluate_operator_readiness": "operator_health_activity",
     "query_operator_health_activity_read_models": "operator_health_activity_facade",
     "validate_operator_read_models_are_read_only": "operator_health_activity_facade",
+    # Stage 7.5 - Read Surface Transport Decision / Local UI Sync Activation Gate
+    "TRANSPORT_DECISION_SCHEMA_VERSION": "transport_decision_models",
+    "TRANSPORT_ANALYSIS_OPTIONS": "transport_decision_models",
+    "TRANSPORT_DECISION_VALUES": "transport_decision_models",
+    "TRANSPORT_GO_NO_GO_VALUES": "transport_decision_models",
+    "TransportOptionAnalysis": "transport_decision_models",
+    "TransportDecisionRecord": "transport_decision_models",
+    "TransportDecisionError": "transport_decision_models",
+    "create_transport_option_analysis": "read_surface_transport_decision",
+    "build_read_surface_transport_decision": "read_surface_transport_decision",
+    "validate_transport_decision_gate": "read_surface_transport_decision",
+    "export_transport_decision_markdown": "read_surface_transport_decision",
 }
 
 __all__ = sorted(_LAZY_EXPORTS)
