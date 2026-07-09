@@ -187,6 +187,7 @@ _NEGATION_TOKENS = (
 _CONTROL_CENTER_SUBPROCESS_ALLOWLIST = {
     "scos/control_center/command_runner.py",
     "scos/control_center/stage5_final_certification.py",
+    "scos/control_center/stage6_final_integration_gate.py",
     "scripts/security_scan_baseline.py",
 }
 _FRONTEND_FORBIDDEN_TOKENS = (

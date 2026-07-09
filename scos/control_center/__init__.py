@@ -281,6 +281,15 @@ _LAZY_EXPORTS: dict[str, str] = {
     "Stage5FinalCertificationResult": "stage5_certification_models",
     "Stage5FinalCertificationError": "stage5_certification_models",
     "run_stage5_final_certification": "stage5_final_certification",
+    # Stage 6.10 - Stage 6 Final Integration Gate / Stage 7 Handoff
+    "STAGE6_FINAL_GATE_SCHEMA_VERSION": "stage6_final_gate_models",
+    "Stage6GateCheck": "stage6_final_gate_models",
+    "Stage6GateBlocker": "stage6_final_gate_models",
+    "Stage6GateEvidence": "stage6_final_gate_models",
+    "Stage6FinalIntegrationResult": "stage6_final_gate_models",
+    "Stage6FinalIntegrationError": "stage6_final_gate_models",
+    "Stage7HandoffItem": "stage6_final_gate_models",
+    "run_stage6_final_integration_gate": "stage6_final_integration_gate",
 }
 
 __all__ = sorted(_LAZY_EXPORTS)
