@@ -2,8 +2,8 @@
 
 An **autonomous, AI-driven video creation and learning system** that transforms raw footage into production-grade content through intelligent storytelling, retention analytics, and persistent memory.
 
-**Tech Stack:** Python 99.9% | Shell 0.1%  
-**Status:** Active development (Last Updated: July 5, 2026)
+**Tech Stack:** Python 86.5% | TypeScript 13.3% | Other 0.2%  
+**Status:** Active development (Last Updated: July 9, 2026)
 
 ---
 
@@ -128,8 +128,8 @@ Super-Creator-OS executes a deterministic pipeline:
 7. **Render** — video-use renders final MP4 with embedded captions
 8. **Color Grade** — Auto-analysis or preset application (no creative shift by default)
 9. **QA Review** — Reviewer validates cuts, captions, retention integrity
-   - **FAIL** → log, do NOT write to memory, re-edit
-   - **PASS** → proceed to learning
+    - **FAIL** → log, do NOT write to memory, re-edit
+    - **PASS** → proceed to learning
 10. **Memory Record** — Append structured project record to `memory/database.json` (atomic, backed up)
 11. **Archival** — Store project metadata & provenance in `integrations/learning/archive/<project>/`
 12. **Calibration** — Update per-niche retention benchmarks & highlight library
@@ -261,11 +261,11 @@ If **any** condition fails, source is kept (reprocessing safe).
 The system is modular. To plug in a new data source:
 
 1. **Telemetry API** — Implement `ApiAdapter` protocol in `integrations/learning/telemetry_capture.py`:
-   ```python
-   class MyPlatformAdapter:
-       def fetch(self, loop_run_id: str, platform: str) -> dict | None:
-           # Return observed metrics dict or None
-   ```
+    ```python
+    class MyPlatformAdapter:
+        def fetch(self, loop_run_id: str, platform: str) -> dict | None:
+            # Return observed metrics dict or None
+    ```
 
 2. **New Skill** — Add to `skills/` folder, follow `SKILL.md` contract, wire into Orchestrator
 
@@ -347,4 +347,4 @@ For issues, feature requests, or PRs: [GitHub Issues](https://github.com/charan-
 
 ---
 
-**Made with ❤️ by Charan | Last Updated: July 5, 2026**
+**Made with ❤️ by Charan | Last Updated: July 9, 2026**
