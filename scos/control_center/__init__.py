@@ -368,6 +368,22 @@ _LAZY_EXPORTS: dict[str, str] = {
     "build_operator_command_view_snapshot": "operator_command_views",
     "validate_operator_command_view_inputs": "operator_command_views",
     "render_operator_command_view_markdown": "operator_command_views",
+    # Stage 7.7 - Adapter Activation Preflight Gate
+    "ADAPTER_ACTIVATION_PREFLIGHT_SCHEMA_VERSION": "adapter_activation_preflight_models",
+    "PREFLIGHT_TARGET_ADAPTERS": "adapter_activation_preflight_models",
+    "PREFLIGHT_ACTIVATION_MODES": "adapter_activation_preflight_models",
+    "PREFLIGHT_REJECTED_ACTIVATION_MODES": "adapter_activation_preflight_models",
+    "PREFLIGHT_STATUSES": "adapter_activation_preflight_models",
+    "PREFLIGHT_GO_NO_GO": "adapter_activation_preflight_models",
+    "AdapterActivationPreflightCheck": "adapter_activation_preflight_models",
+    "AdapterActivationArtifact": "adapter_activation_preflight_models",
+    "AdapterActivationPreflightResult": "adapter_activation_preflight_models",
+    "AdapterActivationPreflightError": "adapter_activation_preflight_models",
+    "validate_adapter_activation_preflight_inputs": "adapter_activation_preflight_validation",
+    "validate_no_secret_or_remote_text": "adapter_activation_preflight_validation",
+    "validate_output_path": "adapter_activation_preflight_validation",
+    "validate_repo_root": "adapter_activation_preflight_validation",
+    "run_adapter_activation_preflight": "adapter_activation_preflight_gate",
 }
 
 __all__ = sorted(_LAZY_EXPORTS)
