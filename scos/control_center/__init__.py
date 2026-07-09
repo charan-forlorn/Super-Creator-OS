@@ -426,6 +426,27 @@ _LAZY_EXPORTS: dict[str, str] = {
     "validate_path_contained": "file_snapshot_transport_validation",
     "validate_payload_is_json_object": "file_snapshot_transport_validation",
     "validate_no_forbidden_transport_behavior": "file_snapshot_transport_validation",
+    # Stage 8.3 - Runtime Credential and Secret Handling Policy
+    "STAGE83_CREDENTIAL_POLICY_SCHEMA_VERSION": "credential_policy_models",
+    "CREDENTIAL_CATEGORIES": "credential_policy_models",
+    "SENSITIVITY_LEVELS": "credential_policy_models",
+    "POLICY_SURFACES": "credential_policy_models",
+    "APPROVAL_BOUNDARY_STATUSES": "credential_policy_models",
+    "POLICY_GO_NO_GO": "credential_policy_models",
+    "REDACTION_MARKER": "credential_policy_models",
+    "CredentialPolicy": "credential_policy_models",
+    "CredentialPolicyViolation": "credential_policy_models",
+    "FrozenPolicyMap": "credential_policy_models",
+    "PolicyValidationResult": "credential_policy_models",
+    "RedactionFinding": "credential_policy_models",
+    "RedactionResult": "credential_policy_models",
+    "create_default_credential_policy": "credential_policy_models",
+    "classify_secret_field_name": "credential_redaction",
+    "classify_secret_value": "credential_redaction",
+    "redact_credential_payload": "credential_redaction",
+    "build_stage83_credential_policy_evidence": "credential_policy_validation",
+    "validate_no_secret_leak": "credential_policy_validation",
+    "validate_operator_approval_boundary": "credential_policy_validation",
 }
 
 __all__ = sorted(_LAZY_EXPORTS)
