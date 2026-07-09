@@ -226,3 +226,8 @@ Stage 7.2 should add a read surface contract/coherence gate that verifies:
 - Required source coverage.
 - Optional artifact warning behavior.
 - Security/static scan coverage for the new read surface.
+
+Stage 7.2 implements this handoff in
+`docs/specification/READ_SURFACE_COHERENCE_GATE_CONTRACT.md` and the
+`run_read_surface_coherence_gate(...)` public function. This is additive only:
+the Stage 7.1 query types, models, and public API remain unchanged.

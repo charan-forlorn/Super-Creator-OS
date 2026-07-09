@@ -66,3 +66,8 @@ Stage 7.2 should add the read surface coherence gate. Stage 7.3 should build
 operator health and activity read models. Stage 7.4 should project selected
 UI panels from approved read models. None of those later stages should bypass
 the read-only and approval boundaries established here.
+
+Stage 7.2 confirms this boundary through a deterministic coherence gate.
+Stage 7.3 and Stage 7.4 must depend on a Stage 7.2 `GO` result, or on an
+explicitly documented non-blocking warning state, before using the read
+surface for health/activity models or UI projection.

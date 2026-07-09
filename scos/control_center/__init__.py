@@ -310,6 +310,16 @@ _LAZY_EXPORTS: dict[str, str] = {
     "validate_repo_root_local": "read_surface_validation",
     "validate_no_url_path": "read_surface_validation",
     "validate_read_only_boundary": "read_surface_validation",
+    # Stage 7.2 - Read Surface Contract and Coherence Gate
+    "READ_SURFACE_COHERENCE_SCHEMA_VERSION": "read_surface_coherence_models",
+    "ReadSurfaceContractCheck": "read_surface_coherence_models",
+    "ReadSurfaceCoherenceIssue": "read_surface_coherence_models",
+    "ReadSurfaceCoherenceReport": "read_surface_coherence_models",
+    "ReadSurfaceCoherenceError": "read_surface_coherence_models",
+    "run_read_surface_coherence_gate": "read_surface_coherence_gate",
+    "validate_read_surface_contract_alignment": "read_surface_coherence_gate",
+    "compare_read_surface_to_stage6_artifacts": "read_surface_coherence_gate",
+    "validate_read_surface_non_mutation_contract": "read_surface_coherence_gate",
 }
 
 __all__ = sorted(_LAZY_EXPORTS)
