@@ -485,6 +485,78 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
             metadata=tuple(metadata),
         )
 
+    # --- Stage 2 planning surface (no activation, no subprocess) ------------
+    def plan_hvs_contract_payload(self, scos_project) -> "AgentAdapterResult | AgentAdapterError":
+        """Produce a Stage 2 HVS-compatible contract payload from a SCOS project.
+
+        Stage 2 planning only. This method does NOT invoke the HVS CLI, does NOT
+        create an HVS project, does NOT write any file, and performs NO
+        subprocess. It delegates to the pure deterministic mapper
+        (``scos.control_center.hvs_schema_mapper``) and returns the result
+        wrapped as a normal ``AgentAdapterResult`` (``result_type="plan"``) or a
+        structured ``AgentAdapterError`` on invalid input.
+
+        This is a read-only planning affordance: it never changes adapter
+        activation defaults, render backend selection, or the allowlisted
+        read-only operation set. It is NOT registered as a production route.
+        """
+        if scos_project is None:
+            return self._failure(
+                "missing_required_field",
+                "scos_project is required",
+                "plan_hvs_contract_payload",
+                request_id="plan",
+                created_at="plan",
+            )
+        # Lazy import keeps the Stage 1 subprocess profile unchanged: the mapper
+        # is only loaded when planning is actually requested.
+        try:
+            from hvs_schema_mapper import map_scos_to_hvs
+        except Exception as exc:  # noqa: BLE001 - boundary must not leak trace
+            return self._failure(
+                "adapter_blocked",
+                f"Stage 2 mapper unavailable: {type(exc).__name__}",
+                "plan_hvs_contract_payload",
+                request_id="plan",
+                created_at="plan",
+            )
+        result = map_scos_to_hvs(scos_project, validate=True)
+        if not result.ok:
+            return AgentAdapterError.of(
+                "contract_violation",
+                result.error.error_detail,
+                "plan_hvs_contract_payload",
+                ok=False,
+                schema_version=AI_AGENT_ADAPTER_SCHEMA_VERSION,
+                request_id="plan",
+                metadata=(
+                    ("stage", "scos-hvs-stage2"),
+                    ("error_kind", result.error.error_kind),
+                    ("field", result.error.field or ""),
+                ),
+            )
+        return AgentAdapterResult.of(
+            result_id=self._config.result_id(request_id="plan-stage2"),
+            request_id="plan-stage2",
+            session_id="scos-hvs-stage2",
+            agent_name=self.agent_name(),
+            runtime_id="hvs-cli",
+            status="result_ready",
+            result_type="plan",
+            result_summary="Stage 2 HVS contract payload planned (no render, no project creation)",
+            output_text=None,
+            output_path=None,
+            created_at="plan",
+            next_action="no further action in Stage 2 (planning only)",
+            metadata=(
+                ("stage", "scos-hvs-stage2"),
+                ("contract_id", result.payload.get("deterministic_hash", "")),
+                ("resolution", str(result.payload.get("resolution", ""))),
+                ("fps", str(result.payload.get("fps", ""))),
+                ("scene_count", str(result.payload.get("scene_count", ""))),
+            ),
+        )
+
     # --- contract compliance note -------------------------------------------
     # BaseAgentAdapter also declares prepare_prompt / simulate_send /
     # capture_result. Those are intentionally NOT overridden: the HVS adapter
