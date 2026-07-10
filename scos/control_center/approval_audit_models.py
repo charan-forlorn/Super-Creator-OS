@@ -36,6 +36,7 @@ ALLOWED_APPROVAL_SUBJECT_TYPES = (
     "packet",
     "git_proposal",
     "adapter_dispatch",
+    "hvs_delivery_approval",
 )
 
 # Genesis entries have no predecessor; the chain links to this sentinel.

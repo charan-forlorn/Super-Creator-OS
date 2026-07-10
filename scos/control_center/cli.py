@@ -90,7 +90,62 @@ def _build_parser() -> argparse.ArgumentParser:
         "(degrades trust to PARTIAL; never falsely VERIFIED).",
     )
     p.set_defaults(func=_cmd_inspect)
+
+    # --- Stage 5: operator delivery approval handoff -------------------------
+    a = sub.add_parser(
+        "create-hvs-delivery-approval",
+        help="Create a PENDING delivery-approval request from a VERIFIED "
+        "HVS render-evidence packet.",
+    )
+    a.add_argument("--evidence-path", required=True)
+    a.set_defaults(func=_cmd_create_approval)
+
+    i = sub.add_parser(
+        "inspect-hvs-delivery-approval",
+        help="Inspect the current state of an approval request by id.",
+    )
+    i.add_argument("--approval-id", required=True)
+    i.set_defaults(func=_cmd_inspect_approval)
+
+    d = sub.add_parser(
+        "decide-hvs-delivery-approval",
+        help="Approve or reject a PENDING delivery-approval request "
+        "(operator-controlled; manual delivery only).",
+    )
+    d.add_argument("--approval-id", required=True)
+    d.add_argument(
+        "--decision",
+        required=True,
+        choices=["approve", "reject"],
+        help="approve = APPROVED_FOR_MANUAL_DELIVERY; "
+        "reject = REJECTED_FOR_MANUAL_DELIVERY",
+    )
+    d.add_argument("--operator-id", required=True)
+    d.add_argument("--note", default=None)
+    d.add_argument(
+        "--reason",
+        default=None,
+        help="required when --decision reject",
+    )
+    d.add_argument(
+        "--decided-at",
+        default=None,
+        help="informational ISO timestamp (not used in deterministic ids); "
+        "defaults to current UTC time",
+    )
+    d.set_defaults(func=_cmd_decide_approval)
     return parser
+
+
+def _repo_root() -> Path:
+    # cli.py lives at <repo>/scos/control_center/cli.py
+    return Path(__file__).resolve().parents[2]
+
+
+def _now_iso() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _cmd_inspect(args: argparse.Namespace) -> int:
@@ -108,6 +163,57 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
     if result.ok and result.trust_level == "VERIFIED":
         return EXIT_OK
     return EXIT_REJECT
+
+
+def _cmd_create_approval(args: argparse.Namespace) -> int:
+    command = "create-hvs-delivery-approval"
+    _reject_url(args.evidence_path)
+    from .hvs_delivery_approval import (
+        HVSDeliveryApprovalRequest,
+        create_approval_request,
+    )
+    from .hvs_evidence_intake import intake_hvs_render_evidence
+
+    packet = intake_hvs_render_evidence(
+        evidence_path=args.evidence_path, verify_artifact=True
+    )
+    outcome = create_approval_request(
+        packet=packet.to_dict(), repo_root=_repo_root()
+    )
+    _emit(outcome.to_dict())
+    if isinstance(outcome, HVSDeliveryApprovalRequest):
+        return EXIT_OK
+    # Ineligible packet (unverified / not ready / already decided) -> reject.
+    return EXIT_REJECT
+
+
+def _cmd_inspect_approval(args: argparse.Namespace) -> int:
+    command = "inspect-hvs-delivery-approval"
+    from .hvs_delivery_approval import get_approval_request
+
+    outcome = get_approval_request(
+        approval_id=args.approval_id, repo_root=_repo_root()
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK
+
+
+def _cmd_decide_approval(args: argparse.Namespace) -> int:
+    command = "decide-hvs-delivery-approval"
+    from .hvs_delivery_approval import decide_approval
+
+    decided_at = args.decided_at or _now_iso()
+    outcome = decide_approval(
+        approval_id=args.approval_id,
+        decision=args.decision,
+        operator_id=args.operator_id,
+        decided_at=decided_at,
+        reason=getattr(args, "reason", None),
+        note=getattr(args, "note", None),
+        repo_root=_repo_root(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
 
 
 def main(argv: list[str] | None = None) -> int:
