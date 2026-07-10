@@ -83,14 +83,14 @@ def test_forbidden_behavior_still_blocks(monkeypatch, tmp_path: Path) -> None:
     assert any("forbidden marker" in blocker for blocker in result.blockers)
 
 
-def test_no_implicit_output_write_and_explicit_output_write(tmp_path: Path) -> None:
+def test_no_implicit_output_write_and_explicit_output_write() -> None:
     result = run_stage7_final_closure_gate(repo_root=Path("."), checked_at=_NOW)
 
     assert isinstance(result, Stage7ClosureResult)
     assert result.report_path is None
     assert not Path("stage7_final_closure_report.json").exists()
 
-    output_path = tmp_path / "reports" / "closure.json"
+    output_path = Path("scos/work/stage7_closure_tests/closure.json")
     written = run_stage7_final_closure_gate(
         repo_root=Path("."),
         checked_at=_NOW,
