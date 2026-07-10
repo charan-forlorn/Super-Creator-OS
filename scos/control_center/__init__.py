@@ -447,6 +447,24 @@ _LAZY_EXPORTS: dict[str, str] = {
     "build_stage83_credential_policy_evidence": "credential_policy_validation",
     "validate_no_secret_leak": "credential_policy_validation",
     "validate_operator_approval_boundary": "credential_policy_validation",
+    # Stage 8.4 - Secret-Safe Adapter Activation Preflight Gate
+    "SECRET_SAFE_ADAPTER_PREFLIGHT_SCHEMA_VERSION": "secret_safe_adapter_preflight_models",
+    "SECRET_SAFE_ADAPTER_IDS": "secret_safe_adapter_preflight_models",
+    "SECRET_SAFE_ADAPTER_RUNTIMES": "secret_safe_adapter_preflight_models",
+    "SECRET_SAFE_ACTIVATION_MODES": "secret_safe_adapter_preflight_models",
+    "SECRET_SAFE_TRANSPORTS": "secret_safe_adapter_preflight_models",
+    "SECRET_SAFE_VERDICTS": "secret_safe_adapter_preflight_models",
+    "FrozenEvidenceMap": "secret_safe_adapter_preflight_models",
+    "SafeCredentialReference": "secret_safe_adapter_preflight_models",
+    "SecretSafeAdapterPreflightRequest": "secret_safe_adapter_preflight_models",
+    "PreflightCheck": "secret_safe_adapter_preflight_models",
+    "PreflightValidationResult": "secret_safe_adapter_preflight_models",
+    "SecretSafeAdapterPreflightResult": "secret_safe_adapter_preflight_models",
+    "validate_secret_safe_adapter_preflight_request": "secret_safe_adapter_preflight_validation",
+    "validate_report_output_path": "secret_safe_adapter_preflight_validation",
+    "evaluate_secret_safe_adapter_preflight": "secret_safe_adapter_preflight_gate",
+    "build_stage84_preflight_evidence": "secret_safe_adapter_preflight_gate",
+    "write_secret_safe_adapter_preflight_report": "secret_safe_adapter_preflight_gate",
 }
 
 __all__ = sorted(_LAZY_EXPORTS)
