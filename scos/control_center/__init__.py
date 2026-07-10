@@ -465,6 +465,22 @@ _LAZY_EXPORTS: dict[str, str] = {
     "evaluate_secret_safe_adapter_preflight": "secret_safe_adapter_preflight_gate",
     "build_stage84_preflight_evidence": "secret_safe_adapter_preflight_gate",
     "write_secret_safe_adapter_preflight_report": "secret_safe_adapter_preflight_gate",
+    # Stage 8.5 - Explicit Operator Adapter Activation Authorization Gate
+    "ADAPTER_ACTIVATION_AUTHORIZATION_SCHEMA_VERSION": "adapter_activation_authorization_models",
+    "ADAPTER_ACTIVATION_AUTHORIZATION_DECISIONS": "adapter_activation_authorization_models",
+    "EXPLICIT_OPERATOR_AUTHORIZATION_DECISIONS": "adapter_activation_authorization_models",
+    "OperatorIdentity": "adapter_activation_authorization_models",
+    "AdapterActivationScope": "adapter_activation_authorization_models",
+    "AdapterActivationAuthorizationRequest": "adapter_activation_authorization_models",
+    "AuthorizationCheck": "adapter_activation_authorization_models",
+    "AdapterActivationAuthorizationResult": "adapter_activation_authorization_models",
+    "validate_operator_identity": "adapter_activation_authorization_validation",
+    "validate_activation_scope": "adapter_activation_authorization_validation",
+    "validate_adapter_activation_authorization_request": "adapter_activation_authorization_validation",
+    "validate_authorization_report_output_path": "adapter_activation_authorization_validation",
+    "evaluate_adapter_activation_authorization": "adapter_activation_authorization_gate",
+    "build_stage85_authorization_evidence": "adapter_activation_authorization_gate",
+    "write_adapter_activation_authorization_report": "adapter_activation_authorization_gate",
 }
 
 __all__ = sorted(_LAZY_EXPORTS)
