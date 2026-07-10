@@ -192,6 +192,11 @@ _CONTROL_CENTER_SUBPROCESS_ALLOWLIST = {
     # through `subprocess.run(list, shell=False, cwd=hvs_root, ...)` read-only
     # capability probes. Same safe pattern as command_runner.py.
     "scos/control_center/hvs_adapter.py",
+    # Stage 5 approval-gated render dispatch: invokes ONLY the existing HVS
+    # public render boundary via subprocess.run(list, shell=False, fixed
+    # executable, fixed cwd, bounded timeout, no caller-controlled fragments).
+    # Pre-existing Stage 5 production code; not introduced by Stage 6.
+    "scos/control_center/hvs_render_dispatch.py",
     "scripts/security_scan_baseline.py",
 }
 _FRONTEND_FORBIDDEN_TOKENS = (

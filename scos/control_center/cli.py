@@ -134,6 +134,69 @@ def _build_parser() -> argparse.ArgumentParser:
         "defaults to current UTC time",
     )
     d.set_defaults(func=_cmd_decide_approval)
+
+    # --- Stage 6: local delivery package preparation + manual delivery -------
+    p6 = sub.add_parser(
+        "prepare-hvs-delivery-package",
+        help="Prepare a deterministic local delivery package from an "
+        "APPROVED_FOR_MANUAL_DELIVERY approval (no media copied).",
+    )
+    p6.add_argument("--approval-id", required=True)
+    p6.add_argument("--operator-id", required=True)
+    p6.add_argument(
+        "--recorded-at",
+        default=None,
+        help="informational ISO timestamp (not used in deterministic ids); "
+        "defaults to current UTC time",
+    )
+    p6.set_defaults(func=_cmd_prepare_package)
+
+    m6 = sub.add_parser(
+        "materialize-hvs-delivery-package",
+        help="Explicitly copy the approved artifact into the local package "
+        "(operator-authorized; source never modified).",
+    )
+    m6.add_argument("--package-id", required=True)
+    m6.add_argument("--operator-id", required=True)
+    m6.add_argument("--recorded-at", default=None)
+    m6.set_defaults(func=_cmd_materialize_package)
+
+    i6 = sub.add_parser(
+        "inspect-hvs-delivery-package",
+        help="Inspect a prepared/materialized local delivery package.",
+    )
+    i6.add_argument("--package-id", required=True)
+    i6.set_defaults(func=_cmd_inspect_package)
+
+    r6 = sub.add_parser(
+        "record-hvs-manual-delivery",
+        help="Record a human-performed manual delivery (or failure/cancel). "
+        "SCOS performs no external action.",
+    )
+    r6.add_argument("--package-id", required=True)
+    r6.add_argument(
+        "--status",
+        required=True,
+        choices=["delivered", "failed", "cancelled"],
+        help="delivered = DELIVERED_MANUALLY; failed = DELIVERY_FAILED; "
+        "cancelled = DELIVERY_CANCELLED",
+    )
+    r6.add_argument("--operator-id", required=True)
+    r6.add_argument(
+        "--channel",
+        default=None,
+        help="required for delivered; one of the bounded manual channels",
+    )
+    r6.add_argument("--recipient-label", default=None)
+    r6.add_argument("--external-reference", default=None)
+    r6.add_argument("--note", default=None)
+    r6.add_argument(
+        "--reason",
+        default=None,
+        help="required for failed/cancelled",
+    )
+    r6.add_argument("--recorded-at", default=None)
+    r6.set_defaults(func=_cmd_record_delivery)
     return parser
 
 
@@ -216,9 +279,94 @@ def _cmd_decide_approval(args: argparse.Namespace) -> int:
     return EXIT_OK if outcome.ok else EXIT_REJECT
 
 
+def _cmd_prepare_package(args: argparse.Namespace) -> int:
+    command = "prepare-hvs-delivery-package"
+    from .hvs_local_delivery_service import prepare_delivery_package
+
+    recorded_at = args.recorded_at or _now_iso()
+    outcome = prepare_delivery_package(
+        approval_id=args.approval_id,
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=recorded_at,
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_materialize_package(args: argparse.Namespace) -> int:
+    command = "materialize-hvs-delivery-package"
+    from .hvs_local_delivery_service import materialize_delivery_package
+
+    recorded_at = args.recorded_at or _now_iso()
+    outcome = materialize_delivery_package(
+        package_id=args.package_id,
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=recorded_at,
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_package(args: argparse.Namespace) -> int:
+    command = "inspect-hvs-delivery-package"
+    from .hvs_local_delivery_service import inspect_delivery_package
+
+    outcome = inspect_delivery_package(
+        package_id=args.package_id, repo_root=_repo_root()
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_record_delivery(args: argparse.Namespace) -> int:
+    command = "record-hvs-manual-delivery"
+    from .hvs_local_delivery_models import (
+        DEL_DELIVERED_MANUALLY,
+        DEL_DELIVERY_CANCELLED,
+        DEL_DELIVERY_FAILED,
+    )
+    from .hvs_local_delivery_service import record_manual_delivery
+
+    status_map = {
+        "delivered": DEL_DELIVERED_MANUALLY,
+        "failed": DEL_DELIVERY_FAILED,
+        "cancelled": DEL_DELIVERY_CANCELLED,
+    }
+    recorded_at = args.recorded_at or _now_iso()
+    outcome = record_manual_delivery(
+        package_id=args.package_id,
+        status=status_map[args.status],
+        operator_id=args.operator_id,
+        channel=getattr(args, "channel", None),
+        recipient_label=getattr(args, "recipient_label", None),
+        external_reference=getattr(args, "external_reference", None),
+        operator_note=getattr(args, "note", None),
+        reason=getattr(args, "reason", None),
+        repo_root=_repo_root(),
+        recorded_at=recorded_at,
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
 def main(argv: list[str] | None = None) -> int:
+    import argparse as _argparse
+
     parser = _build_parser()
-    args = parser.parse_args(argv)  # argparse usage errors exit 2
+    try:
+        args = parser.parse_args(argv)  # argparse errors raise ArgumentError / SystemExit(2)
+    except (_argparse.ArgumentError, SystemExit) as exc:
+        detail = str(exc) if not isinstance(exc, SystemExit) else "invalid command or arguments"
+        _emit({
+            "ok": False,
+            "command": None,
+            "schema_version": CLI_SCHEMA_VERSION,
+            "error_kind": "INVALID_COMMAND",
+            "error_detail": detail,
+        })
+        return EXIT_USAGE
     func = getattr(args, "func", None)
     if func is None:
         _emit({
