@@ -83,14 +83,15 @@ def _make_request(**overrides) -> AgentAdapterRequest:
 
 def test_schema_version_and_constants() -> None:
     check("schema version is 1", AI_AGENT_ADAPTER_SCHEMA_VERSION == 1)
-    check("5 allowed agent names", len(ALLOWED_ADAPTER_AGENT_NAMES) == 5)
+    check("6 allowed agent names", len(ALLOWED_ADAPTER_AGENT_NAMES) == 6)
     check("manual_clipboard is an allowed agent name", "manual_clipboard" in ALLOWED_ADAPTER_AGENT_NAMES)
-    check("9 allowed runtime types", len(ALLOWED_ADAPTER_RUNTIME_TYPES) == 9)
-    check("10 allowed task types", len(ALLOWED_ADAPTER_TASK_TYPES) == 10)
+    check("hermes_video_studio is an allowed agent name", "hermes_video_studio" in ALLOWED_ADAPTER_AGENT_NAMES)
+    check("10 allowed runtime types", len(ALLOWED_ADAPTER_RUNTIME_TYPES) == 10)
+    check("11 allowed task types", len(ALLOWED_ADAPTER_TASK_TYPES) == 11)
     check("3 allowed delivery modes", len(ALLOWED_DELIVERY_MODES) == 3)
-    check("10 allowed result types", len(ALLOWED_RESULT_TYPES) == 10)
+    check("11 allowed result types", len(ALLOWED_RESULT_TYPES) == 11)
     check("7 allowed statuses", len(ALLOWED_ADAPTER_STATUSES) == 7)
-    check("10 allowed error kinds", len(ALLOWED_ADAPTER_ERROR_KINDS) == 10)
+    check("14 allowed error kinds", len(ALLOWED_ADAPTER_ERROR_KINDS) == 14)
     check("9 allowed event types", len(ALLOWED_ADAPTER_EVENT_TYPES) == 9)
 
 

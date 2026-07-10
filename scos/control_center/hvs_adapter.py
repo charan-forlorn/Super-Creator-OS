@@ -1,0 +1,527 @@
+"""SCOS <-> Hermes Video Studio (HVS) adapter — Stage 1 read-only scaffold.
+
+This module is the ONLY integration point SCOS exposes to the Hermes Video
+Studio production engine (repo C:\\Workspace\\hermes-video-studio). It does not
+import any HVS Python package, never writes into the HVS repository, and can
+ONLY drive HVS through its read-only CLI entry point:
+
+    <python_executable> -m hvs.cli [--help | <command> --help]
+
+Boundary (per the cross-project integration architecture decision):
+
+    SCOS -> HermesVideoStudioAdapter -> subprocess(shell=False)
+          -> HVS CLI -> structured SCOS AgentAdapterResult
+
+Stage 1 scope is deliberately tiny:
+
+* discover and validate an HVS repository + Python executable,
+* build deterministic, argument-list-based HVS CLI commands,
+* run ONLY approved read-only capability probes (help/capability),
+* return a normalized existing SCOS ``AgentAdapterResult``,
+* normalize every failure (missing repo, missing python, CLI unavailable,
+  unsupported op, invalid config, timeout, non-zero exit, malformed output,
+  permission error, unexpected exception) into a structured failure,
+* bound captured stdout/stderr so unbounded CLI output never reaches SCOS
+  events or memory.
+
+It does NOT:
+
+* import hvs.* or any HVS internal module,
+* create HVS projects, assemble media, render, publish, export or hand off,
+* change the SCOS default renderer (VideoUseStudioBackend),
+* perform any schema mapping or timeline translation,
+* send anything over a network (no requests/urllib/socket/http imports).
+
+The adapter is intentionally NOT registered in the default
+``AgentAdapterRegistry``, so it never changes runtime adapter selection or
+becomes the default agent for any task. It is instantiated explicitly in
+tests and by future (post-Stage-1) callers behind an authorization gate.
+
+Local-first, deterministic, stdlib-only. No clock (``created_at`` is
+caller-supplied), no random, no uuid, no network, no file I/O except the
+subprocess stdout/stderr it reads back from the CLI.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+try:
+    from .agent_adapter_contracts import BaseAgentAdapter
+    from .agent_adapter_models import (
+        AI_AGENT_ADAPTER_SCHEMA_VERSION,
+        AgentAdapterCapability,
+        AgentAdapterError,
+        AgentAdapterRequest,
+        AgentAdapterResult,
+    )
+except ImportError:  # direct-module execution (tests insert the package dir)
+    from agent_adapter_contracts import BaseAgentAdapter
+    from agent_adapter_models import (
+        AI_AGENT_ADAPTER_SCHEMA_VERSION,
+        AgentAdapterCapability,
+        AgentAdapterError,
+        AgentAdapterRequest,
+        AgentAdapterResult,
+    )
+
+
+# --- Operation allowlist (Stage 1) -------------------------------------------
+# Only read-only capability/help probes are permitted. These produce no
+# project, state, media, cache, or render output and never mutate HVS.
+STAGE1_READONLY_OPERATIONS = ("hvs_capability_probe",)
+
+_HVS_MODULE = "hvs.cli"
+_HVS_REPO_INDICATOR = Path("hvs") / "cli"
+
+# Maximum captured stdout/stderr bytes retained per result (bounded evidence).
+DEFAULT_MAX_OUTPUT_CHARS = 4000
+
+# Hard ceiling on command timeout (seconds) to keep probes finite and safe.
+DEFAULT_TIMEOUT_SECONDS = 60
+_MAX_TIMEOUT_SECONDS = 600
+
+# Marker tokens that indicate a mutating / forbidden HVS subcommand. Stage 1
+# rejects any request for these so the adapter can never drive a write.
+_FORBIDDEN_HVS_SUBCOMMANDS = frozenset(
+    {
+        "create-project",
+        "assemble-media",
+        "export-project",
+        "render-hyperframes",
+        "plan-real-render-batch",
+        "run-real-render-batch",
+        "create-render-pack",
+        "verify-real-render-output",
+        "create-handoff-package",
+        "import-media",
+        "certify-mvp",
+        "backup-project",
+        "dashboard",
+        "release-gate",
+    }
+)
+
+# Characters that have shell meaning AND are NOT legitimate path content.
+# NOTE: backslash and forward slash are intentionally absent — they are valid
+# path separators on Windows / POSIX and, with shell=False + list argv, are
+# never interpreted by a shell, so they are not an injection vector here.
+# The remaining set covers real command-injection / shell-control tokens.
+_SHELL_METACHARACTERS = frozenset(
+    set(";&|`$><\n\r(){}*?!#\"'~")
+)
+
+
+def _stable_id(prefix: str, *parts: Any) -> str:
+    """Deterministic sha256-prefixed id from stable caller/config inputs.
+
+    Mirrors the convention used across the SCOS Control Center (e.g.
+    credential_redaction._stable_id). Volatile inputs (elapsed time, pid,
+    random uuid, absolute temp paths) are NEVER passed here.
+    """
+    text = "|".join(str(part) for part in parts)
+    return prefix + hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def _has_shell_metacharacter(token: str) -> bool:
+    return any(ch in _SHELL_METACHARACTERS for ch in token)
+
+
+def _is_contained(path: Path, root: Path) -> bool:
+    """True only if ``path`` is exactly ``root`` or lives inside it."""
+    try:
+        path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+@dataclass(frozen=True)
+class HVSAdapterConfig:
+    """Injectable, testable adapter configuration.
+
+    All paths are explicit. No value is hard-coded to a specific user's home
+    directory; a Windows default may only come from configuration or an
+    explicit factory.
+    """
+
+    hvs_repo_path: str
+    python_executable: str
+    operation: str = "hvs_capability_probe"
+    timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
+    max_output_chars: int = DEFAULT_MAX_OUTPUT_CHARS
+    cli_module: str = _HVS_MODULE
+
+    def __post_init__(self) -> None:
+        # Normalize to strings defensively (dataclass is frozen, use object.setattr).
+        object.__setattr__(self, "hvs_repo_path", str(self.hvs_repo_path))
+        object.__setattr__(self, "python_executable", str(self.python_executable))
+        object.__setattr__(self, "operation", str(self.operation))
+        object.__setattr__(self, "cli_module", str(self.cli_module))
+        object.__setattr__(self, "timeout_seconds", int(self.timeout_seconds))
+        object.__setattr__(self, "max_output_chars", int(self.max_output_chars))
+
+    # --- validation ---------------------------------------------------------
+    def validate(self) -> tuple[str, ...]:
+        """Return problem strings; empty tuple means the config is usable."""
+        problems: list[str] = []
+
+        if not self.hvs_repo_path:
+            problems.append("hvs_repo_path is required")
+            return tuple(problems)
+        repo = Path(self.hvs_repo_path)
+        if not repo.exists():
+            problems.append(f"hvs_repo_path does not exist: {repo}")
+            return tuple(problems)
+        if not repo.is_dir():
+            problems.append(f"hvs_repo_path is not a directory: {repo}")
+            return tuple(problems)
+        # The configured repo must actually contain the HVS CLI entry point.
+        if not (repo / _HVS_REPO_INDICATOR).exists():
+            problems.append(
+                f"hvs_repo_path does not contain {_HVS_REPO_INDICATOR.as_posix()}: {repo}"
+            )
+            return tuple(problems)
+
+        if not self.python_executable:
+            problems.append("python_executable is required")
+        else:
+            py = Path(self.python_executable)
+            # The executable must either exist as a file OR be resolvable on
+            # PATH (e.g. "python"/"python3"). We never guess or synthesize a
+            # default; "resolvable" means shutil.which finds a concrete path.
+            import shutil
+
+            if not py.exists() and shutil.which(self.python_executable) is None:
+                problems.append(
+                    f"python_executable not found and not resolvable on PATH: "
+                    f"{self.python_executable}"
+                )
+
+        if self.operation not in STAGE1_READONLY_OPERATIONS:
+            problems.append(
+                f"unsupported operation {self.operation!r}; "
+                f"Stage 1 allowlist is {tuple(STAGE1_READONLY_OPERATIONS)}"
+            )
+
+        if self.timeout_seconds <= 0 or self.timeout_seconds > _MAX_TIMEOUT_SECONDS:
+            problems.append(
+                f"timeout_seconds must be in (0, {_MAX_TIMEOUT_SECONDS}], "
+                f"got {self.timeout_seconds}"
+            )
+
+        if self.max_output_chars <= 0:
+            problems.append(
+                f"max_output_chars must be positive, got {self.max_output_chars}"
+            )
+
+        if not self.cli_module:
+            problems.append("cli_module is required")
+        elif _has_shell_metacharacter(self.cli_module):
+            problems.append("cli_module must not contain shell metacharacters")
+
+        return tuple(problems)
+
+    # --- command construction ----------------------------------------------
+    def build_argv(self) -> list[str]:
+        """Build the argv list for the allowed read-only probe.
+
+        Always returns a list (never a string). shell=False is enforced by the
+        caller. Paths with spaces are preserved as single argv elements — no
+        shell-level path joining ever occurs.
+        """
+        argv = [self.python_executable, "-m", self.cli_module, "--help"]
+        return argv
+
+    def result_id(self, *, request_id: str = "dry-run") -> str:
+        """Deterministic correlation id derived from stable config values.
+
+        Excludes elapsed time, process id, random uuid, and temp paths. Two
+        identical configurations + operation produce identical ids, so the
+        evidence hash is stable across runs.
+        """
+        return _stable_id(
+            "hvs-adapter-",
+            self.hvs_repo_path,
+            self.python_executable,
+            self.cli_module,
+            self.operation,
+            request_id,
+        )
+
+
+class HermesVideoStudioAdapter(BaseAgentAdapter):
+    """Read-only SCOS adapter for the Hermes Video Studio production engine.
+
+    Implements the existing ``BaseAgentAdapter`` contract so it can produce a
+    valid ``AgentAdapterResult``. All substantive work is a read-only HVS CLI
+    help/capability probe executed via ``subprocess.run`` with
+    ``shell=False`` and an explicit, isolated ``cwd`` (the configured HVS
+    root). The adapter never mutates HVS and never imports HVS internals.
+    """
+
+    def __init__(self, config: HVSAdapterConfig, *, subprocess_run=None) -> None:
+        self._config = config
+        # Dependency injection point: tests pass a fake runner. The default is
+        # the real subprocess.run with shell=False enforced at call time.
+        self._subprocess_run = subprocess_run or subprocess.run
+        # Latest validated config snapshot (for structured failure metadata).
+        self._last_validation: tuple[str, ...] = config.validate()
+
+    # --- BaseAgentAdapter identity ------------------------------------------
+    def adapter_id(self) -> str:
+        return "hermes-video-studio"
+
+    def agent_name(self) -> str:
+        return "hermes_video_studio"
+
+    def runtime_type(self) -> str:
+        return "hvs_cli"
+
+    def capabilities(self) -> tuple[AgentAdapterCapability, ...]:
+        # Stage 1: a single read-only capability-probe capability. The adapter
+        # does NOT advertise prompt delivery / result capture / status check.
+        return (
+            AgentAdapterCapability.of(
+                "hvs-cli-cap",
+                "hermes_video_studio",
+                "hvs_cli",
+                task_types=("capability_probe",),
+                supports_prompt_delivery=False,
+                supports_result_capture=False,
+                supports_status_check=False,
+                supports_manual_fallback=False,
+                metadata=(
+                    ("integration", "scos-hvs-stage1"),
+                    ("scope", "read_only_capability_probe"),
+                    ("cli_module", self._config.cli_module),
+                ),
+            ),
+        )
+
+    # --- core dry-run / probe -----------------------------------------------
+    def run_readonly_probe(
+        self,
+        *,
+        request_id: str = "dry-run",
+        created_at: str,
+    ) -> AgentAdapterResult | AgentAdapterError:
+        """Validate, optionally execute the read-only probe, normalize result.
+
+        This is Stage 1's dry-run contract: it validates configuration,
+        constructs the allowed command, executes the read-only capability
+        probe (unless ``execute=False``), and returns a normalized
+        ``AgentAdapterResult`` carrying success/failure, adapter identity,
+        operation, exit code, bounded stdout/stderr summary, timing-free
+        deterministic correlation evidence, and bounded internal metadata.
+        """
+        if created_at is None or created_at == "":
+            return AgentAdapterError.of(
+                "missing_required_field",
+                "created_at is required and must be caller-supplied",
+                "run_readonly_probe",
+                request_id=request_id,
+            )
+
+        problems = self._config.validate()
+        if problems:
+            return self._failure(
+                "invalid_configuration",
+                "; ".join(problems),
+                "validate_config",
+                request_id=request_id,
+                created_at=created_at,
+            )
+
+        argv = self._config.build_argv()
+        if any(_has_shell_metacharacter(tok) for tok in argv):
+            return self._failure(
+                "unsafe_command",
+                "constructed argv contained a shell metacharacter",
+                "build_argv",
+                request_id=request_id,
+                created_at=created_at,
+                argv=argv,
+            )
+
+        cwd = Path(self._config.hvs_repo_path).resolve()
+        max_chars = self._config.max_output_chars
+        try:
+            proc = self._subprocess_run(
+                list(argv),
+                cwd=str(cwd),
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=self._config.timeout_seconds,
+                # No stdin inheritance; empty input stream only.
+                input="",
+                env=self._safe_env(),
+            )
+        except subprocess.TimeoutExpired:
+            return self._failure(
+                "command_timeout",
+                f"HVS capability probe exceeded timeout "
+                f"{self._config.timeout_seconds}s",
+                "subprocess.run",
+                request_id=request_id,
+                created_at=created_at,
+                argv=argv,
+                cwd=str(cwd),
+            )
+        except PermissionError as exc:
+            return self._failure(
+                "permission_error",
+                f"could not execute HVS capability probe: {type(exc).__name__}",
+                "subprocess.run",
+                request_id=request_id,
+                created_at=created_at,
+                argv=argv,
+                cwd=str(cwd),
+            )
+        except (OSError, ValueError) as exc:
+            # Missing executable, bad cwd, or other environment failure.
+            return self._failure(
+                "adapter_blocked",
+                f"HVS capability probe could not start: {type(exc).__name__}",
+                "subprocess.run",
+                request_id=request_id,
+                created_at=created_at,
+                argv=argv,
+                cwd=str(cwd),
+            )
+        except Exception as exc:  # noqa: BLE001 - boundary must not leak raw trace
+            return self._failure(
+                "adapter_blocked",
+                f"unexpected error during HVS capability probe: "
+                f"{type(exc).__name__}",
+                "subprocess.run",
+                request_id=request_id,
+                created_at=created_at,
+                argv=argv,
+                cwd=str(cwd),
+            )
+
+        stdout = (proc.stdout or "")[:max_chars]
+        stderr = (proc.stderr or "")[:max_chars]
+        exit_code = int(proc.returncode)
+        ok = exit_code == 0
+
+        summary = (
+            f"HVS capability probe {'succeeded' if ok else 'failed'} "
+            f"(exit={exit_code})"
+        )
+        return AgentAdapterResult.of(
+            result_id=self._config.result_id(request_id=request_id),
+            request_id=request_id,
+            session_id="scos-hvs-stage1",
+            agent_name=self.agent_name(),
+            runtime_id="hvs-cli",
+            status="result_ready" if ok else "failed",
+            result_type="probe_report",
+            result_summary=summary,
+            output_text=stdout if ok else None,
+            output_path=None,
+            created_at=created_at,
+            next_action=(
+                "no further action in Stage 1 (read-only probe only)"
+                if ok
+                else "review HVS CLI availability and configuration"
+            ),
+            metadata=(
+                ("operation", self._config.operation),
+                ("exit_code", str(exit_code)),
+                ("argv", " ".join(argv)),
+                ("cwd", str(cwd)),
+                ("stdout_excerpt", stdout[:200]),
+                ("stderr_excerpt", stderr[:200]),
+                ("stage", "scos-hvs-stage1"),
+            ),
+        )
+
+    # --- helpers ------------------------------------------------------------
+    def _safe_env(self):
+        """Explicitly minimal environment: never a full os.environ dump.
+
+        We pass ``env={}`` so the child gets no inherited shell environment,
+        secrets, or variables. This is the safest choice for a read-only probe
+        and guarantees no secret values reach the subprocess command line.
+        """
+        return {}
+
+    def _failure(
+        self,
+        error_kind: str,
+        error_detail: str,
+        failed_step: str,
+        *,
+        request_id: str,
+        created_at: str,
+        argv: list[str] | None = None,
+        cwd: str | None = None,
+    ) -> AgentAdapterError:
+        metadata: list[tuple[str, str]] = [
+            ("adapter_id", self.adapter_id()),
+            ("operation", self._config.operation),
+            ("stage", "scos-hvs-stage1"),
+        ]
+        if argv is not None:
+            # argv is a safe, allowlisted list; record it for audit evidence.
+            metadata.append(("argv", " ".join(argv)))
+        if cwd is not None:
+            metadata.append(("cwd", cwd))
+        return AgentAdapterError.of(
+            error_kind,
+            error_detail,
+            failed_step,
+            ok=False,
+            schema_version=AI_AGENT_ADAPTER_SCHEMA_VERSION,
+            request_id=request_id,
+            metadata=tuple(metadata),
+        )
+
+    # --- contract compliance note -------------------------------------------
+    # BaseAgentAdapter also declares prepare_prompt / simulate_send /
+    # capture_result. Those are intentionally NOT overridden: the HVS adapter
+    # is a read-only capability probe and never delivers prompts or captures
+    # operator-supplied results. Callers use ``run_readonly_probe``. The base
+    # methods remain available (and would fail validation for this adapter's
+    # agent_name/runtime_type/task_type if misused), preserving the contract.
+
+
+def build_hvs_adapter_config(
+    hvs_repo_path: str,
+    python_executable: str,
+    *,
+    operation: str = "hvs_capability_probe",
+    timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
+    max_output_chars: int = DEFAULT_MAX_OUTPUT_CHARS,
+    cli_module: str = _HVS_MODULE,
+) -> HVSAdapterConfig:
+    """Explicit factory for HVS adapter configuration.
+
+    No global constant embeds a user's home directory; every value is an
+    explicit argument. A Windows default path may be supplied by the caller or
+    by a higher-level factory, never forced here.
+    """
+    return HVSAdapterConfig(
+        hvs_repo_path=hvs_repo_path,
+        python_executable=python_executable,
+        operation=operation,
+        timeout_seconds=timeout_seconds,
+        max_output_chars=max_output_chars,
+        cli_module=cli_module,
+    )
+
+
+__all__ = [
+    "STAGE1_READONLY_OPERATIONS",
+    "HVSAdapterConfig",
+    "HermesVideoStudioAdapter",
+    "build_hvs_adapter_config",
+]

@@ -30,6 +30,11 @@ ALLOWED_ADAPTER_AGENT_NAMES = (
     "codex",
     "hermes",
     "manual_clipboard",
+    # Stage 0 — Cross-Project Integration: Hermes Video Studio production
+    # engine is represented through the existing adapter contract as a
+    # read-only capability probe only. It is NEVER selected as a default
+    # agent and never performs prompt delivery / result capture.
+    "hermes_video_studio",
 )
 
 ALLOWED_ADAPTER_RUNTIME_TYPES = (
@@ -42,6 +47,10 @@ ALLOWED_ADAPTER_RUNTIME_TYPES = (
     "codex_cli",
     "hermes_cli",
     "manual_clipboard",
+    # Stage 0 cross-project integration: HVS is driven only through its
+    # read-only CLI entry point (``python -m hvs.cli ...``) via subprocess
+    # (shell=False). See scos/control_center/hvs_adapter.py.
+    "hvs_cli",
 )
 
 ALLOWED_ADAPTER_TASK_TYPES = (
@@ -55,6 +64,10 @@ ALLOWED_ADAPTER_TASK_TYPES = (
     "release_gate",
     "git_review",
     "manual_handoff",
+    # Stage 0 cross-project integration: the only HVS operation in scope is a
+    # read-only capability/help probe. No timeline mapping, no render, no
+    # project creation is ever requested through the adapter.
+    "capability_probe",
 )
 
 ALLOWED_DELIVERY_MODES = (
@@ -74,6 +87,9 @@ ALLOWED_RESULT_TYPES = (
     "release_gate_report",
     "git_review_report",
     "manual_handoff_note",
+    # Stage 0 cross-project integration: the HVS adapter returns a normalized
+    # read-only capability probe report (help/capability output only).
+    "probe_report",
 )
 
 ALLOWED_ADAPTER_STATUSES = (
@@ -97,6 +113,12 @@ ALLOWED_ADAPTER_ERROR_KINDS = (
     "missing_required_field",
     "contract_violation",
     "adapter_blocked",
+    # Stage 0 cross-project integration: HVS adapter failure kinds. Each maps
+    # a specific Stage 1 failure mode to a structured, auditable error kind.
+    "invalid_configuration",
+    "unsafe_command",
+    "command_timeout",
+    "permission_error",
 )
 
 ALLOWED_ADAPTER_EVENT_TYPES = (

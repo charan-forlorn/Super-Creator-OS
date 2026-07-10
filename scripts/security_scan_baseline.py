@@ -188,6 +188,10 @@ _CONTROL_CENTER_SUBPROCESS_ALLOWLIST = {
     "scos/control_center/command_runner.py",
     "scos/control_center/stage5_final_certification.py",
     "scos/control_center/stage6_final_integration_gate.py",
+    # Stage 0 cross-project integration: the HVS adapter drives HVS only
+    # through `subprocess.run(list, shell=False, cwd=hvs_root, ...)` read-only
+    # capability probes. Same safe pattern as command_runner.py.
+    "scos/control_center/hvs_adapter.py",
     "scripts/security_scan_baseline.py",
 }
 _FRONTEND_FORBIDDEN_TOKENS = (
