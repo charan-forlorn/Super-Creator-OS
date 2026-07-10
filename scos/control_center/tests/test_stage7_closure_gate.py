@@ -11,6 +11,8 @@ from scos.control_center.stage7_closure_models import Stage7ClosureError, Stage7
 
 _NOW = "2026-07-10T03:00:00Z"
 
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
 
 def test_stage7_closure_gate_is_deterministic_for_repo_root() -> None:
     first = run_stage7_final_closure_gate(repo_root=Path("."), checked_at=_NOW)
@@ -90,9 +92,9 @@ def test_no_implicit_output_write_and_explicit_output_write() -> None:
     assert result.report_path is None
     assert not Path("stage7_final_closure_report.json").exists()
 
-    output_path = Path("scos/work/stage7_closure_tests/closure.json")
+    output_path = _REPO_ROOT / "scos" / "work" / "stage7_closure_tests" / "closure.json"
     written = run_stage7_final_closure_gate(
-        repo_root=Path("."),
+        repo_root=_REPO_ROOT,
         checked_at=_NOW,
         output_path=output_path,
     )
