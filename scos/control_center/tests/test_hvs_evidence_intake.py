@@ -326,3 +326,191 @@ def test_existing_hvs_adapter_importable():
     # Constants the Stage 3 intake relies on must exist in the contract.
     assert hasattr(hvs_contract_models, "_sha256_hex16")
     assert hasattr(hvs_adapter, "HermesVideoStudioAdapter")
+
+
+# ---------------------------------------------------------------------------
+# 13) Regression guard: existing ABSOLUTE-path behavior unchanged
+# ---------------------------------------------------------------------------
+def test_absolute_artifact_path_unchanged(tmp_path):
+    art = tmp_path / "render_abs.mp4"
+    art.write_bytes(b"absolute-path-bytes")
+    sha = intake._sha256_file(str(art))
+    payload = _pass_evidence(artifact_sha=sha, artifact_path=str(art))
+    payload["evidence_sha256"] = _recompute_evidence_sha(payload)
+    ep = _write_evidence(tmp_path, "abs.json", payload)
+    result = intake.intake_hvs_render_evidence(
+        evidence_path=ep, verify_artifact=True)
+    assert result.ok is True
+    assert result.trust_level == TRUST_VERIFIED
+    assert result.operator_action == ACTION_REVIEW_EXPORT_READY
+
+
+# ---------------------------------------------------------------------------
+# 14) Regression guard: directly-resolvable RELATIVE path unchanged
+# ---------------------------------------------------------------------------
+def test_relative_artifact_path_resolvable_from_cwd(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    art = tmp_path / "render_rel.mp4"
+    art.write_bytes(b"relative-path-bytes")
+    sha = intake._sha256_file(str(art))  # cwd == tmp_path here
+    payload = _pass_evidence(artifact_sha=sha, artifact_path="render_rel.mp4")
+    payload["evidence_sha256"] = _recompute_evidence_sha(payload)
+    ep = _write_evidence(tmp_path, "rel.json", payload)
+    result = intake.intake_hvs_render_evidence(
+        evidence_path=ep, verify_artifact=True)
+    assert result.ok is True
+    assert result.trust_level == TRUST_VERIFIED
+    assert result.operator_action == ACTION_REVIEW_EXPORT_READY
+
+
+# ---------------------------------------------------------------------------
+# Helpers + tests 15-20: HVS root-relative artifact path resolution
+# ---------------------------------------------------------------------------
+def _hvs_root_relative_layout(
+    tmp_path, pid="pid1", art_bytes=b"hvs-root-relative-bytes",
+    artifact_sha=None, make_artifact=True,
+    artifact_rel="renders/a.mp4",
+):
+    hvs_root = tmp_path / "hvsroot"
+    proj = hvs_root / "projects" / pid
+    stage6 = proj / "stage6_validation"
+    stage6.mkdir(parents=True, exist_ok=True)
+    if make_artifact:
+        art = proj / artifact_rel
+        art.parent.mkdir(parents=True, exist_ok=True)
+        art.write_bytes(art_bytes)
+        sha = intake._sha256_file(str(art))
+    else:
+        sha = "0" * 64
+    if artifact_sha is None:
+        artifact_sha = sha
+    return hvs_root, proj, stage6, artifact_sha
+
+
+def test_hvs_root_relative_artifact_resolves(tmp_path):
+    _hvs_root_relative_layout(tmp_path, pid="pid1")
+    payload = _pass_evidence(
+        artifact_sha=None,  # filled below after layout
+        artifact_path="projects/pid1/renders/a.mp4")
+    # Rebuild with correct sha by reading the written artifact.
+    hvs_root = tmp_path / "hvsroot"
+    art = hvs_root / "projects" / "pid1" / "renders" / "a.mp4"
+    sha = intake._sha256_file(str(art))
+    payload["artifact"]["sha256"] = sha
+    payload["evidence_sha256"] = _recompute_evidence_sha(payload)
+    stage6 = hvs_root / "projects" / "pid1" / "stage6_validation"
+    ev = stage6 / "ev.json"
+    ev.write_text(json.dumps(payload, sort_keys=True, indent=2,
+                             ensure_ascii=False), encoding="utf-8")
+    # Call from repo-root cwd (do NOT chdir into hvsroot) so literal fails.
+    result = intake.intake_hvs_render_evidence(
+        evidence_path=str(ev), verify_artifact=True)
+    assert result.ok is True
+    assert result.trust_level == TRUST_VERIFIED
+    assert result.operator_action == ACTION_REVIEW_EXPORT_READY
+    assert result.evidence_sha256_verified is True
+    assert result.automation_allowed is False
+
+
+def test_hvs_root_relative_pid_mismatch_rejected(tmp_path):
+    # Build BOTH projects; the mismatched file exists, fallback must ignore it.
+    _hvs_root_relative_layout(tmp_path, pid="pid1")
+    hvs_root, _proj2, stage6_2, sha2 = _hvs_root_relative_layout(
+        tmp_path, pid="pidX", art_bytes=b"other-bytes")
+    payload = _pass_evidence(
+        artifact_sha=sha2,
+        artifact_path="projects/pidX/renders/a.mp4")
+    payload["evidence_sha256"] = _recompute_evidence_sha(payload)
+    ev = stage6_2 / "ev.json"
+    ev.write_text(json.dumps(payload, sort_keys=True, indent=2,
+                             ensure_ascii=False), encoding="utf-8")
+    result = intake.intake_hvs_render_evidence(
+        evidence_path=str(ev), verify_artifact=True)
+    assert result.ok is True
+    assert result.trust_level == TRUST_PARTIAL
+    assert result.operator_action == ACTION_REPAIR_OR_RERENDER
+    assert result.automation_allowed is False
+
+
+def test_hvs_root_relative_traversal_rejected(tmp_path):
+    hvs_root, _proj, stage6, _ = _hvs_root_relative_layout(
+        tmp_path, pid="pid1", make_artifact=False)
+    # Poison an escaped file to prove traversal is rejected even if present.
+    (hvs_root / "escape.mp4").write_bytes(b"escape")
+    payload = _pass_evidence(
+        artifact_sha="0" * 64,
+        artifact_path="projects/pid1/../escape.mp4")
+    payload["evidence_sha256"] = _recompute_evidence_sha(payload)
+    ev = stage6 / "ev.json"
+    ev.write_text(json.dumps(payload, sort_keys=True, indent=2,
+                             ensure_ascii=False), encoding="utf-8")
+    result = intake.intake_hvs_render_evidence(
+        evidence_path=str(ev), verify_artifact=True)
+    assert result.ok is True
+    assert result.trust_level == TRUST_PARTIAL
+    assert result.operator_action == ACTION_REPAIR_OR_RERENDER
+    assert result.automation_allowed is False
+
+
+def test_hvs_root_relative_missing_candidate_nonready(tmp_path):
+    _hvs_root_relative_layout(
+        tmp_path, pid="pid1", make_artifact=False)
+    hvs_root = tmp_path / "hvsroot"
+    stage6 = hvs_root / "projects" / "pid1" / "stage6_validation"
+    payload = _pass_evidence(
+        artifact_sha="0" * 64,
+        artifact_path="projects/pid1/renders/missing.mp4")
+    payload["evidence_sha256"] = _recompute_evidence_sha(payload)
+    ev = stage6 / "ev.json"
+    ev.write_text(json.dumps(payload, sort_keys=True, indent=2,
+                             ensure_ascii=False), encoding="utf-8")
+    result = intake.intake_hvs_render_evidence(
+        evidence_path=str(ev), verify_artifact=True)
+    assert result.ok is True
+    assert result.trust_level == TRUST_PARTIAL
+    assert result.operator_action == ACTION_REPAIR_OR_RERENDER
+    assert result.artifact_sha256 is not None
+    assert result.automation_allowed is False
+
+
+def test_hvs_root_relative_sha_mismatch_rejected(tmp_path):
+    _hvs_root_relative_layout(
+        tmp_path, pid="pid1", art_bytes=b"real-artifact-bytes")
+    hvs_root = tmp_path / "hvsroot"
+    stage6 = hvs_root / "projects" / "pid1" / "stage6_validation"
+    # Record a WRONG artifact sha so bytes will not match.
+    payload = _pass_evidence(
+        artifact_sha="deadbeef" * 8,
+        artifact_path="projects/pid1/renders/a.mp4")
+    payload["evidence_sha256"] = _recompute_evidence_sha(payload)
+    ev = stage6 / "ev.json"
+    ev.write_text(json.dumps(payload, sort_keys=True, indent=2,
+                             ensure_ascii=False), encoding="utf-8")
+    result = intake.intake_hvs_render_evidence(
+        evidence_path=str(ev), verify_artifact=True)
+    assert result.ok is True
+    assert result.trust_level == TRUST_PARTIAL
+    assert result.operator_action == ACTION_REPAIR_OR_RERENDER
+    assert result.evidence_sha256_verified is True
+    assert result.automation_allowed is False
+
+
+def test_hvs_root_relative_deterministic(tmp_path):
+    _hvs_root_relative_layout(tmp_path, pid="pid1")
+    hvs_root = tmp_path / "hvsroot"
+    art = hvs_root / "projects" / "pid1" / "renders" / "a.mp4"
+    sha = intake._sha256_file(str(art))
+    payload = _pass_evidence(
+        artifact_sha=sha,
+        artifact_path="projects/pid1/renders/a.mp4")
+    payload["evidence_sha256"] = _recompute_evidence_sha(payload)
+    stage6 = hvs_root / "projects" / "pid1" / "stage6_validation"
+    ev = stage6 / "ev.json"
+    ev.write_text(json.dumps(payload, sort_keys=True, indent=2,
+                             ensure_ascii=False), encoding="utf-8")
+    r1 = intake.intake_hvs_render_evidence(
+        evidence_path=str(ev), verify_artifact=True)
+    r2 = intake.intake_hvs_render_evidence(
+        evidence_path=str(ev), verify_artifact=True)
+    assert r1.packet_id == r2.packet_id
+    assert r1.to_dict() == r2.to_dict()

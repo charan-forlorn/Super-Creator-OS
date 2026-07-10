@@ -100,6 +100,60 @@ def _sha256_file(path: str) -> str | None:
         return None
 
 
+def _resolve_hvs_root_relative_artifact(
+    evidence_path: Path,
+    artifact_path: str,
+    project_id: str | None,
+) -> str | None:
+    """Resolve an HVS root-relative artifact path from the evidence location.
+
+    HVS Stage 6 evidence stores ``artifact.path`` as a string root-relative
+    to the HVS studio root, e.g. ``projects/<project_id>/renders/<file>.mp4``.
+    The evidence JSON itself lives at
+    ``<hvs-root>/projects/<project_id>/stage6_validation/<evidence>.json``,
+    so the artifact's project directory is the evidence file's grandparent
+    (``evidence_path.parent.parent``).
+
+    Returns the resolved path string for EXACTLY ONE additional safe
+    fallback when ALL hold:
+
+    * ``artifact_path`` is relative and shaped exactly
+      ``projects/<pid>/<remaining-path>`` (forward slashes, leading literal
+      ``projects``);
+    * the embedded project id matches the evidence ``project_id`` exactly;
+    * the resolved candidate stays INSIDE the evidence project directory
+      (traversal escapes rejected);
+    * the candidate exists and is a regular file.
+
+    Returns None for absolute paths, non-matching shapes, project-id
+    mismatches, traversal escapes, ambiguous paths, or missing files.
+    Never scans parent folders. Pure and stdlib-only. Does not import HVS.
+    """
+    if not artifact_path:
+        return None
+    if Path(artifact_path).is_absolute():
+        return None
+    parts = artifact_path.replace("\\", "/").split("/")
+    # Need: "projects" / <project_id> / <at least one remaining segment>.
+    if len(parts) < 3 or parts[0] != "projects" or not parts[1] or not parts[2:]:
+        return None
+    if project_id is None or parts[1] != project_id:
+        return None
+    remaining = "/".join(parts[2:])
+    if not remaining:
+        return None
+    evidence_project_dir = evidence_path.parent.parent
+    candidate = evidence_project_dir / remaining
+    try:
+        # Reject any path that escapes the evidence project directory.
+        candidate.resolve().relative_to(evidence_project_dir.resolve())
+    except (ValueError, OSError):
+        return None
+    if candidate.is_file():
+        return str(candidate)
+    return None
+
+
 # --- Required contract fields (HVS Stage 6 producer, observed) ----------
 _REQUIRED_TOP = (
     "schema_version",
@@ -387,6 +441,14 @@ def intake_hvs_render_evidence(
     artifact_verified = None
     if verify_artifact and artifact_path:
         live_sha = _sha256_file(artifact_path)
+        if live_sha is None:
+            # Literal path did not resolve (e.g. HVS stored an
+            # HVS-root-relative path). Try ONE safe fallback resolved from
+            # the evidence file's project directory before degrading trust.
+            resolved = _resolve_hvs_root_relative_artifact(
+                path, artifact_path, project_id)
+            if resolved is not None:
+                live_sha = _sha256_file(resolved)
         if live_sha is None:
             # Artifact intentionally unavailable / unreadable: reduced trust.
             integrity_note = (
