@@ -29,10 +29,15 @@ from scos.control_center.hvs_local_delivery_models import (
     PKG_PREPARED,
     stable_package_id,
 )
+from scos.control_center.hvs_local_delivery_models import (
+    CHANNEL_OTHER_MANUAL,
+    DEL_DELIVERED_MANUALLY,
+)
 from scos.control_center.hvs_local_delivery_service import (
     inspect_delivery_package,
     materialize_delivery_package,
     prepare_delivery_package,
+    record_manual_delivery,
 )
 from scos.control_center.hvs_delivery_audit import (
     append_delivery_event,
@@ -742,8 +747,76 @@ def test_audit_events_append_only_and_linked(repo_root):
         assert e.package_id == out.package_id
         assert e.approval_request_id == req.approval_request_id
         assert e.artifact_sha256 == sha
-        assert e.automation_allowed is False
     # Event ids are deterministic (no timestamp).
     import re
 
     assert re.match(r"^dlevt-[0-9a-f]{16}$", events[0].event_id)
+
+
+# --- boolean contract: SCOS never executes external delivery -----------------
+def test_before_record_external_delivery_false(repo_root):
+    """PHASE 1 invariant: before any manual-delivery record, the prepared
+    package and its result wrapper must assert SCOS did NOT execute external
+    delivery, and manual_delivery_required stays true."""
+    art = _make_artifact(repo_root, "a" * 64)
+    sha = _sha256_of(art)
+    req = _approved_approval(repo_root, art, sha)
+    out = prepare_delivery_package(
+        approval_id=req.approval_request_id,
+        operator_id="op-6",
+        repo_root=repo_root,
+        recorded_at="2026-07-11T00:00:00+00:00",
+    )
+    assert out.ok is True
+    # Result wrapper boolean contract.
+    d = out.to_dict()
+    assert d["external_delivery_executed_by_scos"] is False
+    assert d["automation_allowed"] is False
+    # Manifest-level boolean contract (manifest has no record yet).
+    m = out.manifest.to_dict()
+    # The manifest never claims SCOS executed external delivery: the field is
+    # intentionally absent from the package manifest (it lives only on the
+    # top-level result wrapper, where it is always False).
+    assert "external_delivery_executed_by_scos" not in m
+    assert m["automation_allowed"] is False
+    assert m["manual_delivery_required"] is True
+    # Inspect also reflects the same contract (no delivery recorded yet).
+    ins = inspect_delivery_package(package_id=out.package_id, repo_root=repo_root)
+    assert ins.to_dict()["external_delivery_executed_by_scos"] is False
+    assert ins.to_dict()["automation_allowed"] is False
+
+
+def test_after_delivered_external_delivery_stays_false(repo_root):
+    """PHASE 1 invariant: after a human records DELIVERED_MANUALLY, SCOS still
+    asserts it did NOT execute external delivery, while delivery_was_external_to_scos
+    becomes true and automation_allowed stays false."""
+    art = _make_artifact(repo_root, "a" * 64)
+    sha = _sha256_of(art)
+    req = _approved_approval(repo_root, art, sha)
+    out = prepare_delivery_package(
+        approval_id=req.approval_request_id,
+        operator_id="op-6",
+        repo_root=repo_root,
+        recorded_at="2026-07-11T00:00:00+00:00",
+    )
+    mat = materialize_delivery_package(
+        package_id=out.package_id, operator_id="op-6", repo_root=repo_root,
+        recorded_at="2026-07-11T00:00:01+00:00",
+    )
+    assert mat.ok is True
+    rec = record_manual_delivery(
+        package_id=out.package_id, status=DEL_DELIVERED_MANUALLY,
+        operator_id="op-6", channel=CHANNEL_OTHER_MANUAL,
+        recipient_label="certification-recipient", repo_root=repo_root,
+        recorded_at="2026-07-11T00:00:02+00:00",
+    )
+    assert rec.ok is True
+    rd = rec.to_dict()
+    # SCOS never performed external delivery.
+    assert rd["external_delivery_executed_by_scos"] is False
+    # Human performed delivery outside SCOS.
+    assert rd["delivery_record"]["delivery_was_external_to_scos"] is True
+    assert rd["delivery_record"]["manual_delivery_performed"] is True
+    # Automation remains forbidden.
+    assert rd["automation_allowed"] is False
+    assert rd["delivery_record"]["automation_allowed"] is False

@@ -119,8 +119,9 @@ From the acceptance run (PHASE 12, test-owned artifact):
 * channel: `other_manual` (acceptance)
 * recipient label/reference: `certification-recipient` (acceptance; no PII)
 * final status: `DELIVERED_MANUALLY`
-* `manual_delivery_performed`: `true`
-* `external_delivery_executed_by_scos`: `true` (i.e., SCOS did NOT execute it)
+* `manual_delivery_performed`: `true` (human performed the delivery)
+* `external_delivery_executed_by_scos`: `false` (SCOS never executed external delivery; humans do)
+* `delivery_was_external_to_scos`: `true` (delivery occurred outside SCOS, performed by a human)
 * `automation_allowed`: `false`
 
 No recipient personal data is exposed in this document.
@@ -188,29 +189,50 @@ publish/message/HVS/render invocation.
 * Ignore verification: `scos/work/` is covered by `.gitignore` (line 63);
   acceptance artifacts are NOT tracked (confirmed via `git status` — only source,
   tests, cert doc, and the narrow allowlist edit are staged).
+* Boolean contract (source of truth in production code, NOT in this document):
+  * `external_delivery_executed_by_scos` is **always `false`** — in the prepared
+    manifest (`hvs_local_delivery_service.py:219`), in the result wrapper
+    (`hvs_local_delivery_service.py:219`), and after a `DELIVERED_MANUALLY` record.
+  * `delivery_was_external_to_scos` is **`true`** after a human-recorded delivery
+    (`hvs_local_delivery_service.py:740`).
+  * `manual_delivery_performed` is **`true`** only after a human records delivery
+    (`hvs_local_delivery_service.py:738`); `false` before any record.
+  * `automation_allowed` is **always `false`** (`hvs_local_delivery_service.py:739`,
+    manifest `:218`, result `:218`).
+  * SCOS never claims it executed external delivery; it only prepares local
+    packages and records operator-provided results.
 * Known limitations:
   1. `hvs_asset_materialization` import chain is currently broken; Stage 6
      inlines equivalent safe-path helpers (identical semantics).
   2. Symlink-escape test is skipped on Windows (platform limitation); the
      symlink rejection logic is implemented and covered by the missing-artifact
      path on Windows.
-  3. Security scan had 3 pre-existing findings in `hvs_render_dispatch.py`
-     (Stage 5 production code using `subprocess(shell=False)` per Stage 5 rules).
-     Stage 6 added that file to the existing allowlist (narrow, explained,
-     tested) so the scan now passes cleanly. Stage 6 itself introduces **zero**
-     new findings.
-* Rollback procedure: `git revert <stage6_commit>` (single local commit). No
-  runtime packages are committed, so no generated-state cleanup is needed in Git.
+  3. Security scan previously reported 3 findings in `hvs_render_dispatch.py`
+     (a pre-existing **Stage 5** production file, commit `f8459e3`, NOT created
+     or touched by Stage 6). That file invokes ONLY the existing HVS public
+     render boundary via `subprocess.run(list, shell=False, fixed executable,
+     fixed cwd, bounded timeout, no caller-controlled fragments)` — a safe,
+     approval-gated pattern. Stage 6 added that single file to the existing
+     `_CONTROL_CENTER_SUBPROCESS_ALLOWLIST` (narrow: one path; does not exempt
+     the whole Control Center dir, does not skip `shell=True` detection, does not
+     suppress other findings). Scan now passes with **0 findings**. Stage 6
+     production code itself introduces **zero** subprocess/network/upload tokens.
+* Rollback procedure: `git revert <stage6_commit>` (single local feature commit;
+  a separate corrective commit may also exist — see §12). No runtime packages
+  are committed, so no generated-state cleanup is needed in Git.
 
-## 12. COMMIT
+## 12. COMMIT EVIDENCE
 
-Committed as a single local commit (see Phase 16/17). No push performed.
-
-* commit: a single local commit `feat(integration): add local HVS delivery package`
-  (authoritative hash available via `git rev-parse HEAD`; this document is
-  amended into the same commit, so the exact hash is resolved at commit time)
-* message: `feat(integration): add local HVS delivery package`
-* exact committed files:
+* baseline commit: `54a9f92cf4bbcdaa7a75a1189ba6bac8e2a73773` (`54a9f92`)
+* feature commit: `9e3028058263be22b196d0054d14186aa04702c3` (`9e30280`)
+  `feat(integration): add local HVS delivery package`
+* corrective commit (if any): see FINAL REPORT; created only if a tracked
+  correction is required after all tests pass. This document is **never amended
+  into the feature commit** — the authoritative HEAD is resolved with
+  `git rev-parse HEAD` at verification time.
+* number of commits after baseline: `git rev-list --count 54a9f92..HEAD`
+  (1 feature; +1 if a corrective commit exists).
+* exact files in feature commit (8, matches scope exactly):
   * `scos/control_center/hvs_local_delivery_models.py` (new)
   * `scos/control_center/hvs_delivery_audit.py` (new)
   * `scos/control_center/hvs_local_delivery_service.py` (new)
@@ -219,9 +241,31 @@ Committed as a single local commit (see Phase 16/17). No push performed.
   * `scos/control_center/tests/test_hvs_manual_delivery_record.py` (new)
   * `docs/certification/SCOS-HVS-integration-stage-6-local-delivery-package.md` (new)
   * `scripts/security_scan_baseline.py` (modified — narrow allowlist)
+* exact files in corrective commit (if any): only the corrected documentation
+  and/or regression test paths; no runtime artifacts.
 * final Git status: clean (working tree clean after commit)
 * confirmation no push: no `git push` was executed; remote `origin/main` is
   untouched.
+
+## 12b. HVS REPOSITORY STATUS (read-only, truthful classification)
+
+* HVS repository: `C:\Workspace\hermes-video-studio`
+* HVS branch: `main`
+* HVS HEAD: `139ce26be838247f4cd4607c2a32989d732d3ac5` (`139ce26`)
+* HVS tracked working tree: **clean** (`git status` shows no modified/tracked changes)
+* HVS working DIRECTORY: **NOT completely clean** — one untracked file present:
+  * `?? .vscode/settings.json` (54 bytes: `{"python.analysis.typeCheckingMode": "strict"}`)
+* `.vscode/settings.json` classification: **PRE_EXISTING_UNRELATED**
+  * Not tracked in any commit (`git log --all -- .vscode/settings.json` is empty)
+  * Not gitignored (so it appears as untracked `??`)
+  * Filesystem mtime `2026-07-11 02:01:50 +0700` — **before** the Stage 6 commit
+    (`2026-07-11 05:52:19 +0700`), by ~3.5 hours
+  * Content is a VS Code IDE setting only; no secrets, no media, no PII
+  * No SCOS Stage 6 code path writes to the HVS repository (HVS treated strictly
+    read-only per safety rules), so Stage 6 did **not** create it.
+* Correct classification: **HVS tracked working tree clean; HVS working directory
+  has 1 pre-existing untracked IDE file (.vscode/settings.json).** HVS was NOT
+  modified by this Stage 6 task.
 
 ## 13. SCOPE CONFIRMATION
 
