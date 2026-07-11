@@ -280,6 +280,85 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     insp_revsum7.add_argument("--summary-id", required=True)
     insp_revsum7.set_defaults(func=_cmd_inspect_revenue_audit_summary)
+
+    # --- Stage 8A: manual invoice preparation and payment follow-up ----------
+    inv8 = sub.add_parser(
+        "create-hvs-invoice-preparation",
+        help="Create a manual invoice preparation record from an accepted delivery closure.",
+    )
+    inv8.add_argument("--closure-id", required=True)
+    inv8.add_argument("--customer-id", required=True)
+    inv8.add_argument("--billing-scope-key", default=None)
+    inv8.add_argument("--currency", required=True)
+    inv8.add_argument("--payment-terms", required=True)
+    inv8.add_argument("--operator-id", required=True)
+    inv8.add_argument("--line-description", required=True)
+    inv8.add_argument("--line-quantity", required=True)
+    inv8.add_argument("--line-unit-price", required=True)
+    inv8.add_argument("--line-billing-scope-key", default=None)
+    inv8.add_argument("--tax-amount", default="0")
+    inv8.add_argument("--discount-amount", default="0")
+    inv8.add_argument("--recorded-at", default=None)
+    inv8.set_defaults(func=_cmd_create_invoice_preparation)
+
+    insp_inv8 = sub.add_parser(
+        "inspect-hvs-invoice-preparation",
+        help="Inspect a Stage 8A invoice preparation record.",
+    )
+    insp_inv8.add_argument("--invoice-preparation-id", required=True)
+    insp_inv8.set_defaults(func=_cmd_inspect_invoice_preparation)
+
+    ready8 = sub.add_parser(
+        "mark-hvs-invoice-ready",
+        help="Mark a draft invoice preparation as ready for manual invoice creation.",
+    )
+    ready8.add_argument("--invoice-preparation-id", required=True)
+    ready8.add_argument("--operator-id", required=True)
+    ready8.add_argument("--recorded-at", default=None)
+    ready8.set_defaults(func=_cmd_mark_invoice_ready)
+
+    sent8 = sub.add_parser(
+        "mark-hvs-invoice-sent",
+        help="Record that a human operator marked the manual invoice sent.",
+    )
+    sent8.add_argument("--invoice-preparation-id", required=True)
+    sent8.add_argument("--operator-id", required=True)
+    sent8.add_argument("--sent-date", required=True)
+    sent8.add_argument("--invoice-number", required=True)
+    sent8.add_argument("--due-date", default=None)
+    sent8.add_argument("--follow-up-date", default=None)
+    sent8.add_argument("--recorded-at", default=None)
+    sent8.set_defaults(func=_cmd_mark_invoice_sent)
+
+    queue8 = sub.add_parser(
+        "list-hvs-payment-follow-ups",
+        help="List manual payment follow-up queue items without mutating records.",
+    )
+    queue8.add_argument("--as-of", required=True)
+    queue8.set_defaults(func=_cmd_list_payment_follow_ups)
+
+    pay8 = sub.add_parser(
+        "record-hvs-payment-status",
+        help="Record an explicit manual payment status decision.",
+    )
+    pay8.add_argument("--invoice-preparation-id", required=True)
+    pay8.add_argument("--decision", required=True, choices=["follow_up_due", "overdue", "dispute", "cancel", "resolve_dispute", "paid"])
+    pay8.add_argument("--operator-id", required=True)
+    pay8.add_argument("--reason", default=None)
+    pay8.add_argument("--resolution-note", default=None)
+    pay8.add_argument("--paid-date", default=None)
+    pay8.add_argument("--paid-amount", default=None)
+    pay8.add_argument("--currency", default=None)
+    pay8.add_argument("--payment-reference", default=None)
+    pay8.add_argument("--recorded-at", default=None)
+    pay8.set_defaults(func=_cmd_record_payment_status)
+
+    insp_pay8 = sub.add_parser(
+        "inspect-hvs-payment-status",
+        help="Inspect current manual payment status for an invoice preparation.",
+    )
+    insp_pay8.add_argument("--invoice-preparation-id", required=True)
+    insp_pay8.set_defaults(func=_cmd_inspect_payment_status)
     return parser
 
 
@@ -527,6 +606,114 @@ def _cmd_inspect_revenue_audit_summary(args: argparse.Namespace) -> int:
 
     outcome = get_revenue_audit_summary(
         summary_id=args.summary_id, repo_root=_repo_root()
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_create_invoice_preparation(args: argparse.Namespace) -> int:
+    from .hvs_invoice_service import create_invoice_preparation
+
+    line_scope = args.line_billing_scope_key or args.billing_scope_key or "default"
+    outcome = create_invoice_preparation(
+        delivery_closure_id=args.closure_id,
+        repo_root=_repo_root(),
+        customer_id=args.customer_id,
+        billing_scope_key=args.billing_scope_key,
+        currency=args.currency,
+        payment_terms=args.payment_terms,
+        operator_id=args.operator_id,
+        line_items=[
+            {
+                "description": args.line_description,
+                "quantity": args.line_quantity,
+                "unit_price": args.line_unit_price,
+                "billing_scope_key": line_scope,
+            }
+        ],
+        tax_amount=args.tax_amount,
+        discount_amount=args.discount_amount,
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_invoice_preparation(args: argparse.Namespace) -> int:
+    from .hvs_invoice_service import inspect_invoice_preparation
+
+    outcome = inspect_invoice_preparation(
+        invoice_preparation_id=args.invoice_preparation_id,
+        repo_root=_repo_root(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_mark_invoice_ready(args: argparse.Namespace) -> int:
+    from .hvs_invoice_service import mark_invoice_ready
+
+    outcome = mark_invoice_ready(
+        invoice_preparation_id=args.invoice_preparation_id,
+        repo_root=_repo_root(),
+        operator_id=args.operator_id,
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_mark_invoice_sent(args: argparse.Namespace) -> int:
+    from .hvs_invoice_service import mark_invoice_sent
+
+    outcome = mark_invoice_sent(
+        invoice_preparation_id=args.invoice_preparation_id,
+        repo_root=_repo_root(),
+        operator_id=args.operator_id,
+        sent_date=args.sent_date,
+        invoice_number=args.invoice_number,
+        due_date=args.due_date,
+        follow_up_date=args.follow_up_date,
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_list_payment_follow_ups(args: argparse.Namespace) -> int:
+    from .hvs_invoice_service import list_payment_follow_up_queue
+
+    outcome = list_payment_follow_up_queue(repo_root=_repo_root(), as_of=args.as_of)
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_record_payment_status(args: argparse.Namespace) -> int:
+    from .hvs_invoice_service import record_payment_status_decision
+
+    outcome = record_payment_status_decision(
+        invoice_preparation_id=args.invoice_preparation_id,
+        repo_root=_repo_root(),
+        decision=args.decision,
+        operator_id=args.operator_id,
+        reason=args.reason,
+        resolution_note=args.resolution_note,
+        paid_date=args.paid_date,
+        paid_amount=args.paid_amount,
+        currency=args.currency,
+        payment_reference=args.payment_reference,
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_payment_status(args: argparse.Namespace) -> int:
+    from .hvs_invoice_service import inspect_payment_status
+
+    outcome = inspect_payment_status(
+        invoice_preparation_id=args.invoice_preparation_id,
+        repo_root=_repo_root(),
     )
     _emit(outcome.to_dict())
     return EXIT_OK if outcome.ok else EXIT_REJECT
