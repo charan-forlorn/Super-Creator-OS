@@ -197,6 +197,89 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     r6.add_argument("--recorded-at", default=None)
     r6.set_defaults(func=_cmd_record_delivery)
+
+    # --- Stage 7: customer receipt, closure, and revenue audit ---------------
+    rec7 = sub.add_parser(
+        "record-hvs-customer-receipt",
+        help="Record operator-observed customer receipt evidence; SCOS performs no customer contact.",
+    )
+    rec7.add_argument("--delivery-record-id", required=True)
+    rec7.add_argument(
+        "--status",
+        required=True,
+        choices=["acknowledged", "revision-requested", "rejected", "unconfirmed"],
+    )
+    rec7.add_argument("--source-type", required=True)
+    rec7.add_argument("--operator-id", required=True)
+    rec7.add_argument("--customer-reference", required=True)
+    rec7.add_argument("--statement-summary", required=True)
+    rec7.add_argument("--revision-summary", default=None)
+    rec7.add_argument("--rejection-reason", default=None)
+    rec7.add_argument("--external-reference", default=None)
+    rec7.add_argument("--operator-note", default=None)
+    rec7.add_argument("--recorded-at", default=None)
+    rec7.set_defaults(func=_cmd_record_customer_receipt)
+
+    insp_rec7 = sub.add_parser(
+        "inspect-hvs-customer-receipt",
+        help="Inspect Stage 7 customer receipt evidence by id.",
+    )
+    insp_rec7.add_argument("--receipt-evidence-id", required=True)
+    insp_rec7.set_defaults(func=_cmd_inspect_customer_receipt)
+
+    rev7 = sub.add_parser(
+        "open-hvs-delivery-revision",
+        help="Open a manual revision request from revision-requested receipt evidence.",
+    )
+    rev7.add_argument("--receipt-evidence-id", required=True)
+    rev7.add_argument("--operator-id", required=True)
+    rev7.add_argument("--revision-summary", required=True)
+    rev7.add_argument("--change-category", required=True, action="append")
+    rev7.add_argument("--priority", default="normal")
+    rev7.add_argument("--due-date", default=None)
+    rev7.add_argument("--recorded-at", default=None)
+    rev7.set_defaults(func=_cmd_open_delivery_revision)
+
+    close7 = sub.add_parser(
+        "close-hvs-delivery",
+        help="Close a delivered HVS package from Stage 7 receipt evidence.",
+    )
+    close7.add_argument("--receipt-evidence-id", required=True)
+    close7.add_argument("--operator-id", required=True)
+    close7.add_argument(
+        "--decision",
+        required=True,
+        choices=["accept", "revision_open", "reject", "close_without_confirmation", "cancel"],
+    )
+    close7.add_argument("--reason", required=True)
+    close7.add_argument("--recorded-at", default=None)
+    close7.set_defaults(func=_cmd_close_delivery)
+
+    insp_close7 = sub.add_parser(
+        "inspect-hvs-delivery-closure",
+        help="Inspect Stage 7 delivery closure by id.",
+    )
+    insp_close7.add_argument("--closure-id", required=True)
+    insp_close7.set_defaults(func=_cmd_inspect_delivery_closure)
+
+    revsum7 = sub.add_parser(
+        "create-hvs-revenue-audit-summary",
+        help="Create local revenue-ready audit summary for manual invoice review.",
+    )
+    revsum7.add_argument("--closure-id", required=True)
+    revsum7.add_argument("--operator-id", required=True)
+    revsum7.add_argument("--commercial-reference", required=True)
+    revsum7.add_argument("--amount-minor", type=int, default=None)
+    revsum7.add_argument("--currency", default=None)
+    revsum7.add_argument("--recorded-at", default=None)
+    revsum7.set_defaults(func=_cmd_create_revenue_audit_summary)
+
+    insp_revsum7 = sub.add_parser(
+        "inspect-hvs-revenue-audit-summary",
+        help="Inspect Stage 7 revenue audit summary by id.",
+    )
+    insp_revsum7.add_argument("--summary-id", required=True)
+    insp_revsum7.set_defaults(func=_cmd_inspect_revenue_audit_summary)
     return parser
 
 
@@ -346,6 +429,104 @@ def _cmd_record_delivery(args: argparse.Namespace) -> int:
         reason=getattr(args, "reason", None),
         repo_root=_repo_root(),
         recorded_at=recorded_at,
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_record_customer_receipt(args: argparse.Namespace) -> int:
+    from .hvs_delivery_closure_service import record_customer_receipt_evidence
+
+    outcome = record_customer_receipt_evidence(
+        delivery_record_id=args.delivery_record_id,
+        repo_root=_repo_root(),
+        status=args.status,
+        source_type=args.source_type,
+        operator_id=args.operator_id,
+        customer_reference=args.customer_reference,
+        statement_summary=args.statement_summary,
+        revision_summary=args.revision_summary,
+        rejection_reason=args.rejection_reason,
+        external_reference=args.external_reference,
+        operator_note=args.operator_note,
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_customer_receipt(args: argparse.Namespace) -> int:
+    from .hvs_delivery_closure_service import get_receipt_evidence
+
+    outcome = get_receipt_evidence(
+        receipt_evidence_id=args.receipt_evidence_id,
+        repo_root=_repo_root(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_open_delivery_revision(args: argparse.Namespace) -> int:
+    from .hvs_delivery_closure_service import open_revision_request
+
+    outcome = open_revision_request(
+        receipt_evidence_id=args.receipt_evidence_id,
+        repo_root=_repo_root(),
+        operator_id=args.operator_id,
+        revision_summary=args.revision_summary,
+        change_categories=args.change_category,
+        priority=args.priority,
+        due_date=args.due_date,
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_close_delivery(args: argparse.Namespace) -> int:
+    from .hvs_delivery_closure_service import close_delivery
+
+    outcome = close_delivery(
+        receipt_evidence_id=args.receipt_evidence_id,
+        repo_root=_repo_root(),
+        operator_id=args.operator_id,
+        decision=args.decision,
+        reason=args.reason,
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_delivery_closure(args: argparse.Namespace) -> int:
+    from .hvs_delivery_closure_service import get_closure
+
+    outcome = get_closure(closure_id=args.closure_id, repo_root=_repo_root())
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_create_revenue_audit_summary(args: argparse.Namespace) -> int:
+    from .hvs_delivery_closure_service import create_revenue_audit_summary
+
+    outcome = create_revenue_audit_summary(
+        closure_id=args.closure_id,
+        repo_root=_repo_root(),
+        operator_id=args.operator_id,
+        commercial_reference=args.commercial_reference,
+        agreed_amount_minor=args.amount_minor,
+        currency=args.currency,
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_revenue_audit_summary(args: argparse.Namespace) -> int:
+    from .hvs_delivery_closure_service import get_revenue_audit_summary
+
+    outcome = get_revenue_audit_summary(
+        summary_id=args.summary_id, repo_root=_repo_root()
     )
     _emit(outcome.to_dict())
     return EXIT_OK if outcome.ok else EXIT_REJECT
