@@ -414,6 +414,49 @@ def _build_parser() -> argparse.ArgumentParser:
         item = sub.add_parser(command); item.add_argument("--revision-request-id", required=True); item.add_argument("--operator-id", required=True); item.add_argument("--recorded-at", default=None); item.set_defaults(func=handler)
     commercial = sub.add_parser("classify-hvs-revision-commercial"); commercial.add_argument("--revision-request-id", required=True); commercial.add_argument("--classification", required=True); commercial.add_argument("--basis", required=True); commercial.add_argument("--operator-id", required=True); commercial.add_argument("--amount", default=None); commercial.add_argument("--currency", default=None); commercial.add_argument("--tax", default=None); commercial.add_argument("--discount", default=None); commercial.add_argument("--recorded-at", default=None); commercial.set_defaults(func=_cmd_classify_revision_commercial)
     decision = sub.add_parser("decide-hvs-revision-approval"); decision.add_argument("--revision-request-id", required=True); decision.add_argument("--decision", required=True, choices=["APPROVE_RERENDER_PLAN", "REJECT_RERENDER_PLAN"]); decision.add_argument("--operator-id", required=True); decision.add_argument("--reason", default=None); decision.add_argument("--recorded-at", default=None); decision.set_defaults(func=_cmd_decide_revision_approval)
+
+    # --- Stage 8C: approval-gated revision re-render dispatch -----------------
+    dispatch = sub.add_parser(
+        "request-hvs-rerender-dispatch",
+        help="Convert an APPROVED Stage 8B revision into an immutable, "
+        "lineage-preserving re-render dispatch request (manual HVS handoff; no HVS invocation).",
+    )
+    dispatch.add_argument("--revision-request-id", required=True)
+    dispatch.add_argument("--operator-id", required=True)
+    dispatch.add_argument(
+        "--target-format",
+        required=True,
+        action="append",
+        dest="target_formats",
+        choices=["vertical", "square", "horizontal", "captions", "thumbnail", "raw_master"],
+        help="requested delivery variant; repeatable; bounded to allowed formats",
+    )
+    dispatch.add_argument(
+        "--change-category",
+        action="append",
+        dest="change_categories",
+        default=[],
+        choices=[
+            "TEXT_CHANGE", "CAPTION_CHANGE", "TIMING_CHANGE", "ASSET_REPLACEMENT",
+            "AUDIO_CHANGE", "MUSIC_CHANGE", "VOICE_CHANGE", "LAYOUT_CHANGE",
+            "BRANDING_CHANGE", "FORMAT_CHANGE", "DURATION_CHANGE",
+            "COMPLIANCE_CHANGE", "TECHNICAL_CORRECTION",
+        ],
+        help="optional bounded requested-change category; repeatable",
+    )
+    dispatch.add_argument("--change-description", default=None)
+    dispatch.add_argument("--reason", required=True)
+    dispatch.add_argument("--requested-by", default=None)
+    dispatch.add_argument("--approved-by", default=None)
+    dispatch.add_argument("--recorded-at", default=None)
+    dispatch.set_defaults(func=_cmd_request_rerender_dispatch)
+
+    inspect_dispatch = sub.add_parser(
+        "inspect-hvs-rerender-dispatch",
+        help="Inspect a Stage 8C re-render dispatch request by id (no mutation).",
+    )
+    inspect_dispatch.add_argument("--dispatch-id", required=True)
+    inspect_dispatch.set_defaults(func=_cmd_inspect_rerender_dispatch)
     return parser
 
 
@@ -869,6 +912,48 @@ def _cmd_decide_revision_approval(args: argparse.Namespace) -> int:
 def _cmd_create_rerender_authorization(args: argparse.Namespace) -> int:
     from .hvs_revision_service import create_rerender_authorization
     return _revision_result(lambda **kw: create_rerender_authorization(revision_request_id=args.revision_request_id, operator_id=args.operator_id, repo_root=_repo_root(), **kw), args)
+
+
+def _cmd_request_rerender_dispatch(args: argparse.Namespace) -> int:
+    from .hvs_rerender_dispatch_models import RequestedChange
+    from .hvs_rerender_dispatch_service import request_rerender_dispatch
+
+    changes = ()
+    if getattr(args, "change_categories", None):
+        description = args.change_description or "Operator-requested revision change."
+        changes = tuple(
+            RequestedChange(
+                category=cat,
+                description=description,
+                target_format=None,
+                target_id=None,
+            )
+            for cat in args.change_categories
+        )
+    outcome = request_rerender_dispatch(
+        revision_request_id=args.revision_request_id,
+        operator_id=args.operator_id,
+        target_formats=tuple(args.target_formats),
+        requested_changes=changes,
+        reason=args.reason,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+        requested_by=getattr(args, "requested_by", None),
+        approved_by=getattr(args, "approved_by", None),
+    )
+    _emit(outcome.to_dict())
+    if outcome.ok:
+        return EXIT_OK
+    # Rejections (policy / validation) and not-found both surface as exit 1.
+    return EXIT_REJECT
+
+
+def _cmd_inspect_rerender_dispatch(args: argparse.Namespace) -> int:
+    from .hvs_rerender_dispatch_service import inspect_rerender_dispatch
+
+    outcome = inspect_rerender_dispatch(dispatch_id=args.dispatch_id, repo_root=_repo_root())
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
 
 
 def main(argv: list[str] | None = None) -> int:
