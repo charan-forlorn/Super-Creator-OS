@@ -359,6 +359,53 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     insp_pay8.add_argument("--invoice-preparation-id", required=True)
     insp_pay8.set_defaults(func=_cmd_inspect_payment_status)
+
+    # --- Stage 8A.1: immutable delivery version lineage ---------------------
+    lineage_inspect = sub.add_parser(
+        "inspect-hvs-delivery-lineage",
+        help="Inspect derived HVS delivery-version lineage without mutating delivery records.",
+    )
+    lineage_inspect.add_argument("--delivery-record-id", required=True)
+    lineage_inspect.set_defaults(func=_cmd_inspect_delivery_lineage)
+
+    lineage_register = sub.add_parser(
+        "register-hvs-delivery-lineage",
+        help="Explicitly register immutable historical delivery lineage; no HVS action occurs.",
+    )
+    lineage_register.add_argument("--delivery-record-id", required=True)
+    lineage_register.add_argument("--delivery-version", required=True)
+    lineage_register.add_argument(
+        "--registration-basis",
+        required=True,
+        choices=[
+            "original_delivery_confirmed",
+            "existing_external_version_record",
+            "operator_historical_reconciliation",
+            "imported_certified_lineage",
+            "successor_of_registered_delivery",
+        ],
+    )
+    lineage_register.add_argument("--operator-id", required=True)
+    lineage_register.add_argument("--evidence-reference", default=None)
+    lineage_register.add_argument("--registration-reason", default=None)
+    lineage_register.add_argument("--parent-lineage-id", default=None)
+    lineage_register.add_argument("--confirm-legacy-version", action="store_true")
+    lineage_register.add_argument("--recorded-at", default=None)
+    lineage_register.set_defaults(func=_cmd_register_delivery_lineage)
+
+    lineage_plan = sub.add_parser(
+        "plan-hvs-successor-version",
+        help="Derive a successor delivery version without persistence, revision, render, or HVS action.",
+    )
+    lineage_plan.add_argument("--delivery-record-id", required=True)
+    lineage_plan.set_defaults(func=_cmd_plan_hvs_successor_version)
+
+    lineage_list = sub.add_parser(
+        "list-hvs-delivery-lineage",
+        help="List registered immutable delivery lineage for one project.",
+    )
+    lineage_list.add_argument("--project-id", required=True)
+    lineage_list.set_defaults(func=_cmd_list_delivery_lineage)
     return parser
 
 
@@ -715,6 +762,63 @@ def _cmd_inspect_payment_status(args: argparse.Namespace) -> int:
         invoice_preparation_id=args.invoice_preparation_id,
         repo_root=_repo_root(),
     )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_delivery_lineage(args: argparse.Namespace) -> int:
+    from .hvs_delivery_lineage_service import inspect_delivery_lineage
+
+    outcome = inspect_delivery_lineage(
+        delivery_record_id=args.delivery_record_id,
+        repo_root=_repo_root(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_register_delivery_lineage(args: argparse.Namespace) -> int:
+    from .hvs_delivery_lineage_models import DeliveryLineageRegistrationRequest, DeliveryVersion
+    from .hvs_delivery_lineage_service import register_delivery_lineage
+
+    try:
+        version = DeliveryVersion.parse(args.delivery_version)
+    except ValueError as exc:
+        raise _CliError("INVALID_DELIVERY_VERSION", str(exc)) from exc
+    basis = args.registration_basis.upper()
+    outcome = register_delivery_lineage(
+        request=DeliveryLineageRegistrationRequest(
+            delivery_record_id=args.delivery_record_id,
+            delivery_version=version,
+            operator_id=args.operator_id,
+            registration_basis=basis,
+            confirm_legacy_version=args.confirm_legacy_version,
+            evidence_reference=args.evidence_reference,
+            registration_reason=args.registration_reason,
+            parent_lineage_id=args.parent_lineage_id,
+        ),
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_plan_hvs_successor_version(args: argparse.Namespace) -> int:
+    from .hvs_delivery_lineage_service import plan_successor_version
+
+    outcome = plan_successor_version(
+        delivery_record_id=args.delivery_record_id,
+        repo_root=_repo_root(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_list_delivery_lineage(args: argparse.Namespace) -> int:
+    from .hvs_delivery_lineage_service import list_project_delivery_lineage
+
+    outcome = list_project_delivery_lineage(project_id=args.project_id, repo_root=_repo_root())
     _emit(outcome.to_dict())
     return EXIT_OK if outcome.ok else EXIT_REJECT
 
