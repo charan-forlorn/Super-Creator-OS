@@ -406,6 +406,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     lineage_list.add_argument("--project-id", required=True)
     lineage_list.set_defaults(func=_cmd_list_delivery_lineage)
+
+    revision_create = sub.add_parser("create-hvs-revision-request", help="Create a local revision request from registered delivery lineage.")
+    revision_create.add_argument("--delivery-record-id", required=True); revision_create.add_argument("--requested-by-id", required=True); revision_create.add_argument("--operator-id", required=True)
+    revision_create.add_argument("--item-category", required=True); revision_create.add_argument("--item-description", required=True); revision_create.add_argument("--target-type", required=True); revision_create.add_argument("--target-id", required=True); revision_create.add_argument("--acceptance-requirement", required=True); revision_create.add_argument("--scene-id", default=None); revision_create.add_argument("--asset-id", default=None); revision_create.add_argument("--format", default=None); revision_create.add_argument("--recorded-at", default=None); revision_create.set_defaults(func=_cmd_create_revision_request)
+    for command, handler, argument in (("start-hvs-revision-review", _cmd_start_revision_review, None), ("assess-hvs-revision-impact", _cmd_assess_revision_impact, None), ("prepare-hvs-revision-plan", _cmd_prepare_revision_plan, None), ("create-hvs-revision-approval", _cmd_create_revision_approval, None), ("create-hvs-rerender-authorization", _cmd_create_rerender_authorization, None)):
+        item = sub.add_parser(command); item.add_argument("--revision-request-id", required=True); item.add_argument("--operator-id", required=True); item.add_argument("--recorded-at", default=None); item.set_defaults(func=handler)
+    commercial = sub.add_parser("classify-hvs-revision-commercial"); commercial.add_argument("--revision-request-id", required=True); commercial.add_argument("--classification", required=True); commercial.add_argument("--basis", required=True); commercial.add_argument("--operator-id", required=True); commercial.add_argument("--amount", default=None); commercial.add_argument("--currency", default=None); commercial.add_argument("--tax", default=None); commercial.add_argument("--discount", default=None); commercial.add_argument("--recorded-at", default=None); commercial.set_defaults(func=_cmd_classify_revision_commercial)
+    decision = sub.add_parser("decide-hvs-revision-approval"); decision.add_argument("--revision-request-id", required=True); decision.add_argument("--decision", required=True, choices=["APPROVE_RERENDER_PLAN", "REJECT_RERENDER_PLAN"]); decision.add_argument("--operator-id", required=True); decision.add_argument("--reason", default=None); decision.add_argument("--recorded-at", default=None); decision.set_defaults(func=_cmd_decide_revision_approval)
     return parser
 
 
@@ -821,6 +829,46 @@ def _cmd_list_delivery_lineage(args: argparse.Namespace) -> int:
     outcome = list_project_delivery_lineage(project_id=args.project_id, repo_root=_repo_root())
     _emit(outcome.to_dict())
     return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _revision_result(call, args: argparse.Namespace) -> int:
+    outcome = call(recorded_at=args.recorded_at or _now_iso())
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_create_revision_request(args: argparse.Namespace) -> int:
+    from .hvs_delivery_lineage_service import inspect_delivery_lineage
+    from .hvs_revision_models import RevisionItem
+    from .hvs_revision_service import create_revision_request
+    lineage = inspect_delivery_lineage(delivery_record_id=args.delivery_record_id, repo_root=_repo_root())
+    if not lineage.ok or not lineage.lineage:
+        _emit(lineage.to_dict()); return EXIT_REJECT
+    item = RevisionItem.create(category=args.item_category, description=args.item_description, target_type=args.target_type, target_id=args.target_id, scene_id=args.scene_id, asset_id=args.asset_id, format=args.format, priority="normal", acceptance_requirement=args.acceptance_requirement, requested_by_id=args.requested_by_id, source_artifact_sha256=lineage.lineage.artifact_sha256)
+    return _revision_result(lambda **kw: create_revision_request(delivery_record_id=args.delivery_record_id, requested_by_id=args.requested_by_id, operator_id=args.operator_id, revision_items=(item,), repo_root=_repo_root(), **kw), args)
+
+
+def _cmd_start_revision_review(args: argparse.Namespace) -> int:
+    from .hvs_revision_service import start_revision_review
+    return _revision_result(lambda **kw: start_revision_review(revision_request_id=args.revision_request_id, operator_id=args.operator_id, repo_root=_repo_root(), **kw), args)
+def _cmd_assess_revision_impact(args: argparse.Namespace) -> int:
+    from .hvs_revision_service import assess_revision_impact
+    return _revision_result(lambda **kw: assess_revision_impact(revision_request_id=args.revision_request_id, operator_id=args.operator_id, repo_root=_repo_root(), **kw), args)
+def _cmd_classify_revision_commercial(args: argparse.Namespace) -> int:
+    from .hvs_revision_service import classify_revision_commercial
+    return _revision_result(lambda **kw: classify_revision_commercial(revision_request_id=args.revision_request_id, classification=args.classification, operator_id=args.operator_id, basis=args.basis, amount=args.amount, currency=args.currency, tax=args.tax, discount=args.discount, repo_root=_repo_root(), **kw), args)
+def _cmd_prepare_revision_plan(args: argparse.Namespace) -> int:
+    from .hvs_revision_service import prepare_revision_plan
+    return _revision_result(lambda **kw: prepare_revision_plan(revision_request_id=args.revision_request_id, operator_id=args.operator_id, repo_root=_repo_root(), **kw), args)
+def _cmd_create_revision_approval(args: argparse.Namespace) -> int:
+    from .hvs_revision_service import create_revision_approval_request
+    return _revision_result(lambda **kw: create_revision_approval_request(revision_request_id=args.revision_request_id, operator_id=args.operator_id, repo_root=_repo_root(), **kw), args)
+def _cmd_decide_revision_approval(args: argparse.Namespace) -> int:
+    from .hvs_revision_service import decide_revision_approval
+    return _revision_result(lambda **kw: decide_revision_approval(revision_request_id=args.revision_request_id, decision=args.decision, operator_id=args.operator_id, reason=args.reason, repo_root=_repo_root(), **kw), args)
+def _cmd_create_rerender_authorization(args: argparse.Namespace) -> int:
+    from .hvs_revision_service import create_rerender_authorization
+    return _revision_result(lambda **kw: create_rerender_authorization(revision_request_id=args.revision_request_id, operator_id=args.operator_id, repo_root=_repo_root(), **kw), args)
 
 
 def main(argv: list[str] | None = None) -> int:
