@@ -89,10 +89,12 @@ runtime data under `scos/work` is gitignored and is not staged.
 
 ## Scope confirmation and rollback
 
-No HVS source was modified or invoked. No project, asset copy, media output,
-render, customer contact, invoice/payment mutation, network call, dependency
-change, supersession, or Stage 8C work occurred. The source delivery, closure,
-lineage, and artifact are read-only inputs.
+HVS was not modified. A bounded read-only invocation of `python -m hvs.cli --help`
+occurred during regression/full-suite verification; no project, state, media,
+render output, or repository changes were produced. No customer contact,
+invoice/payment mutation, network call, dependency change, supersession, or
+Stage 8C work occurred. The source delivery, closure, lineage, and artifact are
+read-only inputs.
 
 Rollback is a revert of the single Stage 8B commit. Runtime audit evidence is
 append-only and remains untracked. Stage 8C may consume a valid authorization
