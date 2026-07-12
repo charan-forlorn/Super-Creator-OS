@@ -457,6 +457,46 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     inspect_dispatch.add_argument("--dispatch-id", required=True)
     inspect_dispatch.set_defaults(func=_cmd_inspect_rerender_dispatch)
+
+    # --- Stage 8D: re-render result reconciliation -------------------------
+    recon = sub.add_parser(
+        "reconcile-hvs-rerender-result",
+        help="Reconcile a Stage 8C re-render result into SCOS delivery + revision "
+        "lineage (no HVS invocation; manual HVS handoff boundary).\n\n"
+        "INPUT is a JSON file path containing the re-render result evidence "
+        "contract. The result must bind the same dispatch, revision, delivery, "
+        "project, and correlation lineage as the approved Stage 8C dispatch.",
+    )
+    recon.add_argument("--result-path", required=True, help="path to the re-render result JSON evidence file")
+    recon.add_argument("--operator-id", required=True)
+    recon.add_argument(
+        "--new-delivery-record-id",
+        default=None,
+        help="identifier of the new delivery record produced by the re-render; "
+        "required to register the revised delivery version",
+    )
+    recon.add_argument("--recorded-at", default=None)
+    recon.set_defaults(func=_cmd_reconcile_rerender_result)
+
+    recon_inspect = sub.add_parser(
+        "inspect-hvs-rerender-reconciliation",
+        help="Inspect a Stage 8D reconciliation by id (no mutation).",
+    )
+    recon_inspect.add_argument("--reconciliation-id", required=True)
+    recon_inspect.set_defaults(func=_cmd_inspect_rerender_reconciliation)
+
+    recon_rev = sub.add_parser(
+        "list-hvs-revised-delivery-lineage",
+        help="List the revised-delivery lineage for a project (read-only).",
+    )
+    recon_rev.add_argument("--project-id", required=True)
+    recon_rev.set_defaults(func=_cmd_list_revised_delivery_lineage)
+
+    recon_sup = sub.add_parser(
+        "list-hvs-supersession-lineage",
+        help="List all append-only supersession evidence (read-only).",
+    )
+    recon_sup.set_defaults(func=_cmd_list_supersession_lineage)
     return parser
 
 
@@ -954,6 +994,71 @@ def _cmd_inspect_rerender_dispatch(args: argparse.Namespace) -> int:
     outcome = inspect_rerender_dispatch(dispatch_id=args.dispatch_id, repo_root=_repo_root())
     _emit(outcome.to_dict())
     return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_reconcile_rerender_result(args: argparse.Namespace) -> int:
+    from .hvs_rerender_result_models import RerenderResult
+    from .hvs_rerender_result_reconciliation_service import reconcile_rerender_result
+
+    _reject_url(args.result_path)
+    path = Path(args.result_path)
+    if ".." in path.parts or "://" in str(path) or "\x00" in str(path):
+        _emit({"ok": False, "error_kind": "INVALID_ARGUMENTS", "error_detail": "unsafe result path"})
+        return EXIT_REJECT
+    if not path.is_file():
+        _emit({"ok": False, "error_kind": "INVALID_ARGUMENTS", "error_detail": "result file not found"})
+        return EXIT_REJECT
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        result = RerenderResult(**payload)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        _emit({"ok": False, "error_kind": "INVALID_RESULT_PAYLOAD", "error_detail": str(exc)})
+        return EXIT_REJECT
+    outcome = reconcile_rerender_result(
+        result=result,
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+        new_delivery_record_id=getattr(args, "new_delivery_record_id", None),
+    )
+    _emit(outcome.to_dict())
+    if outcome.ok:
+        return EXIT_OK
+    # Validation/policy/lint rejections surface as exit 1.
+    return EXIT_REJECT
+
+
+def _cmd_inspect_rerender_reconciliation(args: argparse.Namespace) -> int:
+    from .hvs_rerender_result_reconciliation_service import inspect_reconciliation
+
+    outcome = inspect_reconciliation(reconciliation_id=args.reconciliation_id, repo_root=_repo_root())
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_list_revised_delivery_lineage(args: argparse.Namespace) -> int:
+    from .hvs_rerender_result_reconciliation_service import list_revised_delivery_lineage
+
+    records = list_revised_delivery_lineage(project_id=args.project_id, repo_root=_repo_root())
+    _emit({
+        "ok": True,
+        "project_id": args.project_id,
+        "count": len(records),
+        "revised_deliveries": [r.to_dict() for r in records],
+    })
+    return EXIT_OK
+
+
+def _cmd_list_supersession_lineage(args: argparse.Namespace) -> int:
+    from .hvs_rerender_result_reconciliation_service import list_supersession_lineage
+
+    records = list_supersession_lineage(repo_root=_repo_root())
+    _emit({
+        "ok": True,
+        "count": len(records),
+        "supersessions": [r.to_dict() for r in records],
+    })
+    return EXIT_OK
 
 
 def main(argv: list[str] | None = None) -> int:

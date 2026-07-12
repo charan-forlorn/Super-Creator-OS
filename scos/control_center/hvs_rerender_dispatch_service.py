@@ -480,7 +480,10 @@ def request_rerender_dispatch(
 
 
 def _all_dispatches(repo_root: Path) -> list[RerenderDispatchRequest]:
-    out: list[RerenderDispatchRequest] = []
+    # The dispatch ledger is append-only; the LAST event for a given
+    # dispatch_id reflects its current lifecycle status. Keep only the latest
+    # per dispatch_id so inspect/dedup return current state, not a stale one.
+    latest: dict[str, RerenderDispatchRequest] = {}
     for event in read_rerender_dispatch_events(
         audit_log_path=rerender_dispatch_audit_path(repo_root)
     ):
@@ -489,33 +492,31 @@ def _all_dispatches(repo_root: Path) -> list[RerenderDispatchRequest]:
             continue
         try:
             changes = tuple(RequestedChange(**c) for c in rec.get("requested_changes", []))
-            out.append(
-                RerenderDispatchRequest(
-                    schema_version=rec["schema_version"],
-                    dispatch_id=rec["dispatch_id"],
-                    revision_id=rec["revision_id"],
-                    delivery_id=rec["delivery_id"],
-                    original_render_request_id=rec.get("original_render_request_id"),
-                    original_correlation_id=rec.get("original_correlation_id"),
-                    project_id=rec["project_id"],
-                    requested_by=rec["requested_by"],
-                    approved_by=rec["approved_by"],
-                    approval_id=rec["approval_id"],
-                    approval_decision_id=rec["approval_decision_id"],
-                    approval_timestamp=rec["approval_timestamp"],
-                    requested_changes=changes,
-                    target_formats=tuple(rec["target_formats"]),
-                    reason=rec["reason"],
-                    created_at=rec["created_at"],
-                    correlation_id=rec["correlation_id"],
-                    idempotency_key=rec["idempotency_key"],
-                    status=rec["status"],
-                    metadata=rec.get("metadata", {}),
-                )
+            latest[rec["dispatch_id"]] = RerenderDispatchRequest(
+                schema_version=rec["schema_version"],
+                dispatch_id=rec["dispatch_id"],
+                revision_id=rec["revision_id"],
+                delivery_id=rec["delivery_id"],
+                original_render_request_id=rec.get("original_render_request_id"),
+                original_correlation_id=rec.get("original_correlation_id"),
+                project_id=rec["project_id"],
+                requested_by=rec["requested_by"],
+                approved_by=rec["approved_by"],
+                approval_id=rec["approval_id"],
+                approval_decision_id=rec["approval_decision_id"],
+                approval_timestamp=rec["approval_timestamp"],
+                requested_changes=changes,
+                target_formats=tuple(rec["target_formats"]),
+                reason=rec["reason"],
+                created_at=rec["created_at"],
+                correlation_id=rec["correlation_id"],
+                idempotency_key=rec["idempotency_key"],
+                status=rec["status"],
+                metadata=rec.get("metadata", {}),
             )
         except (KeyError, TypeError, ValueError):
             continue
-    return out
+    return list(latest.values())
 
 
 def _find_existing_dispatch(*, repo_root: Path, idempotency_key: str):
