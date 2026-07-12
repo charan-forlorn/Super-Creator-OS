@@ -16,7 +16,7 @@ Convert completed, verified manual-delivery closures into operator-controlled in
 | Stage 7 feature commit | `5af565a` (delivery closure audit) |
 | Stage 7 certification | `docs/certification/SCOS-HVS-integration-stage-7-delivery-closure.md` |
 | Initial Git status | clean (before Stage 8A work) |
-| Test collection | 1363 collected, exit 0 |
+| Test collection | 1364 collected, 0 collection errors, exit 0 |
 | Python | 3.11.15 (`.venv`) |
 
 HVS baseline (read-only):
@@ -26,7 +26,8 @@ HVS baseline (read-only):
 | HVS root | `C:/Workspace/hermes-video-studio` |
 | Branch | `main` |
 | Baseline HEAD | `139ce26be838247f4cd4607c2a32989d732d3ac5` |
-| Working tree | clean (only `.vscode/settings.json` = PRE_EXISTING_UNRELATED) |
+| Hygiene commit | `8e054cf368a812a12dec0d179b5374d0612bfdcd` (`chore(video-studio): ignore local IDE settings`) |
+| Working tree | clean after `.vscode/settings.json` classified as local IDE configuration and ignored via `.gitignore` |
 
 ## 2. Business Boundary
 
@@ -85,7 +86,7 @@ Created:
 Modified:
 - `scos/control_center/cli.py` — 7 subcommands: `create-hvs-invoice-preparation`, `inspect-hvs-invoice-preparation`, `mark-hvs-invoice-ready`, `mark-hvs-invoice-sent`, `list-hvs-payment-follow-ups`, `record-hvs-payment-status`, `inspect-hvs-payment-status`. Structured JSON, explicit `automation_allowed:false`, `manual_action_required`, `permitted_next_actions`, `invoice_not_sent` where relevant; exit 0 valid, non-zero invalid.
 
-No HVS, renderer, Stage 5/6/7 semantics, frontend, payment/accounting integration, dependencies, or lock files changed. Scanner allow-list unchanged (Stage 8A uses no subprocess).
+No HVS production source, renderer, Stage 5/6/7 semantics, frontend, payment/accounting integration, dependencies, or lock files changed. HVS received one separate hygiene-only `.gitignore` commit for local IDE settings. Scanner allow-list unchanged (Stage 8A uses no subprocess).
 
 ## 8. Sensitive-Data Guard (PHASE 8)
 
@@ -117,9 +118,10 @@ All above F–J confirm: incomplete/non-closed delivery blocked; duplicate comme
 | Suite | Result |
 |-------|--------|
 | Stage 8A focused | **17 passed** |
-| Stage 5–7 regression | **69 passed, 1 skipped** |
-| Control Center full | **933 passed, 1 skipped, 1 warning** (pre-existing HVS adapter readonly decode warning) |
-| Full SCOS suite | **1363 passed, 1 skipped, 1 warning, exit 0** (327.96s) |
+| Stage 5–7 regression | **75 passed, 1 skipped, exit 0** |
+| Control Center full | **933 passed, 1 skipped, exit 0** (79.04s) |
+| Test collection | **1364 collected, 0 collection errors, exit 0** (0.94s) |
+| Full SCOS suite | **1363 passed, 1 skipped, exit 0** (299.82s) |
 | Security scan | **PASS, 0 findings** (419 files) |
 | Smoke | **16 passed, PASS** |
 
@@ -127,7 +129,7 @@ All above F–J confirm: incomplete/non-closed delivery blocked; duplicate comme
 
 - No invoice sent, no customer contacted, no payment link, no payment provider accessed.
 - No automatic paid state; PAID only via explicit operator confirmation.
-- HVS unmodified (read-only).
+- HVS production source unmodified; a separate hygiene-only commit ignored local `.vscode/` settings.
 - No dependency/lock-file change.
 - No runtime invoice/payment JSONL or audit staged (all under ignored `scos/work/`).
 - `automation_allowed` always `False` in records/events/CLI.
