@@ -497,6 +497,110 @@ def _build_parser() -> argparse.ArgumentParser:
         help="List all append-only supersession evidence (read-only).",
     )
     recon_sup.set_defaults(func=_cmd_list_supersession_lineage)
+
+    # --- Stage 8E: revised-delivery acceptance, release authorization, and
+    #     final revision closure (evidence only; no HVS / outbound transport) --
+    acc8e = sub.add_parser(
+        "record-revised-delivery-acceptance",
+        help="Record internal acceptance of a Stage 8D revised delivery "
+        "(evidence only; no customer contact).",
+    )
+    acc8e.add_argument("--reconciliation-result-id", required=True)
+    acc8e.add_argument("--revised-delivery-id", required=True)
+    acc8e.add_argument("--reviewer-id", required=True)
+    acc8e.add_argument("--accepted-formats", action="append", dest="accepted_formats", default=[],
+                       choices=["vertical", "square", "horizontal", "captions", "thumbnail", "raw_master"])
+    acc8e.add_argument("--rejected-formats", action="append", dest="rejected_formats", default=[],
+                       choices=["vertical", "square", "horizontal", "captions", "thumbnail", "raw_master"])
+    acc8e.add_argument("--quality-gate-reference", required=True)
+    acc8e.add_argument("--artifact-integrity-reference", required=True)
+    acc8e.add_argument("--acceptance-status", default="ACCEPTED",
+                       choices=["ACCEPTED", "PARTIALLY_ACCEPTED", "REJECTED"])
+    acc8e.add_argument("--rejection-codes", default=None,
+                       help="comma-separated rejection codes (required when status is REJECTED)")
+    acc8e.add_argument("--review-notes", default=None)
+    acc8e.add_argument("--evidence-references", default=None,
+                       help="comma-separated evidence reference tokens")
+    acc8e.add_argument("--operator-id", required=True)
+    acc8e.add_argument("--recorded-at", default=None)
+    acc8e.set_defaults(func=_cmd_record_revised_delivery_acceptance)
+
+    insp_acc8e = sub.add_parser(
+        "inspect-revised-delivery-acceptance",
+        help="Inspect a Stage 8E acceptance by id (no mutation).",
+    )
+    insp_acc8e.add_argument("--acceptance-id", required=True)
+    insp_acc8e.set_defaults(func=_cmd_inspect_revised_delivery_acceptance)
+
+    auth8e = sub.add_parser(
+        "create-customer-release-authorization",
+        help="Create explicit customer-release authorization evidence for an "
+        "accepted revised delivery (evidence only; no delivery transport).",
+    )
+    auth8e.add_argument("--acceptance-id", required=True)
+    auth8e.add_argument("--authorized-by", required=True)
+    auth8e.add_argument("--authorization-scope", action="append", dest="authorization_scope", default=[],
+                        choices=["vertical", "square", "horizontal", "captions", "thumbnail", "raw_master"])
+    auth8e.add_argument("--approved-formats", action="append", dest="approved_formats", default=[],
+                        choices=["vertical", "square", "horizontal", "captions", "thumbnail", "raw_master"])
+    auth8e.add_argument("--allowed-delivery-channels", action="append", dest="allowed_delivery_channels", default=[],
+                        choices=["in_person", "removable_media", "local_network_manual", "customer_portal_manual",
+                                 "cloud_storage_manual", "email_manual", "messaging_manual", "other_manual"])
+    auth8e.add_argument("--customer-reference", required=True)
+    auth8e.add_argument("--approval-basis", required=True)
+    auth8e.add_argument("--policy-version", required=True)
+    auth8e.add_argument("--expiry-at", required=True)
+    auth8e.add_argument("--evidence-references", default=None,
+                        help="comma-separated evidence reference tokens")
+    auth8e.add_argument("--operator-id", required=True)
+    auth8e.add_argument("--recorded-at", default=None)
+    auth8e.set_defaults(func=_cmd_create_customer_release_authorization)
+
+    revoke8e = sub.add_parser(
+        "revoke-customer-release-authorization",
+        help="Revoke a Stage 8E customer-release authorization (append-only; "
+        "the record is preserved).",
+    )
+    revoke8e.add_argument("--authorization-id", required=True)
+    revoke8e.add_argument("--reason", default=None)
+    revoke8e.add_argument("--operator-id", required=True)
+    revoke8e.add_argument("--recorded-at", default=None)
+    revoke8e.set_defaults(func=_cmd_revoke_customer_release_authorization)
+
+    ready8e = sub.add_parser(
+        "evaluate-revised-delivery-release-readiness",
+        help="Evaluate deterministic release readiness for an acceptance "
+        "(fail-closed; no outbound transport).",
+    )
+    ready8e.add_argument("--acceptance-id", required=True)
+    ready8e.add_argument("--authorization-id", default=None)
+    ready8e.add_argument("--recorded-at", default=None)
+    ready8e.set_defaults(func=_cmd_evaluate_release_readiness)
+
+    close8e = sub.add_parser(
+        "close-final-revision",
+        help="Close the final revision release gate for an acceptance "
+        "(idempotent; conflict-rejected).",
+    )
+    close8e.add_argument("--acceptance-id", required=True)
+    close8e.add_argument("--authorization-id", default=None)
+    close8e.add_argument("--operator-id", required=True)
+    close8e.add_argument("--recorded-at", default=None)
+    close8e.set_defaults(func=_cmd_close_final_revision)
+
+    insp_close8e = sub.add_parser(
+        "inspect-final-revision-closure",
+        help="Inspect the Stage 8E final revision closure by revision id.",
+    )
+    insp_close8e.add_argument("--revision-id", required=True)
+    insp_close8e.set_defaults(func=_cmd_inspect_final_revision_closure)
+
+    lineage8e = sub.add_parser(
+        "inspect-revised-delivery-release-lineage",
+        help="Inspect the complete revised-delivery release lineage (read-only).",
+    )
+    lineage8e.add_argument("--project-id", default=None)
+    lineage8e.set_defaults(func=_cmd_inspect_release_lineage)
     return parser
 
 
@@ -1058,6 +1162,123 @@ def _cmd_list_supersession_lineage(args: argparse.Namespace) -> int:
         "count": len(records),
         "supersessions": [r.to_dict() for r in records],
     })
+    return EXIT_OK
+
+
+def _split_csv(value: str | None) -> tuple[str, ...]:
+    if not value:
+        return ()
+    return tuple(v.strip() for v in value.split(",") if v.strip())
+
+
+def _cmd_record_revised_delivery_acceptance(args: argparse.Namespace) -> int:
+    from .hvs_revised_delivery_release_service import record_revised_delivery_acceptance
+
+    rejection_codes = _split_csv(getattr(args, "rejection_codes", None)) if args.acceptance_status == "REJECTED" else ()
+    outcome = record_revised_delivery_acceptance(
+        reconciliation_result_id=args.reconciliation_result_id,
+        revised_delivery_id=args.revised_delivery_id,
+        reviewer_id=args.reviewer_id,
+        accepted_formats=tuple(args.accepted_formats),
+        rejected_formats=tuple(args.rejected_formats),
+        quality_gate_reference=args.quality_gate_reference,
+        artifact_integrity_reference=args.artifact_integrity_reference,
+        acceptance_status=args.acceptance_status,
+        rejection_codes=rejection_codes,
+        review_notes=getattr(args, "review_notes", None),
+        evidence_references=_split_csv(getattr(args, "evidence_references", None)),
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_revised_delivery_acceptance(args: argparse.Namespace) -> int:
+    from .hvs_revised_delivery_release_service import inspect_acceptance
+
+    outcome = inspect_acceptance(acceptance_id=args.acceptance_id, repo_root=_repo_root())
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_create_customer_release_authorization(args: argparse.Namespace) -> int:
+    from .hvs_revised_delivery_release_service import create_customer_release_authorization
+
+    outcome = create_customer_release_authorization(
+        acceptance_id=args.acceptance_id,
+        authorized_by=args.authorized_by,
+        authorization_scope=tuple(args.authorization_scope),
+        approved_formats=tuple(args.approved_formats),
+        allowed_delivery_channels=tuple(args.allowed_delivery_channels),
+        customer_reference=args.customer_reference,
+        approval_basis=args.approval_basis,
+        policy_version=args.policy_version,
+        expiry_at=args.expiry_at,
+        evidence_references=_split_csv(getattr(args, "evidence_references", None)),
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_revoke_customer_release_authorization(args: argparse.Namespace) -> int:
+    from .hvs_revised_delivery_release_service import revoke_customer_release_authorization
+
+    outcome = revoke_customer_release_authorization(
+        authorization_id=args.authorization_id,
+        reason=getattr(args, "reason", None),
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_evaluate_release_readiness(args: argparse.Namespace) -> int:
+    from .hvs_revised_delivery_release_service import evaluate_release_readiness
+
+    decision = evaluate_release_readiness(
+        acceptance_id=args.acceptance_id,
+        authorization_id=getattr(args, "authorization_id", None),
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(decision.to_dict())
+    return EXIT_OK
+
+
+def _cmd_close_final_revision(args: argparse.Namespace) -> int:
+    from .hvs_revised_delivery_release_service import close_final_revision
+
+    outcome = close_final_revision(
+        acceptance_id=args.acceptance_id,
+        authorization_id=getattr(args, "authorization_id", None),
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_final_revision_closure(args: argparse.Namespace) -> int:
+    from .hvs_revised_delivery_release_service import inspect_final_closure
+
+    outcome = inspect_final_closure(revision_id=args.revision_id, repo_root=_repo_root())
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_release_lineage(args: argparse.Namespace) -> int:
+    from .hvs_revised_delivery_release_service import inspect_release_lineage
+
+    outcome = inspect_release_lineage(project_id=getattr(args, "project_id", None), repo_root=_repo_root())
+    _emit(outcome)
     return EXIT_OK
 
 
