@@ -797,6 +797,123 @@ def _build_parser() -> argparse.ArgumentParser:
     isl = sub.add_parser("inspect-post-delivery-support-lineage", help="Inspect full 8G support/dispute/reopen/closure lineage.")
     isl.add_argument("--project-id", default=None)
     isl.set_defaults(func=_cmd_inspect_post_delivery_support_lineage)
+
+    # --- Stage 8H: customer-success evidence and manual opportunity queue ---
+    outcome = sub.add_parser("record-customer-outcome", help="Record explicit customer outcome evidence; no contact occurs.")
+    for name in ("commercial-closure-id", "customer-reference", "recorded-by-operator-id", "business-outcome-status", "business-outcome-summary"):
+        outcome.add_argument("--" + name, required=True)
+    for name in ("satisfaction-rating", "delivery-quality-rating", "communication-rating", "timeliness-rating"):
+        outcome.add_argument("--" + name, required=True, type=int)
+    outcome.add_argument("--measurable-outcomes-json", default="[]")
+    outcome.add_argument("--unresolved-concerns", default="")
+    outcome.add_argument("--evidence-references", default="")
+    outcome.add_argument("--idempotency-key", default="")
+    outcome.add_argument("--recorded-at", default=None)
+    outcome.set_defaults(func=_cmd_record_customer_outcome)
+
+    inspect_outcome = sub.add_parser("inspect-customer-outcome", help="Inspect immutable customer outcome evidence.")
+    inspect_outcome.add_argument("--outcome-review-id", required=True)
+    inspect_outcome.set_defaults(func=_cmd_inspect_customer_outcome)
+
+    portfolio = sub.add_parser("record-portfolio-consent", help="Record explicit scoped portfolio consent; no publication occurs.")
+    for name in ("outcome-review-id", "customer-reference", "consent-status", "consent-scope", "allowed-artifact-references", "allowed-formats", "allowed-usage-contexts", "recorded-by-operator-id", "consent-basis"):
+        portfolio.add_argument("--" + name, required=True)
+    for name in ("brand-name-usage", "logo-usage", "customer-name-usage", "performance-metric-usage", "anonymization-required"):
+        portfolio.add_argument("--" + name, action="store_true")
+    portfolio.add_argument("--anonymization-rules", default="")
+    portfolio.add_argument("--attribution-requirement", default=None)
+    portfolio.add_argument("--valid-from", default=None)
+    portfolio.add_argument("--expires-at", default=None)
+    portfolio.add_argument("--evidence-references", default="")
+    portfolio.add_argument("--idempotency-key", default="")
+    portfolio.add_argument("--recorded-at", default=None)
+    portfolio.set_defaults(func=_cmd_record_portfolio_consent)
+
+    rev_portfolio = sub.add_parser("revoke-portfolio-consent", help="Append portfolio-consent revocation evidence.")
+    rev_portfolio.add_argument("--consent-id", required=True)
+    rev_portfolio.add_argument("--revoked-by-operator-id", required=True)
+    rev_portfolio.add_argument("--revocation-reason", required=True)
+    rev_portfolio.add_argument("--evidence-references", default="")
+    rev_portfolio.add_argument("--idempotency-key", default="")
+    rev_portfolio.add_argument("--recorded-at", default=None)
+    rev_portfolio.set_defaults(func=_cmd_revoke_portfolio_consent)
+
+    portfolio_ready = sub.add_parser("inspect-portfolio-readiness", help="Inspect portfolio readiness; no publication occurs.")
+    portfolio_ready.add_argument("--portfolio-consent-id", required=True)
+    portfolio_ready.add_argument("--as-of", required=True)
+    portfolio_ready.set_defaults(func=_cmd_inspect_portfolio_readiness)
+
+    testimonial = sub.add_parser("record-testimonial-consent", help="Record exact-text testimonial consent; no publication occurs.")
+    for name in ("outcome-review-id", "customer-reference", "testimonial-reference", "testimonial-text-hash", "consent-status", "approved-usage-contexts", "recorded-by-operator-id", "consent-basis"):
+        testimonial.add_argument("--" + name, required=True)
+    testimonial.add_argument("--approved-edits", default="")
+    testimonial.add_argument("--testimonial-text-preview", default=None)
+    testimonial.add_argument("--anonymization-required", action="store_true")
+    testimonial.add_argument("--attribution-name", default=None)
+    testimonial.add_argument("--attribution-role", default=None)
+    testimonial.add_argument("--attribution-company", default=None)
+    testimonial.add_argument("--valid-from", default=None)
+    testimonial.add_argument("--expires-at", default=None)
+    testimonial.add_argument("--evidence-references", default="")
+    testimonial.add_argument("--idempotency-key", default="")
+    testimonial.add_argument("--recorded-at", default=None)
+    testimonial.set_defaults(func=_cmd_record_testimonial_consent)
+
+    rev_testimonial = sub.add_parser("revoke-testimonial-consent", help="Append testimonial-consent revocation evidence.")
+    rev_testimonial.add_argument("--consent-id", required=True)
+    rev_testimonial.add_argument("--revoked-by-operator-id", required=True)
+    rev_testimonial.add_argument("--revocation-reason", required=True)
+    rev_testimonial.add_argument("--evidence-references", default="")
+    rev_testimonial.add_argument("--idempotency-key", default="")
+    rev_testimonial.add_argument("--recorded-at", default=None)
+    rev_testimonial.set_defaults(func=_cmd_revoke_testimonial_consent)
+
+    testimonial_ready = sub.add_parser("inspect-testimonial-readiness", help="Inspect testimonial readiness; no publication occurs.")
+    testimonial_ready.add_argument("--testimonial-consent-id", required=True)
+    testimonial_ready.add_argument("--testimonial-text-hash", required=True)
+    testimonial_ready.add_argument("--requested-edit", default=None)
+    testimonial_ready.add_argument("--as-of", required=True)
+    testimonial_ready.set_defaults(func=_cmd_inspect_testimonial_readiness)
+
+    opportunity = sub.add_parser("create-opportunity", help="Record a manual renewal, follow-on, upsell, referral, or support opportunity.")
+    for name in ("opportunity-type", "commercial-closure-id", "outcome-review-id", "customer-reference", "opportunity-summary", "confidence-level", "urgency", "created-by-operator-id"):
+        opportunity.add_argument("--" + name, required=True)
+    opportunity.add_argument("--source-issue-ids", default="")
+    opportunity.add_argument("--source-evidence-references", default="")
+    opportunity.add_argument("--recommended-offer", default=None)
+    opportunity.add_argument("--estimated-value", default=None)
+    opportunity.add_argument("--currency", default=None)
+    opportunity.add_argument("--target-follow-up-date", default=None)
+    opportunity.add_argument("--assigned-operator-id", default=None)
+    opportunity.add_argument("--idempotency-key", default="")
+    opportunity.add_argument("--recorded-at", default=None)
+    opportunity.set_defaults(func=_cmd_create_opportunity)
+
+    qualify = sub.add_parser("qualify-opportunity", help="Append an explicit manual opportunity status decision.")
+    qualify.add_argument("--opportunity-id", required=True)
+    qualify.add_argument("--status", required=True)
+    qualify.add_argument("--confirmed-by-operator-id", required=True)
+    qualify.add_argument("--reason", required=True)
+    qualify.add_argument("--operator-confirmation", action="store_true")
+    qualify.add_argument("--idempotency-key", default="")
+    qualify.add_argument("--recorded-at", default=None)
+    qualify.set_defaults(func=_cmd_qualify_opportunity)
+
+    inspect_opp = sub.add_parser("inspect-opportunity", help="Inspect manual opportunity readiness.")
+    inspect_opp.add_argument("--opportunity-id", required=True)
+    inspect_opp.set_defaults(func=_cmd_inspect_opportunity)
+
+    priority = sub.add_parser("evaluate-opportunity-priority", help="Evaluate deterministic priority from explicit JSON inputs.")
+    priority.add_argument("--inputs-json", required=True)
+    priority.set_defaults(func=_cmd_evaluate_opportunity_priority)
+
+    queue = sub.add_parser("list-manual-follow-up-queue", help="List deterministic manual follow-up queue; does not contact customers.")
+    queue.add_argument("--as-of", required=True)
+    queue.set_defaults(func=_cmd_list_manual_follow_up_queue)
+
+    lineage8h = sub.add_parser("inspect-customer-success-lineage", help="Inspect complete Stage 8H customer-success lineage.")
+    lineage8h.add_argument("--project-id", default=None)
+    lineage8h.set_defaults(func=_cmd_inspect_customer_success_lineage)
     return parser
 
 
@@ -1007,6 +1124,107 @@ def _cmd_create_commercial_closure(args: argparse.Namespace) -> int:
     )
     _emit(out.to_dict())
     return EXIT_OK if out.ok else EXIT_REJECT
+
+
+def _customer_success_result(out: Any) -> int:
+    _emit(out.to_dict())
+    return EXIT_OK if out.ok else EXIT_REJECT
+
+
+def _cmd_record_customer_outcome(args: argparse.Namespace) -> int:
+    from .hvs_customer_outcome_service import record_customer_outcome
+    try:
+        outcomes = json.loads(args.measurable_outcomes_json)
+        if not isinstance(outcomes, list):
+            raise ValueError("measurable outcomes must be a JSON list")
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise _CliError("INVALID_ARGUMENTS", str(exc)) from exc
+    return _customer_success_result(record_customer_outcome(commercial_closure_id=args.commercial_closure_id, customer_reference=args.customer_reference, recorded_by_operator_id=args.recorded_by_operator_id, satisfaction_rating=args.satisfaction_rating, delivery_quality_rating=args.delivery_quality_rating, communication_rating=args.communication_rating, timeliness_rating=args.timeliness_rating, business_outcome_status=args.business_outcome_status, business_outcome_summary=args.business_outcome_summary, measurable_outcomes=tuple(outcomes), unresolved_concerns=_split_csv(args.unresolved_concerns), evidence_references=_split_csv(args.evidence_references), idempotency_key=args.idempotency_key, repo_root=_repo_root(), recorded_at=args.recorded_at or _now_iso()))
+
+
+def _cmd_inspect_customer_outcome(args: argparse.Namespace) -> int:
+    from .hvs_customer_outcome_service import _outcomes
+    record = _outcomes(_repo_root()).get(args.outcome_review_id)
+    if not record:
+        _emit({"ok": False, "error_code": "OUTCOME_REVIEW_NOT_FOUND"})
+        return EXIT_REJECT
+    _emit(record.to_dict())
+    return EXIT_OK
+
+
+def _cmd_record_portfolio_consent(args: argparse.Namespace) -> int:
+    from .hvs_customer_outcome_service import record_portfolio_consent
+    return _customer_success_result(record_portfolio_consent(outcome_review_id=args.outcome_review_id, customer_reference=args.customer_reference, consent_status=args.consent_status, consent_scope=args.consent_scope, allowed_artifact_references=_split_csv(args.allowed_artifact_references), allowed_formats=_split_csv(args.allowed_formats), allowed_usage_contexts=_split_csv(args.allowed_usage_contexts), brand_name_usage=args.brand_name_usage, logo_usage=args.logo_usage, customer_name_usage=args.customer_name_usage, performance_metric_usage=args.performance_metric_usage, anonymization_required=args.anonymization_required, anonymization_rules=_split_csv(args.anonymization_rules), attribution_requirement=args.attribution_requirement, valid_from=args.valid_from or _now_iso(), expires_at=args.expires_at, recorded_by_operator_id=args.recorded_by_operator_id, consent_basis=args.consent_basis, evidence_references=_split_csv(args.evidence_references), idempotency_key=args.idempotency_key, repo_root=_repo_root(), created_at=args.recorded_at or _now_iso()))
+
+
+def _cmd_revoke_portfolio_consent(args: argparse.Namespace) -> int:
+    return _cmd_revoke_consent(args, "PORTFOLIO")
+
+
+def _cmd_revoke_testimonial_consent(args: argparse.Namespace) -> int:
+    return _cmd_revoke_consent(args, "TESTIMONIAL")
+
+
+def _cmd_revoke_consent(args: argparse.Namespace, consent_type: str) -> int:
+    from .hvs_customer_outcome_service import revoke_consent
+    return _customer_success_result(revoke_consent(consent_type=consent_type, consent_id=args.consent_id, revoked_by_operator_id=args.revoked_by_operator_id, revocation_reason=args.revocation_reason, evidence_references=_split_csv(args.evidence_references), idempotency_key=args.idempotency_key, repo_root=_repo_root(), created_at=args.recorded_at or _now_iso()))
+
+
+def _cmd_inspect_portfolio_readiness(args: argparse.Namespace) -> int:
+    from .hvs_customer_outcome_service import portfolio_readiness
+    _emit(portfolio_readiness(portfolio_consent_id=args.portfolio_consent_id, repo_root=_repo_root(), as_of=args.as_of))
+    return EXIT_OK
+
+
+def _cmd_record_testimonial_consent(args: argparse.Namespace) -> int:
+    from .hvs_customer_outcome_service import record_testimonial_consent
+    return _customer_success_result(record_testimonial_consent(outcome_review_id=args.outcome_review_id, customer_reference=args.customer_reference, testimonial_reference=args.testimonial_reference, testimonial_text_hash=args.testimonial_text_hash, testimonial_text_preview=args.testimonial_text_preview, consent_status=args.consent_status, approved_usage_contexts=_split_csv(args.approved_usage_contexts), approved_edits=_split_csv(args.approved_edits), attribution_name=args.attribution_name, attribution_role=args.attribution_role, attribution_company=args.attribution_company, anonymization_required=args.anonymization_required, valid_from=args.valid_from or _now_iso(), expires_at=args.expires_at, recorded_by_operator_id=args.recorded_by_operator_id, consent_basis=args.consent_basis, evidence_references=_split_csv(args.evidence_references), idempotency_key=args.idempotency_key, repo_root=_repo_root(), created_at=args.recorded_at or _now_iso()))
+
+
+def _cmd_inspect_testimonial_readiness(args: argparse.Namespace) -> int:
+    from .hvs_customer_outcome_service import testimonial_readiness
+    _emit(testimonial_readiness(testimonial_consent_id=args.testimonial_consent_id, testimonial_text_hash=args.testimonial_text_hash, requested_edit=args.requested_edit, repo_root=_repo_root(), as_of=args.as_of))
+    return EXIT_OK
+
+
+def _cmd_create_opportunity(args: argparse.Namespace) -> int:
+    from .hvs_customer_outcome_service import create_opportunity
+    return _customer_success_result(create_opportunity(opportunity_type=args.opportunity_type, commercial_closure_id=args.commercial_closure_id, outcome_review_id=args.outcome_review_id, customer_reference=args.customer_reference, opportunity_summary=args.opportunity_summary, confidence_level=int(args.confidence_level), urgency=args.urgency, created_by_operator_id=args.created_by_operator_id, source_issue_ids=_split_csv(args.source_issue_ids), source_evidence_references=_split_csv(args.source_evidence_references), recommended_offer=args.recommended_offer, estimated_value=args.estimated_value, currency=args.currency, target_follow_up_date=args.target_follow_up_date, assigned_operator_id=args.assigned_operator_id, idempotency_key=args.idempotency_key, repo_root=_repo_root(), created_at=args.recorded_at or _now_iso()))
+
+
+def _cmd_qualify_opportunity(args: argparse.Namespace) -> int:
+    from .hvs_customer_outcome_service import qualify_opportunity
+    return _customer_success_result(qualify_opportunity(opportunity_id=args.opportunity_id, status=args.status, confirmed_by_operator_id=args.confirmed_by_operator_id, reason=args.reason, operator_confirmation=args.operator_confirmation, idempotency_key=args.idempotency_key, repo_root=_repo_root(), created_at=args.recorded_at or _now_iso()))
+
+
+def _cmd_inspect_opportunity(args: argparse.Namespace) -> int:
+    from .hvs_customer_outcome_service import opportunity_readiness
+    _emit(opportunity_readiness(opportunity_id=args.opportunity_id, repo_root=_repo_root()))
+    return EXIT_OK
+
+
+def _cmd_evaluate_opportunity_priority(args: argparse.Namespace) -> int:
+    from .hvs_customer_outcome_service import evaluate_opportunity_priority
+    try:
+        inputs = json.loads(args.inputs_json)
+        if not isinstance(inputs, dict):
+            raise ValueError("priority inputs must be a JSON object")
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise _CliError("INVALID_ARGUMENTS", str(exc)) from exc
+    _emit(evaluate_opportunity_priority(**inputs))
+    return EXIT_OK
+
+
+def _cmd_list_manual_follow_up_queue(args: argparse.Namespace) -> int:
+    from .hvs_customer_outcome_service import list_manual_follow_up_queue
+    _emit({"items": list_manual_follow_up_queue(repo_root=_repo_root(), as_of=args.as_of), "automation_allowed": False})
+    return EXIT_OK
+
+
+def _cmd_inspect_customer_success_lineage(args: argparse.Namespace) -> int:
+    from .hvs_customer_outcome_service import inspect_customer_success_lineage
+    _emit(inspect_customer_success_lineage(project_id=args.project_id, repo_root=_repo_root()))
+    return EXIT_OK
 
 
 def _repo_root() -> Path:

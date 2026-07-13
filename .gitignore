@@ -67,3 +67,5 @@ project_audit/
 .claude/
 .codex/
 .continue/
+.pytest-tmp-stage8h/
+.pytest-tmp-stage8h-*/
