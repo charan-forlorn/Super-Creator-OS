@@ -265,6 +265,73 @@ Result:
 * exit code 0
 * duration: 371.56s / 6:11
 
+## Stage 8K.1 corrective certification addendum
+
+Stage 8K.1 audited the committed Stage 8K implementation at `4e7be0e9d195fa2b6757ac0007c94a262a94d71f` against the 363 mandatory engagement-activation kickoff requirements supplied for final certification.
+
+The audit found one production defect:
+
+* A replay of `create_engagement_activation` with the same acceptance ID but changed activation creation semantics, such as target schedule, was incorrectly treated as an idempotent duplicate because the existing activation was returned before comparing the requested semantic content.
+
+Corrective action:
+
+* `create_engagement_activation` now compares an immutable creation fingerprint when an activation ID already exists.
+* Same creation semantics remain idempotent even after later payment, customer-input, readiness, approval, or authorization events mutate the current activation record.
+* Changed creation semantics now return `ACTIVATION_CONFLICT` and write no additional Stage 8K success event.
+
+Additional Stage 8K.1 focused coverage was added for:
+
+* all acceptance/proposal/handoff/presentation/decision lineage blocker paths and no-side-effect behavior
+* conflicting activation replay versus legitimate idempotent replay
+* optional schedule handling, date validation, bounded text validation, and Unicode preservation
+* payment/deposit readiness mismatch, unsafe evidence/provider/card/bank inputs, finite decimal enforcement, and currency/date checks
+* all implemented customer-input requirement types, alias normalization, unsupported requirement rejection, and multi-input readiness blocking
+* terminal rejected, cancelled, and expired activation authorization blocking
+* authorization lineage, approval-event preservation, and no automation side effects
+* append-only store behavior, duplicate event IDs, unknown schema/type rejection, path traversal rejection, malformed JSON rejection, and Unicode preservation
+* CLI error branches, usage errors, terminal decisions, and secret-free output
+* static no-network/no-HVS/no-render/no-upload/no-publish boundaries
+
+Stage 8K.1 requirement coverage matrix:
+
+| Requirement category | IDs | Count | Stage 8K.1 disposition |
+| --- | ---: | ---: | --- |
+| A - Acceptance eligibility | 1-27 | 27 | Covered |
+| B - Activation creation | 28-54 | 27 | Covered |
+| C - Commercial terms | 55-75 | 21 | Covered |
+| D - Payment/deposit readiness | 76-108 | 33 | Covered |
+| E - Customer inputs | 109-149 | 41 | Covered for implemented Stage 8K input contract; prompt-only unsupported aliases are explicitly rejected |
+| F - Schedule | 150-164 | 15 | Covered |
+| G - Readiness | 165-196 | 32 | Covered |
+| H - Transitions | 197-227 | 31 | Covered |
+| I - Authorization | 228-265 | 38 | Covered |
+| J - Store/audit | 266-288 | 23 | Covered |
+| K - Static security | 289-313 | 25 | Covered |
+| L - CLI | 314-349 | 36 | Covered |
+| M - Regression and certification | 350-363 | 14 | Covered |
+
+Stage 8K.1 verification evidence:
+
+* Focused Stage 8K.1: `.venv\Scripts\python.exe -m pytest scos/control_center/tests/test_hvs_engagement_activation_kickoff.py -q -rA --basetemp .stage8k1_focus_temp -o cache_dir=.stage8k1_focus_cache` - 95 passed, 0 failed, exit code 0.
+* Stage 7-8K regression: `.venv\Scripts\python.exe -m pytest scos/control_center/tests/test_stage7_closure_gate.py scos/control_center/tests/test_hvs_delivery_closure.py scos/control_center/tests/test_hvs_delivery_approval.py scos/control_center/tests/test_hvs_customer_receipt_evidence.py scos/control_center/tests/test_hvs_invoice_payment_follow_up.py scos/control_center/tests/test_hvs_delivery_version_lineage.py scos/control_center/tests/test_hvs_revision_rerender_contract.py scos/control_center/tests/test_hvs_rerender_dispatch.py scos/control_center/tests/test_hvs_rerender_result_reconciliation.py scos/control_center/tests/test_hvs_revised_delivery_release_authorization.py scos/control_center/tests/test_hvs_manual_release_receipt_authorization.py scos/control_center/tests/test_hvs_post_delivery_support_authorization.py scos/control_center/tests/test_hvs_revenue_audit_summary.py scos/control_center/tests/test_hvs_customer_outcome_consent_opportunity.py scos/control_center/tests/test_hvs_commercial_proposal_handoff.py scos/control_center/tests/test_hvs_commercial_acceptance_gate.py scos/control_center/tests/test_hvs_engagement_activation_kickoff.py -q -rA --basetemp .stage8k1_reg_temp -o cache_dir=.stage8k1_reg_cache` - 446 passed, 0 failed, exit code 0.
+* Smoke: `.venv\Scripts\python.exe scripts/test_smoke.py` - 16 passed, 0 failed, `SMOKE: PASS`.
+* Security: `.venv\Scripts\python.exe scripts/security_scan_baseline.py` - 463 files scanned, 0 findings, `SECURITY SCAN: PASS`.
+* Collection: `.venv\Scripts\python.exe -m pytest --collect-only -q --basetemp .stage8k1_collect_temp -o cache_dir=.stage8k1_collect_cache` - 1,747 tests collected, 0 collection errors.
+* Full suite: `.venv\Scripts\python.exe -m pytest -q -rA --basetemp .stage8k1_full_temp -o cache_dir=.stage8k1_full_cache` - 1,746 passed, 1 skipped, 0 failed.
+
+Stage 8K.1 static boundary evidence:
+
+* `rg -n "subprocess|shell=True|os.system" scos/control_center --glob "hvs_engagement_activation*.py"`: no matches.
+* `rg -n "requests|urllib|httpx|socket|smtplib|webhook|slack|stripe" scos/control_center --glob "hvs_engagement_activation*.py"`: no matches.
+* `rg -n "import hvs|from hvs|python -m hvs|hvs.cli" scos/control_center --glob "hvs_engagement_activation*.py"`: no matches.
+* `rg -n "shutil.copy|copyfile|copy2|render|upload|publish" scos/control_center --glob "hvs_engagement_activation*.py"`: only inert `render_started` safety fields/guards; no render, upload, publish, copy, or HVS invocation path.
+
+Stage 8K.1 final corrective commit scope is limited to:
+
+* `scos/control_center/hvs_engagement_activation_service.py`
+* `scos/control_center/tests/test_hvs_engagement_activation_kickoff.py`
+* `docs/certification/SCOS-HVS-Integration-Stage-8K-engagement-activation-kickoff.md`
+
 ## Synthetic acceptance evidence
 
 Focused Stage 8K tests used synthetic test-owned runtime storage only.

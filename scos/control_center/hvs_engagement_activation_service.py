@@ -203,6 +203,44 @@ def _content_hash(activation: EngagementActivation) -> str:
     return canonical_content_hash(payload)
 
 
+def _creation_fingerprint(activation: EngagementActivation) -> str:
+    payload = activation.to_dict()
+    creation_fields = (
+        "commercial_scope_id",
+        "project_id",
+        "customer_reference",
+        "source_opportunity_id",
+        "source_proposal_preparation_id",
+        "source_proposal_content_hash",
+        "source_commercial_handoff_id",
+        "source_presentation_record_id",
+        "source_customer_decision_id",
+        "source_commercial_acceptance_id",
+        "source_delivery_lineage_id",
+        "source_delivery_record_id",
+        "source_artifact_id",
+        "source_artifact_sha256",
+        "accepted_scope_summary",
+        "accepted_deliverables",
+        "accepted_exclusions",
+        "accepted_assumptions",
+        "accepted_subtotal",
+        "accepted_discount_amount",
+        "accepted_tax_amount",
+        "accepted_total_amount",
+        "accepted_currency",
+        "accepted_payment_terms",
+        "accepted_revision_terms",
+        "target_start_date",
+        "target_completion_date",
+        "production_dependency_notes",
+        "production_risk_notes",
+        "operator_review_required",
+        "manual_project_initialization_required",
+    )
+    return canonical_content_hash({key: payload[key] for key in creation_fields})
+
+
 def _with_hash(activation: EngagementActivation, *, updated_at: str) -> EngagementActivation:
     candidate = replace(activation, updated_at=updated_at)
     return replace(candidate, deterministic_content_hash=_content_hash(candidate))
@@ -328,12 +366,6 @@ def create_engagement_activation(
         "customer_decision_id": decision.customer_decision_id,
     }
     activation_id = engagement_activation_id(identity)
-    existing = _activations(repo).get(activation_id)
-    if existing:
-        return EngagementActivationServiceResult(True, activation=existing, duplicate_of=activation_id)
-    for current in _activations(repo).values():
-        if current.source_commercial_acceptance_id == acceptance.commercial_acceptance_id:
-            return _deny("ACTIVATION_CONFLICT", "commercial acceptance already has an engagement activation", activation=current, blockers=("ACTIVATION_CONFLICT",))
     activation = EngagementActivation(
         ENGAGEMENT_ACTIVATION_SCHEMA_VERSION,
         activation_id,
@@ -389,6 +421,14 @@ def create_engagement_activation(
         recorded_at,
     )
     activation = _with_hash(activation, updated_at=recorded_at)
+    existing = _activations(repo).get(activation_id)
+    if existing:
+        if _creation_fingerprint(existing) == _creation_fingerprint(activation):
+            return EngagementActivationServiceResult(True, activation=existing, duplicate_of=activation_id)
+        return _deny("ACTIVATION_CONFLICT", "engagement activation replay conflicts with existing semantic content", activation=existing, blockers=("ACTIVATION_CONFLICT",))
+    for current in _activations(repo).values():
+        if current.source_commercial_acceptance_id == acceptance.commercial_acceptance_id:
+            return _deny("ACTIVATION_CONFLICT", "commercial acceptance already has an engagement activation", activation=current, blockers=("ACTIVATION_CONFLICT",))
     _append(repo, EVT_ENGAGEMENT_ACTIVATION_CREATED, activation.engagement_activation_id, operator, recorded_at, activation.to_dict())
     return EngagementActivationServiceResult(True, activation=activation)
 
