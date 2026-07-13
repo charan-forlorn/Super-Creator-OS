@@ -498,6 +498,173 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     recon_sup.set_defaults(func=_cmd_list_supersession_lineage)
 
+    # --- Stage 8N: approval-gated render dispatch + verified completion -----
+    n8 = sub.add_parser(
+        "dispatch-approved-hvs-render",
+        help="Run a SEPARATELY approved Stage 8N HVS render to verified "
+        "completion. Fails closed on changed asset hash, wrong project id, "
+        "missing/out-of-tree output path, or unverified artifact. "
+        "No delivery/publish/network action occurs.",
+    )
+    n8.add_argument("--project-id", required=True)
+    n8.add_argument("--render-request-id", required=True)
+    n8.add_argument("--selected-format", default="vertical")
+    n8.add_argument("--width", type=int, default=1080)
+    n8.add_argument("--height", type=int, default=1920)
+    n8.add_argument("--fps", type=int, default=30)
+    n8.add_argument("--target-duration-seconds", type=float, default=3.0)
+    n8.add_argument("--video-codec", default="h264")
+    n8.add_argument("--pixel-format", default="yuv420p")
+    n8.add_argument(
+        "--audio-requirement",
+        default="NOT_REQUIRED",
+        choices=["REQUIRED", "NOT_REQUIRED"],
+    )
+    n8.add_argument("--no-overwrite-policy", default="never")
+    n8.add_argument(
+        "--hvs-repo-root",
+        default="C:/Workspace/hermes-video-studio",
+        help="trusted HVS repo root (read-only boundary; output must resolve here)",
+    )
+    n8.add_argument("--hvs-python-executable", default=None)
+    n8.add_argument("--operator-id", required=True)
+    n8.add_argument("--recorded-at", default=None)
+    n8.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="reverify + validate approval only; never invokes the HVS render",
+    )
+    n8.set_defaults(func=_cmd_dispatch_approved_render)
+
+    # --- Stage 8N helper commands (create / evaluate / approve / inspect) ---
+
+    n8_create = sub.add_parser(
+        "create-hvs-render-request",
+        help="Create a deterministic Stage 8N render request and evaluate its "
+        "readiness against verified Stage 8M evidence. Returns the render "
+        "request id and contract hash (no render occurs).",
+    )
+    n8_create.add_argument("--project-id", required=True)
+    n8_create.add_argument("--selected-format", default="vertical")
+    n8_create.add_argument("--width", type=int, default=1080)
+    n8_create.add_argument("--height", type=int, default=1920)
+    n8_create.add_argument("--fps", type=int, default=30)
+    n8_create.add_argument("--target-duration-seconds", type=float, default=3.0)
+    n8_create.add_argument("--video-codec", default="h264")
+    n8_create.add_argument("--pixel-format", default="yuv420p")
+    n8_create.add_argument(
+        "--audio-requirement", default="NOT_REQUIRED",
+        choices=["REQUIRED", "NOT_REQUIRED"],
+    )
+    n8_create.add_argument("--no-overwrite-policy", default="never")
+    n8_create.add_argument("--intake-manifest-content-hash", default="")
+    n8_create.add_argument("--render-readiness-id", default="")
+    n8_create.add_argument("--render-readiness-content-hash", default="")
+    n8_create.add_argument("--operator-id", required=True)
+    n8_create.add_argument("--recorded-at", default=None)
+    n8_create.set_defaults(func=_cmd_create_hvs_render_request)
+
+    n8_eval = sub.add_parser(
+        "evaluate-hvs-render-request-readiness",
+        help="Re-evaluate an existing Stage 8N render request against current "
+        "Stage 8M readiness (read-only).",
+    )
+    n8_eval.add_argument("--project-id", required=True)
+    n8_eval.add_argument("--selected-format", default="vertical")
+    n8_eval.add_argument("--width", type=int, default=1080)
+    n8_eval.add_argument("--height", type=int, default=1920)
+    n8_eval.add_argument("--fps", type=int, default=30)
+    n8_eval.add_argument("--target-duration-seconds", type=float, default=3.0)
+    n8_eval.add_argument("--video-codec", default="h264")
+    n8_eval.add_argument("--pixel-format", default="yuv420p")
+    n8_eval.add_argument(
+        "--audio-requirement", default="NOT_REQUIRED",
+        choices=["REQUIRED", "NOT_REQUIRED"],
+    )
+    n8_eval.add_argument("--no-overwrite-policy", default="never")
+    n8_eval.add_argument("--intake-manifest-content-hash", default="")
+    n8_eval.add_argument("--render-readiness-id", default="")
+    n8_eval.add_argument("--render-readiness-content-hash", default="")
+    n8_eval.add_argument("--operator-id", required=True)
+    n8_eval.add_argument("--recorded-at", default=None)
+    n8_eval.set_defaults(func=_cmd_create_hvs_render_request)
+
+    n8_inspect = sub.add_parser(
+        "inspect-hvs-render-request",
+        help="Inspect a Stage 8N render request (read-only).",
+    )
+    n8_inspect.add_argument("--render-request-id", required=True)
+    n8_inspect.set_defaults(func=_cmd_inspect_hvs_render_request)
+
+    n8_decide = sub.add_parser(
+        "decide-hvs-render",
+        help="Approve or reject a Stage 8N render. Approval is SEPARATE from "
+        "Stage 8M materialization approval and binds the exact render-contract "
+        "hash. Reject requires a reason.",
+    )
+    n8_decide.add_argument("--project-id", required=True)
+    n8_decide.add_argument("--render-request-id", required=True)
+    n8_decide.add_argument("--render-contract-hash", required=True)
+    n8_decide.add_argument("--intake-manifest-content-hash", default="")
+    n8_decide.add_argument("--render-readiness-id", default="")
+    n8_decide.add_argument("--render-readiness-content-hash", default="")
+    n8_decide.add_argument("--operator-id", required=True)
+    n8_decide.add_argument("--recorded-at", default=None)
+    n8_decide.add_argument("--render-confirmation", action="store_true")
+    n8_decide.add_argument("--non-delivery-acknowledgement", action="store_true")
+    n8_decide.add_argument("--reject", action="store_true")
+    n8_decide.add_argument("--rejection-reason", default="")
+    n8_decide.set_defaults(func=_cmd_decide_hvs_render)
+
+    n8_verify = sub.add_parser(
+        "verify-hvs-render-artifact",
+        help="Independently SHA-256 + FFprobe verify a render artifact against "
+        "the approved contract (read-only; no render).",
+    )
+    n8_verify.add_argument("--hvs-repo-root", default="C:/Workspace/hermes-video-studio")
+    n8_verify.add_argument("--project-id", required=True)
+    n8_verify.add_argument("--render-request-id", required=True)
+    n8_verify.add_argument("--render-approval-id", default="")
+    n8_verify.add_argument("--dispatch-id", default="")
+    n8_verify.add_argument("--hvs-render-id", default="")
+    n8_verify.add_argument("--output-relative-path", required=True)
+    n8_verify.add_argument("--selected-format", default="vertical")
+    n8_verify.add_argument("--width", type=int, default=1080)
+    n8_verify.add_argument("--height", type=int, default=1920)
+    n8_verify.add_argument("--fps", type=int, default=30)
+    n8_verify.add_argument("--target-duration-seconds", type=float, default=3.0)
+    n8_verify.add_argument("--video-codec", default="h264")
+    n8_verify.add_argument("--pixel-format", default="yuv420p")
+    n8_verify.add_argument(
+        "--audio-requirement", default="NOT_REQUIRED",
+        choices=["REQUIRED", "NOT_REQUIRED"],
+    )
+    n8_verify.add_argument("--no-overwrite-policy", default="never")
+    n8_verify.add_argument("--operator-id", required=True)
+    n8_verify.add_argument("--recorded-at", default=None)
+    n8_verify.set_defaults(func=_cmd_verify_hvs_render_artifact)
+
+    n8_exec = sub.add_parser(
+        "inspect-hvs-render-execution",
+        help="Inspect Stage 8N dispatch / execution events (read-only).",
+    )
+    n8_exec.add_argument("--render-request-id", required=True)
+    n8_exec.set_defaults(func=_cmd_inspect_hvs_render_execution)
+
+    n8_complete = sub.add_parser(
+        "inspect-hvs-render-completion",
+        help="Inspect Stage 8N completion evidence (read-only).",
+    )
+    n8_complete.add_argument("--render-request-id", required=True)
+    n8_complete.set_defaults(func=_cmd_inspect_hvs_render_completion)
+
+    n8_recover = sub.add_parser(
+        "list-hvs-render-recovery-queue",
+        help="List failed / partial / blocked Stage 8N render requests "
+        "(read-only).",
+    )
+    n8_recover.set_defaults(func=_cmd_list_hvs_render_recovery_queue)
+
     # --- Stage 8E: revised-delivery acceptance, release authorization, and
     #     final revision closure (evidence only; no HVS / outbound transport) --
     acc8e = sub.add_parser(
@@ -2196,6 +2363,12 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _now_date() -> str:
+    from datetime import date
+
+    return date.today().isoformat()
+
+
 def _cmd_inspect(args: argparse.Namespace) -> int:
     command = COMMNAD_NAME
     _reject_url(args.evidence_path)
@@ -2732,6 +2905,148 @@ def _cmd_list_revised_delivery_lineage(args: argparse.Namespace) -> int:
         "revised_deliveries": [r.to_dict() for r in records],
     })
     return EXIT_OK
+
+
+def _cmd_dispatch_approved_render(args: argparse.Namespace) -> int:
+    from .hvs_render_completion_service import dispatch_approved_render
+
+    outcome = dispatch_approved_render(
+        repo_root=_repo_root(),
+        hvs_repo_root=args.hvs_repo_root,
+        hvs_python_executable=args.hvs_python_executable or sys.executable,
+        project_id=args.project_id,
+        render_request_id=args.render_request_id,
+        readiness_binding=None,  # reconstructed internally from Stage 8M evidence
+        selected_format=args.selected_format,
+        width=args.width,
+        height=args.height,
+        fps=args.fps,
+        target_duration_seconds=args.target_duration_seconds,
+        video_codec=args.video_codec,
+        pixel_format=args.pixel_format,
+        audio_requirement=args.audio_requirement,
+        no_overwrite_policy=args.no_overwrite_policy,
+        operator_id=args.operator_id,
+        recorded_at=args.recorded_at or _now_date(),
+        dry_run=args.dry_run,
+    )
+    _emit(outcome)
+    return EXIT_OK if outcome.get("ok") else EXIT_REJECT
+
+
+def _cmd_create_hvs_render_request(args: argparse.Namespace) -> int:
+    from .hvs_render_completion_service import evaluate_render_request_readiness
+
+    outcome = evaluate_render_request_readiness(
+        repo_root=_repo_root(),
+        project_id=args.project_id,
+        selected_format=args.selected_format,
+        width=args.width,
+        height=args.height,
+        fps=args.fps,
+        target_duration_seconds=args.target_duration_seconds,
+        video_codec=args.video_codec,
+        pixel_format=args.pixel_format,
+        audio_requirement=args.audio_requirement,
+        no_overwrite_policy=args.no_overwrite_policy,
+        operator_id=args.operator_id,
+        recorded_at=args.recorded_at or _now_date(),
+    )
+    _emit(outcome)
+    return EXIT_OK if outcome.get("ok") else EXIT_REJECT
+
+
+def _cmd_inspect_hvs_render_request(args: argparse.Namespace) -> int:
+    from .hvs_render_completion_service import inspect_render_request
+
+    outcome = inspect_render_request(repo_root=_repo_root(), render_request_id=args.render_request_id)
+    _emit(outcome)
+    return EXIT_OK if outcome.get("ok") else EXIT_REJECT
+
+
+def _cmd_decide_hvs_render(args: argparse.Namespace) -> int:
+    from .hvs_render_completion_service import approve_render, reject_render
+
+    if getattr(args, "reject", False):
+        outcome = reject_render(
+            repo_root=_repo_root(),
+            project_id=args.project_id,
+            render_request_id=args.render_request_id,
+            operator_id=args.operator_id,
+            rejection_reason=args.rejection_reason,
+            recorded_at=args.recorded_at or _now_iso(),
+        )
+        _emit(outcome)
+        return EXIT_OK if outcome.get("ok") else EXIT_REJECT
+
+    outcome = approve_render(
+        repo_root=_repo_root(),
+        project_id=args.project_id,
+        render_request_id=args.render_request_id,
+        render_contract_hash=args.render_contract_hash,
+        intake_manifest_content_hash=args.intake_manifest_content_hash,
+        render_readiness_id=args.render_readiness_id,
+        render_readiness_content_hash=args.render_readiness_content_hash,
+        operator_id=args.operator_id,
+        recorded_at=args.recorded_at or _now_date(),
+        explicit_render_confirmation=bool(args.render_confirmation),
+        explicit_non_delivery_acknowledgement=bool(args.non_delivery_acknowledgement),
+    )
+    _emit(outcome)
+    return EXIT_OK if outcome.get("ok") else EXIT_REJECT
+
+
+def _cmd_verify_hvs_render_artifact(args: argparse.Namespace) -> int:
+    from .hvs_render_completion_service import verify_render_artifact
+
+    result = verify_render_artifact(
+        repo_root=_repo_root(),
+        hvs_repo_root=args.hvs_repo_root,
+        project_id=args.project_id,
+        render_request_id=args.render_request_id,
+        render_approval_id=args.render_approval_id,
+        dispatch_id=args.dispatch_id,
+        hvs_render_id=args.hvs_render_id,
+        output_relative_path=args.output_relative_path,
+        selected_format=args.selected_format,
+        width=args.width,
+        height=args.height,
+        fps=args.fps,
+        target_duration_seconds=args.target_duration_seconds,
+        video_codec=args.video_codec,
+        pixel_format=args.pixel_format,
+        audio_requirement=args.audio_requirement,
+        no_overwrite_policy=args.no_overwrite_policy,
+        operator_id=args.operator_id,
+        recorded_at=args.recorded_at or _now_date(),
+    )
+    _emit(result)
+    verified = bool(result.get("verification", {}).get("artifact_verified"))
+    return EXIT_OK if verified else EXIT_REJECT
+
+
+def _cmd_inspect_hvs_render_execution(args: argparse.Namespace) -> int:
+    from .hvs_render_completion_service import inspect_render_execution
+
+    outcome = inspect_render_execution(repo_root=_repo_root(), render_request_id=args.render_request_id)
+    _emit(outcome)
+    return EXIT_OK if outcome.get("ok") else EXIT_REJECT
+
+
+def _cmd_inspect_hvs_render_completion(args: argparse.Namespace) -> int:
+    from .hvs_render_completion_service import inspect_render_completion
+
+    outcome = inspect_render_completion(repo_root=_repo_root(), render_request_id=args.render_request_id)
+    _emit(outcome)
+    return EXIT_OK if outcome.get("ok") else EXIT_REJECT
+
+
+def _cmd_list_hvs_render_recovery_queue(args: argparse.Namespace) -> int:
+    from .hvs_render_completion_service import list_render_recovery_queue
+
+    outcome = list_render_recovery_queue(repo_root=_repo_root())
+    _emit(outcome)
+    return EXIT_OK if outcome.get("ok") else EXIT_REJECT
 
 
 def _cmd_list_supersession_lineage(args: argparse.Namespace) -> int:

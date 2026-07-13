@@ -204,6 +204,15 @@ _CONTROL_CENTER_SUBPROCESS_ALLOWLIST = {
     # hvs_adapter.py / hvs_render_dispatch.py; no render, no network, no
     # shell interpolation. Added alongside Stage 8M implementation.
     "scos/control_center/hvs_production_asset_service.py",
+    # Stage 8N approval-gated render dispatch + artifact verification: drives
+    # the EXISTING HVS `render-hyperframes` boundary ONLY via
+    # subprocess.run(list, shell=False, fixed executable, fixed cwd,
+    # bounded timeout, no caller-controlled fragments). FFprobe is also argv
+    # list + shell=False + JSON output. Same safe pattern as
+    # hvs_adapter.py / hvs_render_dispatch.py / hvs_production_asset_service.py;
+    # no render inference from exit code, no network, no shell interpolation.
+    # Added alongside the Stage 8N implementation.
+    "scos/control_center/hvs_render_completion_service.py",
     "scripts/security_scan_baseline.py",
 }
 _FRONTEND_FORBIDDEN_TOKENS = (
