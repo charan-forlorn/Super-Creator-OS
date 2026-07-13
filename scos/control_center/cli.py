@@ -1019,6 +1019,92 @@ def _build_parser() -> argparse.ArgumentParser:
     queue8j = sub.add_parser("list-hvs-commercial-decision-queue", help="List deterministic local customer decision work.")
     queue8j.add_argument("--evaluation-date", required=True)
     queue8j.set_defaults(func=_cmd_list_hvs_commercial_decision_queue)
+
+    # --- Stage 8K: engagement activation and kickoff authorization --------
+    activation8k = sub.add_parser("create-hvs-engagement-activation", help="Create a local engagement activation from a verified Stage 8J acceptance.")
+    activation8k.add_argument("--acceptance-id", required=True)
+    activation8k.add_argument("--operator-id", required=True)
+    activation8k.add_argument("--target-start-date", default=None)
+    activation8k.add_argument("--target-completion-date", default=None)
+    activation8k.add_argument("--production-dependency-notes", default="")
+    activation8k.add_argument("--production-risk-notes", default="")
+    activation8k.add_argument("--recorded-at", required=True)
+    activation8k.set_defaults(func=_cmd_create_hvs_engagement_activation)
+
+    inspect_activation8k = sub.add_parser("inspect-hvs-engagement-activation", help="Inspect a local Stage 8K engagement activation.")
+    inspect_activation8k.add_argument("--engagement-id", "--engagement-activation-id", dest="engagement_activation_id", required=True)
+    inspect_activation8k.set_defaults(func=_cmd_inspect_hvs_engagement_activation)
+
+    payment_requirement8k = sub.add_parser("record-hvs-engagement-payment-requirement", help="Record explicit payment/deposit readiness requirements without processing payment.")
+    payment_requirement8k.add_argument("--engagement-id", "--engagement-activation-id", dest="engagement_activation_id", required=True)
+    payment_requirement8k.add_argument("--payment-start-requirement", required=True)
+    payment_requirement8k.add_argument("--operator-id", required=True)
+    payment_requirement8k.add_argument("--required-payment-amount", default=None)
+    payment_requirement8k.add_argument("--required-payment-currency", default=None)
+    payment_requirement8k.add_argument("--recorded-at", required=True)
+    payment_requirement8k.set_defaults(func=_cmd_record_hvs_engagement_payment_requirement)
+
+    payment_ready8k = sub.add_parser("confirm-hvs-engagement-payment-readiness", help="Record operator-confirmed payment readiness evidence without provider access.")
+    payment_ready8k.add_argument("--engagement-id", "--engagement-activation-id", dest="engagement_activation_id", required=True)
+    payment_ready8k.add_argument("--operator-id", required=True)
+    payment_ready8k.add_argument("--evidence-reference", required=True)
+    payment_ready8k.add_argument("--confirmed-amount", required=True)
+    payment_ready8k.add_argument("--confirmed-currency", required=True)
+    payment_ready8k.add_argument("--confirmation-date", required=True)
+    payment_ready8k.add_argument("--recorded-at", required=True)
+    payment_ready8k.set_defaults(func=_cmd_confirm_hvs_engagement_payment_readiness)
+
+    input8k = sub.add_parser("add-hvs-engagement-customer-input", help="Add an explicit customer-input requirement for activation readiness.")
+    input8k.add_argument("--engagement-id", "--engagement-activation-id", dest="engagement_activation_id", required=True)
+    input8k.add_argument("--requirement-type", required=True)
+    input8k.add_argument("--description", required=True)
+    input8k.add_argument("--operator-id", required=True)
+    input8k.add_argument("--optional", action="store_true")
+    input8k.add_argument("--recorded-at", required=True)
+    input8k.set_defaults(func=_cmd_add_hvs_engagement_customer_input)
+
+    input_confirm8k = sub.add_parser("confirm-hvs-engagement-customer-input", help="Confirm an explicit customer-input requirement using safe local evidence.")
+    input_confirm8k.add_argument("--engagement-id", "--engagement-activation-id", dest="engagement_activation_id", required=True)
+    input_confirm8k.add_argument("--input-requirement-id", dest="customer_input_requirement_id", required=True)
+    input_confirm8k.add_argument("--operator-id", required=True)
+    input_confirm8k.add_argument("--evidence-reference", required=True)
+    input_confirm8k.add_argument("--confirmation-date", required=True)
+    input_confirm8k.add_argument("--recorded-at", required=True)
+    input_confirm8k.set_defaults(func=_cmd_confirm_hvs_engagement_customer_input)
+
+    readiness8k = sub.add_parser("evaluate-hvs-engagement-readiness", help="Evaluate production kickoff readiness without mutating records.")
+    readiness8k.add_argument("--engagement-id", "--engagement-activation-id", dest="engagement_activation_id", required=True)
+    readiness8k.add_argument("--evaluation-date", required=True)
+    readiness8k.set_defaults(func=_cmd_evaluate_hvs_engagement_readiness)
+
+    review8k = sub.add_parser("request-hvs-engagement-production-review", help="Move a ready activation to internal production review.")
+    review8k.add_argument("--engagement-id", "--engagement-activation-id", dest="engagement_activation_id", required=True)
+    review8k.add_argument("--operator-id", required=True)
+    review8k.add_argument("--evaluation-date", required=True)
+    review8k.add_argument("--recorded-at", required=True)
+    review8k.set_defaults(func=_cmd_request_hvs_engagement_production_review)
+
+    decision8k = sub.add_parser("decide-hvs-engagement-activation", help="Approve, reject, or cancel a reviewed engagement activation.")
+    decision8k.add_argument("--engagement-id", "--engagement-activation-id", dest="engagement_activation_id", required=True)
+    decision8k.add_argument("--decision", required=True, choices=["approve", "reject", "cancel", "APPROVE_PROJECT_INITIALIZATION", "REJECT_PROJECT_INITIALIZATION", "CANCEL_ACTIVATION"])
+    decision8k.add_argument("--operator-id", required=True)
+    decision8k.add_argument("--reason", default=None)
+    decision8k.add_argument("--recorded-at", required=True)
+    decision8k.set_defaults(func=_cmd_decide_hvs_engagement_activation)
+
+    authorization8k = sub.add_parser("create-hvs-production-kickoff-authorization", help="Create a local authorization package for future human-controlled project initialization.")
+    authorization8k.add_argument("--engagement-id", "--engagement-activation-id", dest="engagement_activation_id", required=True)
+    authorization8k.add_argument("--operator-id", required=True)
+    authorization8k.add_argument("--recorded-at", required=True)
+    authorization8k.set_defaults(func=_cmd_create_hvs_production_kickoff_authorization)
+
+    inspect_authorization8k = sub.add_parser("inspect-hvs-production-kickoff-authorization", help="Inspect a local Stage 8K kickoff authorization.")
+    inspect_authorization8k.add_argument("--authorization-id", dest="production_kickoff_authorization_id", required=True)
+    inspect_authorization8k.set_defaults(func=_cmd_inspect_hvs_production_kickoff_authorization)
+
+    queue8k = sub.add_parser("list-hvs-engagement-activation-queue", help="List deterministic local engagement activation review work.")
+    queue8k.add_argument("--evaluation-date", required=True)
+    queue8k.set_defaults(func=_cmd_list_hvs_engagement_activation_queue)
     return parser
 
 
@@ -1509,6 +1595,146 @@ def _cmd_list_hvs_commercial_decision_queue(args: argparse.Namespace) -> int:
     from .hvs_commercial_acceptance_service import list_commercial_decision_queue
 
     _emit({"items": list_commercial_decision_queue(repo_root=_repo_root(), evaluation_date=args.evaluation_date), "automation_allowed": False})
+    return EXIT_OK
+
+
+def _engagement_activation_result(outcome: Any) -> int:
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_create_hvs_engagement_activation(args: argparse.Namespace) -> int:
+    from .hvs_engagement_activation_service import create_engagement_activation
+
+    return _engagement_activation_result(create_engagement_activation(
+        commercial_acceptance_id=args.acceptance_id,
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at,
+        target_start_date=args.target_start_date,
+        target_completion_date=args.target_completion_date,
+        production_dependency_notes=_split_csv(args.production_dependency_notes),
+        production_risk_notes=_split_csv(args.production_risk_notes),
+    ))
+
+
+def _cmd_inspect_hvs_engagement_activation(args: argparse.Namespace) -> int:
+    from .hvs_engagement_activation_service import inspect_engagement_activation
+
+    return _engagement_activation_result(inspect_engagement_activation(engagement_activation_id=args.engagement_activation_id, repo_root=_repo_root()))
+
+
+def _cmd_record_hvs_engagement_payment_requirement(args: argparse.Namespace) -> int:
+    from .hvs_engagement_activation_service import record_payment_start_requirement
+
+    return _engagement_activation_result(record_payment_start_requirement(
+        engagement_activation_id=args.engagement_activation_id,
+        payment_start_requirement=args.payment_start_requirement,
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at,
+        required_payment_amount=args.required_payment_amount,
+        required_payment_currency=args.required_payment_currency,
+    ))
+
+
+def _cmd_confirm_hvs_engagement_payment_readiness(args: argparse.Namespace) -> int:
+    from .hvs_engagement_activation_service import confirm_payment_readiness
+
+    return _engagement_activation_result(confirm_payment_readiness(
+        engagement_activation_id=args.engagement_activation_id,
+        operator_id=args.operator_id,
+        evidence_reference=args.evidence_reference,
+        confirmed_amount=args.confirmed_amount,
+        confirmed_currency=args.confirmed_currency,
+        confirmation_date=args.confirmation_date,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at,
+    ))
+
+
+def _cmd_add_hvs_engagement_customer_input(args: argparse.Namespace) -> int:
+    from .hvs_engagement_activation_service import add_customer_input_requirement
+
+    return _engagement_activation_result(add_customer_input_requirement(
+        engagement_activation_id=args.engagement_activation_id,
+        requirement_type=args.requirement_type,
+        description=args.description,
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at,
+        required=not args.optional,
+    ))
+
+
+def _cmd_confirm_hvs_engagement_customer_input(args: argparse.Namespace) -> int:
+    from .hvs_engagement_activation_service import confirm_customer_input_requirement
+
+    return _engagement_activation_result(confirm_customer_input_requirement(
+        engagement_activation_id=args.engagement_activation_id,
+        customer_input_requirement_id=args.customer_input_requirement_id,
+        operator_id=args.operator_id,
+        evidence_reference=args.evidence_reference,
+        confirmation_date=args.confirmation_date,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at,
+    ))
+
+
+def _cmd_evaluate_hvs_engagement_readiness(args: argparse.Namespace) -> int:
+    from .hvs_engagement_activation_service import evaluate_engagement_readiness
+
+    readiness = evaluate_engagement_readiness(engagement_activation_id=args.engagement_activation_id, repo_root=_repo_root(), evaluation_date=args.evaluation_date)
+    _emit(readiness.to_dict())
+    return EXIT_OK if readiness.readiness_status == "READY" else EXIT_REJECT
+
+
+def _cmd_request_hvs_engagement_production_review(args: argparse.Namespace) -> int:
+    from .hvs_engagement_activation_service import request_production_review
+
+    return _engagement_activation_result(request_production_review(
+        engagement_activation_id=args.engagement_activation_id,
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at,
+        evaluation_date=args.evaluation_date,
+    ))
+
+
+def _cmd_decide_hvs_engagement_activation(args: argparse.Namespace) -> int:
+    from .hvs_engagement_activation_service import decide_engagement_activation
+
+    return _engagement_activation_result(decide_engagement_activation(
+        engagement_activation_id=args.engagement_activation_id,
+        decision=args.decision,
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at,
+        reason=args.reason,
+    ))
+
+
+def _cmd_create_hvs_production_kickoff_authorization(args: argparse.Namespace) -> int:
+    from .hvs_engagement_activation_service import create_production_kickoff_authorization
+
+    return _engagement_activation_result(create_production_kickoff_authorization(
+        engagement_activation_id=args.engagement_activation_id,
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at,
+    ))
+
+
+def _cmd_inspect_hvs_production_kickoff_authorization(args: argparse.Namespace) -> int:
+    from .hvs_engagement_activation_service import inspect_production_kickoff_authorization
+
+    return _engagement_activation_result(inspect_production_kickoff_authorization(production_kickoff_authorization_id=args.production_kickoff_authorization_id, repo_root=_repo_root()))
+
+
+def _cmd_list_hvs_engagement_activation_queue(args: argparse.Namespace) -> int:
+    from .hvs_engagement_activation_service import list_engagement_activation_queue
+
+    _emit({"items": list_engagement_activation_queue(repo_root=_repo_root(), evaluation_date=args.evaluation_date), "automation_allowed": False})
     return EXIT_OK
 
 
