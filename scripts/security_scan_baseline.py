@@ -197,6 +197,13 @@ _CONTROL_CENTER_SUBPROCESS_ALLOWLIST = {
     # executable, fixed cwd, bounded timeout, no caller-controlled fragments).
     # Pre-existing Stage 5 production code; not introduced by Stage 6.
     "scos/control_center/hvs_render_dispatch.py",
+    # Stage 8M approval-gated production-asset materialization: drives the
+    # EXISTING HVS `import-media` boundary ONLY via
+    # subprocess.run(list, shell=False, fixed executable, fixed cwd,
+    # bounded timeout, no caller-controlled fragments). Same safe pattern as
+    # hvs_adapter.py / hvs_render_dispatch.py; no render, no network, no
+    # shell interpolation. Added alongside Stage 8M implementation.
+    "scos/control_center/hvs_production_asset_service.py",
     "scripts/security_scan_baseline.py",
 }
 _FRONTEND_FORBIDDEN_TOKENS = (

@@ -1125,6 +1125,118 @@ def _build_parser() -> argparse.ArgumentParser:
 
     list8l = sub.add_parser("list-hvs-project-initialization-evidence", help="List append-only Stage 8L initialization evidence.")
     list8l.set_defaults(func=_cmd_list_hvs_project_initialization_evidence)
+
+    # --- Stage 8M: approval-gated production asset intake + materialization ----
+    s8m_reverify = sub.add_parser(
+        "reverify-stage8l", help="Reverify the certified Stage 8L HVS project for Stage 8M."
+    )
+    s8m_reverify.add_argument("--project-id", required=True)
+    s8m_reverify.add_argument("--hvs-repo-root", required=True)
+    s8m_reverify.add_argument("--hvs-python-executable", required=True)
+    s8m_reverify.add_argument("--recorded-at", required=True)
+    s8m_reverify.set_defaults(func=_cmd_reverify_stage8l)
+
+    s8m_inspect = sub.add_parser(
+        "inspect-hvs-asset-requirements", help="Inspect HVS asset requirements for a verified Stage 8L project."
+    )
+    s8m_inspect.add_argument("--project-id", required=True)
+    s8m_inspect.add_argument("--hvs-repo-root", required=True)
+    s8m_inspect.add_argument("--hvs-python-executable", required=True)
+    s8m_inspect.add_argument("--recorded-at", required=True)
+    s8m_inspect.set_defaults(func=_cmd_inspect_hvs_asset_requirements)
+
+    s8m_register = sub.add_parser(
+        "register-source-asset", help="Validate and register one approved local source asset."
+    )
+    s8m_register.add_argument("--project-id", required=True)
+    s8m_register.add_argument("--requirement-id", required=True)
+    s8m_register.add_argument("--asset-role", required=True, choices=["visual", "voice", "music"])
+    s8m_register.add_argument("--scene-id", default="")
+    s8m_register.add_argument("--source-path", required=True)
+    s8m_register.add_argument("--operator-id", required=True)
+    s8m_register.add_argument("--recorded-at", required=True)
+    s8m_register.set_defaults(func=_cmd_register_source_asset)
+
+    s8m_rights = sub.add_parser(
+        "record-rights-evidence", help="Record explicit rights/usage evidence for a source asset."
+    )
+    s8m_rights.add_argument("--source-asset-id", required=True)
+    s8m_rights.add_argument("--status", required=True,
+                            choices=["UNKNOWN", "CUSTOMER_PROVIDED_CONFIRMED", "OPERATOR_OWNED_CONFIRMED",
+                                     "LICENSED_CONFIRMED", "PUBLIC_DOMAIN_CONFIRMED", "RESTRICTED",
+                                     "EXPIRED", "REJECTED"])
+    s8m_rights.add_argument("--basis", required=True)
+    s8m_rights.add_argument("--usage-scope", required=True)
+    s8m_rights.add_argument("--evidence-reference", required=True)
+    s8m_rights.add_argument("--operator-id", required=True)
+    s8m_rights.add_argument("--restrictions", default="")
+    s8m_rights.add_argument("--expiry-date", default=None)
+    s8m_rights.add_argument("--recorded-at", required=True)
+    s8m_rights.set_defaults(func=_cmd_record_rights_evidence)
+
+    s8m_manifest = sub.add_parser(
+        "create-asset-intake-manifest", help="Create an immutable Stage 8M intake manifest (requires JSON spec)."
+    )
+    s8m_manifest.add_argument("--spec-json", required=True)
+    s8m_manifest.add_argument("--operator-id", required=True)
+    s8m_manifest.add_argument("--recorded-at", required=True)
+    s8m_manifest.set_defaults(func=_cmd_create_asset_intake_manifest)
+
+    s8m_readiness = sub.add_parser(
+        "evaluate-intake-readiness", help="Evaluate materialization readiness (read-only)."
+    )
+    s8m_readiness.add_argument("--manifest-id", required=True)
+    s8m_readiness.add_argument("--evaluation-date", required=True)
+    s8m_readiness.add_argument("--recorded-at", required=True)
+    s8m_readiness.set_defaults(func=_cmd_evaluate_intake_readiness)
+
+    s8m_approve = sub.add_parser(
+        "approve-materialization", help="Approve materialization (bound to exact manifest + hashes)."
+    )
+    s8m_approve.add_argument("--manifest-id", required=True)
+    s8m_approve.add_argument("--operator-id", required=True)
+    s8m_approve.add_argument("--recorded-at", required=True)
+    s8m_approve.add_argument("--confirm-materialization", action="store_true")
+    s8m_approve.add_argument("--ack-non-render", action="store_true")
+    s8m_approve.set_defaults(func=_cmd_approve_materialization)
+
+    s8m_materialize = sub.add_parser(
+        "materialize-assets", help="Materialize approved assets through the existing HVS boundary."
+    )
+    s8m_materialize.add_argument("--manifest-id", required=True)
+    s8m_materialize.add_argument("--approval-id", required=True)
+    s8m_materialize.add_argument("--source-map-json", required=True)
+    s8m_materialize.add_argument("--hvs-repo-root", required=True)
+    s8m_materialize.add_argument("--hvs-python-executable", required=True)
+    s8m_materialize.add_argument("--operator-id", required=True)
+    s8m_materialize.add_argument("--recorded-at", required=True)
+    s8m_materialize.set_defaults(func=_cmd_materialize_assets)
+
+    s8m_verify = sub.add_parser(
+        "verify-materialized-assets", help="Verify materialized assets (read-only HVS re-inspection)."
+    )
+    s8m_verify.add_argument("--manifest-id", required=True)
+    s8m_verify.add_argument("--execution-id", required=True)
+    s8m_verify.add_argument("--hvs-repo-root", required=True)
+    s8m_verify.add_argument("--hvs-python-executable", required=True)
+    s8m_verify.add_argument("--recorded-at", required=True)
+    s8m_verify.set_defaults(func=_cmd_verify_materialized_assets)
+
+    s8m_render_ready = sub.add_parser(
+        "evaluate-hvs-render-readiness", help="Evaluate HVS render readiness (read-only)."
+    )
+    s8m_render_ready.add_argument("--manifest-id", required=True)
+    s8m_render_ready.add_argument("--verification-id", required=True)
+    s8m_render_ready.add_argument("--hvs-repo-root", required=True)
+    s8m_render_ready.add_argument("--hvs-python-executable", required=True)
+    s8m_render_ready.add_argument("--evaluation-date", required=True)
+    s8m_render_ready.add_argument("--recorded-at", required=True)
+    s8m_render_ready.set_defaults(func=_cmd_evaluate_hvs_render_readiness)
+
+    s8m_list = sub.add_parser(
+        "list-production-asset-events", help="List append-only Stage 8M intake events."
+    )
+    s8m_list.set_defaults(func=_cmd_list_production_asset_events)
     return parser
 
 
@@ -1803,6 +1915,273 @@ def _cmd_list_hvs_project_initialization_evidence(args: argparse.Namespace) -> i
     from .hvs_project_initialization_service import list_project_initialization_evidence
 
     _emit({"items": list_project_initialization_evidence(repo_root=_repo_root()), "automation_allowed": False})
+    return EXIT_OK
+
+
+def _cmd_reverify_stage8l(args: argparse.Namespace) -> int:
+    from .hvs_production_asset_service import reverify_stage8l
+
+    record, inspect = reverify_stage8l(
+        project_id=args.project_id,
+        repo_root=_repo_root(),
+        hvs_repo_root=args.hvs_repo_root,
+        hvs_python_executable=args.hvs_python_executable,
+        recorded_at=args.recorded_at,
+    )
+    _emit(record.to_dict())
+    return EXIT_OK if record.hvs_project_exists and record.hvs_project_verified else EXIT_REJECT
+
+
+def _cmd_inspect_hvs_asset_requirements(args: argparse.Namespace) -> int:
+    from .hvs_production_asset_service import (
+        inspect_asset_requirements, reverify_stage8l,
+    )
+
+    record, inspect = reverify_stage8l(
+        project_id=args.project_id,
+        repo_root=_repo_root(),
+        hvs_repo_root=args.hvs_repo_root,
+        hvs_python_executable=args.hvs_python_executable,
+        recorded_at=args.recorded_at,
+    )
+    insp = inspect_asset_requirements(
+        project_id=args.project_id,
+        reverify=record,
+        inspect_payload=inspect,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at,
+        hvs_repo_root=args.hvs_repo_root,
+        hvs_python_executable=args.hvs_python_executable,
+    )
+    _emit(insp.to_dict())
+    return EXIT_OK if insp.materialization_eligibility else EXIT_REJECT
+
+
+def _cmd_register_source_asset(args: argparse.Namespace) -> int:
+    from .hvs_production_asset_service import register_source_asset
+
+    _reject_url(args.source_path)
+    desc, validation, err = register_source_asset(
+        repo_root=_repo_root(),
+        project_id=args.project_id,
+        requirement_id=args.requirement_id,
+        asset_role=args.asset_role,
+        scene_id=args.scene_id,
+        source_path=args.source_path,
+        operator_id=args.operator_id,
+        recorded_at=args.recorded_at,
+    )
+    if err is not None:
+        _emit(err.to_dict())
+        return EXIT_REJECT
+    _emit({"ok": True, "source_asset": desc.to_dict(), "validation": validation.to_dict()})
+    return EXIT_OK
+
+
+def _cmd_record_rights_evidence(args: argparse.Namespace) -> int:
+    from .hvs_production_asset_service import record_rights_evidence
+
+    ev = record_rights_evidence(
+        repo_root=_repo_root(),
+        source_asset_id=args.source_asset_id,
+        status=args.status,
+        basis=args.basis,
+        usage_scope=args.usage_scope,
+        evidence_reference=args.evidence_reference,
+        operator_id=args.operator_id,
+        restrictions=tuple(x for x in args.restrictions.split(",") if x),
+        expiry_date=args.expiry_date,
+        recorded_at=args.recorded_at,
+    )
+    _emit(ev.to_dict())
+    return EXIT_OK
+
+
+def _load_manifest(repo_root, manifest_id):
+    from .hvs_production_asset_store import read_manifest_contract_file
+    data = read_manifest_contract_file(repo_root=repo_root, manifest_id=manifest_id)
+    if data is None:
+        return None
+    from .hvs_production_asset_models import ProductionAssetIntakeManifest
+    return ProductionAssetIntakeManifest(**data)
+
+
+def _cmd_create_asset_intake_manifest(args: argparse.Namespace) -> int:
+    from .hvs_production_asset_service import create_intake_manifest
+    from .hvs_production_asset_models import (
+        AssetRightsEvidence, ProductionAssetBinding, ProductionAssetRequirement,
+        SourceAssetDescriptor, SourceAssetValidation, Stage8LReverificationRecord,
+        HVSAssetRequirementInspection,
+    )
+
+    _reject_url(args.spec_json)
+    spec = json.loads(Path(args.spec_json).read_text(encoding="utf-8"))
+    reverify = Stage8LReverificationRecord(**spec["reverify"])
+    inspection = HVSAssetRequirementInspection(**spec["inspection"])
+    source_assets = tuple(SourceAssetDescriptor(**s) for s in spec["source_assets"])
+    bindings = tuple(ProductionAssetBinding(**b) for b in spec["bindings"])
+    rights = tuple(AssetRightsEvidence(**r) for r in spec["rights_evidence"])
+    validations = tuple(SourceAssetValidation(**v) for v in spec["validation_evidence"])
+    manifest = create_intake_manifest(
+        repo_root=_repo_root(),
+        project_id=spec["project_id"],
+        reverify=reverify,
+        inspection=inspection,
+        source_assets=source_assets,
+        bindings=bindings,
+        rights_evidence=rights,
+        validation_evidence=validations,
+        operator_id=args.operator_id,
+        recorded_at=args.recorded_at,
+    )
+    _emit(manifest.to_dict())
+    return EXIT_OK
+
+
+def _cmd_evaluate_intake_readiness(args: argparse.Namespace) -> int:
+    from .hvs_production_asset_service import evaluate_intake_readiness
+
+    manifest = _load_manifest(_repo_root(), args.manifest_id)
+    if manifest is None:
+        _emit({"ok": False, "error_code": "MANIFEST_NOT_FOUND"})
+        return EXIT_REJECT
+    result = evaluate_intake_readiness(
+        repo_root=_repo_root(),
+        manifest=manifest,
+        evaluation_date=args.evaluation_date,
+        recorded_at=args.recorded_at,
+    )
+    _emit(result.to_dict())
+    return EXIT_OK if result.readiness_status == "READY_FOR_MATERIALIZATION_REVIEW" else EXIT_REJECT
+
+
+def _cmd_approve_materialization(args: argparse.Namespace) -> int:
+    from .hvs_production_asset_service import approve_materialization, evaluate_intake_readiness
+
+    manifest = _load_manifest(_repo_root(), args.manifest_id)
+    if manifest is None:
+        _emit({"ok": False, "error_code": "MANIFEST_NOT_FOUND"})
+        return EXIT_REJECT
+    readiness = evaluate_intake_readiness(
+        repo_root=_repo_root(), manifest=manifest,
+        evaluation_date=args.recorded_at, recorded_at=args.recorded_at,
+    )
+    appr, err = approve_materialization(
+        repo_root=_repo_root(),
+        manifest=manifest,
+        operator_id=args.operator_id,
+        recorded_at=args.recorded_at,
+        readiness=readiness,
+        explicit_materialization_confirmation=args.confirm_materialization,
+        explicit_non_render_acknowledgement=args.ack_non_render,
+    )
+    if err is not None:
+        _emit(err.to_dict())
+        return EXIT_REJECT
+    _emit(appr.to_dict())
+    return EXIT_OK
+
+
+def _cmd_materialize_assets(args: argparse.Namespace) -> int:
+    from .hvs_production_asset_service import materialize_assets
+
+    manifest = _load_manifest(_repo_root(), args.manifest_id)
+    if manifest is None:
+        _emit({"ok": False, "error_code": "MANIFEST_NOT_FOUND"})
+        return EXIT_REJECT
+    approval = _load_approval(_repo_root(), args.approval_id)
+    if approval is None:
+        _emit({"ok": False, "error_code": "APPROVAL_NOT_FOUND"})
+        return EXIT_REJECT
+    source_map = json.loads(Path(args.source_map_json).read_text(encoding="utf-8")) if str(args.source_map_json).endswith(".json") else json.loads(args.source_map_json)
+    result = materialize_assets(
+        repo_root=_repo_root(),
+        manifest=manifest,
+        approval=approval,
+        source_paths=dict(source_map),
+        hvs_repo_root=args.hvs_repo_root,
+        hvs_python_executable=args.hvs_python_executable,
+        operator_id=args.operator_id,
+        recorded_at=args.recorded_at,
+    )
+    _emit(result.to_dict())
+    return EXIT_OK if result.ok else EXIT_REJECT
+
+
+def _load_approval(repo_root, approval_id):
+    from .hvs_production_asset_store import read_asset_intake_events
+    from .hvs_production_asset_models import AssetMaterializationApproval
+    for evt in read_asset_intake_events(audit_log_path=asset_intake_path(repo_root)):
+        if evt.event_type == "MATERIALIZATION_APPROVED" and evt.record.get("approval_id") == approval_id:
+            return AssetMaterializationApproval(**evt.record)
+    return None
+
+
+def _cmd_verify_materialized_assets(args: argparse.Namespace) -> int:
+    from .hvs_production_asset_service import verify_post_materialization
+
+    manifest = _load_manifest(_repo_root(), args.manifest_id)
+    if manifest is None:
+        _emit({"ok": False, "error_code": "MANIFEST_NOT_FOUND"})
+        return EXIT_REJECT
+    # Locate the materialization result by execution_id.
+    from .hvs_production_asset_store import read_asset_intake_events
+    mat_result = None
+    for evt in read_asset_intake_events(audit_log_path=asset_intake_path(_repo_root())):
+        if evt.event_type in ("MATERIALIZATION_COMPLETED", "MATERIALIZATION_PARTIAL") and evt.record.get("execution_id") == args.execution_id:
+            from .hvs_production_asset_models import AssetMaterializationResult
+            mat_result = AssetMaterializationResult(**evt.record)
+            break
+    if mat_result is None:
+        _emit({"ok": False, "error_code": "EXECUTION_NOT_FOUND"})
+        return EXIT_REJECT
+    result = verify_post_materialization(
+        repo_root=_repo_root(),
+        manifest=manifest,
+        materialization=mat_result,
+        hvs_repo_root=args.hvs_repo_root,
+        hvs_python_executable=args.hvs_python_executable,
+        recorded_at=args.recorded_at,
+    )
+    _emit(result.to_dict())
+    return EXIT_OK if result.ok else EXIT_REJECT
+
+
+def _cmd_evaluate_hvs_render_readiness(args: argparse.Namespace) -> int:
+    from .hvs_production_asset_service import evaluate_render_readiness, verify_post_materialization
+
+    manifest = _load_manifest(_repo_root(), args.manifest_id)
+    if manifest is None:
+        _emit({"ok": False, "error_code": "MANIFEST_NOT_FOUND"})
+        return EXIT_REJECT
+    from .hvs_production_asset_store import read_asset_intake_events
+    from .hvs_production_asset_models import PostMaterializationVerification
+    post = None
+    for evt in read_asset_intake_events(audit_log_path=asset_intake_path(_repo_root())):
+        if evt.event_type in ("POST_MATERIALIZATION_VERIFIED", "POST_MATERIALIZATION_FAILED") and evt.record.get("verification_id") == args.verification_id:
+            post = PostMaterializationVerification(**evt.record)
+            break
+    if post is None:
+        _emit({"ok": False, "error_code": "VERIFICATION_NOT_FOUND"})
+        return EXIT_REJECT
+    result = evaluate_render_readiness(
+        repo_root=_repo_root(),
+        manifest=manifest,
+        post_verification=post,
+        hvs_repo_root=args.hvs_repo_root,
+        hvs_python_executable=args.hvs_python_executable,
+        evaluation_date=args.evaluation_date,
+        recorded_at=args.recorded_at,
+    )
+    _emit(result.to_dict())
+    return EXIT_OK
+
+
+def _cmd_list_production_asset_events(args: argparse.Namespace) -> int:
+    from .hvs_production_asset_store import read_asset_intake_events
+
+    items = [e.to_dict() for e in read_asset_intake_events(audit_log_path=asset_intake_path(_repo_root()))]
+    _emit({"items": items, "automation_allowed": False, "render_authorized": False})
     return EXIT_OK
 
 
