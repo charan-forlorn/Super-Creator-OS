@@ -45,6 +45,7 @@ subprocess stdout/stderr it reads back from the CLI.
 from __future__ import annotations
 
 import hashlib
+import json
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -156,6 +157,7 @@ class HVSAdapterConfig:
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
     max_output_chars: int = DEFAULT_MAX_OUTPUT_CHARS
     cli_module: str = _HVS_MODULE
+    require_repo_local_python: bool = False
 
     def __post_init__(self) -> None:
         # Normalize to strings defensively (dataclass is frozen, use object.setattr).
@@ -165,6 +167,7 @@ class HVSAdapterConfig:
         object.__setattr__(self, "cli_module", str(self.cli_module))
         object.__setattr__(self, "timeout_seconds", int(self.timeout_seconds))
         object.__setattr__(self, "max_output_chars", int(self.max_output_chars))
+        object.__setattr__(self, "require_repo_local_python", bool(self.require_repo_local_python))
 
     # --- validation ---------------------------------------------------------
     def validate(self) -> tuple[str, ...]:
@@ -202,6 +205,15 @@ class HVSAdapterConfig:
                     f"python_executable not found and not resolvable on PATH: "
                     f"{self.python_executable}"
                 )
+            if self.require_repo_local_python:
+                try:
+                    py_resolved = py.resolve()
+                    repo_resolved = repo.resolve()
+                    py_resolved.relative_to(repo_resolved)
+                except ValueError:
+                    problems.append("python_executable must be inside hvs_repo_path for mutating operations")
+                if not py.is_file():
+                    problems.append("python_executable must be an existing file for mutating operations")
 
         if self.operation not in STAGE1_READONLY_OPERATIONS:
             problems.append(
@@ -453,6 +465,137 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
         and guarantees no secret values reach the subprocess command line.
         """
         return {}
+
+    def _run_json_command(
+        self,
+        *,
+        command: str,
+        args: list[str],
+        request_id: str,
+    ) -> dict[str, Any]:
+        """Run one approved HVS JSON command through the bounded CLI boundary."""
+        if command not in {"initialize-project", "inspect-project"}:
+            return {
+                "ok": False,
+                "command": command,
+                "exit_code": None,
+                "payload": None,
+                "error_kind": "unsupported_operation",
+                "error_detail": "unsupported HVS command",
+            }
+        problems = self._config.validate()
+        if problems:
+            return {
+                "ok": False,
+                "command": command,
+                "exit_code": None,
+                "payload": None,
+                "error_kind": "invalid_configuration",
+                "error_detail": "; ".join(problems),
+            }
+        argv = [self._config.python_executable, "-m", self._config.cli_module, command, *args]
+        if any(_has_shell_metacharacter(tok) for tok in argv):
+            return {
+                "ok": False,
+                "command": command,
+                "exit_code": None,
+                "payload": None,
+                "error_kind": "unsafe_command",
+                "error_detail": "constructed argv contained a shell metacharacter",
+            }
+        cwd = Path(self._config.hvs_repo_path).resolve()
+        try:
+            proc = self._subprocess_run(
+                list(argv),
+                cwd=str(cwd),
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=self._config.timeout_seconds,
+                input="",
+                env=self._safe_env(),
+            )
+        except subprocess.TimeoutExpired:
+            return {
+                "ok": False,
+                "command": command,
+                "exit_code": None,
+                "payload": None,
+                "error_kind": "command_timeout",
+                "error_detail": f"HVS {command} exceeded timeout {self._config.timeout_seconds}s",
+            }
+        except PermissionError:
+            return {
+                "ok": False,
+                "command": command,
+                "exit_code": None,
+                "payload": None,
+                "error_kind": "permission_error",
+                "error_detail": f"could not execute HVS {command}",
+            }
+        except (OSError, ValueError) as exc:
+            return {
+                "ok": False,
+                "command": command,
+                "exit_code": None,
+                "payload": None,
+                "error_kind": "adapter_blocked",
+                "error_detail": f"HVS {command} could not start: {type(exc).__name__}",
+            }
+        stdout = (proc.stdout or "")[: self._config.max_output_chars]
+        stderr = (proc.stderr or "")[: self._config.max_output_chars]
+        try:
+            payload = json.loads(stdout)
+        except json.JSONDecodeError:
+            return {
+                "ok": False,
+                "command": command,
+                "exit_code": int(proc.returncode),
+                "payload": None,
+                "stdout_excerpt": stdout[:200],
+                "stderr_excerpt": stderr[:200],
+                "error_kind": "malformed_output",
+                "error_detail": "HVS command did not return JSON",
+            }
+        return {
+            "ok": int(proc.returncode) == 0,
+            "command": command,
+            "exit_code": int(proc.returncode),
+            "payload": payload,
+            "stdout_excerpt": stdout[:200],
+            "stderr_excerpt": stderr[:200],
+            "error_kind": None if int(proc.returncode) == 0 else "hvs_command_failed",
+            "error_detail": None if int(proc.returncode) == 0 else str(payload.get("error_detail") or stderr[:200]),
+            "request_id": request_id,
+        }
+
+    def initialize_project(
+        self,
+        *,
+        project_id: str,
+        contract_path: str,
+        expected_payload_hash: str,
+        approve_initialization: bool,
+        request_id: str,
+    ) -> dict[str, Any]:
+        args = [
+            "--project-id",
+            str(project_id),
+            "--contract-path",
+            str(contract_path),
+            "--expected-payload-hash",
+            str(expected_payload_hash),
+        ]
+        if approve_initialization:
+            args.append("--approve-initialization")
+        return self._run_json_command(command="initialize-project", args=args, request_id=request_id)
+
+    def inspect_project(self, *, project_id: str, request_id: str) -> dict[str, Any]:
+        return self._run_json_command(
+            command="inspect-project",
+            args=["--project-id", str(project_id)],
+            request_id=request_id,
+        )
 
     def _failure(
         self,

@@ -1105,6 +1105,26 @@ def _build_parser() -> argparse.ArgumentParser:
     queue8k = sub.add_parser("list-hvs-engagement-activation-queue", help="List deterministic local engagement activation review work.")
     queue8k.add_argument("--evaluation-date", required=True)
     queue8k.set_defaults(func=_cmd_list_hvs_engagement_activation_queue)
+
+    prepare8l = sub.add_parser("prepare-hvs-project-initialization", help="Prepare a deterministic Stage 8L HVS initialization contract.")
+    prepare8l.add_argument("--authorization-id", dest="production_kickoff_authorization_id", required=True)
+    prepare8l.add_argument("--production-input-json", required=True)
+    prepare8l.add_argument("--operator-id", required=True)
+    prepare8l.add_argument("--recorded-at", required=True)
+    prepare8l.set_defaults(func=_cmd_prepare_hvs_project_initialization)
+
+    initialize8l = sub.add_parser("initialize-hvs-project", help="Initialize exactly one HVS project through the certified HVS CLI.")
+    initialize8l.add_argument("--authorization-id", dest="production_kickoff_authorization_id", required=True)
+    initialize8l.add_argument("--production-input-json", required=True)
+    initialize8l.add_argument("--operator-id", required=True)
+    initialize8l.add_argument("--recorded-at", required=True)
+    initialize8l.add_argument("--hvs-repo-root", required=True)
+    initialize8l.add_argument("--hvs-python-executable", required=True)
+    initialize8l.add_argument("--approve-initialization", action="store_true")
+    initialize8l.set_defaults(func=_cmd_initialize_hvs_project)
+
+    list8l = sub.add_parser("list-hvs-project-initialization-evidence", help="List append-only Stage 8L initialization evidence.")
+    list8l.set_defaults(func=_cmd_list_hvs_project_initialization_evidence)
     return parser
 
 
@@ -1735,6 +1755,54 @@ def _cmd_list_hvs_engagement_activation_queue(args: argparse.Namespace) -> int:
     from .hvs_engagement_activation_service import list_engagement_activation_queue
 
     _emit({"items": list_engagement_activation_queue(repo_root=_repo_root(), evaluation_date=args.evaluation_date), "automation_allowed": False})
+    return EXIT_OK
+
+
+def _read_production_input(path: str):
+    _reject_url(path)
+    source = Path(path)
+    data = json.loads(source.read_text(encoding="utf-8"))
+    from .hvs_project_initialization_service import production_input_from_dict
+
+    return production_input_from_dict(data)
+
+
+def _project_initialization_result(outcome: Any) -> int:
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_prepare_hvs_project_initialization(args: argparse.Namespace) -> int:
+    from .hvs_project_initialization_service import prepare_hvs_project_initialization
+
+    return _project_initialization_result(prepare_hvs_project_initialization(
+        production_kickoff_authorization_id=args.production_kickoff_authorization_id,
+        production_input=_read_production_input(args.production_input_json),
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at,
+    ))
+
+
+def _cmd_initialize_hvs_project(args: argparse.Namespace) -> int:
+    from .hvs_project_initialization_service import initialize_hvs_project
+
+    return _project_initialization_result(initialize_hvs_project(
+        production_kickoff_authorization_id=args.production_kickoff_authorization_id,
+        production_input=_read_production_input(args.production_input_json),
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        hvs_repo_root=args.hvs_repo_root,
+        hvs_python_executable=args.hvs_python_executable,
+        recorded_at=args.recorded_at,
+        approve_initialization=args.approve_initialization,
+    ))
+
+
+def _cmd_list_hvs_project_initialization_evidence(args: argparse.Namespace) -> int:
+    from .hvs_project_initialization_service import list_project_initialization_evidence
+
+    _emit({"items": list_project_initialization_evidence(repo_root=_repo_root()), "automation_allowed": False})
     return EXIT_OK
 
 

@@ -254,6 +254,55 @@ def test_build_argv_only_ever_constructs_help(tmp_path) -> None:
     check("argv never contains create-project", "create-project" not in argv)
 
 
+def test_stage8l_initialize_and_inspect_use_bounded_json_cli(tmp_path) -> None:
+    cfg = _valid_config(tmp_path)
+    captured: dict[str, Any] = {}
+    fake = _FakeRun(returncode=0, stdout='{"status":"verified","project_verified":true}', captured=captured)
+    adapter = HermesVideoStudioAdapter(cfg, subprocess_run=fake)
+    init = adapter.initialize_project(
+        project_id="hvs8l-abc",
+        contract_path=str(tmp_path / "contract.json"),
+        expected_payload_hash="a" * 16,
+        approve_initialization=True,
+        request_id="stage8l",
+    )
+    argv = captured["argv"]
+    check("8L init command selected", "initialize-project" in argv)
+    check("8L init approval flag present", "--approve-initialization" in argv)
+    check("8L init shell false", captured["kwargs"].get("shell") is False)
+    check("8L init parses JSON", init["payload"]["project_verified"] is True)
+
+    captured.clear()
+    adapter.inspect_project(project_id="hvs8l-abc", request_id="stage8l")
+    check("8L inspect command selected", "inspect-project" in captured["argv"])
+    check("8L never uses legacy create-project", "create-project" not in " ".join(captured["argv"]))
+
+
+def test_stage8l_mutation_config_requires_repo_local_python(tmp_path) -> None:
+    repo = tmp_path / "hvs_repo"
+    (repo / "hvs" / "cli").mkdir(parents=True, exist_ok=True)
+    outside_python = tmp_path / "outside" / "python.exe"
+    outside_python.parent.mkdir()
+    outside_python.write_text("", encoding="utf-8")
+    inside_python = repo / ".venv" / "Scripts" / "python.exe"
+    inside_python.parent.mkdir(parents=True)
+    inside_python.write_text("", encoding="utf-8")
+
+    outside = HVSAdapterConfig(
+        hvs_repo_path=str(repo),
+        python_executable=str(outside_python),
+        require_repo_local_python=True,
+    )
+    inside = HVSAdapterConfig(
+        hvs_repo_path=str(repo),
+        python_executable=str(inside_python),
+        require_repo_local_python=True,
+    )
+
+    check("outside interpreter rejected", any("inside hvs_repo_path" in item for item in outside.validate()))
+    check("repo-local interpreter accepted", inside.validate() == ())
+
+
 # --- 13. Shell-metacharacter input cannot alter argv -----------------------
 def test_shell_metacharacter_input_cannot_alter_argv(tmp_path) -> None:
     repo = tmp_path / "hvs_repo"
