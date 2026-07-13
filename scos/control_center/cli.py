@@ -914,6 +914,58 @@ def _build_parser() -> argparse.ArgumentParser:
     lineage8h = sub.add_parser("inspect-customer-success-lineage", help="Inspect complete Stage 8H customer-success lineage.")
     lineage8h.add_argument("--project-id", default=None)
     lineage8h.set_defaults(func=_cmd_inspect_customer_success_lineage)
+
+    # --- Stage 8I: local commercial proposal preparation and handoff -------
+    proposal_create = sub.add_parser("create-hvs-commercial-proposal", help="Create local commercial proposal preparation; no customer action occurs.")
+    for name in ("opportunity-id", "delivery-lineage-id", "title", "objective", "scope-summary", "deliverables-json", "exclusions", "assumptions", "line-items-json", "currency", "tax-amount", "tax-treatment", "discount-amount", "payment-terms", "revision-terms", "validity-start-date", "validity-end-date", "operator-id"):
+        proposal_create.add_argument("--" + name, required=True)
+    proposal_create.add_argument("--estimated-start-date", default=None)
+    proposal_create.add_argument("--estimated-completion-date", default=None)
+    proposal_create.add_argument("--dependency-notes", default="")
+    proposal_create.add_argument("--risk-notes", default="")
+    proposal_create.add_argument("--commercial-recipient-reference", default=None)
+    proposal_create.add_argument("--recorded-at", default=None)
+    proposal_create.set_defaults(func=_cmd_create_commercial_proposal)
+
+    proposal_inspect = sub.add_parser("inspect-hvs-commercial-proposal", help="Inspect a local Stage 8I proposal preparation; no customer action occurs.")
+    proposal_inspect.add_argument("--proposal-preparation-id", required=True)
+    proposal_inspect.set_defaults(func=_cmd_inspect_commercial_proposal)
+
+    proposal_readiness = sub.add_parser("evaluate-hvs-commercial-proposal-readiness", help="Evaluate local proposal readiness; no customer action occurs.")
+    proposal_readiness.add_argument("--proposal-preparation-id", required=True)
+    proposal_readiness.add_argument("--as-of", required=True)
+    proposal_readiness.set_defaults(func=_cmd_evaluate_commercial_proposal_readiness)
+
+    proposal_review = sub.add_parser("request-hvs-commercial-proposal-review", help="Request internal review for a ready local proposal.")
+    proposal_review.add_argument("--proposal-preparation-id", required=True)
+    proposal_review.add_argument("--operator-id", required=True)
+    proposal_review.add_argument("--recorded-at", default=None)
+    proposal_review.set_defaults(func=_cmd_request_commercial_proposal_review)
+
+    proposal_approve = sub.add_parser("approve-hvs-commercial-proposal", help="Approve a reviewed proposal for manual presentation only.")
+    proposal_approve.add_argument("--proposal-preparation-id", required=True)
+    proposal_approve.add_argument("--operator-id", required=True)
+    proposal_approve.add_argument("--as-of", required=True)
+    proposal_approve.add_argument("--recorded-at", default=None)
+    proposal_approve.set_defaults(func=_cmd_approve_commercial_proposal)
+
+    for command, handler in (("reject-hvs-commercial-proposal", _cmd_reject_commercial_proposal), ("cancel-hvs-commercial-proposal", _cmd_cancel_commercial_proposal)):
+        proposal_decision = sub.add_parser(command, help="Record a local commercial proposal decision; no customer action occurs.")
+        proposal_decision.add_argument("--proposal-preparation-id", required=True)
+        proposal_decision.add_argument("--operator-id", required=True)
+        proposal_decision.add_argument("--reason", required=True)
+        proposal_decision.add_argument("--recorded-at", default=None)
+        proposal_decision.set_defaults(func=handler)
+
+    proposal_handoff = sub.add_parser("create-hvs-manual-commercial-handoff", help="Create a manual-only handoff from an approved local proposal.")
+    proposal_handoff.add_argument("--proposal-preparation-id", required=True)
+    proposal_handoff.add_argument("--operator-id", required=True)
+    proposal_handoff.add_argument("--recorded-at", default=None)
+    proposal_handoff.set_defaults(func=_cmd_create_manual_commercial_handoff)
+
+    proposal_queue = sub.add_parser("list-hvs-commercial-proposal-review-queue", help="List deterministic local commercial proposal review work.")
+    proposal_queue.add_argument("--as-of", required=True)
+    proposal_queue.set_defaults(func=_cmd_list_commercial_proposal_review_queue)
     return parser
 
 
@@ -1224,6 +1276,109 @@ def _cmd_list_manual_follow_up_queue(args: argparse.Namespace) -> int:
 def _cmd_inspect_customer_success_lineage(args: argparse.Namespace) -> int:
     from .hvs_customer_outcome_service import inspect_customer_success_lineage
     _emit(inspect_customer_success_lineage(project_id=args.project_id, repo_root=_repo_root()))
+    return EXIT_OK
+
+
+def _cmd_inspect_commercial_proposal(args: argparse.Namespace) -> int:
+    from .hvs_commercial_proposal_service import inspect_proposal_preparation
+
+    outcome = inspect_proposal_preparation(
+        proposal_preparation_id=args.proposal_preparation_id,
+        repo_root=_repo_root(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _commercial_proposal_result(outcome: Any) -> int:
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _proposal_json_list(value: str, field: str) -> tuple[dict[str, Any], ...]:
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise _CliError("INVALID_ARGUMENTS", f"{field} must be a JSON list") from exc
+    if not isinstance(parsed, list) or not all(isinstance(item, dict) for item in parsed):
+        raise _CliError("INVALID_ARGUMENTS", f"{field} must be a JSON list of objects")
+    return tuple(parsed)
+
+
+def _cmd_create_commercial_proposal(args: argparse.Namespace) -> int:
+    from .hvs_commercial_proposal_service import create_proposal_preparation
+
+    return _commercial_proposal_result(create_proposal_preparation(
+        opportunity_id=args.opportunity_id,
+        delivery_lineage_id=args.delivery_lineage_id,
+        title=args.title,
+        objective=args.objective,
+        scope_summary=args.scope_summary,
+        deliverables=_proposal_json_list(args.deliverables_json, "deliverables_json"),
+        exclusions=_split_csv(args.exclusions),
+        assumptions=_split_csv(args.assumptions),
+        line_items=_proposal_json_list(args.line_items_json, "line_items_json"),
+        currency=args.currency,
+        tax_amount=args.tax_amount,
+        tax_treatment=args.tax_treatment,
+        discount_amount=args.discount_amount,
+        payment_terms=args.payment_terms,
+        revision_terms=args.revision_terms,
+        validity_start_date=args.validity_start_date,
+        validity_end_date=args.validity_end_date,
+        operator_id=args.operator_id,
+        recorded_at=args.recorded_at or _now_iso()[:10],
+        estimated_start_date=args.estimated_start_date,
+        estimated_completion_date=args.estimated_completion_date,
+        dependency_notes=_split_csv(args.dependency_notes),
+        risk_notes=_split_csv(args.risk_notes),
+        commercial_recipient_reference=args.commercial_recipient_reference,
+        repo_root=_repo_root(),
+    ))
+
+
+def _cmd_evaluate_commercial_proposal_readiness(args: argparse.Namespace) -> int:
+    from .hvs_commercial_proposal_service import evaluate_proposal_readiness
+
+    readiness = evaluate_proposal_readiness(proposal_preparation_id=args.proposal_preparation_id, repo_root=_repo_root(), as_of=args.as_of)
+    _emit(readiness.to_dict())
+    return EXIT_OK if readiness.state == "READY" else EXIT_REJECT
+
+
+def _cmd_request_commercial_proposal_review(args: argparse.Namespace) -> int:
+    from .hvs_commercial_proposal_service import submit_for_internal_review
+
+    return _commercial_proposal_result(submit_for_internal_review(proposal_preparation_id=args.proposal_preparation_id, operator_id=args.operator_id, repo_root=_repo_root(), recorded_at=args.recorded_at or _now_iso()[:10]))
+
+
+def _cmd_approve_commercial_proposal(args: argparse.Namespace) -> int:
+    from .hvs_commercial_proposal_service import approve_for_manual_presentation
+
+    return _commercial_proposal_result(approve_for_manual_presentation(proposal_preparation_id=args.proposal_preparation_id, operator_id=args.operator_id, repo_root=_repo_root(), recorded_at=args.recorded_at or _now_iso()[:10], as_of=args.as_of))
+
+
+def _cmd_reject_commercial_proposal(args: argparse.Namespace) -> int:
+    from .hvs_commercial_proposal_service import reject_proposal
+
+    return _commercial_proposal_result(reject_proposal(proposal_preparation_id=args.proposal_preparation_id, operator_id=args.operator_id, reason=args.reason, repo_root=_repo_root(), recorded_at=args.recorded_at or _now_iso()[:10]))
+
+
+def _cmd_cancel_commercial_proposal(args: argparse.Namespace) -> int:
+    from .hvs_commercial_proposal_service import cancel_proposal
+
+    return _commercial_proposal_result(cancel_proposal(proposal_preparation_id=args.proposal_preparation_id, operator_id=args.operator_id, reason=args.reason, repo_root=_repo_root(), recorded_at=args.recorded_at or _now_iso()[:10]))
+
+
+def _cmd_create_manual_commercial_handoff(args: argparse.Namespace) -> int:
+    from .hvs_commercial_proposal_service import create_manual_commercial_handoff
+
+    return _commercial_proposal_result(create_manual_commercial_handoff(proposal_preparation_id=args.proposal_preparation_id, operator_id=args.operator_id, repo_root=_repo_root(), recorded_at=args.recorded_at or _now_iso()[:10]))
+
+
+def _cmd_list_commercial_proposal_review_queue(args: argparse.Namespace) -> int:
+    from .hvs_commercial_proposal_service import list_proposal_review_queue
+
+    _emit({"items": list_proposal_review_queue(repo_root=_repo_root(), as_of=args.as_of), "automation_allowed": False})
     return EXIT_OK
 
 
