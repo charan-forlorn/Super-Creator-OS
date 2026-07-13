@@ -601,6 +601,81 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     lineage8e.add_argument("--project-id", default=None)
     lineage8e.set_defaults(func=_cmd_inspect_release_lineage)
+
+    # --- Stage 8F: manual release, receipt, post-delivery audit ------------
+    rec_rel = sub.add_parser(
+        "record-manual-release",
+        help="Record that an authorized revised delivery was manually released "
+        "(evidence only; no transport executed).",
+    )
+    rec_rel.add_argument("--authorization-id", required=True)
+    rec_rel.add_argument("--released-by", required=True)
+    rec_rel.add_argument("--release-channel", required=True)
+    rec_rel.add_argument("--released-formats", required=True, help="comma-separated formats")
+    rec_rel.add_argument("--customer-reference", required=True)
+    rec_rel.add_argument("--release-method-reference", required=True)
+    rec_rel.add_argument("--evidence-references", default="", help="comma-separated references")
+    rec_rel.add_argument("--operator-id", required=True)
+    rec_rel.add_argument("--recorded-at", default=None)
+    rec_rel.set_defaults(func=_cmd_record_manual_release)
+
+    ins_rel = sub.add_parser(
+        "inspect-manual-release",
+        help="Inspect a recorded manual release by authorization id.",
+    )
+    ins_rel.add_argument("--authorization-id", required=True)
+    ins_rel.set_defaults(func=_cmd_inspect_manual_release)
+
+    rec_rcpt = sub.add_parser(
+        "record-customer-receipt",
+        help="Record that the customer confirmed receipt (evidence only; no "
+        "customer contact).",
+    )
+    rec_rcpt.add_argument("--release-id", required=True)
+    rec_rcpt.add_argument("--confirmed-by", required=True)
+    rec_rcpt.add_argument("--receipt-status", required=True, help="CONFIRMED|DECLINED|UNREACHABLE")
+    rec_rcpt.add_argument("--received-formats", required=True, help="comma-separated formats")
+    rec_rcpt.add_argument("--customer-reference", required=True)
+    rec_rcpt.add_argument("--confirmation-reference", required=True)
+    rec_rcpt.add_argument("--receipt-channel", default=None)
+    rec_rcpt.add_argument("--receipt-notes", default=None)
+    rec_rcpt.add_argument("--evidence-references", default="", help="comma-separated references")
+    rec_rcpt.add_argument("--operator-id", required=True)
+    rec_rcpt.add_argument("--recorded-at", default=None)
+    rec_rcpt.set_defaults(func=_cmd_record_8f_customer_receipt)
+
+    ins_rcpt = sub.add_parser(
+        "inspect-customer-receipt",
+        help="Inspect a recorded customer receipt by release id.",
+    )
+    ins_rcpt.add_argument("--release-id", required=True)
+    ins_rcpt.set_defaults(func=_cmd_inspect_8f_customer_receipt)
+
+    eval_audit = sub.add_parser(
+        "evaluate-post-delivery-audit",
+        help="Evaluate deterministic post-delivery audit readiness "
+        "(fail-closed; no outbound transport).",
+    )
+    eval_audit.add_argument("--authorization-id", required=True)
+    eval_audit.add_argument("--operator-id", required=True)
+    eval_audit.add_argument("--recorded-at", default=None)
+    eval_audit.set_defaults(func=_cmd_evaluate_post_delivery_audit)
+
+    close_audit = sub.add_parser(
+        "close-post-delivery-audit",
+        help="Close the post-delivery audit (idempotent; conflict-rejected).",
+    )
+    close_audit.add_argument("--authorization-id", required=True)
+    close_audit.add_argument("--operator-id", required=True)
+    close_audit.add_argument("--recorded-at", default=None)
+    close_audit.set_defaults(func=_cmd_close_post_delivery_audit)
+
+    lineage8f = sub.add_parser(
+        "inspect-complete-lineage",
+        help="Inspect the complete post-delivery lineage (Stage 8F + 8E + 8D).",
+    )
+    lineage8f.add_argument("--project-id", default=None)
+    lineage8f.set_defaults(func=_cmd_inspect_post_delivery_lineage)
     return parser
 
 
@@ -1278,6 +1353,100 @@ def _cmd_inspect_release_lineage(args: argparse.Namespace) -> int:
     from .hvs_revised_delivery_release_service import inspect_release_lineage
 
     outcome = inspect_release_lineage(project_id=getattr(args, "project_id", None), repo_root=_repo_root())
+    _emit(outcome)
+    return EXIT_OK
+
+
+def _split_csv(value: str) -> tuple[str, ...]:
+    return tuple(v.strip() for v in (value or "").split(",") if v.strip())
+
+
+def _cmd_record_manual_release(args: argparse.Namespace) -> int:
+    from .hvs_manual_release_receipt_service import record_manual_release
+
+    outcome = record_manual_release(
+        authorization_id=args.authorization_id,
+        released_by=args.released_by,
+        release_channel=args.release_channel,
+        released_formats=_split_csv(args.released_formats),
+        customer_reference=args.customer_reference,
+        release_method_reference=args.release_method_reference,
+        evidence_references=_split_csv(args.evidence_references),
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_manual_release(args: argparse.Namespace) -> int:
+    from .hvs_manual_release_receipt_service import inspect_manual_release
+
+    outcome = inspect_manual_release(authorization_id=args.authorization_id, repo_root=_repo_root())
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_record_8f_customer_receipt(args: argparse.Namespace) -> int:
+    from .hvs_manual_release_receipt_service import record_customer_receipt
+
+    outcome = record_customer_receipt(
+        release_id=args.release_id,
+        confirmed_by=args.confirmed_by,
+        receipt_status=args.receipt_status,
+        received_formats=_split_csv(args.received_formats),
+        customer_reference=args.customer_reference,
+        confirmation_reference=args.confirmation_reference,
+        receipt_channel=getattr(args, "receipt_channel", None),
+        receipt_notes=getattr(args, "receipt_notes", None),
+        evidence_references=_split_csv(args.evidence_references),
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_8f_customer_receipt(args: argparse.Namespace) -> int:
+    from .hvs_manual_release_receipt_service import inspect_customer_receipt
+
+    outcome = inspect_customer_receipt(release_id=args.release_id, repo_root=_repo_root())
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_evaluate_post_delivery_audit(args: argparse.Namespace) -> int:
+    from .hvs_manual_release_receipt_service import evaluate_post_delivery_audit
+
+    outcome = evaluate_post_delivery_audit(
+        authorization_id=args.authorization_id,
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_close_post_delivery_audit(args: argparse.Namespace) -> int:
+    from .hvs_manual_release_receipt_service import close_post_delivery_audit
+
+    outcome = close_post_delivery_audit(
+        authorization_id=args.authorization_id,
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_post_delivery_lineage(args: argparse.Namespace) -> int:
+    from .hvs_manual_release_receipt_service import inspect_post_delivery_lineage
+
+    outcome = inspect_post_delivery_lineage(project_id=getattr(args, "project_id", None), repo_root=_repo_root())
     _emit(outcome)
     return EXIT_OK
 
