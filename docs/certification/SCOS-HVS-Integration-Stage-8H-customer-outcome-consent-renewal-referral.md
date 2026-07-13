@@ -82,6 +82,51 @@ Revert the single Stage 8H commit. Existing Stage 8A–8G ledgers and contracts
 are not modified. Runtime customer-success evidence is intentionally local and
 ignored.
 
+## Corrective Coverage Audit
+
+The initial 11-test focused suite was incomplete. The corrective focused suite
+contains 48 passing cases. The mandatory matrix is fully covered by direct
+assertions, parameterized boundary cases, or static boundary assertions:
+
+| Contract group | Mandatory cases | Evidence |
+| --- | --- | --- |
+| Customer outcome | 1–14 | closed lineage, 1/5 bounds, invalid values, explicit ratings, immutable/idempotent records, measurable outcomes, unsafe metadata/input, active-dispute block |
+| Portfolio consent | 15–31 | grant/deny/absence/revoke/expire, lineage scope, bounded contexts/formats, identity scopes, anonymization, attribution, replay/conflict, append-only revocation |
+| Testimonial consent | 32–48 | independent consent, exact-hash/edit rules, deny/revoke/expire, attribution, anonymization, replay/conflict, no-publication static boundary |
+| Opportunities | 49–70 | all six types, deterministic/audited closed lineage, Decimal/currency/confidence/date validation, replay/conflict, explicit conversion gate, no commercial-state write boundary |
+| Priority scoring | 71–88 | deterministic versioned HIGH/MEDIUM/LOW/BLOCKED/INSUFFICIENT_EVIDENCE decisions, dispute/concern/support penalties, explicit inputs, pure local-only execution |
+| Manual queue | 89–108 | opportunity types, missing/expiring-consent and unresolved-outcome reviews, supplied date, overdue/due-soon/future states, stable order, manual action, non-mutation |
+| Readiness | 109–117 | valid and blocked portfolio/testimonial/opportunity results, exact hash, current-dispute block, deterministic read-only output |
+| Security/privacy | 118–138 | unsafe IDs, traversal, newline, URI, shell metacharacters, forged closure, sensitive metadata, ignored runtime ledger, static no-outbound/no-execution boundary |
+| CLI/regressions | 139–163 | JSON exits for record/inspect/qualify/queue/lineage, malformed usage exit 2, Stage 7 and Stage 8A–8G regressions |
+
+No media-consent subsystem, LLM, external-task client, CRM adapter,
+payment-provider adapter, or publication adapter exists in Stage 8H; static
+tests verify those capabilities are absent.
+
+## Corrective Defects Found and Fixed
+
+1. Restricted metadata names and non-string values are now rejected.
+2. Follow-up dates now require ISO calendar dates.
+3. Stage 8H now requires the referenced Stage 8F audit closure.
+4. Current Stage 8G disputes now block new positive outcomes and readiness.
+5. The queue now emits due state plus missing/expiring-consent and
+   unresolved-outcome manual-review items.
+
+## Fresh Corrective Verification
+
+| Gate | Result |
+| --- | --- |
+| Focused Stage 8H | 48 passed, 0 failed, exit 0, 11.00s |
+| Stage 8A–8G and Stage 7 regression set | 190 passed, 0 failed, exit 0, 35.77s |
+| Smoke | 16 passed, 0 failed, exit 0 |
+| Collection | 1,584 collected, 0 errors, exit 0, 0.96s |
+| Security scan | 451 files, 0 findings, exit 0 |
+| Full unexcluded suite | 1,583 passed, 1 skipped, 0 failed, exit 0, 364.60s |
+
+All pytest commands retained one non-fatal existing cache-permission warning
+under `scos/work/.pytest_cache`; it was not suppressed or changed.
+
 ## Final Verdict
 
 PASS — all focused, cross-stage, full-suite, smoke, and security gates passed.

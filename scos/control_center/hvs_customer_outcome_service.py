@@ -8,6 +8,7 @@ performs publication, HVS, payment, or network work.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -47,7 +48,12 @@ from .hvs_customer_outcome_store import (
     make_customer_success_event,
     read_customer_success_events,
 )
-from .hvs_post_delivery_support_models import COMMERCIAL_CLOSED, PostDeliveryCommercialClosure
+from .hvs_post_delivery_support_models import (
+    COMMERCIAL_CLOSED,
+    DISPUTE_TERMINAL_STATUSES,
+    PostDeliveryCommercialClosure,
+    PostDeliveryDispute,
+)
 from .hvs_post_delivery_support_store import (
     post_delivery_support_path,
     read_post_delivery_support_events,
@@ -164,6 +170,18 @@ def _commercial_closure(repo_root: Any, commercial_closure_id: str) -> PostDeliv
     return None
 
 
+def _has_unresolved_dispute(repo_root: Any, closure: PostDeliveryCommercialClosure) -> bool:
+    """Check current Stage 8G dispute evidence, including post-closure intake."""
+    disputes: dict[str, PostDeliveryDispute] = {}
+    for event in read_post_delivery_support_events(audit_log_path=post_delivery_support_path(Path(repo_root))):
+        if event.event_type not in ("DISPUTE_OPENED", "DISPUTE_RESOLVED"):
+            continue
+        record = PostDeliveryDispute(**_tuple_dict(event.record, "disputed_artifact_references", "evidence_references"))
+        if record.project_id == closure.project_id:
+            disputes[record.dispute_id] = record
+    return any(item.status not in DISPUTE_TERMINAL_STATUSES for item in disputes.values())
+
+
 def _append(repo_root: Any, event_type: str, subject_id: str, operator_id: str, recorded_at: str, record: Any) -> None:
     event = make_customer_success_event(event_type=event_type, subject_id=subject_id, operator_id=operator_id, recorded_at=recorded_at, record=record.to_dict())
     append_customer_success_event(audit_log_path=customer_success_path(Path(repo_root)), event=event)
@@ -183,6 +201,12 @@ def _require_closed_lineage(repo_root: Any, commercial_closure_id: str) -> PostD
         return _deny("COMMERCIAL_CLOSURE_NOT_FOUND", "commercial closure evidence was not found")
     if closure.closure_status != COMMERCIAL_CLOSED:
         return _deny("COMMERCIAL_CLOSURE_NOT_CLOSED", "customer-success evidence requires a commercially closed lineage")
+    from .hvs_manual_release_receipt_service import _audit_exists
+
+    if not _audit_exists(repo_root=Path(repo_root), audit_id=closure.post_delivery_closure_id):
+        return _deny("COMMERCIAL_CLOSURE_LINEAGE_INVALID", "commercial closure is not backed by Stage 8F audit evidence")
+    if _has_unresolved_dispute(repo_root, closure):
+        return _deny("UNRESOLVED_DISPUTE", "an active post-delivery dispute blocks positive customer-success evidence")
     return closure
 
 
@@ -332,7 +356,7 @@ def portfolio_readiness(*, portfolio_consent_id: str, repo_root: Any, as_of: str
         blockers.append("CONSENT_REVOKED")
     if consent.expires_at and consent.expires_at < as_of:
         blockers.append("CONSENT_EXPIRED")
-    return {"portfolio_ready": not blockers, "consent_status": CONSENT_REVOKED if "CONSENT_REVOKED" in blockers else consent.consent_status, "allowed_artifacts": list(consent.allowed_artifact_references), "allowed_contexts": list(consent.allowed_usage_contexts), "anonymization_required": consent.anonymization_required, "blocking_reasons": blockers, "manual_review_required": True, "automation_allowed": False}
+    return {"portfolio_ready": not blockers, "consent_status": CONSENT_REVOKED if "CONSENT_REVOKED" in blockers else consent.consent_status, "allowed_artifacts": list(consent.allowed_artifact_references), "allowed_contexts": list(consent.allowed_usage_contexts), "identity_usage": {"brand_name": consent.brand_name_usage, "logo": consent.logo_usage, "customer_name": consent.customer_name_usage, "performance_metric": consent.performance_metric_usage}, "anonymization_required": consent.anonymization_required, "attribution_requirement": consent.attribution_requirement, "blocking_reasons": blockers, "manual_review_required": True, "automation_allowed": False}
 
 
 def testimonial_readiness(*, testimonial_consent_id: str, testimonial_text_hash: str, repo_root: Any, as_of: str, requested_edit: str | None = None) -> dict[str, Any]:
@@ -360,21 +384,45 @@ def opportunity_readiness(*, opportunity_id: str, repo_root: Any) -> dict[str, A
         return {"opportunity_eligible": False, "blockers": ["OPPORTUNITY_NOT_FOUND"], "automation_allowed": False}
     qualification = _qualifications(repo_root).get(opportunity_id)
     status = qualification.status if qualification else opportunity.opportunity_status
+    closure = _commercial_closure(repo_root, opportunity.commercial_closure_id)
     blockers = [] if status not in (CANCELLED, DECLINED, SUPERSEDED, CONVERTED) else ["OPPORTUNITY_TERMINAL"]
+    if closure is None:
+        blockers.append("COMMERCIAL_CLOSURE_NOT_FOUND")
+    elif _has_unresolved_dispute(repo_root, closure):
+        blockers.append("UNRESOLVED_DISPUTE")
     return {"opportunity_eligible": not blockers, "opportunity_type": opportunity.opportunity_type, "priority": {"score": opportunity.priority_score, "band": HIGH if (opportunity.priority_score or 0) >= 75 else MEDIUM if (opportunity.priority_score or 0) >= 45 else LOW}, "blockers": blockers, "next_manual_action": "REVIEW_AND_CONTACT_MANUALLY" if not blockers else "NO_ACTION", "automation_allowed": False}
 
 
 def list_manual_follow_up_queue(*, repo_root: Any, as_of: str) -> list[dict[str, Any]]:
     qualifications = _qualifications(repo_root)
     items: list[dict[str, Any]] = []
-    for opportunity in _opportunities(repo_root).values():
-        status = qualifications.get(opportunity.opportunity_id, OpportunityQualification("tmp", opportunity.opportunity_id, opportunity.opportunity_status, "system", "derived", "tmp", as_of)).status
+    opportunities = _opportunities(repo_root)
+    outcomes = _outcomes(repo_root)
+    for opportunity in opportunities.values():
+        status = qualifications[opportunity.opportunity_id].status if opportunity.opportunity_id in qualifications else opportunity.opportunity_status
         if opportunity.opportunity_type == NO_OPPORTUNITY or status in (CANCELLED, DECLINED, SUPERSEDED, CONVERTED):
             continue
         due = opportunity.target_follow_up_date
         score = opportunity.priority_score or 0
-        items.append({"queue_item_id": stable_id("scos-hvs-follow-up", {"opportunity_id": opportunity.opportunity_id}), "opportunity_id": opportunity.opportunity_id, "customer_reference": opportunity.customer_reference, "project_id": opportunity.project_id, "opportunity_type": opportunity.opportunity_type, "priority_score": opportunity.priority_score, "priority_band": HIGH if score >= 75 else MEDIUM if score >= 45 else LOW, "target_follow_up_date": due, "days_until_due": None, "overdue": bool(due and due < as_of), "blocking_reasons": [], "recommended_manual_action": "REVIEW_AND_CONTACT_MANUALLY", "automation_allowed": False})
-    return sorted(items, key=lambda item: (not item["overdue"], item["target_follow_up_date"] or "9999-12-31", -int(item["priority_score"] or 0), item["opportunity_id"]))
+        if due is None:
+            due_state, days = "UNSCHEDULED", None
+        else:
+            days = (date.fromisoformat(due) - date.fromisoformat(as_of)).days
+            due_state = "OVERDUE" if days < 0 else "DUE_SOON" if days <= 7 else "FUTURE"
+        items.append({"queue_item_id": stable_id("scos-hvs-follow-up", {"opportunity_id": opportunity.opportunity_id}), "item_type": "OPPORTUNITY", "opportunity_id": opportunity.opportunity_id, "customer_reference": opportunity.customer_reference, "project_id": opportunity.project_id, "opportunity_type": opportunity.opportunity_type, "priority_score": opportunity.priority_score, "priority_band": HIGH if score >= 75 else MEDIUM if score >= 45 else LOW, "target_follow_up_date": due, "days_until_due": days, "due_state": due_state, "overdue": due_state == "OVERDUE", "blocking_reasons": [], "recommended_manual_action": "REVIEW_AND_CONTACT_MANUALLY", "automation_allowed": False})
+    portfolio_by_outcome = {item.outcome_review_id for item in _portfolio_consents(repo_root).values()}
+    testimonial_by_outcome = {item.outcome_review_id for item in _testimonial_consents(repo_root).values()}
+    for outcome in outcomes.values():
+        if outcome.outcome_review_id not in portfolio_by_outcome or outcome.outcome_review_id not in testimonial_by_outcome:
+            items.append({"queue_item_id": stable_id("scos-hvs-consent-review", {"outcome_review_id": outcome.outcome_review_id}), "item_type": "MISSING_CONSENT_REVIEW", "opportunity_id": None, "customer_reference": outcome.customer_reference, "project_id": outcome.project_id, "opportunity_type": None, "priority_score": None, "priority_band": INSUFFICIENT_EVIDENCE, "target_follow_up_date": None, "days_until_due": None, "due_state": "UNSCHEDULED", "overdue": False, "blocking_reasons": ["PORTFOLIO_OR_TESTIMONIAL_CONSENT_MISSING"], "recommended_manual_action": "RECORD_EXPLICIT_CONSENT_DECISION", "automation_allowed": False})
+        if outcome.unresolved_concerns:
+            items.append({"queue_item_id": stable_id("scos-hvs-outcome-review", {"outcome_review_id": outcome.outcome_review_id}), "item_type": "UNRESOLVED_OUTCOME_REVIEW", "opportunity_id": None, "customer_reference": outcome.customer_reference, "project_id": outcome.project_id, "opportunity_type": None, "priority_score": None, "priority_band": INSUFFICIENT_EVIDENCE, "target_follow_up_date": None, "days_until_due": None, "due_state": "UNSCHEDULED", "overdue": False, "blocking_reasons": ["UNRESOLVED_CONCERNS"], "recommended_manual_action": "REVIEW_CUSTOMER_OUTCOME_MANUALLY", "automation_allowed": False})
+    for consent in (*_portfolio_consents(repo_root).values(), *_testimonial_consents(repo_root).values()):
+        expires_at = consent.expires_at
+        if expires_at and 0 <= (date.fromisoformat(expires_at) - date.fromisoformat(as_of)).days <= 7:
+            consent_id = getattr(consent, "portfolio_consent_id", None) or getattr(consent, "testimonial_consent_id")
+            items.append({"queue_item_id": stable_id("scos-hvs-expiring-consent", {"consent_id": consent_id}), "item_type": "EXPIRING_CONSENT_REVIEW", "opportunity_id": None, "customer_reference": consent.customer_reference, "project_id": consent.project_id, "opportunity_type": None, "priority_score": None, "priority_band": MEDIUM, "target_follow_up_date": expires_at, "days_until_due": (date.fromisoformat(expires_at) - date.fromisoformat(as_of)).days, "due_state": "DUE_SOON", "overdue": False, "blocking_reasons": ["CONSENT_EXPIRING"], "recommended_manual_action": "REVIEW_CONSENT_EXPIRY_MANUALLY", "automation_allowed": False})
+    return sorted(items, key=lambda item: (item["item_type"] != "MISSING_CONSENT_REVIEW", item["due_state"] != "OVERDUE", item["target_follow_up_date"] or "9999-12-31", -int(item["priority_score"] or 0), item["queue_item_id"]))
 
 
 def inspect_customer_success_lineage(*, project_id: str | None, repo_root: Any) -> dict[str, Any]:

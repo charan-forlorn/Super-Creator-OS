@@ -10,11 +10,12 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from .hvs_post_delivery_support_models import _safe_customer_reference, _safe_date, _safe_text
-from .hvs_rerender_dispatch_models import _safe_id
+from .hvs_rerender_dispatch_models import ALLOWED_TARGET_FORMATS, _safe_id
 
 
 CUSTOMER_SUCCESS_SCHEMA_VERSION = "scos-hvs.customer-success.v1/1.0.0"
@@ -57,6 +58,7 @@ MEDIUM = "MEDIUM"
 LOW = "LOW"
 BLOCKED = "BLOCKED"
 INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+ALLOWED_CONSENT_USAGE_CONTEXTS = ("website", "case-study", "sales-deck", "proposal")
 
 
 def _canonical(value: Any) -> str:
@@ -71,6 +73,13 @@ def _safe_optional_text(field: str, value: str | None, *, allow_slash: bool = Fa
     if value is None or value == "":
         return None
     _safe_text(field, value, allow_slash=allow_slash)
+    return value
+
+
+def _safe_customer(field: str, value: str) -> str:
+    _safe_customer_reference(field, value)
+    if any(token in value for token in (";", "|", "$", "`")):
+        raise ValueError(f"{field} contains unsafe shell metacharacters")
     return value
 
 
@@ -110,6 +119,15 @@ def normalize_currency(value: str | None, *, required: bool) -> str | None:
     return value
 
 
+def validate_calendar_date(field: str, value: str) -> str:
+    _safe_date(field, value)
+    try:
+        date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError(f"{field} must be an ISO calendar date") from exc
+    return value
+
+
 @dataclass(frozen=True)
 class CustomerOutcomeReview:
     outcome_review_id: str
@@ -145,7 +163,7 @@ class CustomerOutcomeReview:
             raise ValueError("invalid outcome review status")
         for field in ("outcome_review_id", "project_id", "revision_id", "revised_delivery_id", "release_execution_id", "receipt_confirmation_id", "post_delivery_closure_id", "commercial_closure_id", "recorded_by_operator_id", "idempotency_key"):
             _safe_id(field, getattr(self, field))
-        _safe_customer_reference("customer_reference", self.customer_reference)
+        _safe_customer("customer_reference", self.customer_reference)
         for field in ("satisfaction_rating", "delivery_quality_rating", "communication_rating", "timeliness_rating"):
             _safe_rating(field, getattr(self, field))
         _safe_text("business_outcome_status", self.business_outcome_status)
@@ -160,6 +178,13 @@ class CustomerOutcomeReview:
         _safe_string_tuple("evidence_reference", self.evidence_references)
         if not isinstance(self.metadata, dict):
             raise ValueError("metadata must be a dict")
+        for key, value in self.metadata.items():
+            _safe_text("metadata key", key)
+            if any(token in key.lower() for token in ("secret", "password", "token", "api_key", "credential", "media", "bytes")):
+                raise ValueError("metadata contains a restricted field")
+            if not isinstance(value, str):
+                raise ValueError("metadata values must be strings")
+            _safe_text("metadata value", value)
         _safe_date("recorded_at", self.recorded_at)
         _safe_date("created_at", self.created_at)
 
@@ -204,11 +229,15 @@ class PortfolioConsent:
             raise ValueError("invalid portfolio consent")
         for field in ("portfolio_consent_id", "outcome_review_id", "project_id", "revised_delivery_id", "recorded_by_operator_id", "idempotency_key"):
             _safe_id(field, getattr(self, field))
-        _safe_customer_reference("customer_reference", self.customer_reference)
+        _safe_customer("customer_reference", self.customer_reference)
         _safe_text("consent_scope", self.consent_scope)
         _safe_string_tuple("allowed_artifact_reference", self.allowed_artifact_references)
         _safe_string_tuple("allowed_format", self.allowed_formats)
+        if any(value not in ALLOWED_TARGET_FORMATS for value in self.allowed_formats):
+            raise ValueError("portfolio consent contains unsupported format")
         _safe_string_tuple("allowed_usage_context", self.allowed_usage_contexts)
+        if any(value not in ALLOWED_CONSENT_USAGE_CONTEXTS for value in self.allowed_usage_contexts):
+            raise ValueError("portfolio consent contains unsupported usage context")
         for rule in self.anonymization_rules:
             _safe_text("anonymization_rule", rule)
         if self.anonymization_required and not self.anonymization_rules:
@@ -262,11 +291,13 @@ class TestimonialConsent:
             raise ValueError("invalid testimonial consent")
         for field in ("testimonial_consent_id", "outcome_review_id", "project_id", "testimonial_reference", "recorded_by_operator_id", "idempotency_key"):
             _safe_id(field, getattr(self, field))
-        _safe_customer_reference("customer_reference", self.customer_reference)
+        _safe_customer("customer_reference", self.customer_reference)
         if not re.fullmatch(r"sha256:[0-9a-f]{64}", self.testimonial_text_hash):
             raise ValueError("testimonial_text_hash must be sha256:<64 lowercase hex>")
         _safe_optional_text("testimonial_text_preview", self.testimonial_text_preview)
         _safe_string_tuple("approved_usage_context", self.approved_usage_contexts)
+        if any(value not in ALLOWED_CONSENT_USAGE_CONTEXTS for value in self.approved_usage_contexts):
+            raise ValueError("testimonial consent contains unsupported usage context")
         _safe_string_tuple("approved_edit", self.approved_edits)
         if self.consent_status == CONSENT_GRANTED and not self.approved_usage_contexts:
             raise ValueError("granted testimonial consent requires usage contexts")
@@ -360,7 +391,7 @@ class Opportunity:
         if self.urgency not in ("LOW", "MEDIUM", "HIGH"):
             raise ValueError("urgency must be LOW, MEDIUM, or HIGH")
         if self.target_follow_up_date:
-            _safe_date("target_follow_up_date", self.target_follow_up_date)
+            validate_calendar_date("target_follow_up_date", self.target_follow_up_date)
         if self.priority_score is not None and (not isinstance(self.priority_score, int) or not 0 <= self.priority_score <= 100):
             raise ValueError("priority_score must be an integer from 0 through 100")
         _safe_text("score_version", self.score_version, allow_slash=True)
