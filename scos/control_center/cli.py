@@ -966,6 +966,59 @@ def _build_parser() -> argparse.ArgumentParser:
     proposal_queue = sub.add_parser("list-hvs-commercial-proposal-review-queue", help="List deterministic local commercial proposal review work.")
     proposal_queue.add_argument("--as-of", required=True)
     proposal_queue.set_defaults(func=_cmd_list_commercial_proposal_review_queue)
+
+    # --- Stage 8J: manual proposal presentation and commercial acceptance ---
+    presentation = sub.add_parser("record-hvs-proposal-presentation", help="Record a human-performed proposal presentation; SCOS performs no communication.")
+    presentation.add_argument("--proposal-id", "--proposal-preparation-id", dest="proposal_preparation_id", required=True)
+    presentation.add_argument("--handoff-id", required=True)
+    presentation.add_argument("--channel", required=True)
+    presentation.add_argument("--presentation-date", required=True)
+    presentation.add_argument("--operator-id", required=True)
+    presentation.add_argument("--evidence-reference", default=None)
+    presentation.add_argument("--customer-participant-reference", default=None)
+    presentation.add_argument("--operator-note", default=None)
+    presentation.add_argument("--recorded-at", default=None)
+    presentation.add_argument("--confirm-manual-presentation", action="store_true")
+    presentation.set_defaults(func=_cmd_record_hvs_proposal_presentation)
+
+    decision8j = sub.add_parser("record-hvs-customer-commercial-decision", help="Record explicit operator-supplied customer commercial decision evidence.")
+    decision8j.add_argument("--presentation-id", dest="presentation_record_id", required=True)
+    decision8j.add_argument("--decision", required=True, choices=["accepted", "rejected", "negotiation", "negotiation-requested", "revision", "proposal-revision-requested", "no-response", "deferred"])
+    decision8j.add_argument("--decision-date", required=True)
+    decision8j.add_argument("--operator-id", required=True)
+    decision8j.add_argument("--evidence-reference", required=True)
+    decision8j.add_argument("--approved-proposal-content-hash", required=True)
+    decision8j.add_argument("--customer-decision-reference", default=None)
+    decision8j.add_argument("--accepted-total", default=None)
+    decision8j.add_argument("--accepted-currency", default=None)
+    decision8j.add_argument("--accepted-scope-hash", default=None)
+    decision8j.add_argument("--accepted-payment-terms", default=None)
+    decision8j.add_argument("--accepted-revision-terms", default=None)
+    decision8j.add_argument("--accepted-tax", default=None)
+    decision8j.add_argument("--accepted-discount", default=None)
+    decision8j.add_argument("--requested-changes", default="")
+    decision8j.add_argument("--rejection-reason", default=None)
+    decision8j.add_argument("--follow-up-date", default=None)
+    decision8j.add_argument("--deferred-reason", default=None)
+    decision8j.add_argument("--recorded-at", default=None)
+    decision8j.set_defaults(func=_cmd_record_hvs_customer_commercial_decision)
+
+    inspect_decision8j = sub.add_parser("inspect-hvs-customer-commercial-decision", help="Inspect a local Stage 8J customer decision.")
+    inspect_decision8j.add_argument("--decision-id", required=True)
+    inspect_decision8j.set_defaults(func=_cmd_inspect_hvs_customer_commercial_decision)
+
+    readiness8j = sub.add_parser("evaluate-hvs-commercial-acceptance-readiness", help="Evaluate future manual invoice and project-kickoff readiness without mutating records.")
+    readiness8j.add_argument("--proposal-id", "--proposal-preparation-id", dest="proposal_preparation_id", required=True)
+    readiness8j.add_argument("--evaluation-date", required=True)
+    readiness8j.set_defaults(func=_cmd_evaluate_hvs_commercial_acceptance_readiness)
+
+    inspect_acceptance8j = sub.add_parser("inspect-hvs-commercial-acceptance", help="Inspect a local Stage 8J commercial acceptance.")
+    inspect_acceptance8j.add_argument("--acceptance-id", required=True)
+    inspect_acceptance8j.set_defaults(func=_cmd_inspect_hvs_commercial_acceptance)
+
+    queue8j = sub.add_parser("list-hvs-commercial-decision-queue", help="List deterministic local customer decision work.")
+    queue8j.add_argument("--evaluation-date", required=True)
+    queue8j.set_defaults(func=_cmd_list_hvs_commercial_decision_queue)
     return parser
 
 
@@ -1379,6 +1432,83 @@ def _cmd_list_commercial_proposal_review_queue(args: argparse.Namespace) -> int:
     from .hvs_commercial_proposal_service import list_proposal_review_queue
 
     _emit({"items": list_proposal_review_queue(repo_root=_repo_root(), as_of=args.as_of), "automation_allowed": False})
+    return EXIT_OK
+
+
+def _commercial_acceptance_result(outcome: Any) -> int:
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_record_hvs_proposal_presentation(args: argparse.Namespace) -> int:
+    from .hvs_commercial_acceptance_service import record_manual_proposal_presentation
+
+    return _commercial_acceptance_result(record_manual_proposal_presentation(
+        proposal_preparation_id=args.proposal_preparation_id,
+        commercial_handoff_package_id=args.handoff_id,
+        presentation_channel=args.channel,
+        presentation_date=args.presentation_date,
+        presented_by_operator_id=args.operator_id,
+        evidence_reference=args.evidence_reference,
+        customer_participant_reference=args.customer_participant_reference,
+        operator_note=args.operator_note,
+        manual_action_confirmed=args.confirm_manual_presentation,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or args.presentation_date,
+    ))
+
+
+def _cmd_record_hvs_customer_commercial_decision(args: argparse.Namespace) -> int:
+    from .hvs_commercial_acceptance_service import record_customer_commercial_decision
+
+    return _commercial_acceptance_result(record_customer_commercial_decision(
+        presentation_record_id=args.presentation_record_id,
+        decision_type=args.decision,
+        decision_date=args.decision_date,
+        recorded_by_operator_id=args.operator_id,
+        evidence_reference=args.evidence_reference,
+        approved_proposal_content_hash=args.approved_proposal_content_hash,
+        customer_decision_reference=args.customer_decision_reference,
+        accepted_total=args.accepted_total,
+        accepted_currency=args.accepted_currency,
+        accepted_scope_hash=args.accepted_scope_hash,
+        accepted_payment_terms=args.accepted_payment_terms,
+        accepted_revision_terms=args.accepted_revision_terms,
+        accepted_tax=args.accepted_tax,
+        accepted_discount=args.accepted_discount,
+        requested_changes=_split_csv(args.requested_changes),
+        rejection_reason=args.rejection_reason,
+        follow_up_date=args.follow_up_date,
+        deferred_reason=args.deferred_reason,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or args.decision_date,
+    ))
+
+
+def _cmd_inspect_hvs_customer_commercial_decision(args: argparse.Namespace) -> int:
+    from .hvs_commercial_acceptance_service import inspect_customer_commercial_decision
+
+    return _commercial_acceptance_result(inspect_customer_commercial_decision(customer_decision_id=args.decision_id, repo_root=_repo_root()))
+
+
+def _cmd_evaluate_hvs_commercial_acceptance_readiness(args: argparse.Namespace) -> int:
+    from .hvs_commercial_acceptance_service import evaluate_commercial_acceptance_readiness
+
+    readiness = evaluate_commercial_acceptance_readiness(proposal_preparation_id=args.proposal_preparation_id, repo_root=_repo_root(), evaluation_date=args.evaluation_date)
+    _emit(readiness.to_dict())
+    return EXIT_OK if readiness.readiness_status == "READY_FOR_MANUAL_INVOICE_AND_KICKOFF" else EXIT_REJECT
+
+
+def _cmd_inspect_hvs_commercial_acceptance(args: argparse.Namespace) -> int:
+    from .hvs_commercial_acceptance_service import inspect_commercial_acceptance
+
+    return _commercial_acceptance_result(inspect_commercial_acceptance(commercial_acceptance_id=args.acceptance_id, repo_root=_repo_root()))
+
+
+def _cmd_list_hvs_commercial_decision_queue(args: argparse.Namespace) -> int:
+    from .hvs_commercial_acceptance_service import list_commercial_decision_queue
+
+    _emit({"items": list_commercial_decision_queue(repo_root=_repo_root(), evaluation_date=args.evaluation_date), "automation_allowed": False})
     return EXIT_OK
 
 
