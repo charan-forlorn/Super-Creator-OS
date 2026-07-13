@@ -676,7 +676,337 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     lineage8f.add_argument("--project-id", default=None)
     lineage8f.set_defaults(func=_cmd_inspect_post_delivery_lineage)
+
+    # --- Stage 8G: post-delivery support, dispute/reopen, commercial closure -
+    sp = sub.add_parser("register-support-policy", help="Register a post-delivery support policy (explicit window).")
+    sp.add_argument("--authorization-id", required=True)
+    sp.add_argument("--support-window-start", required=True)
+    sp.add_argument("--support-window-end", required=True)
+    sp.add_argument("--policy-type", required=True)
+    sp.add_argument("--included-issue-categories", required=True, help="comma-separated")
+    sp.add_argument("--excluded-issue-categories", default="")
+    sp.add_argument("--revision-allowance-reference", default=None)
+    sp.add_argument("--commercial-terms-reference", default=None)
+    sp.add_argument("--policy-version", required=True)
+    sp.add_argument("--created-by-operator-id", required=True)
+    sp.add_argument("--evidence-references", default="")
+    sp.add_argument("--operator-id", default=None)
+    sp.add_argument("--recorded-at", default=None)
+    sp.set_defaults(func=_cmd_register_support_policy)
+
+    isp = sub.add_parser("inspect-support-policy", help="Inspect a support policy by id.")
+    isp.add_argument("--support-policy-id", required=True)
+    isp.set_defaults(func=_cmd_inspect_support_policy)
+
+    ri = sub.add_parser("record-issue", help="Record a post-delivery customer issue/dispute intake.")
+    ri.add_argument("--support-policy-id", required=True)
+    ri.add_argument("--issue-category", required=True)
+    ri.add_argument("--issue-summary", required=True)
+    ri.add_argument("--recorded-by-operator-id", required=True)
+    ri.add_argument("--customer-reference", required=True)
+    ri.add_argument("--affected-formats", required=True, help="comma-separated")
+    ri.add_argument("--reported-at", required=True)
+    ri.add_argument("--issue-details", default="")
+    ri.add_argument("--affected-artifact-references", default="")
+    ri.add_argument("--artifact-sha256", default="")
+    ri.add_argument("--requested-resolution", default="")
+    ri.add_argument("--evidence-references", default="")
+    ri.add_argument("--operator-id", default=None)
+    ri.add_argument("--recorded-at", default=None)
+    ri.set_defaults(func=_cmd_record_issue)
+
+    ii = sub.add_parser("inspect-issue", help="Inspect an issue by id.")
+    ii.add_argument("--issue-id", required=True)
+    ii.set_defaults(func=_cmd_inspect_issue)
+
+    ci = sub.add_parser("classify-issue", help="Deterministically classify an issue (fail-closed).")
+    ci.add_argument("--issue-id", required=True)
+    ci.add_argument("--classified-by-operator-id", required=True)
+    ci.add_argument("--operator-id", default=None)
+    ci.add_argument("--recorded-at", default=None)
+    ci.set_defaults(func=_cmd_classify_issue)
+
+    od = sub.add_parser("open-dispute", help="Open a dispute for an issue (operator-gated).")
+    od.add_argument("--issue-id", required=True)
+    od.add_argument("--dispute-type", required=True)
+    od.add_argument("--dispute-reason", required=True)
+    od.add_argument("--opened-by-operator-id", required=True)
+    od.add_argument("--disputed-artifact-references", default="")
+    od.add_argument("--artifact-sha256", default="")
+    od.add_argument("--evidence-references", default="")
+    od.add_argument("--operator-id", default=None)
+    od.add_argument("--recorded-at", default=None)
+    od.set_defaults(func=_cmd_open_dispute)
+
+    rd = sub.add_parser("resolve-dispute", help="Resolve a dispute (operator + reason required).")
+    rd.add_argument("--dispute-id", required=True)
+    rd.add_argument("--resolution-status", required=True)
+    rd.add_argument("--resolved-by-operator-id", required=True)
+    rd.add_argument("--resolution-reason", required=True)
+    rd.add_argument("--resolution-reference", default=None)
+    rd.add_argument("--operator-id", default=None)
+    rd.add_argument("--recorded-at", default=None)
+    rd.set_defaults(func=_cmd_resolve_dispute)
+
+    idp = sub.add_parser("inspect-dispute", help="Inspect a dispute by id.")
+    idp.add_argument("--dispute-id", required=True)
+    idp.set_defaults(func=_cmd_inspect_dispute)
+
+    rr = sub.add_parser("request-reopen", help="Request a case reopen (routing evidence only).")
+    rr.add_argument("--issue-id", required=True)
+    rr.add_argument("--target-workflow", required=True)
+    rr.add_argument("--reopen-reason", required=True)
+    rr.add_argument("--reopen-scope", required=True)
+    rr.add_argument("--operator-id", default=None)
+    rr.add_argument("--recorded-at", default=None)
+    rr.set_defaults(func=_cmd_request_reopen)
+
+    ar = sub.add_parser("approve-reopen", help="Approve a reopen (explicit operator approval).")
+    ar.add_argument("--reopen-id", required=True)
+    ar.add_argument("--approved-by-operator-id", required=True)
+    ar.add_argument("--approval-reference", required=True)
+    ar.add_argument("--operator-id", default=None)
+    ar.add_argument("--recorded-at", default=None)
+    ar.set_defaults(func=_cmd_approve_reopen)
+
+    ec = sub.add_parser("evaluate-commercial-closure", help="Evaluate commercial-closure readiness (fail-closed).")
+    ec.add_argument("--authorization-id", required=True)
+    ec.add_argument("--closure-basis", required=True)
+    ec.add_argument("--closed-by-operator-id", required=True)
+    ec.add_argument("--invoice-state-reference", default=None)
+    ec.add_argument("--payment-state-reference", default=None)
+    ec.add_argument("--outstanding-actions", default="")
+    ec.add_argument("--evidence-references", default="")
+    ec.add_argument("--operator-id", default=None)
+    ec.add_argument("--recorded-at", default=None)
+    ec.set_defaults(func=_cmd_evaluate_commercial_closure)
+
+    cc = sub.add_parser("create-commercial-closure", help="Record commercial closure (read-only invoice/payment refs).")
+    cc.add_argument("--authorization-id", required=True)
+    cc.add_argument("--closure-basis", required=True)
+    cc.add_argument("--closed-by-operator-id", required=True)
+    cc.add_argument("--invoice-state-reference", default=None)
+    cc.add_argument("--payment-state-reference", default=None)
+    cc.add_argument("--support-policy-id", default="")
+    cc.add_argument("--outstanding-actions", default="")
+    cc.add_argument("--evidence-references", default="")
+    cc.add_argument("--operator-id", default=None)
+    cc.add_argument("--recorded-at", default=None)
+    cc.set_defaults(func=_cmd_create_commercial_closure)
+
+    isl = sub.add_parser("inspect-post-delivery-support-lineage", help="Inspect full 8G support/dispute/reopen/closure lineage.")
+    isl.add_argument("--project-id", default=None)
+    isl.set_defaults(func=_cmd_inspect_post_delivery_support_lineage)
     return parser
+
+
+def _cmd_inspect_post_delivery_support_lineage(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_support_service import inspect_post_delivery_support_lineage
+
+    out = inspect_post_delivery_support_lineage(project_id=getattr(args, "project_id", None), repo_root=_repo_root())
+    _emit(out)
+    return EXIT_OK
+
+
+def _cmd_register_support_policy(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_support_service import register_post_delivery_support_policy
+
+    out = register_post_delivery_support_policy(
+        authorization_id=args.authorization_id,
+        support_window_start=args.support_window_start,
+        support_window_end=args.support_window_end,
+        policy_type=args.policy_type,
+        included_issue_categories=_split_csv(args.included_issue_categories),
+        excluded_issue_categories=_split_csv(args.excluded_issue_categories),
+        created_by_operator_id=args.created_by_operator_id,
+        policy_version=args.policy_version,
+        revision_allowance_reference=args.revision_allowance_reference,
+        commercial_terms_reference=args.commercial_terms_reference,
+        evidence_references=_split_csv(args.evidence_references),
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(out.to_dict())
+    return EXIT_OK if out.ok else EXIT_REJECT
+
+
+def _cmd_inspect_support_policy(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_support_service import _policies_by_id
+
+    policy = _policies_by_id(repo_root=_repo_root()).get(args.support_policy_id)
+    if policy is None:
+        _emit({"ok": False, "error_code": "SUPPORT_POLICY_NOT_FOUND"})
+        return EXIT_REJECT
+    _emit(policy.to_dict())
+    return EXIT_OK
+
+
+def _cmd_record_issue(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_support_service import record_post_delivery_issue
+
+    out = record_post_delivery_issue(
+        support_policy_id=args.support_policy_id,
+        issue_category=args.issue_category,
+        issue_summary=args.issue_summary,
+        recorded_by_operator_id=args.recorded_by_operator_id,
+        customer_reference=args.customer_reference,
+        affected_formats=_split_csv(args.affected_formats),
+        reported_at=args.reported_at,
+        issue_details=args.issue_details,
+        affected_artifact_references=_split_csv(args.affected_artifact_references),
+        artifact_sha256=args.artifact_sha256,
+        requested_resolution=args.requested_resolution,
+        evidence_references=_split_csv(args.evidence_references),
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(out.to_dict())
+    return EXIT_OK if out.ok else EXIT_REJECT
+
+
+def _cmd_inspect_issue(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_support_service import _issues_by_id
+
+    issue = _issues_by_id(repo_root=_repo_root()).get(args.issue_id)
+    if issue is None:
+        _emit({"ok": False, "error_code": "ISSUE_NOT_FOUND"})
+        return EXIT_REJECT
+    _emit(issue.to_dict())
+    return EXIT_OK
+
+
+def _cmd_classify_issue(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_support_service import classify_post_delivery_issue
+
+    out = classify_post_delivery_issue(
+        issue_id=args.issue_id,
+        classified_by_operator_id=args.classified_by_operator_id,
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(out.to_dict())
+    return EXIT_OK if out.ok else EXIT_REJECT
+
+
+def _cmd_open_dispute(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_support_service import open_post_delivery_dispute
+
+    out = open_post_delivery_dispute(
+        issue_id=args.issue_id,
+        dispute_type=args.dispute_type,
+        dispute_reason=args.dispute_reason,
+        opened_by_operator_id=args.opened_by_operator_id,
+        disputed_artifact_references=_split_csv(args.disputed_artifact_references),
+        artifact_sha256=args.artifact_sha256,
+        evidence_references=_split_csv(args.evidence_references),
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(out.to_dict())
+    return EXIT_OK if out.ok else EXIT_REJECT
+
+
+def _cmd_resolve_dispute(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_support_service import resolve_post_delivery_dispute
+
+    out = resolve_post_delivery_dispute(
+        dispute_id=args.dispute_id,
+        resolution_status=args.resolution_status,
+        resolved_by_operator_id=args.resolved_by_operator_id,
+        resolution_reason=args.resolution_reason,
+        resolution_reference=args.resolution_reference,
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(out.to_dict())
+    return EXIT_OK if out.ok else EXIT_REJECT
+
+
+def _cmd_inspect_dispute(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_support_service import _disputes_by_issue
+
+    for lst in _disputes_by_issue(repo_root=_repo_root()).values():
+        for d in lst:
+            if d.dispute_id == args.dispute_id:
+                _emit(d.to_dict())
+                return EXIT_OK
+    _emit({"ok": False, "error_code": "DISPUTE_NOT_FOUND"})
+    return EXIT_REJECT
+
+
+def _cmd_request_reopen(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_support_service import request_post_delivery_reopen
+
+    out = request_post_delivery_reopen(
+        issue_id=args.issue_id,
+        target_workflow=args.target_workflow,
+        reopen_reason=args.reopen_reason,
+        reopen_scope=args.reopen_scope,
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(out.to_dict())
+    return EXIT_OK if out.ok else EXIT_REJECT
+
+
+def _cmd_approve_reopen(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_support_service import approve_post_delivery_reopen
+
+    out = approve_post_delivery_reopen(
+        reopen_id=args.reopen_id,
+        approved_by_operator_id=args.approved_by_operator_id,
+        approval_reference=args.approval_reference,
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(out.to_dict())
+    return EXIT_OK if out.ok else EXIT_REJECT
+
+
+def _cmd_evaluate_commercial_closure(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_support_service import evaluate_commercial_closure
+
+    out = evaluate_commercial_closure(
+        authorization_id=args.authorization_id,
+        closure_basis=args.closure_basis,
+        closed_by_operator_id=args.closed_by_operator_id,
+        invoice_state_reference=args.invoice_state_reference,
+        payment_state_reference=args.payment_state_reference,
+        outstanding_actions=_split_csv(args.outstanding_actions),
+        evidence_references=_split_csv(args.evidence_references),
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(out.to_dict())
+    return EXIT_OK if out.ok else EXIT_REJECT
+
+
+def _cmd_create_commercial_closure(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_support_service import record_commercial_closure
+
+    out = record_commercial_closure(
+        authorization_id=args.authorization_id,
+        closure_basis=args.closure_basis,
+        closed_by_operator_id=args.closed_by_operator_id,
+        invoice_state_reference=args.invoice_state_reference,
+        payment_state_reference=args.payment_state_reference,
+        support_policy_id=args.support_policy_id,
+        outstanding_actions=_split_csv(args.outstanding_actions),
+        evidence_references=_split_csv(args.evidence_references),
+        operator_id=args.operator_id,
+        repo_root=_repo_root(),
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(out.to_dict())
+    return EXIT_OK if out.ok else EXIT_REJECT
 
 
 def _repo_root() -> Path:
