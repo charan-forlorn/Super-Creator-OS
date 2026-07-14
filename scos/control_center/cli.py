@@ -1795,6 +1795,11 @@ def _build_parser() -> argparse.ArgumentParser:
     r_outcomes.add_argument("--customer-reference", default=None)
     r_outcomes.set_defaults(func=_cmd_stage8r_list_outcomes)
 
+    # Stage 8S — read-only lifecycle release inspector (no mutation).
+    from .hvs_lifecycle_release_cli import register as _register_lifecycle
+
+    _register_lifecycle(sub)
+
     return parser
 
 
