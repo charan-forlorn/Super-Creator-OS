@@ -776,6 +776,97 @@ def _build_parser() -> argparse.ArgumentParser:
     o_insp_rec.add_argument("--delivery-record-id", required=True)
     o_insp_rec.set_defaults(func=_cmd_inspect_hvs_manual_delivery_record)
 
+    # --- Stage 8P: customer receipt confirmation, delivered-artifact
+    #     reverification, and acceptance / issue-intake gate (local-only;
+    #     evidence + decision-intake only; no customer contact, no HVS,
+    #     no transport, no automatic revision / dispute / closure) --
+    p_elig = sub.add_parser(
+        "inspect-hvs-stage8p-customer-receipt-eligibility",
+        help="Verify Stage 8O actual-delivery lineage for Stage 8P receipt eligibility (read-only).",
+    )
+    p_elig.add_argument("--actual-delivery-record-id", required=True)
+    p_elig.add_argument("--delivery-package-id", default=None)
+    p_elig.add_argument("--artifact-id", default=None)
+    p_elig.add_argument("--artifact-sha256", default=None)
+    p_elig.add_argument("--customer-reference", default=None)
+    p_elig.set_defaults(func=_cmd_inspect_hvs_customer_receipt_eligibility)
+
+    p_rec = sub.add_parser(
+        "record-hvs-stage8p-customer-receipt",
+        help="Record operator-supplied customer receipt confirmation (binds to Stage 8O delivery).",
+    )
+    p_rec.add_argument("--actual-delivery-record-id", required=True)
+    p_rec.add_argument("--delivery-package-id", required=True)
+    p_rec.add_argument("--artifact-id", required=True)
+    p_rec.add_argument("--artifact-sha256", required=True)
+    p_rec.add_argument("--customer-reference", required=True)
+    p_rec.add_argument("--receipt-evidence-type", required=True,
+        choices=["CUSTOMER_WRITTEN_CONFIRMATION", "CUSTOMER_VERBAL_CONFIRMATION_RECORDED_BY_OPERATOR",
+                 "CUSTOMER_PORTAL_CONFIRMATION_IMPORTED_MANUALLY", "SIGNED_RECEIPT_REFERENCE",
+                 "DELIVERY_CHANNEL_ACKNOWLEDGEMENT", "OTHER_OPERATOR_VERIFIED_RECEIPT_EVIDENCE"])
+    p_rec.add_argument("--safe-evidence-reference", required=True)
+    p_rec.add_argument("--receipt-confirmation-date", required=True)
+    p_rec.add_argument("--recorded-by-operator-id", required=True)
+    p_rec.add_argument("--customer-confirmed-artifact-sha256", default=None)
+    p_rec.add_argument("--source-render-completion-id", default="")
+    p_rec.add_argument("--source-delivery-authorization-id", default="")
+    p_rec.add_argument("--source-delivery-lineage-id", default=None)
+    p_rec.add_argument("--recorded-at", default=None)
+    p_rec.set_defaults(func=_cmd_record_hvs_customer_receipt)
+
+    p_insp_rec = sub.add_parser(
+        "inspect-hvs-stage8p-customer-receipt",
+        help="Inspect a Stage 8P customer receipt record (read-only).",
+    )
+    p_insp_rec.add_argument("--receipt-record-id", required=True)
+    p_insp_rec.set_defaults(func=_cmd_inspect_hvs_customer_receipt)
+
+    p_dec = sub.add_parser(
+        "record-hvs-stage8p-customer-decision",
+        help="Record explicit customer acceptance or rejection bound to a confirmed receipt.",
+    )
+    p_dec.add_argument("--actual-delivery-record-id", required=True)
+    p_dec.add_argument("--decision-status", required=True, choices=["ACCEPTED", "REJECTED"])
+    p_dec.add_argument("--decision-date", required=True)
+    p_dec.add_argument("--safe-evidence-reference", required=True)
+    p_dec.add_argument("--recorded-by-operator-id", required=True)
+    p_dec.add_argument("--acceptance-scope", default=None)
+    p_dec.add_argument("--rejection-reason", default=None)
+    p_dec.add_argument("--recorded-at", default=None)
+    p_dec.set_defaults(func=_cmd_record_hvs_customer_decision)
+
+    p_issue = sub.add_parser(
+        "record-hvs-stage8p-delivery-issue",
+        help="Record a customer-raised issue for internal review (no dispute / revision).",
+    )
+    p_issue.add_argument("--actual-delivery-record-id", required=True)
+    p_issue.add_argument("--issue-category", default=None)
+    p_issue.add_argument("--issue-summary", required=True)
+    p_issue.add_argument("--decision-date", required=True)
+    p_issue.add_argument("--safe-evidence-reference", required=True)
+    p_issue.add_argument("--recorded-by-operator-id", required=True)
+    p_issue.add_argument("--recorded-at", default=None)
+    p_issue.set_defaults(func=_cmd_record_hvs_delivery_issue)
+
+    p_rev = sub.add_parser(
+        "record-hvs-stage8p-revision-review-request",
+        help="Record a customer revision-review request (no Stage 8B revision created).",
+    )
+    p_rev.add_argument("--actual-delivery-record-id", required=True)
+    p_rev.add_argument("--revision-review-reason", required=True)
+    p_rev.add_argument("--decision-date", required=True)
+    p_rev.add_argument("--safe-evidence-reference", required=True)
+    p_rev.add_argument("--recorded-by-operator-id", required=True)
+    p_rev.add_argument("--recorded-at", default=None)
+    p_rev.set_defaults(func=_cmd_record_hvs_revision_review_request)
+
+    p_status = sub.add_parser(
+        "inspect-hvs-stage8p-post-delivery-status",
+        help="Inspect the Stage 8P post-receipt readiness / outcome view (read-only).",
+    )
+    p_status.add_argument("--actual-delivery-record-id", required=True)
+    p_status.set_defaults(func=_cmd_inspect_hvs_post_delivery_status)
+
     # --- Stage 8E: revised-delivery acceptance, release authorization, and
     #     final revision closure (evidence only; no HVS / outbound transport) --
     acc8e = sub.add_parser(
@@ -3532,6 +3623,116 @@ def _cmd_record_hvs_manual_delivery(args: argparse.Namespace) -> int:
         recorded_at=args.recorded_at or _now_iso(),
         external_evidence_reference=getattr(args, "external_evidence_reference", "") or "",
         operator_note=getattr(args, "operator_note", "") or "",
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_hvs_customer_receipt_eligibility(args: argparse.Namespace) -> int:
+    from .hvs_customer_receipt_acceptance_service import inspect_stage8p_eligibility
+
+    outcome = inspect_stage8p_eligibility(
+        repo_root=_repo_root(),
+        actual_delivery_record_id=args.actual_delivery_record_id,
+        delivery_package_id=getattr(args, "delivery_package_id", None) or None,
+        artifact_id=getattr(args, "artifact_id", None) or None,
+        artifact_sha256=getattr(args, "artifact_sha256", None) or None,
+        customer_reference=getattr(args, "customer_reference", None) or None,
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_record_hvs_customer_receipt(args: argparse.Namespace) -> int:
+    from .hvs_customer_receipt_acceptance_service import create_customer_receipt_record
+
+    outcome = create_customer_receipt_record(
+        repo_root=_repo_root(),
+        actual_delivery_record_id=args.actual_delivery_record_id,
+        delivery_package_id=args.delivery_package_id,
+        artifact_id=args.artifact_id,
+        artifact_sha256=args.artifact_sha256,
+        customer_reference=args.customer_reference,
+        receipt_evidence_type=args.receipt_evidence_type,
+        safe_evidence_reference=args.safe_evidence_reference,
+        receipt_confirmation_date=args.receipt_confirmation_date,
+        recorded_by_operator_id=args.recorded_by_operator_id,
+        customer_confirmed_artifact_sha256=getattr(args, "customer_confirmed_artifact_sha256", None) or None,
+        source_render_completion_id=getattr(args, "source_render_completion_id", "") or "",
+        source_delivery_authorization_id=getattr(args, "source_delivery_authorization_id", "") or "",
+        source_delivery_lineage_id=getattr(args, "source_delivery_lineage_id", None) or None,
+        informational_recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_hvs_customer_receipt(args: argparse.Namespace) -> int:
+    from .hvs_customer_receipt_acceptance_service import inspect_customer_receipt
+
+    outcome = inspect_customer_receipt(
+        repo_root=_repo_root(), receipt_record_id=args.receipt_record_id
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_record_hvs_customer_decision(args: argparse.Namespace) -> int:
+    from .hvs_customer_receipt_acceptance_service import record_customer_decision
+
+    outcome = record_customer_decision(
+        repo_root=_repo_root(),
+        actual_delivery_record_id=args.actual_delivery_record_id,
+        decision_status=args.decision_status,
+        decision_date=args.decision_date,
+        safe_evidence_reference=args.safe_evidence_reference,
+        recorded_by_operator_id=args.recorded_by_operator_id,
+        acceptance_scope=getattr(args, "acceptance_scope", None) or None,
+        rejection_reason=getattr(args, "rejection_reason", None) or None,
+        informational_recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_record_hvs_delivery_issue(args: argparse.Namespace) -> int:
+    from .hvs_customer_receipt_acceptance_service import record_delivery_issue
+
+    outcome = record_delivery_issue(
+        repo_root=_repo_root(),
+        actual_delivery_record_id=args.actual_delivery_record_id,
+        issue_category=getattr(args, "issue_category", None) or None,
+        issue_summary=args.issue_summary,
+        decision_date=args.decision_date,
+        safe_evidence_reference=args.safe_evidence_reference,
+        recorded_by_operator_id=args.recorded_by_operator_id,
+        informational_recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_record_hvs_revision_review_request(args: argparse.Namespace) -> int:
+    from .hvs_customer_receipt_acceptance_service import record_revision_review_request
+
+    outcome = record_revision_review_request(
+        repo_root=_repo_root(),
+        actual_delivery_record_id=args.actual_delivery_record_id,
+        revision_review_reason=args.revision_review_reason,
+        decision_date=args.decision_date,
+        safe_evidence_reference=args.safe_evidence_reference,
+        recorded_by_operator_id=args.recorded_by_operator_id,
+        informational_recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_hvs_post_delivery_status(args: argparse.Namespace) -> int:
+    from .hvs_customer_receipt_acceptance_service import inspect_delivery_post_receipt_status
+
+    outcome = inspect_delivery_post_receipt_status(
+        repo_root=_repo_root(), actual_delivery_record_id=args.actual_delivery_record_id
     )
     _emit(outcome.to_dict())
     return EXIT_OK if outcome.ok else EXIT_REJECT
