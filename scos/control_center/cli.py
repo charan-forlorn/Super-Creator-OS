@@ -867,6 +867,102 @@ def _build_parser() -> argparse.ArgumentParser:
     p_status.add_argument("--actual-delivery-record-id", required=True)
     p_status.set_defaults(func=_cmd_inspect_hvs_post_delivery_status)
 
+    # --- Stage 8Q: post-delivery resolution routing (recommendation + operator
+    #     authorization evidence only; no execution / contact / HVS) ---------
+    q_elig = sub.add_parser(
+        "stage8q-inspect-eligibility",
+        help="Reverify Stage 8P/8O evidence and check Stage 8Q routing eligibility.",
+    )
+    q_elig.add_argument("--actual-delivery-record-id", required=True)
+    q_elig.set_defaults(func=_cmd_stage8q_inspect_eligibility)
+
+    q_create = sub.add_parser(
+        "stage8q-create-route",
+        help="Create a deterministic Stage 8Q resolution-route recommendation (no execution).",
+    )
+    q_create.add_argument("--actual-delivery-record-id", required=True)
+    q_create.add_argument("--issue-category", default=None)
+    q_create.add_argument("--issue-summary", default=None)
+    q_create.add_argument("--safe-evidence-reference", default=None)
+    q_create.add_argument("--revision-request-valid", default="true", choices=["true", "false"])
+    q_create.add_argument("--requested-scope", default=None)
+    q_create.add_argument("--dispute-active", default="false", choices=["true", "false"])
+    q_create.add_argument("--support-blocker-active", default="false", choices=["true", "false"])
+    q_create.add_argument("--commercial-payment-blocker-active", default="false", choices=["true", "false"])
+    q_create.add_argument("--evaluation-date", default=None)
+    q_create.add_argument("--recorded-at", default=None)
+    q_create.set_defaults(func=_cmd_stage8q_create_route)
+
+    q_inspect = sub.add_parser(
+        "stage8q-inspect-route",
+        help="Inspect a Stage 8Q resolution route by id (read-only).",
+    )
+    q_inspect.add_argument("--resolution-route-id", required=True)
+    q_inspect.set_defaults(func=_cmd_stage8q_inspect_route)
+
+    q_close = sub.add_parser(
+        "stage8q-evaluate-closure",
+        help="Evaluate closure eligibility for a bound Stage 8Q route context (read-only).",
+    )
+    q_close.add_argument("--actual-delivery-record-id", required=True)
+    q_close.add_argument("--dispute-active", default="false", choices=["true", "false"])
+    q_close.add_argument("--support-blocker-active", default="false", choices=["true", "false"])
+    q_close.add_argument("--commercial-payment-blocker-active", default="false", choices=["true", "false"])
+    q_close.add_argument("--evaluation-date", default=None)
+    q_close.set_defaults(func=_cmd_stage8q_evaluate_closure)
+
+    q_qual = sub.add_parser(
+        "stage8q-qualify-issue",
+        help="Qualify a reported issue as a deterministic candidate (no confirmation).",
+    )
+    q_qual.add_argument("--issue-category", default=None)
+    q_qual.add_argument("--issue-summary", default=None)
+    q_qual.add_argument("--safe-evidence-reference", default=None)
+    q_qual.add_argument("--evaluation-date", default=None)
+    q_qual.set_defaults(func=_cmd_stage8q_qualify_issue)
+
+    q_rev = sub.add_parser(
+        "stage8q-evaluate-revision",
+        help="Evaluate Stage 8B revision eligibility for a revision-review request (read-only).",
+    )
+    q_rev.add_argument("--actual-delivery-record-id", required=True)
+    q_rev.add_argument("--revision-request-valid", default="true", choices=["true", "false"])
+    q_rev.add_argument("--requested-scope", default=None)
+    q_rev.add_argument("--conflicting-final-decision", default="false", choices=["true", "false"])
+    q_rev.add_argument("--evaluation-date", default=None)
+    q_rev.set_defaults(func=_cmd_stage8q_evaluate_revision)
+
+    q_decide = sub.add_parser(
+        "stage8q-decide-route",
+        help="Record an explicit operator decision on a Stage 8Q route (authorization only).",
+    )
+    q_decide.add_argument("--resolution-route-id", required=True)
+    q_decide.add_argument(
+        "--decision-action",
+        required=True,
+        choices=[
+            "APPROVE_CLOSURE_RECOMMENDATION",
+            "APPROVE_MANUAL_FOLLOW_UP_RECOMMENDATION",
+            "APPROVE_SUPPORT_REVIEW_ROUTE",
+            "APPROVE_DEFECT_REVIEW_ROUTE",
+            "APPROVE_DISPUTE_ELIGIBILITY_REVIEW",
+            "APPROVE_REVISION_ELIGIBILITY_REVIEW",
+            "REJECT_ROUTE_RECOMMENDATION",
+            "CANCEL_ROUTE_REVIEW",
+        ],
+    )
+    q_decide.add_argument("--operator-id", required=True)
+    q_decide.add_argument("--reason", default=None)
+    q_decide.add_argument("--recorded-at", default=None)
+    q_decide.set_defaults(func=_cmd_stage8q_decide_route)
+
+    q_ready = sub.add_parser(
+        "stage8q-readiness",
+        help="Build a read-only Stage 8Q readiness view for a delivery (no mutation).",
+    )
+    q_ready.add_argument("--actual-delivery-record-id", required=True)
+    q_ready.set_defaults(func=_cmd_stage8q_readiness)
+
     # --- Stage 8E: revised-delivery acceptance, release authorization, and
     #     final revision closure (evidence only; no HVS / outbound transport) --
     acc8e = sub.add_parser(
@@ -3787,6 +3883,179 @@ def main(argv: list[str] | None = None) -> int:
             "metadata": exc.metadata,
         })
         return EXIT_REJECT
+
+
+# ---------------------------------------------------------------------------
+# Stage 8Q: post-delivery resolution routing (recommendation + authorization)
+# ---------------------------------------------------------------------------
+def _cmd_stage8q_inspect_eligibility(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_resolution_service import inspect_stage8q_eligibility
+
+    outcome = inspect_stage8q_eligibility(
+        repo_root=_repo_root(), actual_delivery_record_id=args.actual_delivery_record_id
+    )
+    payload = outcome.to_dict()
+    payload["command"] = "stage8q-inspect-eligibility"
+    payload["schema_version"] = CLI_SCHEMA_VERSION
+    _emit(payload)
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_stage8q_create_route(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_resolution_service import create_post_delivery_route
+
+    outcome = create_post_delivery_route(
+        repo_root=_repo_root(),
+        actual_delivery_record_id=args.actual_delivery_record_id,
+        issue_category=getattr(args, "issue_category", None) or None,
+        issue_summary=getattr(args, "issue_summary", None) or None,
+        safe_evidence_reference=getattr(args, "safe_evidence_reference", None) or None,
+        revision_request_valid=(getattr(args, "revision_request_valid", "true") != "false"),
+        requested_scope=getattr(args, "requested_scope", None) or None,
+        dispute_active=(getattr(args, "dispute_active", "false") == "true"),
+        support_blocker_active=(getattr(args, "support_blocker_active", "false") == "true"),
+        commercial_payment_blocker_active=(getattr(args, "commercial_payment_blocker_active", "false") == "true"),
+        evaluation_date=getattr(args, "evaluation_date", None) or None,
+        informational_recorded_at=args.recorded_at or _now_iso(),
+    )
+    payload = outcome.to_dict()
+    payload["command"] = "stage8q-create-route"
+    payload["schema_version"] = CLI_SCHEMA_VERSION
+    _emit(payload)
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_stage8q_inspect_route(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_resolution_service import inspect_post_delivery_route
+
+    outcome = inspect_post_delivery_route(
+        repo_root=_repo_root(), resolution_route_id=args.resolution_route_id
+    )
+    payload = outcome.to_dict()
+    payload["command"] = "stage8q-inspect-route"
+    payload["schema_version"] = CLI_SCHEMA_VERSION
+    _emit(payload)
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_stage8q_evaluate_closure(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_resolution_service import (
+        build_source_binding,
+        evaluate_closure_eligibility,
+    )
+
+    binding = build_source_binding(repo_root=_repo_root(), actual_delivery_record_id=args.actual_delivery_record_id)
+    if binding is None:
+        _emit({
+            "ok": False,
+            "command": "stage8q-evaluate-closure",
+            "schema_version": CLI_SCHEMA_VERSION,
+            "error_kind": "stage8p_evidence_not_verified",
+            "error_detail": "could not construct source binding from verified evidence",
+        })
+        return EXIT_REJECT
+    result = evaluate_closure_eligibility(
+        binding=binding,
+        dispute_active=(getattr(args, "dispute_active", "false") == "true"),
+        support_blocker_active=(getattr(args, "support_blocker_active", "false") == "true"),
+        commercial_payment_blocker_active=(getattr(args, "commercial_payment_blocker_active", "false") == "true"),
+        evaluation_date=getattr(args, "evaluation_date", None) or None,
+    )
+    _emit({
+        "ok": True,
+        "command": "stage8q-evaluate-closure",
+        "schema_version": CLI_SCHEMA_VERSION,
+        "closure_eligibility": result.to_dict(),
+    })
+    return EXIT_OK
+
+
+def _cmd_stage8q_qualify_issue(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_resolution_service import qualify_reported_issue
+
+    outcome = qualify_reported_issue(
+        issue_category=getattr(args, "issue_category", None) or None,
+        issue_summary=getattr(args, "issue_summary", None) or None,
+        safe_evidence_reference=getattr(args, "safe_evidence_reference", None) or None,
+        evaluation_date=getattr(args, "evaluation_date", None) or None,
+    )
+    result = outcome.to_dict() if isinstance(outcome, object) else {}
+    _emit({
+        "ok": True,
+        "command": "stage8q-qualify-issue",
+        "schema_version": CLI_SCHEMA_VERSION,
+        "issue_qualification": result.get("issue_qualification"),
+        "confirmed": result.get("confirmed"),
+        "defect_confirmed": result.get("defect_confirmed"),
+        "dispute_created": result.get("dispute_created"),
+        "revision_created": result.get("revision_created"),
+        "hvs_invoked": result.get("hvs_invoked"),
+        "insufficient_evidence": result.get("insufficient_evidence"),
+    })
+    return EXIT_OK
+
+
+def _cmd_stage8q_evaluate_revision(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_resolution_service import (
+        build_source_binding,
+        evaluate_revision_eligibility,
+    )
+
+    binding = build_source_binding(repo_root=_repo_root(), actual_delivery_record_id=args.actual_delivery_record_id)
+    if binding is None:
+        _emit({
+            "ok": False,
+            "command": "stage8q-evaluate-revision",
+            "schema_version": CLI_SCHEMA_VERSION,
+            "error_kind": "stage8p_evidence_not_verified",
+            "error_detail": "could not construct source binding from verified evidence",
+        })
+        return EXIT_REJECT
+    result = evaluate_revision_eligibility(
+        binding=binding,
+        revision_request_valid=(getattr(args, "revision_request_valid", "true") != "false"),
+        requested_scope=getattr(args, "requested_scope", None) or None,
+        conflicting_final_decision=(getattr(args, "conflicting_final_decision", "false") == "true"),
+        evaluation_date=getattr(args, "evaluation_date", None) or None,
+    )
+    _emit({
+        "ok": True,
+        "command": "stage8q-evaluate-revision",
+        "schema_version": CLI_SCHEMA_VERSION,
+        "revision_eligibility": result.to_dict(),
+    })
+    return EXIT_OK
+
+
+def _cmd_stage8q_decide_route(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_resolution_service import decide_post_delivery_route
+
+    outcome = decide_post_delivery_route(
+        repo_root=_repo_root(),
+        resolution_route_id=args.resolution_route_id,
+        decision_action=args.decision_action,
+        operator_id=args.operator_id,
+        reason=getattr(args, "reason", None) or None,
+        informational_recorded_at=args.recorded_at or _now_iso(),
+    )
+    payload = outcome.to_dict()
+    payload["command"] = "stage8q-decide-route"
+    payload["schema_version"] = CLI_SCHEMA_VERSION
+    _emit(payload)
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_stage8q_readiness(args: argparse.Namespace) -> int:
+    from .hvs_post_delivery_resolution_service import build_stage8q_readiness_view
+
+    outcome = build_stage8q_readiness_view(
+        repo_root=_repo_root(), actual_delivery_record_id=args.actual_delivery_record_id
+    )
+    payload = outcome.to_dict()
+    payload["command"] = "stage8q-readiness"
+    payload["schema_version"] = CLI_SCHEMA_VERSION
+    _emit(payload)
+    return EXIT_OK if outcome.ok else EXIT_REJECT
 
 
 if __name__ == "__main__":
