@@ -1702,6 +1702,99 @@ def _build_parser() -> argparse.ArgumentParser:
         "list-production-asset-events", help="List append-only Stage 8M intake events."
     )
     s8m_list.set_defaults(func=_cmd_list_production_asset_events)
+
+    # --- Stage 8R: operator-controlled approved resolution action execution ----
+    r_create = sub.add_parser(
+        "create-resolution-action-request",
+        help="Create a Stage 8R execution request for an approved Stage 8Q route + action.",
+    )
+    r_create.add_argument("--resolution-route-id", required=True)
+    r_create.add_argument("--action-family", required=True)
+    r_create.add_argument("--operator-id", required=True)
+    r_create.add_argument("--receipt-evidence-id", default=None)
+    r_create.add_argument("--closure-reason", default=None)
+    r_create.add_argument("--revision-items", default=None)
+    r_create.add_argument("--requested-scope", default=None)
+    r_create.add_argument("--source-issue-id", default=None)
+    r_create.add_argument("--dispute-type", default=None)
+    r_create.add_argument("--dispute-reason", default=None)
+    r_create.add_argument("--follow-up-purpose", default=None)
+    r_create.add_argument("--follow-up-recommended-action", default=None)
+    r_create.add_argument("--follow-up-due-date", default=None)
+    r_create.add_argument("--recorded-at", default=None)
+    r_create.set_defaults(func=_cmd_stage8r_create_request)
+
+    r_eval = sub.add_parser(
+        "evaluate-resolution-action",
+        help="Evaluate Stage 8R execution readiness/compatibility for an existing request.",
+    )
+    r_eval.add_argument("--execution-request-id", required=True)
+    r_eval.set_defaults(func=_cmd_stage8r_evaluate)
+
+    r_approve = sub.add_parser(
+        "approve-resolution-action",
+        help="Approve a Stage 8R execution request for execution.",
+    )
+    r_approve.add_argument("--execution-request-id", required=True)
+    r_approve.add_argument("--operator-id", required=True)
+    r_approve.add_argument("--reason", default=None)
+    r_approve.add_argument("--recorded-at", default=None)
+    r_approve.set_defaults(func=_cmd_stage8r_approve)
+
+    r_reject = sub.add_parser(
+        "reject-resolution-action",
+        help="Reject a Stage 8R execution request.",
+    )
+    r_reject.add_argument("--execution-request-id", required=True)
+    r_reject.add_argument("--operator-id", required=True)
+    r_reject.add_argument("--reason", required=True)
+    r_reject.add_argument("--recorded-at", default=None)
+    r_reject.set_defaults(func=_cmd_stage8r_reject)
+
+    r_cancel = sub.add_parser(
+        "cancel-resolution-action",
+        help="Cancel a Stage 8R execution request.",
+    )
+    r_cancel.add_argument("--execution-request-id", required=True)
+    r_cancel.add_argument("--operator-id", required=True)
+    r_cancel.add_argument("--reason", required=True)
+    r_cancel.add_argument("--recorded-at", default=None)
+    r_cancel.set_defaults(func=_cmd_stage8r_cancel)
+
+    r_exec = sub.add_parser(
+        "execute-approved-resolution-action",
+        help="Execute an approved Stage 8R resolution action (single target mutation).",
+    )
+    r_exec.add_argument("--execution-request-id", required=True)
+    r_exec.add_argument("--operator-id", required=True)
+    r_exec.add_argument("--recorded-at", default=None)
+    r_exec.set_defaults(func=_cmd_stage8r_execute)
+
+    r_inspect = sub.add_parser(
+        "inspect-resolution-action",
+        help="Inspect a Stage 8R execution request (read-only).",
+    )
+    r_inspect.add_argument("--execution-request-id", required=True)
+    r_inspect.set_defaults(func=_cmd_stage8r_inspect)
+
+    r_audit = sub.add_parser(
+        "list-resolution-action-events",
+        help="List append-only Stage 8R resolution-action audit events (read-only).",
+    )
+    r_audit.add_argument("--execution-request-id", default=None)
+    r_audit.add_argument("--project-id", default=None)
+    r_audit.add_argument("--customer-reference", default=None)
+    r_audit.set_defaults(func=_cmd_stage8r_list_events)
+
+    r_outcomes = sub.add_parser(
+        "list-resolution-outcomes",
+        help="List Stage 8R execution outcomes / manual follow-ups (read-only).",
+    )
+    r_outcomes.add_argument("--execution-request-id", default=None)
+    r_outcomes.add_argument("--project-id", default=None)
+    r_outcomes.add_argument("--customer-reference", default=None)
+    r_outcomes.set_defaults(func=_cmd_stage8r_list_outcomes)
+
     return parser
 
 
@@ -4053,6 +4146,167 @@ def _cmd_stage8q_readiness(args: argparse.Namespace) -> int:
     )
     payload = outcome.to_dict()
     payload["command"] = "stage8q-readiness"
+    payload["schema_version"] = CLI_SCHEMA_VERSION
+    _emit(payload)
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+# ---------------------------------------------------------------------------
+# Stage 8R: operator-controlled approved resolution action execution
+# ---------------------------------------------------------------------------
+def _stage8r_selection_from_args(args: argparse.Namespace) -> "Any":
+    from .hvs_resolution_action_models import ResolutionActionSelection
+
+    revision_items = ()
+    raw = getattr(args, "revision_items", None)
+    if raw:
+        import json as _json
+
+        parsed = _json.loads(raw) if isinstance(raw, str) else raw
+        revision_items = tuple(dict(it) for it in parsed)
+    return ResolutionActionSelection(
+        action_family=args.action_family,
+        receipt_evidence_id=getattr(args, "receipt_evidence_id", None) or None,
+        closure_reason=getattr(args, "closure_reason", None) or None,
+        revision_items=revision_items,
+        requested_scope=getattr(args, "requested_scope", None) or None,
+        source_issue_id=getattr(args, "source_issue_id", None) or None,
+        dispute_type=getattr(args, "dispute_type", None) or None,
+        dispute_reason=getattr(args, "dispute_reason", None) or None,
+        follow_up_purpose=getattr(args, "follow_up_purpose", None) or None,
+        follow_up_recommended_action=getattr(args, "follow_up_recommended_action", None) or None,
+        follow_up_due_date=getattr(args, "follow_up_due_date", None) or None,
+    )
+
+
+def _cmd_stage8r_create_request(args: argparse.Namespace) -> int:
+    from .hvs_resolution_action_service import create_execution_request
+
+    sel = _stage8r_selection_from_args(args)
+    outcome = create_execution_request(
+        repo_root=_repo_root(),
+        resolution_route_id=args.resolution_route_id,
+        action_selection=sel,
+        recorded_by_operator_id=args.operator_id,
+        informational_recorded_at=args.recorded_at or _now_iso(),
+    )
+    payload = outcome.to_dict() if hasattr(outcome, "to_dict") else {"ok": outcome.ok}
+    payload["command"] = "create-resolution-action-request"
+    payload["schema_version"] = CLI_SCHEMA_VERSION
+    _emit(payload)
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_stage8r_evaluate(args: argparse.Namespace) -> int:
+    from .hvs_resolution_action_service import evaluate_execution_eligibility
+
+    outcome = evaluate_execution_eligibility(
+        repo_root=_repo_root(), execution_request_id=args.execution_request_id
+    )
+    payload = outcome.to_dict() if hasattr(outcome, "to_dict") else {"ok": outcome.ok}
+    payload["command"] = "evaluate-resolution-action"
+    payload["schema_version"] = CLI_SCHEMA_VERSION
+    _emit(payload)
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_stage8r_approve(args: argparse.Namespace) -> int:
+    from .hvs_resolution_action_service import approve_execution_request
+
+    outcome = approve_execution_request(
+        repo_root=_repo_root(),
+        execution_request_id=args.execution_request_id,
+        operator_id=args.operator_id,
+        reason=getattr(args, "reason", None) or None,
+        informational_recorded_at=args.recorded_at or _now_iso(),
+    )
+    payload = outcome.to_dict() if hasattr(outcome, "to_dict") else {"ok": outcome.ok}
+    payload["command"] = "approve-resolution-action"
+    payload["schema_version"] = CLI_SCHEMA_VERSION
+    _emit(payload)
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_stage8r_reject(args: argparse.Namespace) -> int:
+    from .hvs_resolution_action_service import reject_execution_request
+
+    outcome = reject_execution_request(
+        repo_root=_repo_root(),
+        execution_request_id=args.execution_request_id,
+        operator_id=args.operator_id,
+        reason=args.reason,
+        informational_recorded_at=args.recorded_at or _now_iso(),
+    )
+    payload = outcome.to_dict() if hasattr(outcome, "to_dict") else {"ok": outcome.ok}
+    payload["command"] = "reject-resolution-action"
+    payload["schema_version"] = CLI_SCHEMA_VERSION
+    _emit(payload)
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_stage8r_cancel(args: argparse.Namespace) -> int:
+    from .hvs_resolution_action_service import cancel_execution_request
+
+    outcome = cancel_execution_request(
+        repo_root=_repo_root(),
+        execution_request_id=args.execution_request_id,
+        operator_id=args.operator_id,
+        reason=args.reason,
+        informational_recorded_at=args.recorded_at or _now_iso(),
+    )
+    payload = outcome.to_dict() if hasattr(outcome, "to_dict") else {"ok": outcome.ok}
+    payload["command"] = "cancel-resolution-action"
+    payload["schema_version"] = CLI_SCHEMA_VERSION
+    _emit(payload)
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_stage8r_execute(args: argparse.Namespace) -> int:
+    from .hvs_resolution_action_service import execute_approved_action
+
+    outcome = execute_approved_action(
+        repo_root=_repo_root(),
+        execution_request_id=args.execution_request_id,
+        operator_id=args.operator_id,
+        informational_recorded_at=args.recorded_at or _now_iso(),
+    )
+    payload = outcome.to_dict() if hasattr(outcome, "to_dict") else {"ok": outcome.ok}
+    payload["command"] = "execute-approved-resolution-action"
+    payload["schema_version"] = CLI_SCHEMA_VERSION
+    _emit(payload)
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_stage8r_inspect(args: argparse.Namespace) -> int:
+    from .hvs_resolution_action_service import inspect_execution_request
+
+    outcome = inspect_execution_request(
+        repo_root=_repo_root(), execution_request_id=args.execution_request_id
+    )
+    payload = outcome.to_dict() if hasattr(outcome, "to_dict") else {"ok": outcome.ok}
+    payload["command"] = "inspect-resolution-action"
+    payload["schema_version"] = CLI_SCHEMA_VERSION
+    _emit(payload)
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_stage8r_list_events(args: argparse.Namespace) -> int:
+    from .hvs_resolution_action_service import list_resolution_actions
+
+    outcome = list_resolution_actions(repo_root=_repo_root())
+    payload = outcome.to_dict() if hasattr(outcome, "to_dict") else {"ok": outcome.ok}
+    payload["command"] = "list-resolution-action-events"
+    payload["schema_version"] = CLI_SCHEMA_VERSION
+    _emit(payload)
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_stage8r_list_outcomes(args: argparse.Namespace) -> int:
+    from .hvs_resolution_action_service import list_resolution_actions
+
+    outcome = list_resolution_actions(repo_root=_repo_root())
+    payload = outcome.to_dict() if hasattr(outcome, "to_dict") else {"ok": outcome.ok}
+    payload["command"] = "list-resolution-outcomes"
     payload["schema_version"] = CLI_SCHEMA_VERSION
     _emit(payload)
     return EXIT_OK if outcome.ok else EXIT_REJECT
