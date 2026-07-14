@@ -665,6 +665,117 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     n8_recover.set_defaults(func=_cmd_list_hvs_render_recovery_queue)
 
+    # --- Stage 8O: operator-controlled delivery package, manual delivery
+    #     authorization, and actual delivery record (local-only; no transport).
+    #     Distinct `stage8o-` command prefixes keep Stage 8O separate from the
+    #     Stage 6 local-delivery commands that share conceptual vocabulary. --
+    o_elig = sub.add_parser(
+        "stage8o-inspect-delivery-eligibility",
+        help="Verify Stage 8N completion evidence + artifact for delivery eligibility.",
+    )
+    o_elig.add_argument("--completion-evidence-id", required=True)
+    o_elig.add_argument("--project-id", required=True)
+    o_elig.add_argument("--artifact-path", required=True)
+    o_elig.add_argument("--operator-id", required=True)
+    o_elig.set_defaults(func=_cmd_inspect_hvs_delivery_eligibility)
+
+    o_prep = sub.add_parser(
+        "stage8o-prepare-delivery-package",
+        help="Prepare a deterministic Stage 8O delivery-package contract (no copy, no authorization).",
+    )
+    o_prep.add_argument("--completion-evidence-id", required=True)
+    o_prep.add_argument("--project-id", required=True)
+    o_prep.add_argument("--artifact-path", required=True)
+    o_prep.add_argument("--operator-id", required=True)
+    o_prep.add_argument("--recorded-at", default=None)
+    o_prep.set_defaults(func=_cmd_prepare_hvs_delivery_package)
+
+    o_mat = sub.add_parser(
+        "stage8o-materialize-delivery-package",
+        help="Materialize the local delivery package (byte-identical copy + manifest).",
+    )
+    o_mat.add_argument("--delivery-package-id", required=True)
+    o_mat.add_argument("--artifact-path", required=True)
+    o_mat.add_argument("--operator-id", required=True)
+    o_mat.add_argument("--recorded-at", default=None)
+    o_mat.set_defaults(func=_cmd_materialize_hvs_delivery_package)
+
+    o_ver = sub.add_parser(
+        "stage8o-verify-delivery-package",
+        help="Verify package integrity and mark PACKAGE_READY (no authorization).",
+    )
+    o_ver.add_argument("--delivery-package-id", required=True)
+    o_ver.add_argument("--operator-id", required=True)
+    o_ver.add_argument("--recorded-at", default=None)
+    o_ver.set_defaults(func=_cmd_verify_hvs_delivery_package)
+
+    o_auth_req = sub.add_parser(
+        "stage8o-create-manual-delivery-authorization",
+        help="Create an explicit manual-delivery authorization request (PENDING).",
+    )
+    o_auth_req.add_argument("--delivery-package-id", required=True)
+    o_auth_req.add_argument("--recipient-reference", required=True)
+    o_auth_req.add_argument(
+        "--delivery-method", required=True,
+        choices=["IN_PERSON", "REMOVABLE_MEDIA", "MANUAL_EMAIL", "MANUAL_CLOUD_SHARE",
+                 "MANUAL_MESSAGING_PLATFORM", "MANUAL_CUSTOMER_PORTAL", "OTHER_MANUAL"],
+    )
+    o_auth_req.add_argument("--operator-id", required=True)
+    o_auth_req.add_argument("--other-manual-description", default=None)
+    o_auth_req.add_argument("--authorization-validity", default="")
+    o_auth_req.add_argument("--recorded-at", default=None)
+    o_auth_req.set_defaults(func=_cmd_create_hvs_manual_delivery_authorization)
+
+    o_appr = sub.add_parser(
+        "stage8o-approve-manual-delivery",
+        help="Approve a manual-delivery authorization (explicit operator decision; no transport).",
+    )
+    o_appr.add_argument("--authorization-request-id", required=True)
+    o_appr.add_argument("--operator-id", required=True)
+    o_appr.add_argument("--approval-note", default=None)
+    o_appr.add_argument("--recorded-at", default=None)
+    o_appr.set_defaults(func=_cmd_approve_hvs_manual_delivery)
+
+    o_rej = sub.add_parser(
+        "stage8o-reject-manual-delivery",
+        help="Reject a manual-delivery authorization (explicit operator decision).",
+    )
+    o_rej.add_argument("--authorization-request-id", required=True)
+    o_rej.add_argument("--operator-id", required=True)
+    o_rej.add_argument("--reason", required=True)
+    o_rej.add_argument("--recorded-at", default=None)
+    o_rej.set_defaults(func=_cmd_reject_hvs_manual_delivery)
+
+    o_insp_auth = sub.add_parser(
+        "stage8o-inspect-manual-delivery-authorization",
+        help="Inspect a manual-delivery authorization request (read-only).",
+    )
+    o_insp_auth.add_argument("--authorization-request-id", required=True)
+    o_insp_auth.set_defaults(func=_cmd_inspect_hvs_manual_delivery_authorization)
+
+    o_rec = sub.add_parser(
+        "stage8o-record-manual-delivery",
+        help="Record that a human performed delivery outside SCOS (requires explicit confirmation).",
+    )
+    o_rec.add_argument("--authorization-request-id", required=True)
+    o_rec.add_argument("--operator-id", required=True)
+    o_rec.add_argument("--delivery-method", required=True,
+        choices=["IN_PERSON", "REMOVABLE_MEDIA", "MANUAL_EMAIL", "MANUAL_CLOUD_SHARE",
+                 "MANUAL_MESSAGING_PLATFORM", "MANUAL_CUSTOMER_PORTAL", "OTHER_MANUAL"])
+    o_rec.add_argument("--recipient-reference", required=True)
+    o_rec.add_argument("--confirm-human-delivery-performed", action="store_true")
+    o_rec.add_argument("--external-evidence-reference", default="")
+    o_rec.add_argument("--operator-note", default="")
+    o_rec.add_argument("--recorded-at", default=None)
+    o_rec.set_defaults(func=_cmd_record_hvs_manual_delivery)
+
+    o_insp_rec = sub.add_parser(
+        "stage8o-inspect-manual-delivery-record",
+        help="Inspect an actual manual-delivery record (read-only).",
+    )
+    o_insp_rec.add_argument("--delivery-record-id", required=True)
+    o_insp_rec.set_defaults(func=_cmd_inspect_hvs_manual_delivery_record)
+
     # --- Stage 8E: revised-delivery acceptance, release authorization, and
     #     final revision closure (evidence only; no HVS / outbound transport) --
     acc8e = sub.add_parser(
@@ -3270,6 +3381,171 @@ def _cmd_inspect_post_delivery_lineage(args: argparse.Namespace) -> int:
     outcome = inspect_post_delivery_lineage(project_id=getattr(args, "project_id", None), repo_root=_repo_root())
     _emit(outcome)
     return EXIT_OK
+
+
+# --- Stage 8O command handlers ---------------------------------------------
+def _cmd_inspect_hvs_delivery_eligibility(args: argparse.Namespace) -> int:
+    from .hvs_stage8o_delivery_service import prepare_delivery_package
+
+    # Eligibility is verified via a dry "prepare" that fails closed before any
+    # record is written: if the evidence/artifact is eligible, a contract is
+    # created (prepare). We surface eligibility only (no materialization).
+    outcome = prepare_delivery_package(
+        repo_root=_repo_root(),
+        completion_evidence_id=args.completion_evidence_id,
+        project_id=args.project_id,
+        artifact_path=args.artifact_path,
+        operator_id=args.operator_id,
+        recorded_at=getattr(args, "recorded_at", None) or _now_iso(),
+    )
+    eligibility_ok = bool(outcome.ok)
+    _emit({
+        "ok": True,
+        "eligible": eligibility_ok,
+        "delivery_package_id": outcome.delivery_package_id,
+        "package_status": outcome.package_status,
+        "artifact_sha256": outcome.artifact_sha256,
+        "delivery_authorized": False,
+        "publishing_authorized": False,
+        "automation_allowed": False,
+        "error_code": None if eligibility_ok else outcome.error_code,
+        "error_detail": None if eligibility_ok else outcome.error_detail,
+    })
+    return EXIT_OK if eligibility_ok else EXIT_REJECT
+
+
+def _cmd_prepare_hvs_delivery_package(args: argparse.Namespace) -> int:
+    from .hvs_stage8o_delivery_service import prepare_delivery_package
+
+    outcome = prepare_delivery_package(
+        repo_root=_repo_root(),
+        completion_evidence_id=args.completion_evidence_id,
+        project_id=args.project_id,
+        artifact_path=args.artifact_path,
+        operator_id=args.operator_id,
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_materialize_hvs_delivery_package(args: argparse.Namespace) -> int:
+    from .hvs_stage8o_delivery_service import materialize_delivery_package
+
+    outcome = materialize_delivery_package(
+        repo_root=_repo_root(),
+        delivery_package_id=args.delivery_package_id,
+        artifact_path=args.artifact_path,
+        operator_id=args.operator_id,
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_verify_hvs_delivery_package(args: argparse.Namespace) -> int:
+    from .hvs_stage8o_delivery_service import verify_delivery_package
+
+    outcome = verify_delivery_package(
+        repo_root=_repo_root(),
+        delivery_package_id=args.delivery_package_id,
+        operator_id=args.operator_id,
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_create_hvs_manual_delivery_authorization(args: argparse.Namespace) -> int:
+    from .hvs_stage8o_delivery_service import create_manual_delivery_authorization_request
+
+    outcome = create_manual_delivery_authorization_request(
+        repo_root=_repo_root(),
+        delivery_package_id=args.delivery_package_id,
+        recipient_reference=args.recipient_reference,
+        delivery_method=args.delivery_method,
+        operator_id=args.operator_id,
+        recorded_at=args.recorded_at or _now_iso(),
+        other_manual_description=getattr(args, "other_manual_description", None),
+        authorization_validity=getattr(args, "authorization_validity", "") or "",
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_approve_hvs_manual_delivery(args: argparse.Namespace) -> int:
+    from .hvs_stage8o_delivery_service import approve_manual_delivery
+
+    outcome = approve_manual_delivery(
+        repo_root=_repo_root(),
+        authorization_request_id=args.authorization_request_id,
+        operator_id=args.operator_id,
+        recorded_at=args.recorded_at or _now_iso(),
+        approval_note=getattr(args, "approval_note", None),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_reject_hvs_manual_delivery(args: argparse.Namespace) -> int:
+    from .hvs_stage8o_delivery_service import reject_manual_delivery
+
+    outcome = reject_manual_delivery(
+        repo_root=_repo_root(),
+        authorization_request_id=args.authorization_request_id,
+        operator_id=args.operator_id,
+        reason=args.reason,
+        recorded_at=args.recorded_at or _now_iso(),
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_hvs_manual_delivery_authorization(args: argparse.Namespace) -> int:
+    from .hvs_stage8o_delivery_service import inspect_manual_delivery_authorization
+
+    outcome = inspect_manual_delivery_authorization(
+        repo_root=_repo_root(),
+        authorization_request_id=args.authorization_request_id,
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_record_hvs_manual_delivery(args: argparse.Namespace) -> int:
+    from .hvs_stage8o_delivery_service import record_actual_manual_delivery
+
+    if not getattr(args, "confirm_human_delivery_performed", False):
+        _emit({
+            "ok": False,
+            "error_code": "missing_human_delivery_confirmation",
+            "error_detail": "explicit --confirm-human-delivery-performed is required",
+        })
+        return EXIT_REJECT
+    outcome = record_actual_manual_delivery(
+        repo_root=_repo_root(),
+        authorization_request_id=args.authorization_request_id,
+        operator_id=args.operator_id,
+        delivery_method=args.delivery_method,
+        recipient_reference=args.recipient_reference,
+        human_delivery_confirmation=True,
+        recorded_at=args.recorded_at or _now_iso(),
+        external_evidence_reference=getattr(args, "external_evidence_reference", "") or "",
+        operator_note=getattr(args, "operator_note", "") or "",
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
+
+
+def _cmd_inspect_hvs_manual_delivery_record(args: argparse.Namespace) -> int:
+    from .hvs_stage8o_delivery_service import inspect_actual_manual_delivery
+
+    outcome = inspect_actual_manual_delivery(
+        repo_root=_repo_root(),
+        delivery_record_id=args.delivery_record_id,
+    )
+    _emit(outcome.to_dict())
+    return EXIT_OK if outcome.ok else EXIT_REJECT
 
 
 def main(argv: list[str] | None = None) -> int:
