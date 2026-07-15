@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -39,17 +40,59 @@ from scos.control_center.hvs_render_completion_store import (
 )
 
 REPO = Path(__file__).resolve().parents[3]
-CERT_ARTIFACT = (
-    REPO
-    / ".."
-    / "hermes-video-studio"
-    / "projects"
-    / "hvs8l-e32880405a6292d1ac4e1f68997d085f"
-    / "renders"
-    / "hyperframes-693c0e7c3bad0f4d.mp4"
+
+# ---------------------------------------------------------------------------
+# Hermetic prerequisite artifact (Cohort 6C).
+#
+# Stage 8O's contract (`prepare_delivery_package` -> `resolve_artifact_source`
+# -> live SHA-256 recompute) requires a present, non-empty, regular file whose
+# SHA-256 matches the certified hash carried by the seeded Stage 8N completion
+# evidence. It performs NO media-structure probing (no ffprobe / codec /
+# duration / stream inspection) — only file-exists + size>0 + SHA match.
+#
+# The historical tests bound the artifact to a production MP4 under
+# ``../hermes-video-studio/...`` (the certified Stage 8N render output), which
+# is not present in a clean checkout and must never be restored/copied per the
+# safety contract. We therefore generate a minimal deterministic synthetic
+# artifact INSIDE a session-owned temp root and seed the completion evidence
+# with THAT artifact's real SHA-256. This keeps every Stage 8O test
+# self-contained, order-independent, and free of production / workstation
+# residue while preserving the genuine production authorization + no-transport
+# contracts.
+# ---------------------------------------------------------------------------
+_SYNTHETIC_ARTIFACT_BYTES = (
+    b"SCOS-STAGE8O-HERMETIC-PREREQUISITE-ARTIFACT\n"
+    b"deterministic synthetic media stand-in (no real mp4, no network)\n"
+    * 48
 )
-CERT_ARTIFACT_PATH = CERT_ARTIFACT.resolve()
-CERT_SHA256 = "70f1a0ccc5233315af85e6f95df023632a9de91f3e2c3f0751e49d10f0d93f26"
+
+
+def _make_hermetic_artifact() -> Path:
+    """Create the minimal synthetic prerequisite artifact under a test-owned
+    temp root and return its ``Path``.
+
+    Stage 8O's contract (`prepare_delivery_package` -> `resolve_artifact_source`
+    -> live SHA-256 recompute) requires only a present, non-empty, regular file
+    whose SHA-256 matches the certified hash seeded into the Stage 8N completion
+    evidence. It performs NO media-structure probing (no ffprobe / codec /
+    duration / stream inspection). A small deterministic file therefore fully
+    satisfies the contract without any production MP4, network, or media engine.
+    """
+    root = Path(tempfile.mkdtemp(prefix="stage8o_hermetic_"))
+    path = root / "synthetic_artifact.mp4"
+    path.write_bytes(_SYNTHETIC_ARTIFACT_BYTES)
+    return path
+
+
+# Hermetic prerequisite artifact: a minimal deterministic file under a
+# session-owned temp root. Its SHA-256 is the certified hash seeded into the
+# Stage 8N completion evidence (see the ``_seed_completion*`` helpers below),
+# satisfying the Stage 8O contract without any production MP4 or media probing.
+# This replaces the historical hard-coded path to
+# ``../hermes-video-studio/.../hyperframes-693c0e7c3bad0f4d.mp4`` (which is not
+# present in a clean checkout and must never be restored/copied).
+CERT_ARTIFACT_PATH = _make_hermetic_artifact()
+CERT_SHA256 = M.sha256_bytes(_SYNTHETIC_ARTIFACT_BYTES)
 
 
 @pytest.fixture(autouse=True)
@@ -645,7 +688,12 @@ def test_valid_artifact_copied_byte_identically(tmp_path):
     assert mat.ok
     c = S._load_contract(tmp_path, prep.delivery_package_id)
     dest = Path(c.package_runtime_root) / c.artifact_filename
-    assert dest.read_bytes() == CERT_ARTIFACT_PATH.read_bytes()
+    # Byte-identical delivery is proven by the SHA-256 chain (see
+    # test_packaged_sha_equals_source_sha / test_source_sha_preserved). The
+    # hermetic synthetic artifact is intentionally NOT a byte copy of any
+    # production mp4, so we assert the package content equals the source by
+    # hash rather than by raw bytes.
+    assert M.sha256_bytes(dest.read_bytes()) == CERT_SHA256
 
 
 def test_packaged_sha_equals_source_sha(tmp_path):
@@ -1873,7 +1921,9 @@ def test_no_private_media_bytes_persisted(tmp_path):
         human_delivery_confirmation=True, recorded_at="2026-07-14")
     ledger = S.delivery_ledger_path(tmp_path)
     text = ledger.read_text(encoding="utf-8")
-    # The certified mp4 is 26204 bytes; its bytes must never appear in the ledger.
+    # The source artifact bytes must never appear verbatim in the ledger.
+    # The hermetic synthetic artifact carries no private production media, so we
+    # assert its leading bytes are never persisted as raw content.
     assert CERT_ARTIFACT_PATH.read_bytes()[:16].hex() not in text
 
 
@@ -2241,9 +2291,11 @@ def test_local_package_acceptance_certified_artifact(tmp_path):
     assert c.delivery_performed is False
     assert c.external_delivery_executed_by_scos is False
     assert c.automation_allowed is False
-    # Byte-identical proof.
+    # Byte-identical proof (verified via the SHA-256 chain; the hermetic
+    # synthetic artifact is the genuine source under test, so its hash equals
+    # the certified hash).
     dest = Path(c.package_runtime_root) / c.artifact_filename
-    assert dest.read_bytes() == CERT_ARTIFACT_PATH.read_bytes()
+    assert M.sha256_bytes(dest.read_bytes()) == CERT_SHA256
 
 
 @pytest.mark.local_acceptance
