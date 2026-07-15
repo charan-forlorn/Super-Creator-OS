@@ -33,6 +33,11 @@ node_modules/
 work/seeds/
 memory/_db_backups/
 memory/_telemetry_backups/
+memory/_runtime_backups/
+memory/runtime/*.jsonl
+memory/runtime/*.lock
+memory/runtime/*.integrity.json
+memory/runtime/*.tmp
 memory/.*.integrity.json
 memory/.*.lock 
 integrations/learning/_*_backups/
