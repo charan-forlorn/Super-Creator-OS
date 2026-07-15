@@ -209,9 +209,13 @@ body {
 @media (max-width: 760px) { .cockpit-shell { display: block; }.cockpit-sidebar { min-height: auto; padding: 12px; border-bottom: 1px solid var(--cockpit-line); border-right: 0; }.cockpit-brand { display: none; }.cockpit-nav { display: flex; overflow-x: auto; }.cockpit-nav__item { min-width: 44px; }.cockpit-sidebar__footer { display: none; }.cockpit-content { padding: 22px 16px 26px; }.cockpit-header { display: grid; }.cockpit-header__controls { justify-content: space-between; align-items: flex-end; }.cockpit-summary { grid-template-columns: 1fr 1fr; }.cockpit-summary > div { border-bottom: 1px solid var(--cockpit-line); }.cockpit-summary > div:nth-child(2n) { border-right: 0; }.cockpit-side-stack { grid-template-columns: 1fr; }.workflow-map { grid-template-columns: 1fr; padding: 18px 0 0; gap: 8px; }.workflow-connector { display: none; }.workflow-node { min-height: auto; }.workflow-note { min-height: auto; margin-block: 10px; }.activity-list, .evidence-rail > div { grid-template-columns: 1fr 1fr; }.evidence-rail { display: grid; gap: 12px; }.cockpit-toast { right: 12px; bottom: 12px; left: 12px; max-width: none; } }
 @media (prefers-reduced-motion: reduce) { .cockpit-orbit, .cockpit-orbit__eye, .cockpit-orbit--attention .cockpit-orbit__arm--right { animation: none; } .cockpit-nav__item, .button-primary, .button-secondary { transition: none; } }
 
+
 /* ---------- Agent Operations Cockpit V0.2 routes ---------- */
 
 .cockpit-nav a { text-decoration: none; }
+.cockpit-nav__item.is-unavailable { cursor: not-allowed; opacity: .55; color: var(--cockpit-muted); filter: grayscale(.4); }
+.cockpit-nav__item.is-unavailable:hover { border-color: var(--cockpit-line); background: transparent; }
+.cockpit-nav__item.is-unavailable::after { content: ""; }
 .route-content { padding-bottom: 44px; }
 .cockpit-route-header { margin-bottom: 18px; }.route-description { max-width: 590px; margin: 8px 0 0; color: var(--cockpit-muted); font-size: 14px; line-height: 1.5; }.demo-note { color: #94b9ac; font-size: 12px; }.route-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 18px; }.route-toolbar--filters { justify-content: flex-start; align-items: flex-start; flex-wrap: wrap; }
 .filter-control { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--cockpit-line); border-radius: 11px; background: #111d2b; }.filter-control button { border: 0; border-radius: 7px; padding: 7px 10px; color: var(--cockpit-muted); background: transparent; font-size: 12px; font-weight: 650; cursor: pointer; }.filter-control button:hover { color: var(--cockpit-ink); background: #1a2b3b; }.filter-control button.is-selected { color: #0d2b32; background: var(--cockpit-mint); }
@@ -375,3 +379,6 @@ body {
   .cockpit-muted, .panel-heading p, .workflow-note, .workflow-role, .project-row > p, .evidence-record > div > p:not(.action-kicker), .approval-card > p { color: #dedbd1; }
   .cockpit-nav__item { color: #e2dfd5; }.cockpit-nav__item.is-active { border-color: #d5e4d2; background: #314134; }
 }
+
+.orbit-briefing { grid-template-columns: 132px minmax(0, 1fr); min-height: 164px; gap: 14px; overflow: visible; }.orbit-briefing > div { min-width: 0; }
+@media (max-width: 760px) { .orbit-briefing { grid-template-columns: 132px minmax(0, 1fr); gap: 10px; } }

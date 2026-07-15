@@ -1,5 +1,5 @@
-import { AppShell } from "@/components/app-shell";
+import { CockpitDashboard } from "@/components/cockpit/cockpit-dashboard";
 
 export default function Page() {
-  return <AppShell />;
+  return <CockpitDashboard />;
 }

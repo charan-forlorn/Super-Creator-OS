@@ -1,107 +1,30 @@
+import { OrbitMascot as AnimatedOrbitMascot } from "@/components/cockpit/orbit-mascot";
 import { cn } from "@/lib/utils";
 import type { MascotMood } from "@/lib/types";
 import type { MascotView } from "@/lib/utils";
 
-// Per-mood visual tokens for Orbit. All CSS — no 3D libraries, no remote assets.
-const MOOD_STYLES: Record<
-  MascotMood,
-  { glow: string; body: string; ring: string; label: string; dot: string }
-> = {
-  idle: {
-    glow: "bg-status-idle",
-    body: "from-slate-500/70 to-slate-800",
-    ring: "border-status-idle/40",
-    label: "Idle",
-    dot: "bg-status-idle",
-  },
-  working: {
-    glow: "bg-status-working",
-    body: "from-amber-400/80 to-amber-700",
-    ring: "border-status-working/50",
-    label: "Working",
-    dot: "bg-status-working",
-  },
-  blocked: {
-    glow: "bg-status-blocked",
-    body: "from-rose-400/80 to-rose-700",
-    ring: "border-status-blocked/50",
-    label: "Blocked",
-    dot: "bg-status-blocked",
-  },
-  approved: {
-    glow: "bg-status-approved",
-    body: "from-emerald-400/80 to-emerald-700",
-    ring: "border-status-approved/50",
-    label: "All clear",
-    dot: "bg-status-approved",
-  },
-  review: {
-    glow: "bg-status-review",
-    body: "from-violet-400/80 to-violet-700",
-    ring: "border-status-review/50",
-    label: "Thinking",
-    dot: "bg-status-review",
-  },
+const MOOD_STYLES: Record<MascotMood, { label: string; dot: string }> = {
+  idle: { label: "Idle", dot: "bg-status-idle" },
+  working: { label: "Working", dot: "bg-status-working" },
+  blocked: { label: "Blocked", dot: "bg-status-blocked" },
+  approved: { label: "All clear", dot: "bg-status-approved" },
+  review: { label: "Thinking", dot: "bg-status-review" },
 };
 
-function OrbitMascot({ mood, compact }: { mood: MascotMood; compact?: boolean }) {
-  const s = MOOD_STYLES[mood];
-  return (
-    <div
-      className={cn(
-        "relative flex items-center justify-center",
-        compact ? "h-20 w-20" : "h-28 w-28",
-      )}
-    >
-      {/* Soft mood glow */}
-      <div
-        className={cn(
-          "orbit-glow absolute rounded-full blur-2xl opacity-60",
-          compact ? "h-16 w-16" : "h-24 w-24",
-          s.glow,
-        )}
-        aria-hidden
-      />
-      {/* Floating body */}
-      <div className="orbit-float relative">
-        {/* Rotating accent ring */}
-        <div
-          className={cn(
-            "orbit-ring absolute -inset-2 rounded-full border-2 border-dashed",
-            s.ring,
-          )}
-          aria-hidden
-        />
-        {/* Orb body with layered gradient for a 3D feel */}
-        <div
-          className={cn(
-            "relative flex items-center justify-center rounded-full bg-gradient-to-br shadow-[inset_-6px_-8px_16px_rgba(0,0,0,0.45),inset_4px_6px_12px_rgba(255,255,255,0.15)]",
-            compact ? "h-14 w-14" : "h-20 w-20",
-            s.body,
-          )}
-        >
-          {/* Specular highlight */}
-          <div
-            className="absolute left-4 top-3 h-4 w-4 rounded-full bg-white/40 blur-[2px]"
-            aria-hidden
-          />
-          {/* Eyes */}
-          <div className="flex gap-2.5">
-            <span className="orbit-eye block h-3.5 w-2 rounded-full bg-slate-900/85" />
-            <span className="orbit-eye block h-3.5 w-2 rounded-full bg-slate-900/85" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+const MASCOT_STATE: Record<MascotMood, "normal" | "attention" | "success"> = {
+  idle: "normal",
+  working: "attention",
+  blocked: "attention",
+  approved: "success",
+  review: "attention",
+};
 
 export function MascotAssistant({
   view,
   compact,
 }: {
   view: MascotView;
-  /** Visual density only — smaller orb, glow, and padding. Does not affect content/logic. */
+  /** Visual density only; does not affect the workflow advice or task state. */
   compact?: boolean;
 }) {
   const s = MOOD_STYLES[view.mood];
@@ -115,9 +38,7 @@ export function MascotAssistant({
     >
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold tracking-tight text-ink">
-            Orbit
-          </h2>
+          <h2 className="text-sm font-semibold tracking-tight text-ink">Orbit</h2>
           <p className="text-xs text-ink-faint">Your control-center assistant</p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-xs font-medium text-ink-muted ring-1 ring-inset ring-border">
@@ -127,12 +48,10 @@ export function MascotAssistant({
       </div>
 
       <div className={cn("flex justify-center", compact ? "mt-1" : "mt-2")}>
-        <OrbitMascot mood={view.mood} compact={compact} />
+        <AnimatedOrbitMascot state={MASCOT_STATE[view.mood]} size={compact ? 96 : 132} />
       </div>
 
-      <p className="mt-1 text-center text-sm leading-relaxed text-ink">
-        {view.message}
-      </p>
+      <p className="mt-1 text-center text-sm leading-relaxed text-ink">{view.message}</p>
 
       <div className={cn("space-y-3", compact ? "mt-3" : "mt-4")}>
         <div className="rounded-xl border border-border-soft bg-surface p-3">
