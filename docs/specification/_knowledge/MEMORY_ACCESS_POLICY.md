@@ -22,11 +22,50 @@
 > governs intended access for when it is restored (DD-009); until then, agents must treat
 > memory as **read-only** and flag any write attempt.
 
+## 1A. Canonical Memory Versus Practice Runtime Journal
+
+The canonical memory store and the practice runtime journal are separate state
+domains.
+
+- `memory/database.json` is the reviewed canonical memory system of record. It
+  is a JSON array of project learning records and is owned by
+  `integrations/learning/memory_writer.py::safe_append`.
+- `memory/runtime/practice-render.jsonl` is mutable local runtime state for the
+  daily practice-render loop. It records `practice_render` attempts from the
+  `practice-loop` engine and is owned by
+  `integrations/learning/runtime_journal.py::append_runtime_record`.
+- Runtime integrity is guarded by
+  `memory/runtime/.practice-render.jsonl.integrity.json`; the lock file is
+  `memory/runtime/.practice-render.jsonl.lock`.
+- `integrations/learning/memory_store.py` preserves canonical-only reads by
+  default. Runtime-only or combined reads are explicit modes, and writes are
+  delegated to the owning layer (`safe_append` for canonical records,
+  `append_runtime_record` for runtime records).
+
+The practice runtime journal exists so local practice renders can retain
+operational learning without promoting every practice attempt into reviewed
+canonical memory. A legitimate production runtime journal may already exist.
+Its existence is not a defect; integrity, provenance, and isolation are the
+checks that matter.
+
+Tests that exercise practice learning must use injected temporary canonical and
+runtime paths. They must not depend on whether the real repository runtime
+journal exists, and they must not delete or truncate runtime files merely to
+satisfy an absence assumption. During isolated tests:
+
+- the injected runtime path receives practice records;
+- the temporary canonical database remains byte-identical;
+- an absent production-equivalent default runtime path remains absent;
+- pre-existing production-equivalent default runtime state remains
+  byte-identical;
+- no fallback write occurs beside the default runtime sentinel.
+
 ## 2. Access matrix by role
 
 | Role / agent | Read | Write | Memory scope | Notes |
 |---|---|---|---|---|
 | **Orchestrator** (CAP-023) | ✅ `database.json` (STEP 1) | ✅ via `safe_append` (STEP 15) | full record | the only writer of project records (EV-010) |
+| **Practice render loop** | explicit injected runtime/canonical paths | runtime journal via `append_runtime_record` | practice attempts | does not write canonical memory during isolated practice tests |
 | **Recommendation** (CAP-015) | ✅ `database.json` | ❌ | read nearest-niche | produces seed, never writes |
 | **Telemetry capture** (CAP-016) | ✅ `telemetry.json` | ✅ via `append_telemetry` | observed rows only | rejects predicted (DD-003) |
 | **Learning evaluator** (CAP-017) | ✅ db + telemetry | ❌ | calibration read | writes nothing to memory |

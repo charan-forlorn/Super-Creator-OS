@@ -143,9 +143,41 @@ cd C:\Workspace\super-creator-os
 ## 19. Runtime-Path Locations
 
 - SCOS work dir: `scos/work/` (append-only ledgers, gitignored).
+- Practice runtime journal: `memory/runtime/practice-render.jsonl` with
+  `memory/runtime/.practice-render.jsonl.integrity.json` and
+  `memory/runtime/.practice-render.jsonl.lock`.
 - HVS projects: `C:\Workspace\hermes-video-studio\projects/<PROJECT_ID>/`
   (renders/, assets/, gitignored).
 - HVS runtime is never committed.
+
+## 19A. Practice Runtime Preservation
+
+The practice runtime journal is legitimate local runtime state. Its existence
+is not a blocker and must not be treated as test failure evidence. Preserve it
+unless an explicit, separately approved runtime-maintenance task says
+otherwise.
+
+Operator rules:
+
+- Do not delete, truncate, migrate, append to, or regenerate
+  `memory/runtime/practice-render.jsonl` to satisfy a test.
+- Do not remove the runtime integrity marker or lock to force absence.
+- Before certification, hash `memory/database.json`,
+  `memory/runtime/practice-render.jsonl`,
+  `memory/runtime/.practice-render.jsonl.integrity.json`, and
+  `memory/runtime/.practice-render.jsonl.lock`.
+- After each practice-runtime test command, recompute those hashes and compare
+  them with the preflight values.
+- Treat unexpected hash drift, unexpected staged changes, or a runtime
+  integrity failure as a blocking condition.
+- Run practice-runtime tests with injected temporary paths and a system-temp
+  `--basetemp`; do not use repository temp directories for new verification
+  output.
+
+The isolated contract is: injected runtime paths receive practice records;
+temporary canonical memory remains byte-identical; absent default runtime paths
+remain absent; pre-existing default runtime state remains byte-identical; no
+fallback write occurs beside a default runtime sentinel.
 
 ## 20. Safe Task-Owned Cleanup
 
