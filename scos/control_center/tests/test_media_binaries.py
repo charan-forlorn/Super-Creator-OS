@@ -233,9 +233,18 @@ def test_real_host_resolution_when_available():
         pytest.skip("no host ffmpeg/ffprobe on PATH")
     if host_ffmpeg:
         # Identity check: resolver must return the same absolute path.
-        assert resolve_ffmpeg() == os.path.abspath(host_ffmpeg)
+        # On Windows the resolver normalizes the executable extension case
+        # (.exe vs .EXE) while still identifying the same file, so compare
+        # canonical filesystem identity instead of exact case-sensitive
+        # strings. os.path.normcase is a no-op on POSIX, so a real path
+        # difference is never concealed there.
+        assert os.path.normcase(os.path.abspath(resolve_ffmpeg())) == os.path.normcase(
+            os.path.abspath(host_ffmpeg)
+        )
     if host_ffprobe:
-        assert resolve_ffprobe() == os.path.abspath(host_ffprobe)
+        assert os.path.normcase(os.path.abspath(resolve_ffprobe())) == os.path.normcase(
+            os.path.abspath(host_ffprobe)
+        )
 
 
 def test_no_subprocess_execution_during_resolution(tmp_path: Path):
