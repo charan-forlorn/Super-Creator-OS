@@ -87,6 +87,54 @@ DEFAULT_MAX_OUTPUT_CHARS = 4000
 DEFAULT_TIMEOUT_SECONDS = 60
 _MAX_TIMEOUT_SECONDS = 600
 
+# --- subprocess text-encoding boundary (deterministic, locale-independent) --
+# The HVS CLI may emit non-UTF-8 bytes on Windows (e.g. a cp1252 0x97 em dash).
+# We therefore capture RAW BYTES (never ``text=True``): the internal subprocess
+# reader thread then only copies bytes and never decodes, so it can never raise
+# ``UnicodeDecodeError`` in a background thread. Decoding happens HERE, in the
+# main thread, under explicit control:
+#
+#   * Display text (stdout/stderr excerpts) uses ``errors="backslashreplace"`` so
+#     it is lossy-but-safe and can NEVER raise, regardless of host encoding.
+#   * Control-plane JSON is decoded STRICTLY (``errors="strict"``). A non-UTF-8
+#     byte (the cp1252 0x97 case) makes the parse fail closed as
+#     ``malformed_output`` instead of being silently accepted or crashing a
+#     reader thread.
+#
+# This is encoding-agnostic: it does not depend on
+# ``locale.getpreferredencoding()`` and reproduces on utf-8 and cp1252 hosts.
+_OUTPUT_TEXT_ENCODING = "utf-8"
+_OUTPUT_TEXT_ERRORS = "backslashreplace"
+_OUTPUT_JSON_ERRORS = "strict"
+
+
+def _to_bytes(value: object) -> bytes:
+    """Normalize a subprocess output field into raw bytes.
+
+    ``subprocess.run(..., capture_output=True, text=False)`` returns ``bytes`` or
+    ``None``. Centralizing this keeps the strict/known byte boundary explicit and
+    lets the decode step below stay total over its inputs.
+    """
+    if value is None:
+        return b""
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, str):
+        return value.encode(_OUTPUT_TEXT_ENCODING, errors=_OUTPUT_TEXT_ERRORS)
+    return str(value).encode(_OUTPUT_TEXT_ENCODING, errors=_OUTPUT_TEXT_ERRORS)
+
+
+def _decode_output(value: object, *, max_chars: int) -> str:
+    """Decode captured bytes into display-safe text without raising.
+
+    Uses ``errors="backslashreplace"`` so an unexpected byte (e.g. cp1252 0x97)
+    is escaped (``\\x97``) rather than crashing a background reader thread or
+    raising ``UnicodeDecodeError``. The result is bounded to ``max_chars``.
+    """
+    return _to_bytes(value).decode(
+        _OUTPUT_TEXT_ENCODING, errors=_OUTPUT_TEXT_ERRORS
+    )[:max_chars]
+
 # Marker tokens that indicate a mutating / forbidden HVS subcommand. Stage 1
 # rejects any request for these so the adapter can never drive a write.
 _FORBIDDEN_HVS_SUBCOMMANDS = frozenset(
@@ -369,7 +417,10 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
                 cwd=str(cwd),
                 shell=False,
                 capture_output=True,
-                text=True,
+                # Raw bytes: the internal reader thread never decodes, so it
+                # cannot raise UnicodeDecodeError on cp1252 output (e.g. 0x97).
+                # Decoding happens below, in the main thread, under our control.
+                text=False,
                 timeout=self._config.timeout_seconds,
                 # No stdin inheritance; empty input stream only.
                 input="",
@@ -419,8 +470,8 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
                 cwd=str(cwd),
             )
 
-        stdout = (proc.stdout or "")[:max_chars]
-        stderr = (proc.stderr or "")[:max_chars]
+        stdout = _decode_output(proc.stdout, max_chars=max_chars)
+        stderr = _decode_output(proc.stderr, max_chars=max_chars)
         exit_code = int(proc.returncode)
         ok = exit_code == 0
 
@@ -510,7 +561,10 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
                 cwd=str(cwd),
                 shell=False,
                 capture_output=True,
-                text=True,
+                # Raw bytes: the internal reader thread never decodes, so it
+                # cannot raise UnicodeDecodeError on cp1252 output (e.g. 0x97).
+                # Control-plane JSON is decoded STRICTLY below.
+                text=False,
                 timeout=self._config.timeout_seconds,
                 input="",
                 env=self._safe_env(),
@@ -542,10 +596,29 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
                 "error_kind": "adapter_blocked",
                 "error_detail": f"HVS {command} could not start: {type(exc).__name__}",
             }
-        stdout = (proc.stdout or "")[: self._config.max_output_chars]
-        stderr = (proc.stderr or "")[: self._config.max_output_chars]
+        stdout = _decode_output(proc.stdout, max_chars=self._config.max_output_chars)
+        stderr = _decode_output(proc.stderr, max_chars=self._config.max_output_chars)
+        # Strict-decode the raw control-plane bytes. A non-UTF-8 byte (cp1252
+        # 0x97) raises UnicodeDecodeError, which we normalize as malformed_output
+        # so corrupt/foreign-encoded control-plane JSON is REJECTED, never
+        # silently accepted and never crashes a background reader thread.
         try:
-            payload = json.loads(stdout)
+            raw_text = _to_bytes(proc.stdout).decode(
+                _OUTPUT_TEXT_ENCODING, errors=_OUTPUT_JSON_ERRORS
+            )
+        except UnicodeDecodeError:
+            return {
+                "ok": False,
+                "command": command,
+                "exit_code": int(proc.returncode),
+                "payload": None,
+                "stdout_excerpt": stdout[:200],
+                "stderr_excerpt": stderr[:200],
+                "error_kind": "malformed_output",
+                "error_detail": "HVS control-plane output is not valid UTF-8 (non-UTF-8 bytes such as cp1252 0x97 present)",
+            }
+        try:
+            payload = json.loads(raw_text)
         except json.JSONDecodeError:
             return {
                 "ok": False,

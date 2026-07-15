@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -54,8 +55,10 @@ def check(name: str, cond: bool) -> None:
 # repository is ever touched by these tests.
 @dataclass
 class _FakeProc:
-    stdout: str
-    stderr: str
+    # stdout/stderr may be str (legacy/display-path fakes) or bytes (the real
+    # text=False boundary); the adapter normalizes both via _to_bytes().
+    stdout: str | bytes
+    stderr: str | bytes
     returncode: int
 
 
@@ -66,6 +69,25 @@ class _FakeRun:
     returncode: int = 0
     stdout: str = "usage: hvs.cli.studio_cli ..."
     stderr: str = ""
+    raise_cls: type[Exception] | None = None
+    captured: dict[str, Any] | None = None
+
+    def __call__(self, argv, **kwargs):
+        if self.captured is not None:
+            self.captured["argv"] = list(argv)
+            self.captured["kwargs"] = dict(kwargs)
+        if self.raise_cls is not None:
+            raise self.raise_cls("fake failure")
+        return _FakeProc(stdout=self.stdout, stderr=self.stderr, returncode=self.returncode)
+
+
+@dataclass
+class _FakeRunBytes:
+    """Like ``_FakeRun`` but returns RAW BYTES (mirrors ``text=False``)."""
+
+    returncode: int = 0
+    stdout: bytes = b""
+    stderr: bytes = b""
     raise_cls: type[Exception] | None = None
     captured: dict[str, Any] | None = None
 
@@ -276,6 +298,75 @@ def test_stage8l_initialize_and_inspect_use_bounded_json_cli(tmp_path) -> None:
     adapter.inspect_project(project_id="hvs8l-abc", request_id="stage8l")
     check("8L inspect command selected", "inspect-project" in captured["argv"])
     check("8L never uses legacy create-project", "create-project" not in " ".join(captured["argv"]))
+
+
+# --- 11b. Deterministic cp1252 0x97 encoding boundary (Cohort 6E.2) --------
+# These tests pin the SCOS-only repair: the adapter captures RAW BYTES
+# (text=False) so the subprocess reader thread never decodes, and:
+#   * display text escapes a cp1252 0x97 byte via backslashreplace (never raises);
+#   * control-plane JSON with a cp1252 0x97 byte is REJECTED as malformed_output
+#     (never silently accepted, never crashes a background reader thread).
+def test_probe_display_text_escapes_cp1252_0x97(tmp_path) -> None:
+    cfg = _valid_config(tmp_path)
+    # Raw bytes the HVS CLI could emit on a cp1252 Windows console (0x97 = em dash).
+    raw = b"status: ok \x97 done\n"
+    fake = _FakeRunBytes(returncode=0, stdout=raw, stderr=b"note \x97\n")
+    adapter = HermesVideoStudioAdapter(cfg, subprocess_run=fake)
+    result = adapter.run_readonly_probe(request_id="r1", created_at=_created_at())
+    check("probe returns AgentAdapterResult", isinstance(result, AgentAdapterResult))
+    check("probe status result_ready", result.status == "result_ready")
+    # The 0x97 byte must be escaped as \x97, not crash a reader thread.
+    text = result.output_text or ""
+    check("0x97 byte escaped (no crash, no mojibake)", "\x97" not in text and "\\x97" in text)
+    md = dict(result.metadata)
+    check("stderr 0x97 escaped in metadata", "\\x97" in (md.get("stderr_excerpt") or ""))
+
+
+def test_json_command_rejects_cp1252_0x97_control_plane(tmp_path) -> None:
+    cfg = _valid_config(tmp_path)
+    # A control-plane payload contaminated with a non-UTF-8 cp1252 0x97 byte.
+    raw = b'{"status": "verified"\x97}\n'
+    fake = _FakeRunBytes(returncode=0, stdout=raw, stderr=b"")
+    adapter = HermesVideoStudioAdapter(cfg, subprocess_run=fake)
+    init = adapter.initialize_project(
+        project_id="hvs8l-abc",
+        contract_path=str(tmp_path / "contract.json"),
+        expected_payload_hash="a" * 16,
+        approve_initialization=True,
+        request_id="stage8l",
+    )
+    check("0x97 control-plane is NOT parsed", init.get("payload") is None)
+    check("0x97 control-plane rejected (malformed_output)",
+          init.get("error_kind") == "malformed_output")
+    check("0x97 control-plane not ok", init.get("ok") is False)
+
+
+def test_json_command_accepts_valid_utf8_control_plane(tmp_path) -> None:
+    cfg = _valid_config(tmp_path)
+    # Genuine UTF-8 control-plane JSON (Thai + emoji) must still parse fine.
+    payload = {"status": "verified", "note": "ส่งมอบแล้ว \U0001f680"}
+    raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    fake = _FakeRunBytes(returncode=0, stdout=raw, stderr=b"")
+    adapter = HermesVideoStudioAdapter(cfg, subprocess_run=fake)
+    init = adapter.initialize_project(
+        project_id="hvs8l-abc",
+        contract_path=str(tmp_path / "contract.json"),
+        expected_payload_hash="a" * 16,
+        approve_initialization=True,
+        request_id="stage8l",
+    )
+    check("valid UTF-8 control-plane parses", init.get("payload") == payload)
+    check("valid UTF-8 control-plane ok", init.get("ok") is True)
+
+
+def test_subprocess_run_uses_text_false_bytes_boundary(tmp_path) -> None:
+    cfg = _valid_config(tmp_path)
+    captured: dict[str, Any] = {}
+    HermesVideoStudioAdapter(
+        cfg, subprocess_run=_FakeRunBytes(captured=captured)
+    ).run_readonly_probe(request_id="r1", created_at=_created_at())
+    check("text=False (raw bytes) set on subprocess", captured["kwargs"].get("text") is False)
+
 
 
 def test_stage8l_mutation_config_requires_repo_local_python(tmp_path) -> None:
