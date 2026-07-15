@@ -52,6 +52,7 @@ work/uigen/lyrics_words.json
 work/assets_mcp/
 *.egg-info/
 .vscode/
+.hermes/desktop-attachments/*.pdf
 _backup_pre_integration_2026-06-15/
 # Organized work/ scratch subfolders (generated per job: videos / frames / data / edit)
 work/video/
