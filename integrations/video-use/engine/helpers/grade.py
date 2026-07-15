@@ -34,6 +34,19 @@ import sys
 import uuid
 from pathlib import Path
 
+# --- Central media-binary resolver ------------------------------------------
+# Keep grade.py runnable as a standalone script and importable under pytest
+# while routing ffmpeg/ffprobe through the shared, hermetic resolver.
+# Repo root is added to sys.path so the in-package resolver is
+# importable without a hardcoded path. Resolution is lazy (module import)
+# and fails closed with an actionable error if a binary is unavailable.
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from scos.media_binaries import resolve_ffmpeg, resolve_ffprobe  # noqa: E402
+
+FFMPEG = resolve_ffmpeg()
+FFPROBE = resolve_ffprobe()
 
 PRESETS: dict[str, str] = {
     # Subtle baseline — barely perceptible cleanup. No color shift.
@@ -107,7 +120,7 @@ def _sample_frame_stats(
 
     try:
         cmd = [
-            "ffmpeg", "-y", "-hide_banner", "-nostats",
+            FFMPEG, "-y", "-hide_banner", "-nostats",
             "-ss", f"{start:.3f}",
             "-i", str(video),
             "-t", f"{duration:.3f}",
@@ -199,7 +212,7 @@ def auto_grade_for_clip(
     if duration is None:
         # Probe duration
         probe_cmd = [
-            "ffprobe", "-v", "error",
+            FFPROBE, "-v", "error",
             "-show_entries", "format=duration",
             "-of", "default=noprint_wrappers=1:nokey=1",
             str(video),
@@ -280,12 +293,12 @@ def apply_grade(input_path: Path, output_path: Path, filter_string: str) -> None
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if not filter_string:
         cmd = [
-            "ffmpeg", "-y", "-i", str(input_path),
+            FFMPEG, "-y", "-i", str(input_path),
             "-c", "copy", str(output_path),
         ]
     else:
         cmd = [
-            "ffmpeg", "-y", "-i", str(input_path),
+            FFMPEG, "-y", "-i", str(input_path),
             "-vf", filter_string,
             "-c:v", "libx264", "-preset", "fast", "-crf", "18",
             "-pix_fmt", "yuv420p",

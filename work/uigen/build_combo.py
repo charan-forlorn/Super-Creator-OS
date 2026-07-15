@@ -6,6 +6,20 @@ import numpy as np, subprocess, math, wave
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
+# --- Central media-binary resolver ------------------------------------------
+# Keep build_combo.py runnable as a standalone script and importable
+# under pytest while routing ffmpeg through the shared, hermetic
+# resolver. Repo root is added to sys.path so the in-package
+# resolver is importable without a hardcoded path. Resolution is
+# lazy (module import) and fails closed with an actionable error.
+import sys  # noqa: E402
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from scos.media_binaries import resolve_ffmpeg  # noqa: E402
+
+FFMPEG = resolve_ffmpeg()
+
 HERE=Path(__file__).parent
 W,H,FPS=1080,1920,30
 CARD_CY=820
@@ -118,7 +132,7 @@ starts=[s[0] for s in SC]
 
 # ---- audio envelope from the real beat ----
 wavp=HERE/"_beat.wav"
-subprocess.run(["ffmpeg","-hide_banner","-y","-i",str(BEAT),"-ar","44100","-ac","1",str(wavp)],stderr=subprocess.DEVNULL)
+subprocess.run([FFMPEG,"-hide_banner","-y","-i",str(BEAT),"-ar","44100","-ac","1",str(wavp)],stderr=subprocess.DEVNULL)
 with wave.open(str(wavp),'rb') as w:
     sr=w.getframerate();raw=w.readframes(w.getnframes())
 a=np.frombuffer(raw,np.int16).astype(np.float32)/32768.0
@@ -151,7 +165,7 @@ def scene_at(tt):
     return si
 
 out=Path("C:/Users/chara/super-creator-os/output/COMBO_canva_higgsfield_uiedit.mp4")
-cmd=["ffmpeg","-y","-f","rawvideo","-pix_fmt","rgb24","-s","%dx%d"%(W,H),"-r",str(FPS),"-i","-","-i",str(BEAT),
+cmd=[FFMPEG,"-y","-f","rawvideo","-pix_fmt","rgb24","-s","%dx%d"%(W,H),"-r",str(FPS),"-i","-","-i",str(BEAT),
      "-c:v","libx264","-pix_fmt","yuv420p","-profile:v","high","-crf","19","-preset","medium","-c:a","aac","-b:a","192k","-shortest",str(out)]
 proc=subprocess.Popen(cmd,stdin=subprocess.PIPE,stderr=subprocess.DEVNULL)
 print("rendering %d frames..."%NF)

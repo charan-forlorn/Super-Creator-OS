@@ -30,6 +30,21 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+# --- Central media-binary resolver ------------------------------------------
+# Keep timeline_view.py runnable as a standalone script and importable
+# under pytest while routing ffmpeg/ffprobe through the shared,
+# hermetic resolver. Repo root is added to sys.path so the
+# in-package resolver is importable without a hardcoded path.
+# Resolution is lazy (module import) and fails closed.
+import sys  # noqa: E402
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from scos.media_binaries import resolve_ffmpeg, resolve_ffprobe  # noqa: E402
+
+FFMPEG = resolve_ffmpeg()
+FFPROBE = resolve_ffprobe()
+
 
 # -------- Frame extraction ---------------------------------------------------
 
@@ -56,7 +71,7 @@ def extract_frames(video: Path, start: float, end: float, n: int, dest_dir: Path
         wrote = False
         for seek in (t, max(start, t - 0.30), max(start, t - 0.80)):
             cmd = [
-                "ffmpeg", "-y",
+                FFMPEG, "-y",
                 "-ss", f"{seek:.3f}",
                 "-i", str(video),
                 "-frames:v", "1",
@@ -91,7 +106,7 @@ def compute_envelope(video: Path, start: float, end: float, samples: int = 2000)
         wav = Path(f.name)
     try:
         cmd = [
-            "ffmpeg", "-y",
+            FFMPEG, "-y",
             "-ss", f"{start:.3f}",
             "-i", str(video),
             "-t", f"{(end - start):.3f}",

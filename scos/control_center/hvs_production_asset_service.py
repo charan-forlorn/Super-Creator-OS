@@ -33,12 +33,13 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
+
+from scos.media_binaries import resolve_ffprobe
 
 from .hvs_asset_materialization import (
     _assert_not_network_or_device,
@@ -226,7 +227,7 @@ def _probe_media_local(source_path: str) -> tuple[str, dict[str, Any]]:
     """
     if not os.path.isfile(source_path):
         return "missing", {"reason": "file not found"}
-    bin_name = shutil.which("ffprobe") or "ffprobe"
+    bin_name = resolve_ffprobe()
     try:
         proc = subprocess.run(
             [bin_name, "-v", "error", "-show_format", "-show_streams", "-of", "json", source_path],

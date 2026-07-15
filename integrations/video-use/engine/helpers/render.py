@@ -28,6 +28,20 @@ import subprocess
 import sys
 from pathlib import Path
 
+# --- Central media-binary resolver ------------------------------------------
+# Keep render.py runnable as a standalone script (``python helpers/render.py``)
+# and importable under pytest while routing ffmpeg/ffprobe through the
+# shared, hermetic resolver. Repo root is added to sys.path so the
+# in-package resolver is importable without a hardcoded path. Resolution
+# is lazy (module import) and fails closed.
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from scos.media_binaries import resolve_ffmpeg, resolve_ffprobe  # noqa: E402
+
+FFMPEG = resolve_ffmpeg()
+FFPROBE = resolve_ffprobe()
+
 try:
     from grade import get_preset, auto_grade_for_clip  # same directory
 except Exception:
@@ -121,7 +135,7 @@ def is_hdr_source(video: Path) -> bool:
     """Return True if the source uses a PQ or HLG transfer function."""
     try:
         out = subprocess.run(
-            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+            [FFPROBE, "-v", "error", "-select_streams", "v:0",
              "-show_entries", "stream=color_transfer",
              "-of", "default=noprint_wrappers=1:nokey=1", str(video)],
             capture_output=True, text=True, check=True,
@@ -135,7 +149,7 @@ def is_portrait_source(video: Path) -> bool:
     """Return True if the video's height > width (portrait / vertical)."""
     try:
         out = subprocess.run(
-            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+            [FFPROBE, "-v", "error", "-select_streams", "v:0",
              "-show_entries", "stream=width,height",
              "-of", "csv=p=0", str(video)],
             capture_output=True, text=True, check=True,
@@ -196,7 +210,7 @@ def extract_segment(
         preset, crf = "fast", "20"
 
     cmd = [
-        "ffmpeg", "-y",
+        FFMPEG, "-y",
         "-ss", f"{seg_start:.3f}",
         "-i", str(source),
         "-t", f"{duration:.3f}",
@@ -271,7 +285,7 @@ def concat_segments(segment_paths: list[Path], out_path: Path, edit_dir: Path) -
     concat_list.write_text("".join(f"file '{p.resolve()}'\n" for p in segment_paths))
 
     cmd = [
-        "ffmpeg", "-y",
+        FFMPEG, "-y",
         "-f", "concat", "-safe", "0",
         "-i", str(concat_list),
         "-c", "copy",
@@ -404,7 +418,7 @@ def measure_loudness(video_path: Path) -> dict[str, str] | None:
         f"loudnorm=I={LOUDNORM_I}:TP={LOUDNORM_TP}:LRA={LOUDNORM_LRA}:print_format=json"
     )
     cmd = [
-        "ffmpeg", "-y", "-hide_banner", "-nostats",
+        FFMPEG, "-y", "-hide_banner", "-nostats",
         "-i", str(video_path),
         "-af", filter_str,
         "-vn", "-f", "null", "-",
@@ -445,7 +459,7 @@ def apply_loudnorm_two_pass(
         # One-pass approximation — faster, slightly less accurate.
         filter_str = f"loudnorm=I={LOUDNORM_I}:TP={LOUDNORM_TP}:LRA={LOUDNORM_LRA}"
         cmd = [
-            "ffmpeg", "-y", "-hide_banner", "-nostats",
+            FFMPEG, "-y", "-hide_banner", "-nostats",
             "-i", str(input_path),
             "-c:v", "copy",
             "-af", filter_str,
@@ -477,7 +491,7 @@ def apply_loudnorm_two_pass(
         f":linear=true"
     )
     cmd = [
-        "ffmpeg", "-y", "-hide_banner", "-nostats",
+        FFMPEG, "-y", "-hide_banner", "-nostats",
         "-i", str(input_path),
         "-c:v", "copy",
         "-af", filter_str,
@@ -509,7 +523,7 @@ def build_final_composite(
 
     if not has_overlays and not has_subs:
         # Nothing to do — just rename/copy base to final name
-        run(["ffmpeg", "-y", "-i", str(base_path), "-c", "copy", str(out_path)], quiet=True)
+        run([FFMPEG, "-y", "-i", str(base_path), "-c", "copy", str(out_path)], quiet=True)
         return
 
     inputs: list[str] = ["-i", str(base_path)]
@@ -556,7 +570,7 @@ def build_final_composite(
     filter_complex = ";".join(filter_parts)
 
     cmd = [
-        "ffmpeg", "-y",
+        FFMPEG, "-y",
         *inputs,
         "-filter_complex", filter_complex,
         "-map", out_label,

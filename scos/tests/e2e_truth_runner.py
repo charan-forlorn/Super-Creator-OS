@@ -32,6 +32,11 @@ from scos.assets import AssetBuilder                 # noqa: E402  (Module 3)
 from scos.agents.edit_composer import EditComposer   # noqa: E402  (reused, unmodified)
 from scos.render import ffmpeg_engine                 # noqa: E402  (Module 2, unmodified)
 
+from scos.media_binaries import resolve_ffmpeg, resolve_ffprobe  # noqa: E402
+
+FFMPEG = resolve_ffmpeg()
+FFPROBE = resolve_ffprobe()
+
 _RENDER_DIR = _REPO_ROOT / "scos" / "work" / "render"
 _MANIFEST = _REPO_ROOT / "scos" / "work" / "assets_manifest.json"
 _TOL_S = 0.05
@@ -64,7 +69,7 @@ def _png_dims(p: Path) -> tuple[int, int]:
 
 def _ffprobe_dims(p: Path) -> tuple[int, int]:
     proc = subprocess.run(
-        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+        [FFPROBE, "-v", "error", "-select_streams", "v:0",
          "-show_entries", "stream=width,height", "-of", "json", str(p)],
         capture_output=True, text=True)
     if proc.returncode != 0:
@@ -76,7 +81,7 @@ def _ffprobe_dims(p: Path) -> tuple[int, int]:
 def _framemd5(p: Path) -> str:
     """Decoded-frame checksum (robust to encoder byte drift). Comment lines stripped."""
     proc = subprocess.run(
-        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", str(p),
+        [FFMPEG, "-hide_banner", "-loglevel", "error", "-i", str(p),
          "-map", "0:v", "-f", "framemd5", "-"], capture_output=True, text=True)
     lines = [ln for ln in proc.stdout.splitlines() if ln and not ln.startswith("#")]
     return hashlib.sha256("\n".join(lines).encode()).hexdigest()

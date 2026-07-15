@@ -41,13 +41,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from .hvs_commercial_proposal_models import canonical_json
+from scos.media_binaries import resolve_ffprobe
 from .hvs_render_completion_models import (
     ALLOWED_EVENT_TYPES,
     AudioRequirement,
@@ -739,7 +738,7 @@ def _probe_media_ffprobe(source_path: str) -> tuple[str, dict[str, Any]]:
     """Probe a media file with ffprobe. (status, detail). argv, shell=False."""
     if not os.path.isfile(source_path):
         return "missing", {"reason": "file not found"}
-    bin_name = shutil.which("ffprobe") or "ffprobe"
+    bin_name = resolve_ffprobe()
     try:
         proc = subprocess.run(
             [

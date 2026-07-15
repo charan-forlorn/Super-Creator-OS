@@ -26,6 +26,19 @@ from pathlib import Path
 
 import requests
 
+# --- Central media-binary resolver ------------------------------------------
+# Keep transcribe.py runnable as a standalone script and importable under
+# pytest while routing ffmpeg/ffprobe through the shared, hermetic
+# resolver. Repo root is added to sys.path so the in-package resolver
+# is importable without a hardcoded path. Resolution is lazy (module
+# import) and fails closed with an actionable error.
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from scos.media_binaries import resolve_ffmpeg, resolve_ffprobe  # noqa: E402
+
+FFMPEG = resolve_ffmpeg()
+FFPROBE = resolve_ffprobe()
 
 SCRIBE_URL = "https://api.elevenlabs.io/v1/speech-to-text"
 
@@ -48,7 +61,7 @@ def load_api_key() -> str:
 
 def extract_audio(video_path: Path, dest: Path) -> None:
     cmd = [
-        "ffmpeg", "-y", "-i", str(video_path),
+        FFMPEG, "-y", "-i", str(video_path),
         "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le",
         str(dest),
     ]

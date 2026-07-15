@@ -39,6 +39,19 @@ from highlight_engine import HighlightConfig, extract_audio_energy, onset, _ffpr
 
 GRADE_PUNCH = "eq=contrast=1.12:saturation=1.28:brightness=0.01"
 
+# --- Central media-binary resolver ------------------------------------------
+# Keep montage.py runnable as a standalone script (``python montage.py``)
+# while routing ffmpeg through the shared, hermetic resolver. Repo root
+# is added to sys.path so the in-package resolver is importable without a
+# hardcoded path or a changed CLI. Resolution is lazy (module import time)
+# and fails closed with an actionable error if ffmpeg is unavailable.
+_REPO_ROOT = _HERE.parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from scos.media_binaries import resolve_ffmpeg  # noqa: E402
+
+FFMPEG = resolve_ffmpeg()
+
 
 @dataclass
 class MontageConfig:
@@ -130,7 +143,7 @@ def _render_shot(source: Path, src_start: float, src_end: float, cfg: MontageCon
                  f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={cfg.tw}x{cfg.th}:fps={cfg.fps}")
     post += f",fade=t=in:st=0:d={cfg.flash_s}:color=white"
     fc = f"{vchain};[vr]{post}[vout];[0:a]atempo={cfg.speed},afade=t=in:st=0:d=0.02,afade=t=out:st={max(0,out_dur-0.03):.3f}:d=0.03[aout]"
-    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+    cmd = [FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
            "-ss", f"{start:.3f}", "-t", f"{src_dur:.3f}", "-i", str(source),
            "-filter_complex", fc, "-map", "[vout]", "-map", "[aout]",
            "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p",
@@ -146,7 +159,7 @@ def _render_shot_noznoom(source, start, src_dur, out_dur, cfg, out) -> bool:
     fc = (f"{vchain};[vr]setpts=PTS/{cfg.speed},{GRADE_PUNCH},"
           f"fade=t=in:st=0:d={cfg.flash_s}:color=white[vout];"
           f"[0:a]atempo={cfg.speed},afade=t=in:st=0:d=0.02,afade=t=out:st={max(0,out_dur-0.03):.3f}:d=0.03[aout]")
-    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+    cmd = [FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
            "-ss", f"{start:.3f}", "-t", f"{src_dur:.3f}", "-i", str(source),
            "-filter_complex", fc, "-map", "[vout]", "-map", "[aout]",
            "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p",
@@ -185,7 +198,7 @@ def render_montage(source: str | Path, music: str | Path, out: str | Path,
     listf = tmp / "list.txt"
     listf.write_text("".join(f"file '{p.as_posix()}'\n" for p in shot_files), encoding="utf-8")
     base = tmp / "base.mp4"
-    c1 = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+    c1 = subprocess.run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
                          "-f", "concat", "-safe", "0", "-i", str(listf),
                          "-c", "copy", str(base)], capture_output=True, text=True)
     if c1.returncode != 0:                                 # fallback: re-encode concat
@@ -194,7 +207,7 @@ def render_montage(source: str | Path, music: str | Path, out: str | Path,
             inputs += ["-i", str(p)]
         n = len(shot_files)
         fc = "".join(f"[{i}:v][{i}:a]" for i in range(n)) + f"concat=n={n}:v=1:a=1[v][a]"
-        subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *inputs,
+        subprocess.run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error", *inputs,
                         "-filter_complex", fc, "-map", "[v]", "-map", "[a]",
                         "-c:v", "libx264", "-crf", "20", "-preset", "veryfast",
                         "-pix_fmt", "yuv420p", "-c:a", "aac", str(base)],
@@ -207,7 +220,7 @@ def render_montage(source: str | Path, music: str | Path, out: str | Path,
             f"[g][m]amix=inputs=2:duration=first:normalize=0,"
             f"loudnorm=I=-14:TP=-1.5:LRA=11[aout]")
     out.parent.mkdir(parents=True, exist_ok=True)
-    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+    cmd = [FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
            "-i", str(base), "-ss", f"{hype_t:.3f}", "-t", f"{total:.3f}", "-i", str(music),
            "-filter_complex", amix, "-map", "0:v", "-map", "[aout]",
            "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out)]
@@ -306,7 +319,7 @@ def _render_fight(source: Path, ep: dict, cfg: MontageConfig, out: Path,
         climax_rel = climax - start
         fc = (f"{zc};{_fx_chain('vr', 'vout', cfg, climax_rel, text, font)};"
               f"[0:a]afade=t=in:st=0:d=0.02[aout]")
-        cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        cmd = [FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
                "-ss", f"{start:.3f}", "-t", f"{end - start:.3f}", "-i", str(source),
                "-filter_complex", fc, "-map", "[vout]", "-map", "[aout]",
                "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p",
@@ -321,7 +334,7 @@ def _render_fight(source: Path, ep: dict, cfg: MontageConfig, out: Path,
            f"[0:a]atrim={start:.3f}:{sm:.3f},asetpts=PTS-STARTPTS[a0];"
            f"[0:a]atrim={sm:.3f}:{end:.3f},asetpts=PTS-STARTPTS,atempo={slow}[a1];"
            f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[vc][ac]")
-    if subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(source),
+    if subprocess.run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error", "-i", str(source),
                        "-filter_complex", fcr, "-map", "[vc]", "-map", "[ac]",
                        "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p",
                        "-r", str(cfg.fps), "-c:a", "aac", "-ar", "48000", str(raw)],
@@ -329,7 +342,7 @@ def _render_fight(source: Path, ep: dict, cfg: MontageConfig, out: Path,
         return False
     climax_rel = (sm - start) + 0.5 / slow
     fc2 = f"{zc};{_fx_chain('vr', 'vout', cfg, climax_rel, text, font)}"
-    return subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(raw),
+    return subprocess.run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error", "-i", str(raw),
                            "-filter_complex", fc2, "-map", "[vout]", "-map", "0:a",
                            "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p",
                            "-r", str(cfg.fps), "-c:a", "aac", "-ar", "48000", str(out)],
@@ -355,7 +368,7 @@ def _render_coldopen(source: Path, ep: dict, cfg: MontageConfig, out: Path, text
           f"drawbox=w=iw:h=ih:color=white@0.6:t=fill:enable='between(t,{kill_rel:.2f},{kill_rel + 0.05:.2f})',"
           f"tpad=stop_mode=clone:stop_duration={freeze}{tx}[vout];"
           f"[0:a]afade=t=out:st={max(0.0, dur - 0.1):.2f}:d=0.1,apad=pad_dur={freeze}[aout]")
-    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+    cmd = [FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
            "-ss", f"{start:.3f}", "-t", f"{dur:.3f}", "-i", str(source),
            "-filter_complex", fc, "-map", "[vout]", "-map", "[aout]",
            "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p",
@@ -416,7 +429,7 @@ def render_highlight_60s(source: str | Path, music: str | Path, out: str | Path,
     listf = tmp / "list.txt"
     listf.write_text("".join(f"file '{p.as_posix()}'\n" for p in parts), encoding="utf-8")
     base = tmp / "base.mp4"
-    if subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "concat",
+    if subprocess.run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error", "-f", "concat",
                        "-safe", "0", "-i", str(listf), "-c", "copy", str(base)],
                       capture_output=True, text=True).returncode != 0:
         inp = []
@@ -424,7 +437,7 @@ def render_highlight_60s(source: str | Path, music: str | Path, out: str | Path,
             inp += ["-i", str(p)]
         n = len(parts)
         fc = "".join(f"[{i}:v][{i}:a]" for i in range(n)) + f"concat=n={n}:v=1:a=1[v][a]"
-        subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *inp,
+        subprocess.run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error", *inp,
                         "-filter_complex", fc, "-map", "[v]", "-map", "[a]",
                         "-c:v", "libx264", "-crf", "20", "-preset", "veryfast",
                         "-pix_fmt", "yuv420p", "-c:a", "aac", str(base)], capture_output=True, text=True)
@@ -439,7 +452,7 @@ def render_highlight_60s(source: str | Path, music: str | Path, out: str | Path,
             f"[1:a]volume={cfg.music_volume},afade=t=out:st={fade_out:.3f}:d=0.5[m];"
             f"[g][m]amix=inputs=2:duration=first:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11[aout]")
     out.parent.mkdir(parents=True, exist_ok=True)
-    r = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+    r = subprocess.run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
                         "-i", str(base), "-ss", f"{m_start:.3f}", "-t", f"{total:.3f}", "-i", str(music),
                         "-filter_complex", amix, "-map", "0:v", "-map", "[aout]",
                         "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out)],
