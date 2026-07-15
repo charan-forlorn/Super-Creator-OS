@@ -134,11 +134,26 @@ Stage 8S from zero.
 
 ```powershell
 cd C:\Workspace\super-creator-os
-.venv\Scripts\python.exe -m pytest -q                       # full suite (integration deselected)
-.venv\Scripts\python.exe -m pytest -m integration -q       # real-HVS integration
+$pytestRoot = Join-Path $env:TEMP ("scos-pytest-" + [guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $pytestRoot | Out-Null
+
+.venv\Scripts\python.exe -m pytest -q `
+  -o "cache_dir=$pytestRoot\full-cache" `
+  --basetemp "$pytestRoot\full-base" `
+  -W error::pytest.PytestConfigWarning                       # full suite (integration deselected)
+.venv\Scripts\python.exe -m pytest -m integration -q `
+  -o "cache_dir=$pytestRoot\integration-cache" `
+  --basetemp "$pytestRoot\integration-base" `
+  -W error::pytest.PytestConfigWarning                       # real-HVS integration
 .venv\Scripts\python.exe scripts/test_smoke.py             # smoke (16 passed)
 .venv\Scripts\python.exe scripts/security_scan_baseline.py # security (504/0)
 ```
+
+Keep pytest's built-in `cacheprovider` plugin enabled. The repository's
+`cache_dir` setting is registered by that plugin; disabling it with
+`-p no:cacheprovider` makes the valid option appear unknown. For isolated
+verification, redirect both `cache_dir` and `--basetemp` to a unique system-temp
+root as shown above.
 
 ## 19. Runtime-Path Locations
 
@@ -170,9 +185,9 @@ Operator rules:
   them with the preflight values.
 - Treat unexpected hash drift, unexpected staged changes, or a runtime
   integrity failure as a blocking condition.
-- Run practice-runtime tests with injected temporary paths and a system-temp
-  `--basetemp`; do not use repository temp directories for new verification
-  output.
+- Run practice-runtime tests with injected temporary paths, cacheprovider
+  enabled, and system-temp `cache_dir` plus `--basetemp`; do not use
+  repository temp directories for new verification output.
 
 The isolated contract is: injected runtime paths receive practice records;
 temporary canonical memory remains byte-identical; absent default runtime paths
