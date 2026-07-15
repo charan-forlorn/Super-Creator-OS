@@ -17,7 +17,7 @@ Design (safety-first, per HVS studio.config.json `approval_required: true`,
     This script never bypasses that gate.
   - After a (real or simulated) render, we:
       1. verify the output exists (HVS verify-real-render-output, or pattern sim)
-      2. append a learned render-pattern record to SCOS memory/database.json
+      2. append a learned render-pattern record to the SCOS runtime journal
       3. delete the produced video, keeping only the learned pattern
          (uses the same verify-then-delete gating from video_job_cleanup)
 
@@ -42,8 +42,14 @@ from typing import Callable, Optional
 _ROOT = Path(__file__).resolve().parents[1]
 _HVS_ROOT = _ROOT.parent / "hermes-video-studio"
 _DEFAULT_MEMORY_DB = _ROOT / "memory" / "database.json"
+_DEFAULT_RUNTIME_JOURNAL = _ROOT / "memory" / "runtime" / "practice-render.jsonl"
 _DEFAULT_REFERENCE = _ROOT / "input" / "reference"
 _DEFAULT_OUTPUT = _ROOT / "output"
+_LEARNING_ROOT = _ROOT / "integrations" / "learning"
+if str(_LEARNING_ROOT) not in sys.path:
+    sys.path.insert(0, str(_LEARNING_ROOT))
+
+import memory_store  # noqa: E402
 
 # Platform families HVS supports, mapped to CLI format ids.
 PLATFORM_FORMATS = {
@@ -52,7 +58,7 @@ PLATFORM_FORMATS = {
     "youtube_website": "landscape_16_9",
 }
 
-# Learned-pattern schema we append to SCOS database.json.
+# Learned-pattern schema we append to SCOS runtime memory.
 _PATTERN_SCHEMA_VERSION = "v4"
 _ENGINE = "practice-loop"
 
@@ -93,15 +99,13 @@ def list_render_formats(hvs_root: Path) -> list[dict]:
 
 
 # --- learning record ------------------------------------------------------
-def _next_project_name(db_path: Path, platform_key: str) -> str:
-    rows = []
-    if db_path.is_file():
-        try:
-            rows = json.loads(db_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            rows = []
-    n = sum(1 for r in rows if r.get("engine") == _ENGINE)
-    return f"Practice {platform_key} #{n + 1} ({date.today().isoformat()})"
+def _default_attempt_id(platform_key: str, format_id: str, simulated: bool) -> str:
+    mode = "simulated" if simulated else "real"
+    return f"{date.today().isoformat()}::{platform_key}::{format_id}::{mode}"
+
+
+def _project_name(platform_key: str) -> str:
+    return f"Practice {platform_key} ({date.today().isoformat()})"
 
 
 def append_learned_pattern(
@@ -113,18 +117,19 @@ def append_learned_pattern(
     lesson: str,
     simulated: bool,
     render_success: bool = None,
+    *,
+    runtime_journal: Path = _DEFAULT_RUNTIME_JOURNAL,
+    persist: bool = True,
+    attempt_id: Optional[str] = None,
 ) -> dict:
-    rows = []
-    if db_path.is_file():
-        try:
-            rows = json.loads(db_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            rows = []
     # render_success defaults to "not simulated" unless an explicit result given
     if render_success is None:
         render_success = not simulated
+    attempt = attempt_id or _default_attempt_id(platform_key, format_id, simulated)
     record = {
-        "project_name": _next_project_name(db_path, platform_key),
+        "runtime_record_type": "practice_render",
+        "record_type": "practice_render",
+        "project_name": _project_name(platform_key),
         "product_niche": "render_practice",
         "hook_successful": f"render-format={format_id} ({resolution}@{fps})",
         "editing_specs": f"platform={platform_key}; simulated={simulated}",
@@ -134,6 +139,11 @@ def append_learned_pattern(
         "schema_version": _PATTERN_SCHEMA_VERSION,
         "engine": _ENGINE,
         "clip_type": "render_practice",
+        "platform_family": platform_key,
+        "format_id": format_id,
+        "render_source_id": "learn-only" if simulated else "hvs-real-render",
+        "attempt_id": attempt,
+        "canonical_memory_path": str(db_path),
         "transcribed": False,
         "render_success": render_success,
         "qa_pass": render_success,
@@ -145,9 +155,17 @@ def append_learned_pattern(
         },
         "is_practice": True,
     }
-    rows.append(record)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    db_path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    if not persist:
+        record["learning_persisted"] = False
+        record["learning_store"] = "dry_run"
+        return record
+
+    ok, info = memory_store.append_runtime_record(record, runtime_path=runtime_journal)
+    record["learning_persisted"] = ok
+    record["learning_store"] = "runtime_journal"
+    record["learning_info"] = info
+    if not ok:
+        record["learning_error"] = info
     return record
 
 
@@ -161,6 +179,9 @@ def practice_one(
     hvs_approval_flags: Optional[list[str]] = None,
     hvs_project_id: str = "my-VDO",
     source_hint: Optional[str] = None,
+    runtime_journal: Path = _DEFAULT_RUNTIME_JOURNAL,
+    persist_learning: bool = True,
+    attempt_id: Optional[str] = None,
     renderer: Callable[[str, str], tuple[bool, str]] = None,
     delete_fn: Callable[[str], list[str]] = None,
 ) -> dict:
@@ -224,11 +245,15 @@ def practice_one(
     record = append_learned_pattern(
         memory_db, platform_key, format_id, resolution, fps, lesson, simulated,
         render_success=(ok if not simulated else False),
+        runtime_journal=runtime_journal,
+        persist=persist_learning,
+        attempt_id=attempt_id,
     )
+    learning_persisted = bool(record.get("learning_persisted"))
 
     # 3) if a real video was produced, delete it (keep only the pattern)
     deleted = []
-    if ok and not simulated:
+    if ok and not simulated and learning_persisted:
         out_file = str(_DEFAULT_OUTPUT / f"{platform_key}.mp4")
         if delete_fn is not None:
             # test injection: deterministic, no real HVS/cleanup calls
@@ -265,7 +290,9 @@ def practice_one(
         "render_ok": ok,
         "render_detail": detail,
         "simulated": simulated,
-        "learned_record": record["project_name"],
+        "learned_record": record["project_name"] if learning_persisted else None,
+        "learning_persisted": learning_persisted,
+        "learning_error": record.get("learning_error"),
         "deleted_videos": deleted,
     }
 
@@ -274,12 +301,18 @@ def run_daily(
     *,
     hvs_root: Path = _HVS_ROOT,
     memory_db: Path = _DEFAULT_MEMORY_DB,
+    runtime_journal: Path = _DEFAULT_RUNTIME_JOURNAL,
     allow_real: bool = False,
     hvs_approval_flags: Optional[list[str]] = None,
+    persist_learning: bool = True,
+    attempt_id: Optional[str] = None,
     renderer: Callable[[str, str], tuple[bool, str]] = None,
 ) -> dict:
     reports = [practice_one(k, hvs_root=hvs_root, memory_db=memory_db,
                             allow_real=allow_real, hvs_approval_flags=hvs_approval_flags,
+                            runtime_journal=runtime_journal,
+                            persist_learning=persist_learning,
+                            attempt_id=(f"{attempt_id}::{k}" if attempt_id else None),
                             renderer=renderer)
                for k in PLATFORM_FORMATS]
     learned = sum(1 for r in reports if r["learned_record"])
@@ -299,6 +332,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="SCOS x HVS daily practice-render loop")
     p.add_argument("--hvs-root", type=Path, default=_HVS_ROOT)
     p.add_argument("--memory-db", type=Path, default=_DEFAULT_MEMORY_DB)
+    p.add_argument("--runtime-journal", type=Path, default=_DEFAULT_RUNTIME_JOURNAL)
     p.add_argument("--once", action="store_true", help="รันรอบเดียว (ไม่วนลูป)")
     p.add_argument("--dry-run", action="store_true",
                    help="learn-only: ไม่ render จริง ไม่ลบไฟล์ (ดีฟอลต์ปลอดภัย)")
@@ -315,8 +349,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     result = run_daily(
         hvs_root=args.hvs_root,
         memory_db=args.memory_db,
+        runtime_journal=args.runtime_journal,
         allow_real=allow_real,
         hvs_approval_flags=args.hvs_approval_flags,
+        persist_learning=not args.dry_run,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2))
     print("\nหมายเหตุ: โหมด", "REAL" if result["real_renders"] else "LEARN-ONLY/DRY-RUN",
