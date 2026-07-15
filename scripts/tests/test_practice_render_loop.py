@@ -36,6 +36,33 @@ def _seed_canonical(path: Path, payload: bytes = b"[]") -> bytes:
     return path.read_bytes()
 
 
+def _file_tree_bytes(path: Path) -> dict[str, bytes]:
+    if not path.exists():
+        return {}
+    return {
+        str(p.relative_to(path)): p.read_bytes()
+        for p in sorted(path.rglob("*"))
+        if p.is_file()
+    }
+
+
+def _seed_runtime_sentinel(path: Path) -> None:
+    record = append_learned_pattern(
+        path.parent / "canonical-equivalent.json",
+        "ig_fb_feed",
+        "square_1_1",
+        "1080x1080",
+        30,
+        "sentinel",
+        simulated=True,
+        runtime_journal=path,
+        attempt_id="sentinel-default-state",
+    )
+    ok = record.get("learning_persisted")
+    info = record.get("learning_info")
+    assert ok, info
+
+
 def test_learn_only_records_patterns_to_runtime_no_real(tmp_path: Path):
     canonical = tmp_path / "memory" / "database.json"
     runtime = tmp_path / "runtime" / "practice-render.jsonl"
@@ -362,15 +389,47 @@ def test_malformed_canonical_db_is_not_overwritten(tmp_path: Path):
     assert len(_runtime_rows(runtime)) == len(PLATFORM_FORMATS)
 
 
-def test_production_paths_are_not_created_when_temp_paths_are_injected(tmp_path: Path):
+def test_default_runtime_path_absent_when_temp_paths_are_injected(monkeypatch, tmp_path: Path):
     canonical = tmp_path / "memory" / "database.json"
-    runtime = tmp_path / "runtime" / "practice-render.jsonl"
-    _seed_canonical(canonical)
+    injected_runtime = tmp_path / "runtime" / "practice-render.jsonl"
+    default_runtime = tmp_path / "production-equivalent" / "memory" / "runtime" / "practice-render.jsonl"
+    canonical_before = _seed_canonical(canonical)
 
-    run_daily(memory_db=canonical, runtime_journal=runtime, renderer=_fake_renderer(True))
+    monkeypatch.setattr(
+        "scripts.practice_render_loop.memory_store.DEFAULT_RUNTIME_JOURNAL",
+        default_runtime,
+    )
+    monkeypatch.setattr("scripts.practice_render_loop._DEFAULT_RUNTIME_JOURNAL", default_runtime)
 
-    assert runtime.exists()
-    assert not Path("memory/runtime/practice-render.jsonl").exists()
+    run_daily(memory_db=canonical, runtime_journal=injected_runtime, renderer=_fake_renderer(True))
+
+    assert canonical.read_bytes() == canonical_before
+    assert len(_runtime_rows(injected_runtime)) == len(PLATFORM_FORMATS)
+    assert not default_runtime.exists()
+    assert not default_runtime.parent.exists()
+
+
+def test_preexisting_default_runtime_state_preserved_when_temp_paths_are_injected(
+    monkeypatch, tmp_path: Path
+):
+    canonical = tmp_path / "memory" / "database.json"
+    injected_runtime = tmp_path / "runtime" / "practice-render.jsonl"
+    default_runtime = tmp_path / "production-equivalent" / "memory" / "runtime" / "practice-render.jsonl"
+    canonical_before = _seed_canonical(canonical)
+    _seed_runtime_sentinel(default_runtime)
+    default_before = _file_tree_bytes(default_runtime.parent)
+
+    monkeypatch.setattr(
+        "scripts.practice_render_loop.memory_store.DEFAULT_RUNTIME_JOURNAL",
+        default_runtime,
+    )
+    monkeypatch.setattr("scripts.practice_render_loop._DEFAULT_RUNTIME_JOURNAL", default_runtime)
+
+    run_daily(memory_db=canonical, runtime_journal=injected_runtime, renderer=_fake_renderer(True))
+
+    assert canonical.read_bytes() == canonical_before
+    assert len(_runtime_rows(injected_runtime)) == len(PLATFORM_FORMATS)
+    assert _file_tree_bytes(default_runtime.parent) == default_before
 
 
 def test_daily_report_wrapper_remains_compatible(monkeypatch):
