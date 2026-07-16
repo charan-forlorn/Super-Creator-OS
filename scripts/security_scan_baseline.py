@@ -304,8 +304,21 @@ def _code_lines(text: str):
 
 
 def _is_test_path(rel: str) -> bool:
+    """Path-based classification of recognized test files.
+
+    Covers tests/, __tests__/, *.test.*, *.spec.*, and the existing test_*
+    Python convention. Classification is path-based ONLY — production files
+    are never exempted because their contents resemble a test.
+    """
     parts = rel.split("/")
-    return "tests" in parts or Path(rel).name.startswith("test_")
+    name = Path(rel).name
+    if "tests" in parts or "__tests__" in parts:
+        return True
+    if name.startswith("test_") or name.startswith("test."):
+        return True
+    if ".test." in name or ".spec." in name:
+        return True
+    return False
 
 
 def _append_control_center_findings(findings, rel: str, text: str) -> None:
@@ -355,12 +368,22 @@ def _append_frontend_findings(findings, rel: str, text: str, path: Path) -> None
 
     for line_no, stripped in _code_lines(text):
         for category, token in _FRONTEND_FORBIDDEN_TOKENS:
-            if token in stripped:
-                if _is_test_path(rel) and token in (
-                    _W_DATE_NOW, _W_MATH_RANDOM, _W_CRYPTO_RANDOM_UUID,
-                ) and "monkeypatch" in stripped.lower():
-                    continue
-                findings.append((rel, line_no, category, _redact(stripped)))
+            if token not in stripped:
+                continue
+            # Nondeterminism tokens: exempt in recognized test paths only when
+            # the test actually mocks the API (existing behavior, unchanged).
+            if _is_test_path(rel) and token in (
+                _W_DATE_NOW, _W_MATH_RANDOM, _W_CRYPTO_RANDOM_UUID,
+            ) and "monkeypatch" in stripped.lower():
+                continue
+            # Browser-storage tokens: exempt when located in a recognized test
+            # path. Test fixtures exercise storage APIs legitimately; production
+            # files are never exempted on content resemblance.
+            if _is_test_path(rel) and token in (
+                _W_LOCAL_STORAGE, _W_SESSION_STORAGE,
+            ):
+                continue
+            findings.append((rel, line_no, category, _redact(stripped)))
 
 
 def main() -> int:
