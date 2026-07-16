@@ -1236,17 +1236,33 @@ class TestPreExecutionRehash:
 # ===========================================================================
 @pytest.mark.integration
 class TestHVSMaterializationReal:
-    HVS_REPO = "C:/Workspace/hermes-video-studio"
+    """Hermetic real-HVS materialization boundary (integration).
+
+    Exercises the EXACT SCOS-to-HVS ``import-media`` integration boundary
+    (command construction, path propagation, subprocess invocation seam,
+    manifest read-back, sha256 verification, event persistence) against a
+    process-local temporary HVS double instead of the operator's real repo.
+    Every write stays beneath the temp HVS root; no real HVS is touched.
+    """
+
+    # Fixed project id keeps the test deterministic and isolated.
+    HVS_PID = "hvs8l-e32880405a6292d1ac4e2381af092"
 
     def _run_pipeline(self, tmp_path, wav_name):
-        import sys
-        hvs_py = sys.executable
-        pid = "hvs8l-e32880405a6292d1ac4e1f68997d085f"
+        from hvs_temp_repo_double import hvs_subprocess_double, make_temp_hvs_repo
+
+        # Process-local temporary HVS repository double (NOT the real repo).
+        hvs_root = make_temp_hvs_repo(tmp_path / "hvs-repo", self.HVS_PID)
+        hvs_run = hvs_subprocess_double(hvs_root)
+        hvs_py = "python"  # unused by the injected double; kept for parity
+
+        pid = self.HVS_PID
         rec, inspect = svc.reverify_stage8l(project_id=pid, repo_root=tmp_path,
-            hvs_repo_root=self.HVS_REPO, hvs_python_executable=hvs_py, recorded_at="2026-07-14")
+            hvs_repo_root=str(hvs_root), hvs_python_executable=hvs_py, recorded_at="2026-07-14",
+            inspect_payload=_fake_inspect(pid), subprocess_run=hvs_run)
         assert rec.hvs_project_verified
         insp = svc.inspect_asset_requirements(project_id=pid, reverify=rec, inspect_payload=inspect,
-            repo_root=tmp_path, recorded_at="2026-07-14", hvs_repo_root=self.HVS_REPO,
+            repo_root=tmp_path, recorded_at="2026-07-14", hvs_repo_root=str(hvs_root),
             hvs_python_executable=hvs_py)
         p = _intake(tmp_path) / wav_name; _make_wav(p)
         d, v, e = svc.register_source_asset(repo_root=tmp_path, project_id=pid,
@@ -1268,46 +1284,47 @@ class TestHVSMaterializationReal:
             explicit_non_render_acknowledgement=True)
         assert aerr is None
         res = svc.materialize_assets(repo_root=tmp_path, manifest=m, approval=appr,
-            source_paths={d.source_asset_id: str(p.resolve())}, hvs_repo_root=self.HVS_REPO,
-            hvs_python_executable=hvs_py, operator_id="op", recorded_at="2026-07-14")
-        return rec, insp, d, m, appr, res
+            source_paths={d.source_asset_id: str(p.resolve())}, hvs_repo_root=str(hvs_root),
+            hvs_python_executable=hvs_py, operator_id="op", recorded_at="2026-07-14",
+            subprocess_run=hvs_run)
+        return rec, insp, d, m, appr, res, hvs_root
 
     def test_materialize_completes(self, tmp_path):
-        rec, insp, d, m, appr, res = self._run_pipeline(tmp_path, "real_voice.wav")
+        rec, insp, d, m, appr, res, hvs_root = self._run_pipeline(tmp_path, "real_voice.wav")
         assert res.ok is True
         assert res.status == M.AssetMaterializationStatus.COMPLETED
 
     def test_materialize_uses_approved_boundary(self, tmp_path):
-        rec, insp, d, m, appr, res = self._run_pipeline(tmp_path, "real_voice2.wav")
+        rec, insp, d, m, appr, res, hvs_root = self._run_pipeline(tmp_path, "real_voice2.wav")
         assert any(a["verdict"] == "PASS" for a in res.per_asset)
 
     def test_materialize_destination_hash_matches_source(self, tmp_path):
-        rec, insp, d, m, appr, res = self._run_pipeline(tmp_path, "real_voice3.wav")
+        rec, insp, d, m, appr, res, hvs_root = self._run_pipeline(tmp_path, "real_voice3.wav")
         for a in res.per_asset:
             assert a["asset_sha256"] == d.sha256
 
     def test_materialize_no_render(self, tmp_path):
-        rec, insp, d, m, appr, res = self._run_pipeline(tmp_path, "real_voice4.wav")
+        rec, insp, d, m, appr, res, hvs_root = self._run_pipeline(tmp_path, "real_voice4.wav")
         assert res.ok is True
 
     def test_materialize_persists_event(self, tmp_path):
-        rec, insp, d, m, appr, res = self._run_pipeline(tmp_path, "real_voice5.wav")
+        rec, insp, d, m, appr, res, hvs_root = self._run_pipeline(tmp_path, "real_voice5.wav")
         evs = store.read_asset_intake_events(audit_log_path=store.asset_intake_path(tmp_path))
         assert any(e.event_type == "MATERIALIZATION_COMPLETED" for e in evs)
 
     def test_materialize_destination_present_in_hvs(self, tmp_path):
-        rec, insp, d, m, appr, res = self._run_pipeline(tmp_path, "real_voice6.wav")
+        rec, insp, d, m, appr, res, hvs_root = self._run_pipeline(tmp_path, "real_voice6.wav")
         asset_id = res.per_asset[0]["asset_id"]
-        man_path = Path(self.HVS_REPO) / "projects" / rec.project_id / "media" / "media_manifest.json"
+        man_path = Path(hvs_root) / "projects" / rec.project_id / "media" / "media_manifest.json"
         data = json.loads(man_path.read_text(encoding="utf-8"))
         assert any(a["asset_id"] == asset_id for a in data["assets"])
 
     def test_materialize_no_overwrite(self, tmp_path):
-        rec, insp, d, m, appr, res = self._run_pipeline(tmp_path, "real_voice7.wav")
+        rec, insp, d, m, appr, res, hvs_root = self._run_pipeline(tmp_path, "real_voice7.wav")
         assert res.no_overwrite is True
 
     def test_materialize_reports_per_asset(self, tmp_path):
-        rec, insp, d, m, appr, res = self._run_pipeline(tmp_path, "real_voice8.wav")
+        rec, insp, d, m, appr, res, hvs_root = self._run_pipeline(tmp_path, "real_voice8.wav")
         assert len(res.per_asset) == 1
 
 

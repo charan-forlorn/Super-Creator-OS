@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+import hvs_temp_repo_double as DOUBLE
 import scos.control_center.hvs_render_completion_models as M
 import scos.control_center.hvs_render_completion_service as SVC
 from scos.control_center.hvs_render_completion_models import (
@@ -1691,21 +1692,41 @@ class TestStage8NRealHVS:
         assert "--format" in argv and "vertical" in argv
 
     def test_real_mp4_discovered_and_hashed(self, tmp_path):
-        """Case 6: the existing real MP4 is discovered + SHA-256 computed."""
+        """Case 6: a real vertical MP4 (synthetic, temp HVS double) is discovered
+        and SHA-256 computed via the real ffprobe/file boundary."""
         import hashlib
-        abs_path = Path(self.HVS_REPO).resolve() / self.REAL_ARTIFACT
-        assert abs_path.is_file() and abs_path.stat().st_size > 0
-        sha = hashlib.sha256(abs_path.read_bytes()).hexdigest()
+        import subprocess as _sp
+        import shutil as _sh
+        hvs_root = DOUBLE.make_temp_hvs_repo(tmp_path / "hvs-repo", self.REAL_PROJECT)
+        mp4 = Path(hvs_root) / self.REAL_ARTIFACT
+        mp4.parent.mkdir(parents=True, exist_ok=True)
+        bin_name = _sh.which("ffmpeg") or "ffmpeg"
+        _sp.run([bin_name, "-y", "-f", "lavfi", "-i", "color=c=blue:s=1080x1920:d=3",
+                 "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30", str(mp4)],
+                shell=False, capture_output=True, text=True, timeout=120, check=False)
+        assert mp4.is_file() and mp4.stat().st_size > 0
+        sha = hashlib.sha256(mp4.read_bytes()).hexdigest()
         assert len(sha) == 64
 
     def test_ffprobe_verifies_profile(self, tmp_path):
-        """Case 7: ffprobe verifies the real artifact (h264, 1080x1920, 30fps,
-        yuv420p, ~3.0s). Real ffprobe runs here (read-only, no render)."""
+        """Case 7: ffprobe verifies the (synthetic) artifact (h264, 1080x1920,
+        30fps, yuv420p, ~3.0s). Real ffprobe runs here against a temp HVS double
+        (read-only inspection, no real HVS mutation)."""
+        import subprocess as _sp
+        import shutil as _sh
+        hvs_root = DOUBLE.make_temp_hvs_repo(tmp_path / "hvs-repo", self.REAL_PROJECT)
+        mp4 = Path(hvs_root) / self.REAL_ARTIFACT
+        mp4.parent.mkdir(parents=True, exist_ok=True)
+        bin_name = _sh.which("ffmpeg") or "ffmpeg"
+        _sp.run([bin_name, "-y", "-f", "lavfi", "-i", "color=c=blue:s=1080x1920:d=3",
+                 "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30", str(mp4)],
+                shell=False, capture_output=True, text=True, timeout=120, check=False)
+        assert mp4.is_file() and mp4.stat().st_size > 0
         from scos.control_center.hvs_render_completion_service import (
             verify_render_artifact,
         )
         result = verify_render_artifact(
-            repo_root=tmp_path, hvs_repo_root=self.HVS_REPO,
+            repo_root=tmp_path, hvs_repo_root=str(hvs_root),
             project_id=self.REAL_PROJECT,
             render_request_id="req-real", render_approval_id="ap-real",
             dispatch_id="d-real", hvs_render_id="r-real",
@@ -1728,13 +1749,24 @@ class TestStage8NRealHVS:
 
     def test_completion_evidence_created(self, tmp_path):
         """Case 8: completion evidence is created with verified artifact and
-        all delivery/publish flags forced false."""
+        all delivery/publish flags forced false. Uses a temp HVS double with a
+        synthetic artifact (no real HVS mutation)."""
+        import subprocess as _sp
+        import shutil as _sh
+        hvs_root = DOUBLE.make_temp_hvs_repo(tmp_path / "hvs-repo", self.REAL_PROJECT)
+        mp4 = Path(hvs_root) / self.REAL_ARTIFACT
+        mp4.parent.mkdir(parents=True, exist_ok=True)
+        bin_name = _sh.which("ffmpeg") or "ffmpeg"
+        _sp.run([bin_name, "-y", "-f", "lavfi", "-i", "color=c=blue:s=1080x1920:d=3",
+                 "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30", str(mp4)],
+                shell=False, capture_output=True, text=True, timeout=120, check=False)
+        assert mp4.is_file() and mp4.stat().st_size > 0
         from scos.control_center.hvs_render_completion_service import (
             verify_render_artifact,
             create_render_completion_evidence,
         )
         result = verify_render_artifact(
-            repo_root=tmp_path, hvs_repo_root=self.HVS_REPO,
+            repo_root=tmp_path, hvs_repo_root=str(hvs_root),
             project_id=self.REAL_PROJECT,
             render_request_id="req-real", render_approval_id="ap-real",
             dispatch_id="d-real", hvs_render_id="r-real",

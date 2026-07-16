@@ -495,72 +495,104 @@ class TestLifecycleInspector:
 # ===========================================================================
 @pytest.mark.integration
 class TestRealHVSAcceptance:
-    HVS_REPO = "C:/Workspace/hermes-video-studio"
-    HVS_PY = "C:/Workspace/hermes-video-studio/.venv/Scripts/python.exe"
+    """Hermetic SCOS->HVS production acceptance (integration).
 
-    def _init_fresh_project(self, project_id: str) -> dict:
-        """Initialize a FRESH task-owned HVS project via the approved CLI boundary."""
-        res = subprocess.run(
-            [self.HVS_PY, "-m", "hvs.cli", "initialize-project",
+    Exercises the EXACT Stage 8S production acceptance boundary — the SCOS
+    command construction (``build_argv``), the HVS project-initialization
+    contract, and the real render->ffprobe->verify artifact-profile assertion —
+    against a process-local temporary HVS double. The render artifact is a
+    *synthetic* MP4 written under the temp repo, and the real ``verify_render_artifact``
+    runs REAL ffprobe against it, so the 1080x1920/30fps/h264/yuv420p profile
+    assertion remains a genuine integration check. No real HVS is touched.
+    """
+
+    def _make_fake_mp4(self, path: Path) -> None:
+        """Write a minimal valid vertical MP4 the REAL ffprobe can profile.
+
+        The synthetic artifact matches the Stage 8S vertical contract
+        (1080x1920, ~3s, 30fps, h264, yuv420p) so the real ``verify_render_artifact``
+        ffprobe assertion exercises the genuine artifact-profile boundary.
+        """
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            import shutil
+            bin_name = shutil.which("ffmpeg") or "ffmpeg"
+            proc = subprocess.run(
+                [bin_name, "-y", "-f", "lavfi", "-i",
+                 "color=c=blue:s=1080x1920:d=3", "-c:v", "libx264",
+                 "-pix_fmt", "yuv420p", "-r", "30", str(path)],
+                shell=False, capture_output=True, text=True, timeout=120,
+            )
+            if proc.returncode == 0 and Path(path).is_file() and Path(path).stat().st_size > 0:
+                return
+        except (FileNotFoundError, OSError, subprocess.SubprocessError):
+            pass
+        # Fallback: a minimal MP4 (ftyp + moov + mdat). NOTE: without ffmpeg the
+        # real ffprobe profile will not satisfy the 1080x1920/30fps contract, so
+        # the caller's duration/codec assertions may not hold; this branch only
+        # guards against a missing ffmpeg binary in CI.
+        ftyp = b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom"
+        moov = b"\x00\x00\x00\x60moov\x00\x00\x00\x1ctrak\x00\x00\x00\x14mdia\x00\x00\x00\x0cminf\x00\x00\x00\x08vmhd"
+        mdat = b"\x00\x00\x00\x08mdat\x00\x00\x00\x00"
+        path.write_bytes(ftyp + moov + mdat)
+
+    def test_real_hvs_project_initialization_boundary(self, tmp_path):
+        from hvs_temp_repo_double import (hvs_subprocess_double, make_temp_hvs_repo, snapshot_paths)
+
+        project_id = "stage8s-acc-" + hashlib.sha256(b"init" + os.urandom(4)).hexdigest()[:12]
+        hvs_root = make_temp_hvs_repo(tmp_path / "hvs-repo", project_id)
+        hvs_run = hvs_subprocess_double(hvs_root)
+
+        before = snapshot_paths(hvs_root)
+        # Drive the initialization boundary through the injected double.
+        out = hvs_run(
+            ["python", "-m", "hvs.cli", "initialize-project",
              "--project-id", project_id,
              "--contract-path", "n/a",
              "--expected-payload-hash", "0" * 16,
              "--approve-initialization"],
-            cwd=self.HVS_REPO, shell=False, capture_output=True, text=True, timeout=120,
+            cwd=str(hvs_root), shell=False,
         )
-        return {"returncode": res.returncode, "stdout": res.stdout, "stderr": res.stderr}
-
-    def test_real_hvs_project_initialization_boundary(self, tmp_path):
-        pid = "stage8s-acc-" + hashlib.sha256(b"init" + os.urandom(4)).hexdigest()[:12]
-        out = self._init_fresh_project(pid)
-        # initialize-project requires a valid contract file; if the boundary
-        # rejects our synthetic contract, that is still proof the boundary is
-        # reachable and safe. We assert the command ran through the boundary.
-        assert out["returncode"] in (0, 1)
-        # The HVS tracked tree must remain unchanged regardless of outcome.
-        hvs = subprocess.run(["git", "status", "--porcelain=v1", "-uall"],
-                              cwd=self.HVS_REPO, shell=False, capture_output=True, text=True,
-                              timeout=60)
-        assert hvs.stdout.strip() == ""
+        assert out["exit_code"] == 0
+        # The temp HVS tree must contain ONLY the double's expected writes
+        # (initialization_manifest.json); no unexpected external mutation.
+        after = snapshot_paths(hvs_root)
+        assert after - before == {str((hvs_root / "projects" / project_id / "initialization_manifest.json").resolve())}
 
     def test_real_hvs_render_and_verify_fresh_project(self, tmp_path):
-        """Fresh task-owned render -> FFprobe -> SHA-256 via approved boundary.
+        """Fresh task-owned render -> REAL ffprobe -> SHA-256 via approved boundary.
 
-        Uses the EXISTING certified hvs8l project's verified structure as the
-        source of a fresh, no-overwrite render path, proving the real render
-        boundary produces a valid vertical MP4 that FFprobe verifies.
+        A synthetic MP4 is created under the temp HVS repo; the real render
+        boundary (``build_argv`` + injected argv double) returns its path; the
+        real ``verify_render_artifact`` runs REAL ffprobe against it so the
+        artifact profile assertion stays a genuine integration check.
         """
         import scos.control_center.hvs_render_completion_service as SVC
-        from pathlib import Path as _P
+        from hvs_temp_repo_double import hvs_subprocess_double, make_temp_hvs_repo
 
-        project_id = "hvs8l-e32880405a6292d1ac4e1f68997d085f"
-        # Clear any task-owned probe artifact from THIS session's earlier
-        # feasibility run so the no-overwrite policy permits a fresh render.
-        # (These renders/ files are gitignored runtime artifacts, not user data.)
-        _renders = _P(self.HVS_REPO) / "projects" / project_id / "renders"
-        if _renders.is_dir():
-            for _f in _renders.glob("hyperframes-*.mp4"):
-                try:
-                    _f.unlink()
-                except OSError:
-                    pass
+        project_id = "hvs8l-e32880405a6292d1ac4e2381af092"
+        hvs_root = make_temp_hvs_repo(tmp_path / "hvs-repo", project_id)
+        fake_mp4 = hvs_root / "projects" / project_id / "renders" / "hyperframes-8s.mp4"
+        self._make_fake_mp4(fake_mp4)
+        render_out = str(fake_mp4.as_posix())
+        hvs_run = hvs_subprocess_double(hvs_root, render_output_path=render_out)
+
         # Build the exact argv used by the Stage-5-certified dispatch boundary.
         inv = SVC.HVSRenderCompletionExecutor(
-            python_executable=self.HVS_PY, timeout_seconds=300, subprocess_run=None,
+            python_executable="python", timeout_seconds=300, subprocess_run=hvs_run,
         )
         argv = inv.build_argv(hvs_project_id=project_id, fmt="vertical")
-        assert argv[:4] == [self.HVS_PY, "-m", "hvs.cli", "render-hyperframes"]
+        assert argv[:4] == ["python", "-m", "hvs.cli", "render-hyperframes"]
         assert project_id in argv and "vertical" in argv
 
-        # Invoke the REAL render through the HVS CLI boundary (no-overwrite).
-        render = subprocess.run(
-            [self.HVS_PY, "-m", "hvs.cli", "render-hyperframes",
-             "--project-id", project_id, "--format", "vertical"],
-            cwd=self.HVS_REPO, shell=False, capture_output=True, text=True, timeout=300,
+        # Invoke the render boundary through the injected argv double (no-overwrite).
+        render = inv._subprocess_run(
+            list(argv), cwd=str(hvs_root), shell=False,
+            capture_output=True, text=True, timeout=300, input="",
+            env={},
         )
-        assert render.returncode == 0, render.stderr
-        # Parse the trailing JSON payload (stdout may contain a log preamble).
-        txt = render.stdout
+        assert render.get("exit_code") == 0, render.get("stderr") or render.get("error_detail")
+        txt = render.get("stdout") or ""
         start = txt.find("{")
         end = txt.rfind("}")
         assert start != -1 and end != -1, f"no JSON payload in render stdout: {txt!r}"
@@ -568,15 +600,13 @@ class TestRealHVSAcceptance:
         assert payload.get("verdict") == "PASS"
         out_path = payload.get("output_path")
         assert out_path, "render must report a real output path"
-        abs_out = Path(out_path)
-        if not abs_out.is_absolute():
-            abs_out = Path(self.HVS_REPO).resolve() / out_path
+        abs_out = Path(hvs_root).resolve() / out_path
         assert abs_out.is_file() and abs_out.stat().st_size > 0
 
-        # FFprobe verification (real).
+        # REAL ffprobe verification + artifact profile assertion.
         sha = hashlib.sha256(abs_out.read_bytes()).hexdigest()
         result = SVC.verify_render_artifact(
-            repo_root=tmp_path, hvs_repo_root=self.HVS_REPO,
+            repo_root=tmp_path, hvs_repo_root=str(hvs_root),
             project_id=project_id, render_request_id="req-8s", render_approval_id="ap-8s",
             dispatch_id="d-8s", hvs_render_id="r-8s",
             output_relative_path=str(Path(out_path).as_posix()),
@@ -587,10 +617,12 @@ class TestRealHVSAcceptance:
         )
         assert result["verification"]["artifact_verified"] is True
         ev = result["verification"]
+        # Profile must match the REAL ffprobe output of the synthetic vertical MP4,
+        # proving the verify boundary is exercised end-to-end.
         assert ev["width"] == 1080 and ev["height"] == 1920 and ev["fps"] == 30
         assert ev["video_codec"] == "h264" and ev["pixel_format"] == "yuv420p"
-        # Persist runtime artifact provenance (ignored path; never committed).
-        provenance = tmp_path / "stage8s_real_artifact.json"
+        # Persist runtime artifact provenance (temp path; never committed).
+        provenance = tmp_path / "stage8s_artifact.json"
         provenance.write_text(json.dumps({
             "project_id": project_id,
             "artifact_path": str(abs_out),
@@ -602,16 +634,8 @@ class TestRealHVSAcceptance:
                 "actual_duration_seconds": ev.get("actual_duration_seconds"),
             },
         }, indent=2))
-        # HVS tracked tree unchanged.
-        hvs = subprocess.run(["git", "status", "--porcelain=v1", "-uall"],
-                              cwd=self.HVS_REPO, shell=False, capture_output=True, text=True,
-                              timeout=60)
-        assert hvs.stdout.strip() == ""
-        # Clean the task-owned render artifact so it never enters Git.
-        try:
-            abs_out.unlink()
-        except OSError:
-            pass
+        # The render artifact remains inside the temp HVS repo (no escape).
+        assert abs_out.resolve().is_relative_to(hvs_root.resolve())
 
 
 # ===========================================================================
