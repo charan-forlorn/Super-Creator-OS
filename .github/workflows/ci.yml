@@ -1,21 +1,17 @@
 name: CI
 
-# Resolves audit finding T1 (no-CI). Runs the full test matrix on the pinned
-# runtime (CPython 3.11, matching requirements.txt "Tested on: CPython 3.11.15")
-# so dependency / Windows-compat / loop-closure regressions are caught on every
-# push and PR — not just on a developer's machine.
-#
-# Note on the smoke test (integrations/shortgen/tests/test_smoke_pipeline.py):
-# it exercises a REAL clip from input/reference/, which is .gitignored and so is
-# absent in CI. The test is written to SKIP cleanly (exit 0) when no asset is
-# present, so CI stays green without shipping media. Real-render verification
-# stays a local/manual gate.
+# Activates CI on main (Cohort 8A) and enforces a minimal fail-closed gate on
+# the pinned runtime (CPython 3.11, matching requirements.txt "Tested on:
+# CPython 3.11.15"). Every push and PR to main triggers a smoke check plus a
+# static security-scan baseline; both exit non-zero on failure, so the job
+# fails closed. The full certified Standard + Explicit-Integration populations
+# are wired in by Cohort 8B, not here.
 
 on:
   push:
-    branches: [master, h1-foundation]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:        # manual "Run workflow" button (bootstraps the first run)
 
 # Cancel an in-flight run when a newer commit is pushed to the same ref.
@@ -46,19 +42,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Learning layer suite (stdlib spine + DQ + e2e closed-loop)
-        run: python integrations/learning/tests/run_suite.py
+      - name: Smoke
+        run: python scripts/test_smoke.py
 
-      - name: Highlight engine tests
-        run: |
-          python integrations/highlight/tests/test_highlight_engine.py
-          python integrations/highlight/tests/test_narrative_engine.py
-
-      - name: Short-gen tests (montage, short generator, render smoke)
-        run: |
-          python integrations/shortgen/tests/test_montage.py
-          python integrations/shortgen/tests/test_short_generator.py
-          python integrations/shortgen/tests/test_smoke_pipeline.py
-
-      - name: Module 2 — real FFmpeg renderer (synthetic lavfi fixtures, real render)
-        run: python scos/render/tests/test_renderer.py
+      - name: Security scan baseline
+        run: python scripts/security_scan_baseline.py
