@@ -12,13 +12,15 @@ describe("Agent Operations Cockpit — truthful read-only bridge", () => {
     expect(screen.queryByText(/DEMO DATA — NOT LIVE SYSTEM STATE/i)).not.toBeInTheDocument();
   });
 
-  it("shows a loading state while the live snapshot is being read", () => {
+  it("shows a loading state or resolved live data, never mock operational truth", () => {
     render(<CockpitDashboard />);
-    // The component mounts in loading state before fetch resolves; either the
-    // loading text or the resolved live data is acceptable, but it must never
-    // claim mock operational truth.
     const loading = screen.queryByText(/Reading local SCOS state/i);
-    expect(loading === null || loading !== null).toBe(true);
+    const liveData = screen.queryByText(/Live local read-only/i);
+    // Either the loading text or resolved live data is acceptable; the key
+    // contract is that the cockpit must never present mock/demo operational
+    // state as real system truth.
+    expect(loading !== null || liveData !== null).toBe(true);
+    expect(screen.queryByText(/DEMO DATA — NOT LIVE SYSTEM STATE/i)).not.toBeInTheDocument();
   });
 
   it("renders the source mode toggle and switches to explicit demo mode", () => {
@@ -50,6 +52,15 @@ describe("Agent Operations Cockpit — truthful read-only bridge", () => {
     expect(screen.getByText("SCOS")).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { name: "Video-production request" })).toHaveLength(1);
     expect(screen.getByText("Cohort 10A control loop")).toBeInTheDocument();
+  });
+
+  it("exposes the Cohort 10B project-preparation workflow exactly once without replacing Cohort 10A", () => {
+    render(<Page />);
+
+    expect(screen.getAllByRole("heading", { name: "Project draft and render-preparation preview" })).toHaveLength(1);
+    expect(screen.getByText("Cohort 10B planning surface")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "Video-production request" })).toHaveLength(1);
+    expect(screen.queryByText(/Project initialized|Render started|Published|Uploaded/i)).not.toBeInTheDocument();
   });
 
   it("renders Orbit as the static CSS-native mascot (no canvas, no runtime image)", () => {
