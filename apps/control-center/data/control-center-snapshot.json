@@ -1,0 +1,248 @@
+{
+  "approval_summary": {
+    "available": false,
+    "data": null,
+    "observed_at": "2026-07-16T08:58:58Z",
+    "reason_code": "READ_SOURCE_MISSING",
+    "status": "UNAVAILABLE"
+  },
+  "degradation_reasons": [
+    "READ_SOURCE_MISSING"
+  ],
+  "evidence_summary": {
+    "available": false,
+    "data": null,
+    "observed_at": "2026-07-16T08:58:58Z",
+    "reason_code": "READ_SOURCE_MISSING",
+    "status": "UNAVAILABLE"
+  },
+  "generated_at": "2026-07-16T08:58:58Z",
+  "health": {
+    "available": true,
+    "data": {
+      "artifact_count": 2,
+      "audit_record_count": 8,
+      "blocker_count": 0,
+      "command_record_count": 0,
+      "event_count": 0,
+      "health_status": "degraded",
+      "source_coverage": [
+        [
+          "state_db",
+          "readable"
+        ],
+        [
+          "approval_audit",
+          "readable"
+        ],
+        [
+          "event_log",
+          "missing"
+        ],
+        [
+          "command_queue",
+          "missing"
+        ]
+      ],
+      "warning_count": 2
+    },
+    "observed_at": "2026-07-16T08:58:58Z",
+    "reason_code": null,
+    "status": "AVAILABLE_WITH_DATA"
+  },
+  "project_summary": {
+    "available": true,
+    "data": {
+      "has_dedicated_project_model": false,
+      "state_tables_present": []
+    },
+    "observed_at": "2026-07-16T08:58:58Z",
+    "reason_code": "READ_OK",
+    "status": "AVAILABLE_WITH_DATA"
+  },
+  "queue_summary": {
+    "available": true,
+    "data": {
+      "count": 0,
+      "items": []
+    },
+    "observed_at": "2026-07-16T08:58:58Z",
+    "reason_code": "READ_SOURCE_EMPTY",
+    "status": "AVAILABLE_EMPTY"
+  },
+  "recent_activity": {
+    "available": true,
+    "data": {
+      "count": 23,
+      "items": [
+        {
+          "activity_id": "oar-fc5e673a9edb145e",
+          "activity_type": "EVENT_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "HEALTHY",
+          "summary": "latest 0 events rows"
+        },
+        {
+          "activity_id": "oar-f9ace796158f0e99",
+          "activity_type": "STATE_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "HEALTHY",
+          "summary": "latest 0 commands rows"
+        },
+        {
+          "activity_id": "oar-ec86346f369b9672",
+          "activity_type": "SECURITY_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "DEGRADED",
+          "summary": "command_queue: missing optional runtime artifact"
+        },
+        {
+          "activity_id": "oar-deb193fe4f4cb61f",
+          "activity_type": "SECURITY_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "HEALTHY",
+          "summary": "required source scos/control_center/drift_detection.py"
+        },
+        {
+          "activity_id": "oar-db7c76a70e91640a",
+          "activity_type": "SECURITY_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "DEGRADED",
+          "summary": "event_log: missing artifact"
+        },
+        {
+          "activity_id": "oar-d2b605fc427700f4",
+          "activity_type": "SECURITY_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "DEGRADED",
+          "summary": "optional Stage 6 runtime artifact is missing: scos/work/control_center/queue/approved_commands.jsonl"
+        },
+        {
+          "activity_id": "oar-d162a7602bc81f41",
+          "activity_type": "SECURITY_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "DEGRADED",
+          "summary": "command_queue: missing artifact"
+        },
+        {
+          "activity_id": "oar-a764305d0a4e2421",
+          "activity_type": "EVENT_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "MISSING",
+          "summary": "local command event log summary"
+        },
+        {
+          "activity_id": "oar-a68750cb4b1725c7",
+          "activity_type": "SECURITY_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "DEGRADED",
+          "summary": "event_log: missing optional runtime artifact"
+        },
+        {
+          "activity_id": "oar-80edbfdc0715d97c",
+          "activity_type": "SECURITY_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "HEALTHY",
+          "summary": "required source scos/control_center/sqlite_state_schema.py"
+        },
+        {
+          "activity_id": "oar-80c8de2cc2688934",
+          "activity_type": "SECURITY_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "HEALTHY",
+          "summary": "required source docs/roadmap/STAGE7_HANDOFF.md"
+        },
+        {
+          "activity_id": "oar-7f5082914c3af4a5",
+          "activity_type": "DRIFT_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "HEALTHY",
+          "summary": "0 drift finding(s)"
+        },
+        {
+          "activity_id": "oar-7a81a0de9da68b61",
+          "activity_type": "STATE_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "HEALTHY",
+          "summary": "latest 0 sessions rows"
+        },
+        {
+          "activity_id": "oar-78afad8d1f69a4f0",
+          "activity_type": "SECURITY_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "DEGRADED",
+          "summary": "optional Stage 6 runtime artifact is missing: scos/work/control_center/events/command_events.jsonl"
+        },
+        {
+          "activity_id": "oar-77c16b4f17369f3d",
+          "activity_type": "SECURITY_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "HEALTHY",
+          "summary": "required source scos/control_center/host_metrics.py"
+        },
+        {
+          "activity_id": "oar-73f2084baf490b34",
+          "activity_type": "SECURITY_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "HEALTHY",
+          "summary": "required source scos/control_center/backend_health.py"
+        },
+        {
+          "activity_id": "oar-5a3b42707ba17165",
+          "activity_type": "STATE_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "HEALTHY",
+          "summary": "latest 0 results rows"
+        },
+        {
+          "activity_id": "oar-471ddef99807c66e",
+          "activity_type": "STATE_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "HEALTHY",
+          "summary": "SQLite WAL state summary"
+        },
+        {
+          "activity_id": "oar-4119d6f80d3008e5",
+          "activity_type": "SECURITY_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "HEALTHY",
+          "summary": "required source docs/specification/STAGE6_FINAL_INTEGRATION_GATE_CONTRACT.md"
+        },
+        {
+          "activity_id": "oar-1895b0664410327d",
+          "activity_type": "APPROVAL_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "HEALTHY",
+          "summary": "operator approval record summary"
+        },
+        {
+          "activity_id": "oar-15b8abf492c2730f",
+          "activity_type": "APPROVAL_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "HEALTHY",
+          "summary": "latest 0 approvals rows"
+        },
+        {
+          "activity_id": "oar-04f640f66fb33c2e",
+          "activity_type": "AUDIT_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "HEALTHY",
+          "summary": "approval audit ledger summary"
+        },
+        {
+          "activity_id": "oar-04acf1757d5d7320",
+          "activity_type": "COMMAND_ACTIVITY",
+          "occurred_at": "2026-07-16T08:58:58Z",
+          "status": "MISSING",
+          "summary": "approved command queue summary"
+        }
+      ]
+    },
+    "observed_at": "2026-07-16T08:58:58Z",
+    "reason_code": null,
+    "status": "AVAILABLE_WITH_DATA"
+  },
+  "schema_version": 1,
+  "snapshot_id": "ccs-c3f1c54a14cf58e1",
+  "source_mode": "LIVE_LOCAL_READ_ONLY"
+}

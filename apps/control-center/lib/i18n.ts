@@ -18,6 +18,14 @@ export interface MessageDictionary {
   evidence: { title: string; details: Record<"tests" | "commit" | "hvs-render" | "n8n-run", string>; labels: Record<"tests" | "commit" | "hvs-render" | "n8n-run", string> };
   activity: Record<"certification" | "build" | "review", string>;
   feedback: Record<"review" | "changes" | "project" | "evidence", string>;
+  bridge: {
+    source: string; liveValue: string; demoValue: string; health: string; queue: string; approvals: string; evidence: string;
+    available: string; unavailable: string; loading: string; loadError: string; retry: string; refresh: string;
+    switchToDemo: string; switchToLive: string; modeSwitched: string;
+    backend: string; readOnlyBridge: string; liveBriefing: string; demoBriefing: string;
+    noActivity: string; activityUnavailable: string;
+    approvalsAvailable: (count: number) => string; approvalsUnavailable: string;
+  };
   v02: {
     demo: string; route: Record<"projects" | "approvals" | "evidence", { title: string; description: string }>;
     filters: { all: string; active: string; needsYou: string; completed: string; status: string; source: string; };

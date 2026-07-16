@@ -1,48 +1,197 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { V02_APPROVALS, V02_EVIDENCE, V02_PROJECTS } from "@/lib/cockpit-mock-data";
-import type { ApprovalDecision, ApprovalId, EvidenceRecord, EvidenceSource, EvidenceStatus, EvidenceV02Id, ProjectFilter, ProjectV02Id } from "@/lib/cockpit-types";
 import { useLocale } from "@/lib/i18n";
 import { CockpitShell } from "@/components/cockpit/cockpit-shell";
 import { DetailPanel, FilterControl, LocalToast, RouteHeader, StatusBadge } from "@/components/cockpit/route-primitives";
+import {
+  DEMO_LABEL,
+  useControlCenterData,
+  type CockpitView,
+} from "@/lib/control-center-snapshot";
 
-const projectFilters = ["all", "active", "needs-you", "completed"] as const;
-const evidenceStatuses = ["all", "verified", "passed", "healthy"] as const;
-const evidenceSources = ["all", "hermes", "codex", "git", "hvs", "n8n"] as const;
+function SourceModeNote({ mode }: { mode: "LIVE" | "DEMO" }) {
+  if (mode === "DEMO") {
+    return <span className="cockpit-note cockpit-note--demo" role="status">{DEMO_LABEL}</span>;
+  }
+  return <span className="cockpit-note cockpit-note--live"><i />{DEMO_LABEL ? "Live local read-only" : ""}</span>;
+}
+
+function UnavailableOrEmpty({ available, isEmpty, emptyText, unavailableText }: { available: boolean; isEmpty: boolean; emptyText: string; unavailableText: string }) {
+  if (!available) return <p className="empty-state empty-state--unavailable">{unavailableText}</p>;
+  if (isEmpty) return <p className="empty-state">{emptyText}</p>;
+  return null;
+}
 
 function ProjectsSurface() {
-  const { t } = useLocale();
-  const [filter, setFilter] = useState<ProjectFilter>("all");
-  const [selectedId, setSelectedId] = useState<ProjectV02Id>("scos-hvs");
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const projects = useMemo(() => V02_PROJECTS.filter((project) => filter === "all" || (filter === "active" ? project.status === "active" || project.status === "healthy" : project.status === filter)), [filter]);
-  const selected = V02_PROJECTS.find((project) => project.id === selectedId) ?? V02_PROJECTS[0];
-  const copy = t.v02.projectData[selected.id];
-  return <section className="cockpit-content route-content"><RouteHeader route="projects" /><div className="route-toolbar"><FilterControl value={filter} onChange={setFilter} label={t.v02.filters.status} options={projectFilters.map((value) => ({ value, label: t.v02.filters[value === "needs-you" ? "needsYou" : value] }))} /><span className="demo-note">{t.v02.demo}</span></div><div className="route-two-column"><section className="route-list" aria-label={t.v02.route.projects.title}>{projects.length ? projects.map((project) => { const item = t.v02.projectData[project.id]; return <button type="button" className={project.id === selected.id ? "project-row is-selected" : "project-row"} key={project.id} onClick={() => { setSelectedId(project.id); setFeedback(t.v02.feedback.projectSelected); }}><div className="project-row__head"><h2>{item.name}</h2><StatusBadge tone={project.status}>{t.v02.projectStatus[project.status]}</StatusBadge></div><p>{item.purpose}</p><div className="project-row__meta"><span>{project.stage}</span><span>{t.agents[project.lead].name}</span><span>{project.lastActivity}</span></div></button>; }) : <p className="empty-state">{t.v02.empty}</p>}</section><DetailPanel title={copy.name} onClose={() => setFeedback(null)}><dl className="detail-list"><div><dt>{t.v02.labels.purpose}</dt><dd>{copy.purpose}</dd></div><div><dt>{t.v02.labels.stage}</dt><dd>{selected.stage}</dd></div><div><dt>{t.v02.labels.status}</dt><dd><StatusBadge tone={selected.status}>{t.v02.projectStatus[selected.status]}</StatusBadge></dd></div><div><dt>{t.v02.labels.lead}</dt><dd>{t.agents[selected.lead].name}</dd></div><div><dt>{t.v02.labels.lastActivity}</dt><dd>{selected.lastActivity}</dd></div><div><dt>{t.v02.labels.nextAction}</dt><dd>{copy.nextAction}</dd></div><div><dt>{t.v02.labels.evidence}</dt><dd>{selected.evidenceValue}</dd></div><div><dt>{t.v02.labels.risk}</dt><dd>{copy.risk}</dd></div><div><dt>{t.v02.labels.blocker}</dt><dd>{copy.blocker}</dd></div></dl></DetailPanel></div><LocalToast message={feedback} onClose={() => setFeedback(null)} /></section>;
+  const { t, locale } = useLocale();
+  const { mode, view } = useControlCenterData("LIVE");
+  const [filter, setFilter] = useState<"all" | "available" | "unavailable">("all");
+  const [selected, setSelected] = useState<string | null>(null);
+
+  const tableRows = view.projects.stateTables;
+  const filtered = useMemo(() => {
+    if (filter === "available") return tableRows;
+    return tableRows;
+  }, [filter, tableRows]);
+
+  return (
+    <section className="cockpit-content route-content">
+      <RouteHeader route="projects" />
+      <div className="route-toolbar">
+        <FilterControl
+          value={filter}
+          onChange={setFilter}
+          label={t.bridge.source}
+          options={[
+            { value: "all", label: t.bridge.source },
+            { value: "available", label: t.bridge.available },
+            { value: "unavailable", label: t.bridge.unavailable },
+          ]}
+        />
+        <SourceModeNote mode={mode} />
+      </div>
+      <div className="route-two-column">
+        <section className="route-list" aria-label={t.v02.route.projects.title}>
+          {!view.projects.available ? (
+            <p className="empty-state empty-state--unavailable">{t.bridge.unavailable}</p>
+          ) : (
+            <article className="project-row" key="project-state">
+              <div className="project-row__head">
+                <h2>{t.bridge.backend}</h2>
+                <StatusBadge tone={view.projects.hasDedicatedModel ? "active" : "needs-you"}>
+                  {view.projects.hasDedicatedModel ? t.bridge.available : t.bridge.readOnlyBridge}
+                </StatusBadge>
+              </div>
+              <p>{t.bridge.readOnlyBridge}</p>
+              <div className="project-row__meta">
+                <span>{t.bridge.source}: {view.projects.stateTables.length} state tables</span>
+                <span>{locale === "th" ? "โหมดข้อมูล: " : "mode: "}{mode}</span>
+              </div>
+            </article>
+          )}
+          {filtered.length === 0 && view.projects.available && <p className="empty-state">{t.bridge.noActivity}</p>}
+        </section>
+        {selected && (
+          <DetailPanel title={selected} onClose={() => setSelected(null)}>
+            <dl className="detail-list">
+              <div><dt>{t.bridge.source}</dt><dd>{selected}</dd></div>
+            </dl>
+          </DetailPanel>
+        )}
+      </div>
+    </section>
+  );
 }
 
 function ApprovalsSurface() {
   const { t } = useLocale();
-  const [decisions, setDecisions] = useState<Record<ApprovalId, ApprovalDecision>>({ "stage-8s": "pending", "asset-rights": "pending", "weekly-schedule": "pending" });
-  const [activity, setActivity] = useState<string[]>([]);
+  const { mode, view } = useControlCenterData("LIVE");
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [openEvidence, setOpenEvidence] = useState<EvidenceV02Id | null>(null);
-  function decide(id: ApprovalId, decision: ApprovalDecision) { const message = decision === "approved" ? t.v02.feedback.approvalApproved : decision === "changes-requested" ? t.v02.feedback.approvalChanges : t.v02.feedback.approvalRejected; setDecisions((current) => ({ ...current, [id]: decision })); setActivity((current) => [t.v02.approvalData[id].activity, ...current]); setFeedback(message); }
-  const selectedEvidence = V02_EVIDENCE.find((item) => item.id === openEvidence);
-  return <section className="cockpit-content route-content"><RouteHeader route="approvals" /><div className="route-toolbar"><span className="demo-note">{t.v02.demo}</span></div><div className="approvals-layout"><section className="approval-queue" aria-label={t.v02.route.approvals.title}>{V02_APPROVALS.map((approval) => { const data = t.v02.approvalData[approval.id]; const decision = decisions[approval.id]; return <article className={`approval-card approval-card--${approval.priority}`} key={approval.id}><div className="approval-card__top"><StatusBadge tone={approval.priority}>{t.v02.priorities[approval.priority]}</StatusBadge><StatusBadge tone={decision}>{t.v02.decisions[decision]}</StatusBadge></div><h2>{data.title}</h2><p>{data.reason}</p><dl className="approval-facts"><div><dt>{t.v02.labels.requestedBy}</dt><dd>{t.v02.sources[approval.requestedBy]}</dd></div><div><dt>{t.v02.labels.scope}</dt><dd>{data.scope}</dd></div><div><dt>{t.v02.labels.evidence}</dt><dd>{data.evidence}</dd></div><div><dt>{t.v02.labels.risk}</dt><dd>{t.v02.risks[approval.risk]}</dd></div><div><dt>{t.v02.labels.deadline}</dt><dd>{approval.deadline}</dd></div></dl><div className="approval-actions"><button type="button" className="button-primary" onClick={() => decide(approval.id, "approved")}>{t.v02.actions.approve}</button><button type="button" className="button-secondary" onClick={() => decide(approval.id, "changes-requested")}>{t.v02.actions.requestChanges}</button><button type="button" className="button-danger" onClick={() => decide(approval.id, "rejected")}>{t.v02.actions.reject}</button><button type="button" className="button-link" onClick={() => { setOpenEvidence(approval.relatedEvidenceId); setFeedback(t.v02.feedback.evidenceOpened); }}>{t.v02.actions.openEvidence}</button></div></article>; })}</section><aside className="approval-side"><section className="cockpit-panel activity-panel"><h2>{t.v02.labels.activity}</h2>{activity.length ? <div className="activity-list activity-list--stacked">{activity.map((item, index) => <p key={`${item}-${index}`}>{item}</p>)}</div> : <p className="empty-state">{t.v02.empty}</p>}</section>{selectedEvidence && <DetailPanel title={t.v02.evidenceData[selectedEvidence.id].title} onClose={() => setOpenEvidence(null)}><p className="detail-summary">{t.v02.evidenceData[selectedEvidence.id].summary}</p><dl className="detail-list"><div><dt>{t.v02.labels.result}</dt><dd>{t.v02.evidenceStatus[selectedEvidence.status]}</dd></div><div><dt>{t.v02.labels.evidence}</dt><dd>{selectedEvidence.technicalValue ?? t.v02.evidenceData[selectedEvidence.id].metadata}</dd></div></dl></DetailPanel>}</aside></div><LocalToast message={feedback} onClose={() => setFeedback(null)} /></section>;
+
+  const available = view.approvals.available;
+  const count = view.approvals.count;
+
+  return (
+    <section className="cockpit-content route-content">
+      <RouteHeader route="approvals" />
+      <div className="route-toolbar">
+        <SourceModeNote mode={mode} />
+      </div>
+      <div className="approvals-layout">
+        <section className="approval-queue" aria-label={t.v02.route.approvals.title}>
+          {!available ? (
+            <p className="empty-state empty-state--unavailable">{t.bridge.approvalsUnavailable}</p>
+          ) : count === 0 ? (
+            <p className="empty-state">{t.bridge.approvalsAvailable(0)}</p>
+          ) : (
+            <article className="approval-card approval-card--high">
+              <div className="approval-card__top">
+                <StatusBadge tone="high">{t.bridge.approvals}</StatusBadge>
+                <StatusBadge tone="waiting">{t.bridge.available}</StatusBadge>
+              </div>
+              <h2>{t.bridge.approvalsAvailable(count ?? 0)}</h2>
+              <p>{t.bridge.readOnlyBridge}</p>
+              <div className="approval-actions">
+                {/* Read-only bridge: mutation controls remain disabled. */}
+                <button type="button" className="button-primary" disabled aria-disabled="true">{t.v02.actions.approve}</button>
+                <button type="button" className="button-secondary" disabled aria-disabled="true">{t.v02.actions.requestChanges}</button>
+                <button type="button" className="button-danger" disabled aria-disabled="true">{t.v02.actions.reject}</button>
+              </div>
+            </article>
+          )}
+        </section>
+        <aside className="approval-side">
+          <section className="cockpit-panel activity-panel">
+            <h2>{t.v02.labels.activity}</h2>
+            <p className="cockpit-note cockpit-note--live">{t.bridge.readOnlyBridge}</p>
+          </section>
+        </aside>
+      </div>
+      {mode === "DEMO" && <LocalToast message={DEMO_LABEL} onClose={() => setFeedback(null)} />}
+    </section>
+  );
 }
 
 function EvidenceSurface() {
   const { t } = useLocale();
-  const [status, setStatus] = useState<"all" | EvidenceStatus>("all");
-  const [source, setSource] = useState<"all" | EvidenceSource>("all");
-  const [selected, setSelected] = useState<EvidenceRecord | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const records = useMemo(() => V02_EVIDENCE.filter((record) => (status === "all" || record.status === status) && (source === "all" || record.source === source)), [source, status]);
-  return <section className="cockpit-content route-content"><RouteHeader route="evidence" /><div className="route-toolbar route-toolbar--filters"><FilterControl value={status} onChange={setStatus} label={t.v02.filters.status} options={evidenceStatuses.map((value) => ({ value, label: value === "all" ? t.v02.filters.all : t.v02.evidenceStatus[value] }))} /><FilterControl value={source} onChange={setSource} label={t.v02.filters.source} options={evidenceSources.map((value) => ({ value, label: value === "all" ? t.v02.filters.all : t.v02.sources[value] }))} /></div><div className="route-two-column"><section className="evidence-records" aria-label={t.v02.route.evidence.title}>{records.length ? records.map((record) => { const data = t.v02.evidenceData[record.id]; return <article className="evidence-record" key={record.id}><div><p className="action-kicker">{data.type} · {t.v02.demo}</p><h2>{data.title}</h2><p>{data.summary}</p><div className="evidence-record__meta"><StatusBadge tone={record.status}>{t.v02.evidenceStatus[record.status]}</StatusBadge><span>{t.v02.sources[record.source]}</span><span>{record.timestamp}</span></div></div><button type="button" className="button-secondary" onClick={() => { setSelected(record); setFeedback(t.v02.feedback.evidenceOpened); }}>{t.v02.actions.openEvidence}</button></article>; }) : <p className="empty-state">{t.v02.empty}</p>}</section>{selected && <DetailPanel title={t.v02.evidenceData[selected.id].title} onClose={() => setSelected(null)}><p className="detail-summary">{t.v02.evidenceData[selected.id].summary}</p><dl className="detail-list"><div><dt>{t.v02.labels.result}</dt><dd><StatusBadge tone={selected.status}>{t.v02.evidenceStatus[selected.status]}</StatusBadge></dd></div><div><dt>{t.v02.labels.stage}</dt><dd>{selected.stage}</dd></div><div><dt>{t.v02.labels.source}</dt><dd>{t.v02.sources[selected.source]}</dd></div><div><dt>{t.v02.labels.timestamp}</dt><dd>{selected.timestamp}</dd></div><div><dt>{t.v02.labels.technical}</dt><dd>{selected.technicalValue ?? t.v02.evidenceData[selected.id].metadata}</dd></div></dl></DetailPanel>}</div><LocalToast message={feedback} onClose={() => setFeedback(null)} /></section>;
+  const { mode, view } = useControlCenterData("LIVE");
+  const [selected, setSelected] = useState<string | null>(null);
+
+  const available = view.evidence.available;
+  const eventCount = view.evidence.eventCount;
+  const auditCount = view.evidence.auditCount;
+
+  return (
+    <section className="cockpit-content route-content">
+      <RouteHeader route="evidence" />
+      <div className="route-toolbar route-toolbar--filters">
+        <SourceModeNote mode={mode} />
+      </div>
+      <div className="route-two-column">
+        <section className="evidence-records" aria-label={t.v02.route.evidence.title}>
+          {!available ? (
+            <p className="empty-state empty-state--unavailable">{t.bridge.activityUnavailable}</p>
+          ) : (eventCount ?? 0) === 0 && (auditCount ?? 0) === 0 ? (
+            <p className="empty-state">{t.bridge.noActivity}</p>
+          ) : (
+            <article className="evidence-record" key="evidence-summary">
+              <div>
+                <p className="action-kicker">{t.bridge.evidence} · {mode === "DEMO" ? DEMO_LABEL : t.bridge.liveValue}</p>
+                <h2>{t.bridge.evidence}</h2>
+                <p>{t.bridge.readOnlyBridge}</p>
+                <div className="evidence-record__meta">
+                  <StatusBadge tone="verified">{t.bridge.available}</StatusBadge>
+                  <span>{t.bridge.evidence}: {(eventCount ?? 0) + (auditCount ?? 0)}</span>
+                </div>
+              </div>
+              <button type="button" className="button-secondary" onClick={() => setSelected(t.bridge.evidence)}>
+                {t.v02.actions.openEvidence}
+              </button>
+            </article>
+          )}
+        </section>
+        {selected && (
+          <DetailPanel title={selected} onClose={() => setSelected(null)}>
+            <p className="detail-summary">{t.bridge.readOnlyBridge}</p>
+          </DetailPanel>
+        )}
+      </div>
+    </section>
+  );
 }
 
-export function ProjectsScreen() { return <CockpitShell><ProjectsSurface /></CockpitShell>; }
-export function ApprovalsScreen() { return <CockpitShell><ApprovalsSurface /></CockpitShell>; }
-export function EvidenceScreen() { return <CockpitShell><EvidenceSurface /></CockpitShell>; }
+export function ProjectsScreen() {
+  return <CockpitShell><ProjectsSurface /></CockpitShell>;
+}
+export function ApprovalsScreen() {
+  return <CockpitShell><ApprovalsSurface /></CockpitShell>;
+}
+export function EvidenceScreen() {
+  return <CockpitShell><EvidenceScreenInner /></CockpitShell>;
+}
+
+// Small alias to keep the export name stable while using the inner component.
+function EvidenceScreenInner() {
+  return <EvidenceSurface />;
+}

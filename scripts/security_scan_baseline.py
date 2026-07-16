@@ -233,6 +233,20 @@ _FRONTEND_FORBIDDEN_TOKENS = (
 )
 _FRONTEND_PATH_MARKERS = ("route.ts", "middleware.ts")
 
+# Cohort 9A reviewed-safe read-only transport allow-list.
+# These specific files implement the ONLY authorized local read-only bridge
+# (cohort §8 option 4): a GET-only, same-origin Next.js route handler that
+# performs a single fs.readFileSync on a pre-generated committed snapshot
+# artifact, plus the frontend adapter that fetches that same-origin route.
+# No mutation method, no subprocess, no secret exposure, no external egress.
+# The scanner's structural heuristics (frontend_api_route /
+# frontend_route_or_middleware / frontend_transport) still flag ANY other new
+# transport; only these reviewed paths are exempt.
+_FRONTEND_READ_ONLY_TRANSPORT_ALLOWLIST = {
+    "apps/control-center/app/api/control-center-snapshot/route.ts",
+    "apps/control-center/lib/control-center-snapshot.ts",
+}
+
 
 def _iter_scan_files():
     seen = set()
@@ -361,14 +375,23 @@ def _append_control_center_findings(findings, rel: str, text: str) -> None:
 
 
 def _append_frontend_findings(findings, rel: str, text: str, path: Path) -> None:
-    if path.name in _FRONTEND_PATH_MARKERS:
-        findings.append((rel, 0, "frontend_route_or_middleware", _redact(path.name)))
-    if "/app/" in f"/{rel}" and "/api/" in f"{rel}/":
-        findings.append((rel, 0, "frontend_api_route", _redact("app/api")))
+    read_only_transport = rel in _FRONTEND_READ_ONLY_TRANSPORT_ALLOWLIST
+    if not read_only_transport:
+        if path.name in _FRONTEND_PATH_MARKERS:
+            findings.append((rel, 0, "frontend_route_or_middleware", _redact(path.name)))
+        if "/app/" in f"/{rel}" and "/api/" in f"{rel}/":
+            findings.append((rel, 0, "frontend_api_route", _redact("app/api")))
 
     for line_no, stripped in _code_lines(text):
         for category, token in _FRONTEND_FORBIDDEN_TOKENS:
             if token not in stripped:
+                continue
+            # The reviewed Cohort 9A read-only transport is exempt from the
+            # structural frontend_transport heuristic only; every other
+            # forbidden-token category (storage, clipboard, polling,
+            # nondeterminism, server-action) remains fully active even on the
+            # allowed paths, so real regressions are still caught.
+            if read_only_transport and category == "frontend_transport":
                 continue
             # Nondeterminism tokens: exempt in recognized test paths only when
             # the test actually mocks the API (existing behavior, unchanged).
