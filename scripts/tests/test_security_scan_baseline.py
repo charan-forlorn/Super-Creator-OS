@@ -306,3 +306,99 @@ def test_cohort9b_negative_production_requests_import_still_flagged(tmp_path: Pa
 
     assert code == 1
     assert "network_library_in_control_center" in output
+
+
+def test_cohort9g_detects_supported_synthetic_secret_families_with_safe_output(tmp_path: Path):
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    secrets = {
+        "openai": "sk-" + "A" * 24,
+        "github": "gh" + "p_" + "B" * 24,
+        "slack": "xo" + "xb-" + "1" * 12 + "-" + "2" * 12,
+        "aws_id": "AK" + "IA" + "C" * 16,
+        "aws_secret": "aws_" + "secret" + "_access_key = '" + "D" * 40 + "'",
+        "bearer": "Bearer " + "E" * 24,
+        "jwt": "ey" + "J" + "F" * 18 + "." + "G" * 18 + "." + "H" * 18,
+        "private_key": "-----" + "BEGIN" + " PRIVATE" + " KEY-----",
+        "password": "pass" + "word = 'cohort9g-do-not-use-password'",
+        "webhook": "web" + "hook = 'cohort9g-do-not-use-webhook-secret'",
+        "url": "https://user:cohort9g-password@example.invalid/path",
+        "generic": "api" + "_key = '" + "I" * 24 + "'",
+    }
+    _write(
+        root / "scripts" / "leaky.py",
+        "\n".join(f"{name} = {value!r}" for name, value in secrets.items()) + "\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    for category in (
+        "openai_secret_key",
+        "github_token",
+        "slack_token",
+        "aws_access_key_id",
+        "aws_secret_access_key",
+        "bearer_or_jwt_token",
+        "private_key_header",
+        "password_assignment",
+        "webhook_or_signing_secret",
+        "credential_url",
+        "generic_secret_assignment",
+    ):
+        assert category in output
+    assert "[REDACTED len=" in output
+    for raw in secrets.values():
+        assert raw not in output
+
+
+def test_cohort9g_synthetic_test_fixtures_are_narrowly_classified(tmp_path: Path):
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    synthetic = "sk-" + "cohort9g" + "DONOTUSE" + "synthetic"
+    _write(
+        root / "scripts" / "tests" / "test_fixture.py",
+        "TOKEN = '" + synthetic + "'  # synthetic cohort9g do-not-use fixture\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 0
+    assert "findings      : 0" in output
+
+
+def test_cohort9g_production_like_synthetic_secret_is_not_ignored(tmp_path: Path):
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    synthetic = "sk-" + "cohort9g" + "DONOTUSE" + "synthetic"
+    _write(root / "scripts" / "production_like.py", "TOKEN = '" + synthetic + "'\n")
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "openai_secret_key" in output
+    assert synthetic not in output
+
+
+def test_cohort9g_scanner_read_error_fails_closed(tmp_path: Path, monkeypatch):
+    root = tmp_path / "repo"
+    leaky = root / "scripts" / "unreadable.py"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(leaky, "VALUE = 1\n")
+
+    original = Path.read_text
+
+    def boom(self, *args, **kwargs):
+        if self == leaky:
+            raise OSError("cohort9g unreadable")
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", boom)
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "unreadable_source_file" in output

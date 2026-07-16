@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import re
 import sys
+import hashlib
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -40,8 +41,6 @@ _FRONTEND_SKIP_DIR_NAMES = {
     "node_modules", ".next", ".vercel", "dist", "build", "coverage",
 }
 _FRONTEND_SUFFIXES = {".ts", ".tsx", ".js", ".jsx"}
-
-_REDACT_KEEP = 12
 
 # ---------------------------------------------------------------------------
 # Pattern table. Literal tokens are assembled from fragments (repo convention)
@@ -99,22 +98,41 @@ _W_SESSION_STORAGE = "session" + "Storage"
 _W_USE_SERVER = '"use' + ' server"'
 _W_NAVIGATOR_CLIPBOARD = "navigator." + "clip" + "board"
 _W_AKIA = "AK" + "IA"
+_W_ASIA = "AS" + "IA"
 _W_GHP = "gh" + "p_"
 _W_XOX = "xo" + "x"
 _W_SK = "sk" + "-"
 _W_API_KEY = "api" + "_key"
 _W_TOKEN = "tok" + "en"
 _W_SECRET = "sec" + "ret"
+_W_PASSWORD = "pass" + "word"
+_W_WEBHOOK = "web" + "hook"
+_W_SIGNING_SECRET = "signing" + "_secret"
 _W_BEGIN = "-----" + "BEGIN"
 _W_PRIVATE_KEY = "PRIVATE" + " KEY"
+_W_EYJ = "ey" + "J"
 
 _PATTERNS = (
     # (category, scope, compiled regex)
-    ("token_indicator", "all", re.compile(_W_AKIA + r"[0-9A-Z]{16}")),
-    ("token_indicator", "all", re.compile(_W_GHP + r"[A-Za-z0-9]{20,}")),
-    ("token_indicator", "all", re.compile(_W_XOX + r"[baprs]-[A-Za-z0-9-]{10,}")),
-    ("token_indicator", "all", re.compile(r"\b" + _W_SK + r"[A-Za-z0-9]{20,}\b")),
-    ("token_indicator", "all", re.compile(
+    ("openai_secret_key", "all", re.compile(r"\b" + _W_SK + r"[A-Za-z0-9]{20,}\b")),
+    ("github_token", "all", re.compile(_W_GHP + r"[A-Za-z0-9]{20,}")),
+    ("slack_token", "all", re.compile(_W_XOX + r"[baprs]-[A-Za-z0-9-]{10,}")),
+    ("aws_access_key_id", "all", re.compile(r"\b(?:" + _W_AKIA + "|" + _W_ASIA + r")[0-9A-Z]{16}\b")),
+    ("aws_secret_access_key", "all", re.compile(
+        r"\baws_" + _W_SECRET + r"_access_key\b\s*[:=]\s*[\"'][A-Za-z0-9/+=]{32,}[\"']",
+        re.IGNORECASE)),
+    ("bearer_or_jwt_token", "all", re.compile(r"\b[Bb]earer\s+[A-Za-z0-9._\-]{16,}\b")),
+    ("bearer_or_jwt_token", "all", re.compile(
+        r"\b" + _W_EYJ + r"[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")),
+    ("password_assignment", "all", re.compile(
+        r"\b" + _W_PASSWORD + r"\b\s*[:=]\s*[\"'][^\"'\s]{8,}[\"']",
+        re.IGNORECASE)),
+    ("webhook_or_signing_secret", "all", re.compile(
+        r"\b(?:" + _W_WEBHOOK + "|" + _W_SIGNING_SECRET + r")\b\s*[:=]\s*[\"'][^\"'\s]{12,}[\"']",
+        re.IGNORECASE)),
+    ("credential_url", "all", re.compile(
+        r"\b[A-Za-z][A-Za-z0-9+.-]*://[^/\s:@]+:[^@\s/]+@[^/\s]+[^\s\"']*")),
+    ("generic_secret_assignment", "all", re.compile(
         r"\b(?:" + _W_API_KEY + "|" + _W_TOKEN + "|" + _W_SECRET
         + r")\b\s*[:=]\s*[\"'][A-Za-z0-9_\-/+]{16,}[\"']", re.IGNORECASE)),
     ("money_provider_import", "all", re.compile(
@@ -321,9 +339,8 @@ def _line_is_negated(line: str) -> bool:
 
 def _redact(text: str) -> str:
     flat = " ".join(text.split())
-    if len(flat) <= _REDACT_KEEP:
-        return flat + "***"
-    return flat[:_REDACT_KEEP] + "***"
+    digest = hashlib.sha256(flat.encode("utf-8")).hexdigest()[:12]
+    return f"[REDACTED len={len(flat)} sha256={digest}]"
 
 
 def _line_no(text: str, offset: int) -> int:
@@ -360,6 +377,40 @@ def _is_test_path(rel: str) -> bool:
     if ".test." in name or ".spec." in name:
         return True
     return False
+
+
+def _is_narrow_synthetic_fixture(rel: str, category: str, text: str) -> bool:
+    """Classify exact synthetic test fixtures without broad test exclusions."""
+    if not _is_test_path(rel):
+        return False
+    if (
+        rel == "scos/control_center/tests/test_adapter_activation_authorization_validation.py"
+        and category == "bearer_or_jwt_token"
+        and text == "Bearer " + "abcdefghijklmnop"
+    ):
+        return True
+    lowered = text.lower()
+    markers = (
+        "cohort9g",
+        "do-not-use",
+        "synthetic",
+        "example.invalid",
+        "fake_" + "secret" + "_do_not_use",
+    )
+    covered = {
+        "openai_secret_key",
+        "github_token",
+        "slack_token",
+        "aws_access_key_id",
+        "aws_secret_access_key",
+        "bearer_or_jwt_token",
+        "password_assignment",
+        "webhook_or_signing_secret",
+        "credential_url",
+        "generic_secret_assignment",
+        "private_key_header",
+    }
+    return category in covered and sum(1 for marker in markers if marker in lowered) >= 2
 
 
 def _append_control_center_findings(findings, rel: str, text: str) -> None:
@@ -472,6 +523,8 @@ def main() -> int:
             if pattern_scope == "commercial" and scope != "commercial":
                 continue
             for match in pattern.finditer(text):
+                if _is_narrow_synthetic_fixture(rel, category, match.group(0)):
+                    continue
                 line_no = text.count("\n", 0, match.start()) + 1
                 findings.append((rel, line_no, category, _redact(match.group(0))))
         if scope == "control_center":

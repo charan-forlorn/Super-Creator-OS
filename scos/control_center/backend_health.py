@@ -36,6 +36,10 @@ except ImportError:  # direct-module execution (tests insert the package dir)
 BACKEND_HEALTH_SCHEMA_VERSION = 1
 DEFAULT_EVENT_LOG_RELATIVE_PATH = "scos/work/control_center/events/command_events.jsonl"
 DEFAULT_COMMAND_QUEUE_RELATIVE_PATH = "scos/work/control_center/queue/approved_commands.jsonl"
+HEALTHY = "HEALTHY"
+DEGRADED = "DEGRADED"
+UNAVAILABLE = "UNAVAILABLE"
+UNKNOWN = "UNKNOWN"
 
 _STATE_TABLES = (
     "state_schema", "commands", "sessions", "events", "approvals",
@@ -297,7 +301,14 @@ def run_backend_health_check(
     artifact_count = sum(1 for metric in metrics if metric.artifact.exists)
     warning_count = len(warnings)
     blocker_count = len(blockers)
-    health_status = "blocked" if blocker_count else ("degraded" if warning_count else "healthy")
+    if malformed_sources:
+        health_status = UNKNOWN
+    elif blocker_count:
+        health_status = UNAVAILABLE
+    elif warning_count:
+        health_status = DEGRADED
+    else:
+        health_status = HEALTHY
     recent_activity_summary = (
         ("checked_at", checked_at),
         ("latest_event_at", _last_value(event_metric.records, "created_at")),

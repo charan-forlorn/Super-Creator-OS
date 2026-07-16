@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from urllib.parse import urlsplit
 from typing import Any
 
 try:
@@ -24,10 +25,23 @@ except ImportError:  # direct-module execution
 _FAKE_SENTINEL = "FAKE_" + "SECRET" + "_DO_NOT_USE"
 _BEARER_RE = re.compile(r"\b[Bb]earer\s+[A-Za-z0-9._\-]{8,}\b")
 _SK_RE = re.compile(r"\b" + "sk" + r"-[A-Za-z0-9]{8,}\b")
+_AWS_ACCESS_KEY_RE = re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")
+_JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")
+_CREDENTIAL_URL_RE = re.compile(r"\b[A-Za-z][A-Za-z0-9+.-]*://[^/\s:@]+:[^@\s/]+@[^/\s]+[^\s]*")
 _ASSIGNMENT_RE = re.compile(
-    r"\b(?:" + "|".join(("api" + "_key", "token", "secret", "password")) + r")\b\s*[:=]\s*[^,\s}]+",
+    r"\b(?:"
+    + "|".join(("api" + "_key", "token", "secret", "password", "web" + "hook", "signing" + "_secret"))
+    + r")\b\s*[:=]\s*[^,\s}]+",
     re.IGNORECASE,
 )
+
+
+def _has_url_credentials(text: str) -> bool:
+    try:
+        parsed = urlsplit(text)
+    except ValueError:
+        return False
+    return bool(parsed.scheme and parsed.netloc and (parsed.username or parsed.password))
 
 
 def _stable_id(prefix: str, *parts: Any) -> str:
@@ -78,6 +92,12 @@ def classify_secret_value(value: object) -> str | None:
         return "TOKEN"
     if _SK_RE.search(text):
         return "API_KEY"
+    if _AWS_ACCESS_KEY_RE.search(text):
+        return "API_KEY"
+    if _JWT_RE.search(text):
+        return "TOKEN"
+    if _CREDENTIAL_URL_RE.search(text) or _has_url_credentials(text):
+        return "GENERIC_SECRET"
     if _ASSIGNMENT_RE.search(text):
         return "GENERIC_SECRET"
     if "-----" + "BEGIN" in upper and "PRIVATE" + " KEY" in upper:

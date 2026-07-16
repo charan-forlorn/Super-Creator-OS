@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 
 from scos.control_center.credential_policy_models import REDACTION_MARKER
@@ -51,3 +52,41 @@ def test_classifiers_detect_field_and_value_markers() -> None:
     assert classify_secret_field_name("caption_style") is None
     assert classify_secret_value(_fake_secret()) == "GENERIC_SECRET"
     assert classify_secret_value("safe audit metadata") is None
+
+
+def test_cohort9g_redacts_nested_urls_headers_errors_and_preserves_input() -> None:
+    url = "postgresql://user:" + "cohort9g-password" + "@localhost/db"
+    bearer = "Bearer " + "cohort9g-sensitive-token"
+    payload = {
+        "safe": "operator-ready",
+        "Headers": {"Authorization": bearer},
+        "events": [
+            {"error": f"connection failed for {url}"},
+            {"subprocess": {"environment": {"OPENAI_API_KEY": "sk-test-" + "cohort9g-DONOTUSE123456"}}},
+        ],
+    }
+    original = deepcopy(payload)
+
+    result = redact_credential_payload(payload)
+    redacted = result.to_dict()["redacted_payload"]
+    serialized = json.dumps(redacted, sort_keys=True)
+
+    assert payload == original
+    assert redacted["safe"] == "operator-ready"
+    assert redacted["Headers"]["Authorization"] == REDACTION_MARKER
+    assert redacted["events"][0]["error"] == REDACTION_MARKER
+    assert redacted["events"][1]["subprocess"]["environment"]["OPENAI_API_KEY"] == REDACTION_MARKER
+    assert "cohort9g-password" not in serialized
+    assert "cohort9g-sensitive-token" not in serialized
+    assert "sk-test-cohort9g" not in serialized
+
+
+def test_cohort9g_redaction_is_idempotent() -> None:
+    payload = {"token": "Bearer " + "cohort9g-sensitive-token", "safe": "kept"}
+
+    once = redact_credential_payload(payload).to_dict()["redacted_payload"]
+    twice = redact_credential_payload(once).to_dict()["redacted_payload"]
+
+    assert once == twice
+    assert once["token"] == REDACTION_MARKER
+    assert once["safe"] == "kept"

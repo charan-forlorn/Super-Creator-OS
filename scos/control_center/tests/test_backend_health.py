@@ -8,7 +8,7 @@ import sqlite3
 from pathlib import Path
 
 from scos.control_center.approval_audit_store import append_decision
-from scos.control_center.backend_health import run_backend_health_check
+from scos.control_center.backend_health import DEGRADED, HEALTHY, UNAVAILABLE, UNKNOWN, run_backend_health_check
 from scos.control_center.host_metrics import collect_jsonl_metric, collect_sqlite_metric
 from scos.control_center.sqlite_state_schema import get_index_statements, get_pragmas, get_schema_statements
 
@@ -109,7 +109,7 @@ def test_backend_health_healthy_report_with_all_artifacts(tmp_path: Path) -> Non
         command_queue_path=queue,
     )
 
-    assert report.health_status == "healthy"
+    assert report.health_status == HEALTHY
     assert report.artifact_count == 4
     assert report.event_count == 2
     assert report.audit_record_count == 1
@@ -132,12 +132,12 @@ def test_backend_health_degraded_when_optional_artifact_missing(tmp_path: Path) 
         command_queue_path=queue,
     )
 
-    assert report.health_status == "degraded"
+    assert report.health_status == DEGRADED
     assert "event_log: missing artifact" in report.warnings
     assert report.blocker_count == 0
 
 
-def test_backend_health_blocked_when_required_sqlite_is_malformed(tmp_path: Path) -> None:
+def test_backend_health_unavailable_when_required_sqlite_is_malformed(tmp_path: Path) -> None:
     db = tmp_path / "state" / "broken.sqlite3"
     db.parent.mkdir(parents=True)
     db.write_text("not sqlite", encoding="utf-8")
@@ -148,7 +148,7 @@ def test_backend_health_blocked_when_required_sqlite_is_malformed(tmp_path: Path
         state_db_path=db,
     )
 
-    assert report.health_status == "blocked"
+    assert report.health_status == UNAVAILABLE
     assert any("state_db" in blocker for blocker in report.blockers)
 
 
@@ -223,8 +223,37 @@ def test_backend_health_rejects_unsafe_local_paths(tmp_path: Path) -> None:
         event_log_path=tmp_path.parent / "outside.jsonl",
     )
 
-    assert report.health_status == "blocked"
+    assert report.health_status == UNAVAILABLE
     assert "event_log: unsafe local path" in report.blockers
+
+
+def test_backend_health_unknown_when_evidence_is_malformed(tmp_path: Path) -> None:
+    db, event_log, queue = _healthy_fixture(tmp_path)
+    event_log.write_text('{"event_id":"evt-jsonl-1"}\n{broken\n', encoding="utf-8")
+
+    report = run_backend_health_check(
+        repo_root=tmp_path,
+        checked_at=_CHECKED_AT,
+        state_db_path=db,
+        event_log_path=event_log,
+        command_queue_path=queue,
+    )
+
+    assert report.health_status == UNKNOWN
+    assert "event_log: malformed JSONL records found" in report.blockers
+
+
+def test_backend_health_errors_are_categorized_without_secret_detail(tmp_path: Path) -> None:
+    report = run_backend_health_check(
+        repo_root=tmp_path,
+        checked_at=_CHECKED_AT,
+        state_db_path="https://user:cohort9g-password@example.invalid/state.sqlite3",
+    )
+    text = json.dumps(report.to_dict(), sort_keys=True)
+
+    assert report.health_status == UNAVAILABLE
+    assert "URL_PATH_REJECTED" in text
+    assert "cohort9g-password" not in text
 
 
 def test_backend_health_source_uses_no_clock_random_uuid_or_network_subprocess() -> None:
