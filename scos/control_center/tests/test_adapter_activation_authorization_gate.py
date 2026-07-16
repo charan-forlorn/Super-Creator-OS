@@ -314,3 +314,42 @@ def test_static_safety_scan_new_stage85_sources() -> None:
                     assert func.id not in forbidden_call_names
                 if isinstance(func, ast.Attribute):
                     assert func.attr not in forbidden_call_names | forbidden_attribute_roots
+
+
+def test_authorization_binding_rejects_operation_and_target_mismatch() -> None:
+    # The Stage 8.5 gate authorizes activation *in principle*; the final,
+    # fail-closed binding to a specific operation AND target is enforced by the
+    # adapter's ``Stage8_5AdapterAuthorization.require_for`` (the last common
+    # point before the HVS subprocess). This test pins that policy: an
+    # AUTHORIZED_IN_PRINCIPLE decision bound to a different operation or target
+    # must NOT permit initialize-project.
+
+    from scos.control_center.hvs_adapter import Stage8_5AdapterAuthorization as _Auth
+
+    # Decision bound to a read-only op cannot authorize a mutating op.
+    wrong_op = _Auth("AUTHORIZED_IN_PRINCIPLE", operation="inspect-project", target="proj-1")
+    try:
+        wrong_op.require_for(operation="initialize-project", target="proj-1")
+        raise AssertionError("op-mismatch authorization unexpectedly permitted initialize-project")
+    except Exception as exc:  # noqa: BLE001 - fail-closed raise expected
+        assert not isinstance(exc, AssertionError)
+
+    # Decision bound to a different project cannot authorize this project.
+    wrong_target = _Auth("AUTHORIZED_IN_PRINCIPLE", operation="initialize-project", target="other-project")
+    try:
+        wrong_target.require_for(operation="initialize-project", target="proj-1")
+        raise AssertionError("target-mismatch authorization unexpectedly permitted initialize-project")
+    except Exception as exc:  # noqa: BLE001 - fail-closed raise expected
+        assert not isinstance(exc, AssertionError)
+
+    # Correctly bound decision passes.
+    ok = _Auth("AUTHORIZED_IN_PRINCIPLE", operation="initialize-project", target="proj-1")
+    ok.require_for(operation="initialize-project", target="proj-1")  # does not raise
+
+    # Denied decision fails regardless of binding.
+    denied = _Auth("DENIED", operation="initialize-project", target="proj-1")
+    try:
+        denied.require_for(operation="initialize-project", target="proj-1")
+        raise AssertionError("denied authorization unexpectedly permitted initialize-project")
+    except Exception as exc:  # noqa: BLE001 - fail-closed raise expected
+        assert not isinstance(exc, AssertionError)

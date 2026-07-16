@@ -27,8 +27,17 @@ from hvs_adapter import (  # noqa: E402
     DEFAULT_MAX_OUTPUT_CHARS,
     DEFAULT_TIMEOUT_SECONDS,
     STAGE1_READONLY_OPERATIONS,
+    READ_ONLY_OPERATIONS,
+    STATE_MUTATING_OPERATIONS,
+    STAGE85_REASON_DENIED,
+    STAGE85_REASON_MISSING,
+    STAGE85_REASON_UNKNOWN,
+    STAGE85_REASON_STALE,
+    STAGE85_REASON_OP_MISMATCH,
+    STAGE85_REASON_TARGET_MISMATCH,
     HVSAdapterConfig,
     HermesVideoStudioAdapter,
+    Stage8_5AdapterAuthorization,
     build_hvs_adapter_config,
 )
 from agent_adapter_contracts import BaseAgentAdapter  # noqa: E402
@@ -280,7 +289,10 @@ def test_stage8l_initialize_and_inspect_use_bounded_json_cli(tmp_path) -> None:
     cfg = _valid_config(tmp_path)
     captured: dict[str, Any] = {}
     fake = _FakeRun(returncode=0, stdout='{"status":"verified","project_verified":true}', captured=captured)
-    adapter = HermesVideoStudioAdapter(cfg, subprocess_run=fake)
+    auth = Stage8_5AdapterAuthorization(
+        "AUTHORIZED_IN_PRINCIPLE", operation="initialize-project", target="hvs8l-abc"
+    )
+    adapter = HermesVideoStudioAdapter(cfg, subprocess_run=fake, stage85_authorization=auth)
     init = adapter.initialize_project(
         project_id="hvs8l-abc",
         contract_path=str(tmp_path / "contract.json"),
@@ -295,9 +307,144 @@ def test_stage8l_initialize_and_inspect_use_bounded_json_cli(tmp_path) -> None:
     check("8L init parses JSON", init["payload"]["project_verified"] is True)
 
     captured.clear()
+    # inspect-project is read-only and requires no authorization decision.
     adapter.inspect_project(project_id="hvs8l-abc", request_id="stage8l")
     check("8L inspect command selected", "inspect-project" in captured["argv"])
     check("8L never uses legacy create-project", "create-project" not in " ".join(captured["argv"]))
+
+
+def test_stage8l_initialize_is_state_mutating_classified(tmp_path) -> None:
+    check("initialize-project is state-mutating", "initialize-project" in STATE_MUTATING_OPERATIONS)
+    check("inspect-project is read-only", "inspect-project" in READ_ONLY_OPERATIONS)
+    check("hvs_capability_probe is read-only", "hvs_capability_probe" in READ_ONLY_OPERATIONS)
+    check("read-only does not include mutating", "initialize-project" not in READ_ONLY_OPERATIONS)
+
+
+def test_stage8l_initialize_missing_authorization_fails_closed(tmp_path) -> None:
+    cfg = _valid_config(tmp_path)
+    captured: dict[str, Any] = {}
+    fake = _FakeRun(returncode=0, stdout='{"status":"verified"}', captured=captured)
+    # No authorization supplied -> fail closed, no subprocess.
+    adapter = HermesVideoStudioAdapter(cfg, subprocess_run=fake)
+    init = adapter.initialize_project(
+        project_id="hvs8l-abc",
+        contract_path=str(tmp_path / "contract.json"),
+        expected_payload_hash="a" * 16,
+        approve_initialization=True,
+        request_id="stage8l",
+    )
+    check("missing auth -> not ok", init.get("ok") is False)
+    check("missing auth -> stable reason", init.get("error_kind") == "stage85_authorization_blocked")
+    check("missing auth -> no subprocess", "argv" not in captured)
+    check("missing auth -> no success claim", bool(init.get("payload")) is False)
+
+
+def test_stage8l_initialize_denied_authorization_fails_closed(tmp_path) -> None:
+    cfg = _valid_config(tmp_path)
+    captured: dict[str, Any] = {}
+    fake = _FakeRun(returncode=0, stdout='{"status":"verified"}', captured=captured)
+    auth = Stage8_5AdapterAuthorization("DENIED", operation="initialize-project", target="hvs8l-abc")
+    adapter = HermesVideoStudioAdapter(cfg, subprocess_run=fake, stage85_authorization=auth)
+    init = adapter.initialize_project(
+        project_id="hvs8l-abc",
+        contract_path=str(tmp_path / "contract.json"),
+        expected_payload_hash="a" * 16,
+        approve_initialization=True,
+        request_id="stage8l",
+    )
+    check("denied auth -> not ok", init.get("ok") is False)
+    check("denied auth -> stable reason", init.get("error_kind") == "stage85_authorization_blocked")
+    check("denied auth -> no subprocess", "argv" not in captured)
+
+
+def test_stage8l_initialize_unknown_authorization_fails_closed(tmp_path) -> None:
+    cfg = _valid_config(tmp_path)
+    captured: dict[str, Any] = {}
+    fake = _FakeRun(returncode=0, stdout='{"status":"verified"}', captured=captured)
+    auth = Stage8_5AdapterAuthorization("MAYBE", operation="initialize-project", target="hvs8l-abc")
+    adapter = HermesVideoStudioAdapter(cfg, subprocess_run=fake, stage85_authorization=auth)
+    init = adapter.initialize_project(
+        project_id="hvs8l-abc",
+        contract_path=str(tmp_path / "contract.json"),
+        expected_payload_hash="a" * 16,
+        approve_initialization=True,
+        request_id="stage8l",
+    )
+    check("unknown auth -> not ok", init.get("ok") is False)
+    check("unknown auth -> no subprocess", "argv" not in captured)
+
+
+def test_stage8l_initialize_operation_mismatch_fails_closed(tmp_path) -> None:
+    cfg = _valid_config(tmp_path)
+    captured: dict[str, Any] = {}
+    fake = _FakeRun(returncode=0, stdout='{"status":"verified"}', captured=captured)
+    # Authorization bound to a different operation cannot authorize init.
+    auth = Stage8_5AdapterAuthorization(
+        "AUTHORIZED_IN_PRINCIPLE", operation="inspect-project", target="hvs8l-abc"
+    )
+    adapter = HermesVideoStudioAdapter(cfg, subprocess_run=fake, stage85_authorization=auth)
+    init = adapter.initialize_project(
+        project_id="hvs8l-abc",
+        contract_path=str(tmp_path / "contract.json"),
+        expected_payload_hash="a" * 16,
+        approve_initialization=True,
+        request_id="stage8l",
+    )
+    check("op-mismatch auth -> not ok", init.get("ok") is False)
+    check("op-mismatch auth -> no subprocess", "argv" not in captured)
+
+
+def test_stage8l_initialize_target_mismatch_fails_closed(tmp_path) -> None:
+    cfg = _valid_config(tmp_path)
+    captured: dict[str, Any] = {}
+    fake = _FakeRun(returncode=0, stdout='{"status":"verified"}', captured=captured)
+    # Authorization bound to a different target/project cannot authorize init.
+    auth = Stage8_5AdapterAuthorization(
+        "AUTHORIZED_IN_PRINCIPLE", operation="initialize-project", target="other-project"
+    )
+    adapter = HermesVideoStudioAdapter(cfg, subprocess_run=fake, stage85_authorization=auth)
+    init = adapter.initialize_project(
+        project_id="hvs8l-abc",
+        contract_path=str(tmp_path / "contract.json"),
+        expected_payload_hash="a" * 16,
+        approve_initialization=True,
+        request_id="stage8l",
+    )
+    check("target-mismatch auth -> not ok", init.get("ok") is False)
+    check("target-mismatch auth -> no subprocess", "argv" not in captured)
+
+
+def test_stage8l_initialize_authorization_reason_has_no_secret(tmp_path) -> None:
+    cfg = _valid_config(tmp_path)
+    captured: dict[str, Any] = {}
+    fake = _FakeRun(returncode=0, stdout='{"status":"verified"}', captured=captured)
+    auth = Stage8_5AdapterAuthorization("DENIED", operation="initialize-project", target="hvs8l-abc")
+    adapter = HermesVideoStudioAdapter(cfg, subprocess_run=fake, stage85_authorization=auth)
+    init = adapter.initialize_project(
+        project_id="hvs8l-abc",
+        contract_path=str(tmp_path / "contract.json"),
+        expected_payload_hash="a" * 16,
+        approve_initialization=True,
+        request_id="stage8l",
+    )
+    detail = str(init.get("error_detail") or "")
+    check("deny reason is non-secret code", init.get("error_detail") in
+          (STAGE85_REASON_DENIED, STAGE85_REASON_MISSING, STAGE85_REASON_UNKNOWN,
+           STAGE85_REASON_STALE, STAGE85_REASON_OP_MISMATCH, STAGE85_REASON_TARGET_MISMATCH))
+    check("deny detail leaks no token", "sk-" not in detail and "secret" not in detail.lower())
+
+
+def test_stage8l_inspect_requires_no_authorization_and_does_not_initialize(tmp_path) -> None:
+    cfg = _valid_config(tmp_path)
+    captured: dict[str, Any] = {}
+    fake = _FakeRun(returncode=0, stdout='{"exists":true,"project_id":"hvs8l-abc"}', captured=captured)
+    # Read-only inspection works WITHOUT any authorization decision and must
+    # not perform an implicit initialize-project.
+    adapter = HermesVideoStudioAdapter(cfg, subprocess_run=fake)
+    result = adapter.inspect_project(project_id="hvs8l-abc", request_id="stage8l")
+    check("inspect invoked", "inspect-project" in captured["argv"])
+    check("inspect command only", "initialize-project" not in captured["argv"])
+    check("inspect ok", result.get("ok") is True)
 
 
 # --- 11b. Deterministic cp1252 0x97 encoding boundary (Cohort 6E.2) --------

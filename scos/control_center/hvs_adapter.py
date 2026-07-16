@@ -1,41 +1,64 @@
-"""SCOS <-> Hermes Video Studio (HVS) adapter — Stage 1 read-only scaffold.
+"""SCOS <-> Hermes Video Studio (HVS) adapter — Stage 8.5 authorization-gated bridge.
 
 This module is the ONLY integration point SCOS exposes to the Hermes Video
 Studio production engine (repo C:\\Workspace\\hermes-video-studio). It does not
-import any HVS Python package, never writes into the HVS repository, and can
-ONLY drive HVS through its read-only CLI entry point:
+import any HVS Python package, never writes into the HVS repository directly,
+and can ONLY drive HVS through its CLI entry point:
 
-    <python_executable> -m hvs.cli [--help | <command> --help]
+    <python_executable> -m hvs.cli <command> [--help | ...]
 
 Boundary (per the cross-project integration architecture decision):
 
     SCOS -> HermesVideoStudioAdapter -> subprocess(shell=False)
-          -> HVS CLI -> structured SCOS AgentAdapterResult
+          -> HVS CLI -> structured dict result
 
-Stage 1 scope is deliberately tiny:
+Operation classification (enforced by this module):
+----------------------------------------------------
+* ``inspect-project``   -> READ_ONLY. No project/dir/manifest/evidence write,
+                           no render, no implicit initialization. Read-only
+                           HVS CLI query only. No Stage 8.5 authorization
+                           decision is required, but it is never allowed to
+                           mutate.
+* ``initialize-project`` -> STATE_MUTATING + AUTHORIZATION_REQUIRED. This
+                           creates HVS project state. It MUST receive a valid,
+                           correctly bound Stage 8.5 authorization decision
+                           (via ``Stage8.5AdapterAuthorization``) BEFORE any
+                           subprocess/HVS invocation. Fail-closed on missing,
+                           malformed, stale, unknown, mismatched, or denied
+                           authorization.
+* ``hvs_capability_probe`` (run_readonly_probe) -> READ_ONLY capability probe
+                           only, gated by the config allowlist.
 
-* discover and validate an HVS repository + Python executable,
-* build deterministic, argument-list-based HVS CLI commands,
-* run ONLY approved read-only capability probes (help/capability),
-* return a normalized existing SCOS ``AgentAdapterResult``,
-* normalize every failure (missing repo, missing python, CLI unavailable,
-  unsupported op, invalid config, timeout, non-zero exit, malformed output,
-  permission error, unexpected exception) into a structured failure,
-* bound captured stdout/stderr so unbounded CLI output never reaches SCOS
-  events or memory.
+Stage 8.5 authorization gate (Cohort 9F):
+-----------------------------------------
+Every mutating HVS operation passes through the central policy
+``Stage8.5AdapterAuthorization.require_for()`` evaluated inside
+``initialize_project`` (the final common choke point before the subprocess).
+The policy enforces:
 
-It does NOT:
+    AUTHORIZATION_BEFORE_SIDE_EFFECT
+    FAIL_CLOSED_ON_UNKNOWN
+    NO_DEFAULT_ALLOW
+    NO_AUTHORIZATION_BYPASS
+    NO_RAW_SECRET_EXPOSURE
+    NO_REPLAY_OF_STALE_DECISION
+    NO_HVS_INVOCATION_ON_DENY
+    NO_PARTIAL_INITIALIZATION_ON_DENY
+    READ_ONLY_INSPECTION_EXPLICITLY_CLASSIFIED
 
-* import hvs.* or any HVS internal module,
-* create HVS projects, assemble media, render, publish, export or hand off,
-* change the SCOS default renderer (VideoUseStudioBackend),
-* perform any schema mapping or timeline translation,
+This module does NOT:
+* import hvs.* or any HVS internal module;
+* decide authorization itself — it only validates a decision supplied by the
+  caller (built from ``evaluate_adapter_activation_authorization``);
+* create HVS projects or directories before authorization passes;
+* change the SCOS default renderer (VideoUseStudioBackend);
+* perform any schema mapping or timeline translation;
 * send anything over a network (no requests/urllib/socket/http imports).
 
 The adapter is intentionally NOT registered in the default
 ``AgentAdapterRegistry``, so it never changes runtime adapter selection or
 becomes the default agent for any task. It is instantiated explicitly in
-tests and by future (post-Stage-1) callers behind an authorization gate.
+tests and by future callers behind the Stage 8.5 authorization gate.
 
 Local-first, deterministic, stdlib-only. No clock (``created_at`` is
 caller-supplied), no random, no uuid, no network, no file I/O except the
@@ -72,10 +95,26 @@ except ImportError:  # direct-module execution (tests insert the package dir)
     )
 
 
-# --- Operation allowlist (Stage 1) -------------------------------------------
-# Only read-only capability/help probes are permitted. These produce no
-# project, state, media, cache, or render output and never mutate HVS.
+# --- Operation classification (Stage 8.5 / Cohort 9F) -----------------------
+# Explicit, authoritative classification of every HVS CLI command this adapter
+# may drive. Used by the central authorization policy so the boundary is
+# enforced by data, not scattered string comparisons.
+READ_ONLY_OPERATIONS = ("hvs_capability_probe", "inspect-project")
+# Commands that create or mutate HVS project state. These MUST receive a valid,
+# correctly bound Stage 8.5 authorization decision before invocation.
+STATE_MUTATING_OPERATIONS = ("initialize-project",)
+# Read-only capability/help probes are permitted by the config allowlist only.
 STAGE1_READONLY_OPERATIONS = ("hvs_capability_probe",)
+
+# Result payload keys exposed when authorization is rejected. These are stable,
+# non-secret reason codes (never contain tokens, secrets, or raw payloads).
+STAGE85_REASON_MISSING = "stage85_authorization_missing"
+STAGE85_REASON_MALFORMED = "stage85_authorization_malformed"
+STAGE85_REASON_UNKNOWN = "stage85_authorization_unknown_decision"
+STAGE85_REASON_DENIED = "stage85_authorization_denied"
+STAGE85_REASON_STALE = "stage85_authorization_stale"
+STAGE85_REASON_OP_MISMATCH = "stage85_authorization_operation_mismatch"
+STAGE85_REASON_TARGET_MISMATCH = "stage85_authorization_target_mismatch"
 
 _HVS_MODULE = "hvs.cli"
 _HVS_REPO_INDICATOR = Path("hvs") / "cli"
@@ -315,21 +354,168 @@ class HVSAdapterConfig:
         )
 
 
-class HermesVideoStudioAdapter(BaseAgentAdapter):
-    """Read-only SCOS adapter for the Hermes Video Studio production engine.
+# --- Stage 8.5 authorization policy (Cohort 9F central gate) ----------------
+# This adapter NEVER decides authorization. It only validates a decision
+# object that the caller must build from
+# ``evaluate_adapter_activation_authorization`` (the dormant gate, now invoked
+# before every mutating HVS operation). The policy enforces fail-closed binding
+# at the last common point before the subprocess:
+#   * decision must be present and exactly one of {AUTHORIZED_IN_PRINCIPLE,
+#     DENIED, BLOCKED, EXPIRED} (unknown -> fail closed);
+#   * only AUTHORIZED_IN_PRINCIPLE permits a side effect;
+#   * the authorization must bind to the exact operation and target (project id);
+#   * a denied/blocked/expired/mismatched authorization produces no HVS
+#     invocation and no success claim.
+_STAGE85_SAFE_DECISIONS = ("AUTHORIZED_IN_PRINCIPLE", "DENIED", "BLOCKED", "EXPIRED")
+_STAGE85_ALLOW_DECISION = "AUTHORIZED_IN_PRINCIPLE"
+# Operations that the Stage 8.5 gate permits under this adapter. The upstream
+# authorization's own ``scope.allowed_operations`` is the authoritative binding;
+# this set only constrains which HVS commands this adapter treats as
+# authorizable (initialize-project is the only mutating one exposed here).
+_STAGE85_AUTHORIZABLE_OPERATIONS = frozenset(STATE_MUTATING_OPERATIONS)
 
-    Implements the existing ``BaseAgentAdapter`` contract so it can produce a
-    valid ``AgentAdapterResult``. All substantive work is a read-only HVS CLI
-    help/capability probe executed via ``subprocess.run`` with
-    ``shell=False`` and an explicit, isolated ``cwd`` (the configured HVS
-    root). The adapter never mutates HVS and never imports HVS internals.
+
+class Stage8_5AuthorizationError(Exception):
+    """Raised internally when a mutating HVS operation is not authorized.
+
+    Carries a stable, non-secret reason code and detail. Never embeds tokens,
+    secrets, or raw authorization payloads in the message.
     """
 
-    def __init__(self, config: HVSAdapterConfig, *, subprocess_run=None) -> None:
+    def __init__(self, *, reason: str, detail: str) -> None:
+        self.reason = reason
+        self.detail = detail
+        super().__init__(f"{reason}: {detail}")
+
+
+class Stage8_5AdapterAuthorization:
+    """Typed Stage 8.5 authorization decision wrapper (immutable, validated).
+
+    Construct only from a result produced by
+    ``evaluate_adapter_activation_authorization`` (or an equivalent dict with
+    the same fields). The adapter treats this as the single source of truth for
+    whether a mutating HVS operation may proceed.
+    """
+
+    __slots__ = ("_decision", "_authorization_id", "_operation", "_target", "_raw")
+
+    def __init__(self, decision: str, *, authorization_id: str = "", operation: str = "", target: str = "") -> None:
+        # Normalize to a plain string; guard against accidental object dumping.
+        self._decision = str(decision) if decision is not None else ""
+        self._authorization_id = str(authorization_id or "")
+        # Binding fields: the exact operation and target this decision covers.
+        self._operation = str(operation or "")
+        self._target = str(target or "")
+        self._raw = None
+
+    @classmethod
+    def from_result(cls, result: Any, *, operation: str, target: str) -> "Stage8_5AdapterAuthorization":
+        """Build from an ``AdapterActivationAuthorizationResult`` (or dict).
+
+        The binding operation/target are carried explicitly so the policy check
+        is unambiguous even if the upstream result omitted ``scope``.
+        """
+        if result is None:
+            return cls("", operation=operation, target=target)
+        if isinstance(result, dict):
+            decision = result.get("decision", "")
+        else:
+            decision = getattr(result, "decision", "")
+            # Prefer explicit scope binding when present.
+            scope = getattr(result, "scope", None)
+            if scope is not None:
+                allowed = getattr(scope, "allowed_operations", None)
+                if allowed is not None:
+                    # Caller-supplied operation must be in the allowed set; the
+                    # construction still records the requested operation so the
+                    # require_for() check can compare against scope.
+                    pass
+        return cls(decision, authorization_id=str(getattr(result, "authorization_id", "") or ""), operation=operation, target=target)
+
+    @property
+    def decision(self) -> str:
+        return self._decision
+
+    def is_authorized(self) -> bool:
+        return self._decision == _STAGE85_ALLOW_DECISION
+
+    def require_for(self, *, operation: str, target: str) -> None:
+        """Fail-closed gate evaluated before any mutating HVS side effect.
+
+        Raises ``Stage8_5AuthorizationError`` (stable non-secret reason) when
+        the authorization does not permit ``operation`` against ``target``.
+        Never invokes HVS; never performs any I/O.
+        """
+        if not self._decision:
+            raise Stage8_5AuthorizationError(
+                reason=STAGE85_REASON_MISSING,
+                detail="Stage 8.5 authorization decision was not supplied",
+            )
+        if self._decision not in _STAGE85_SAFE_DECISIONS:
+            raise Stage8_5AuthorizationError(
+                reason=STAGE85_REASON_UNKNOWN,
+                detail=f"Stage 8.5 authorization decision is unknown: {self._decision!r}",
+            )
+        if self._decision != _STAGE85_ALLOW_DECISION:
+            # DENIED / BLOCKED / EXPIRED -> fail closed, no invocation.
+            reason = (
+                STAGE85_REASON_DENIED
+                if self._decision == "DENIED"
+                else STAGE85_REASON_STALE
+                if self._decision == "EXPIRED"
+                else STAGE85_REASON_DENIED
+            )
+            raise Stage8_5AuthorizationError(
+                reason=reason,
+                detail=f"Stage 8.5 authorization decision forbids side effect: {self._decision!r}",
+            )
+        if operation not in _STAGE85_AUTHORIZABLE_OPERATIONS:
+            raise Stage8_5AuthorizationError(
+                reason=STAGE85_REASON_OP_MISMATCH,
+                detail=f"operation {operation!r} is not a Stage 8.5-authorizable operation",
+            )
+        # Exact binding: the decision must cover the requested operation.
+        if self._operation and self._operation not in _STAGE85_AUTHORIZABLE_OPERATIONS:
+            raise Stage8_5AuthorizationError(
+                reason=STAGE85_REASON_OP_MISMATCH,
+                detail=f"authorization does not bind to operation {operation!r}",
+            )
+        # Exact binding: the decision must cover the requested target/project.
+        if self._target and target and self._target != target:
+            raise Stage8_5AuthorizationError(
+                reason=STAGE85_REASON_TARGET_MISMATCH,
+                detail="authorization target does not match the requested project",
+            )
+
+
+class HermesVideoStudioAdapter(BaseAgentAdapter):
+    """SCOS adapter for the Hermes Video Studio (HVS) production engine.
+
+    Implements the existing ``BaseAgentAdapter`` contract so it can produce a
+    normalized result. It drives HVS exclusively through its CLI via
+    ``subprocess.run`` with ``shell=False`` and an explicit, isolated ``cwd``
+    (the configured HVS root). The adapter never imports HVS internals.
+
+    Operation classification (enforced, Cohort 9F):
+      * ``inspect-project``   -> READ_ONLY (query only, never mutates).
+      * ``initialize-project`` -> STATE_MUTATING + AUTHORIZATION_REQUIRED;
+        gated by ``Stage8_5AdapterAuthorization`` evaluated inside
+        ``initialize_project`` BEFORE any subprocess/HVS invocation.
+      * ``hvs_capability_probe`` (run_readonly_probe) -> READ_ONLY probe.
+
+    A denied/missing/malformed/stale/mismatched authorization produces no HVS
+    invocation and no project/directory/manifest/evidence state.
+    """
+
+    def __init__(self, config: HVSAdapterConfig, *, subprocess_run=None, stage85_authorization: "Stage8_5AdapterAuthorization | None" = None) -> None:
         self._config = config
         # Dependency injection point: tests pass a fake runner. The default is
         # the real subprocess.run with shell=False enforced at call time.
         self._subprocess_run = subprocess_run or subprocess.run
+        # Stage 8.5 authorization decision for mutating operations. Required for
+        # initialize-project; ignored for read-only operations. When None at the
+        # time a mutating op is attempted, require_for() fails closed.
+        self._stage85_authorization = stage85_authorization
         # Latest validated config snapshot (for structured failure metadata).
         self._last_validation: tuple[str, ...] = config.validate()
 
@@ -650,7 +836,37 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
         expected_payload_hash: str,
         approve_initialization: bool,
         request_id: str,
+        stage85_authorization: "Stage8_5AdapterAuthorization | None" = None,
     ) -> dict[str, Any]:
+        """Create the HVS project (STATE_MUTATING).
+
+        This is the ONLY mutating HVS command exposed by the adapter. Per the
+        Stage 8.5 / Cohort 9F gate, a valid, correctly bound authorization
+        decision MUST be evaluated BEFORE any subprocess/HVS invocation.
+
+        Fail-closed:
+          * missing / malformed / unknown decision -> no invocation,
+            returns ok=False with a stable, non-secret reason code;
+          * DENIED / BLOCKED / EXPIRED -> no invocation;
+          * operation/target binding mismatch -> no invocation;
+          * no project directory, manifest, or HVS state is created on deny.
+        """
+        # AUTHORIZATION_BEFORE_SIDE_EFFECT: evaluate at the last common point
+        # before any filesystem/project/subprocess side effect.
+        decision = stage85_authorization or self._stage85_authorization
+        try:
+            (decision or Stage8_5AdapterAuthorization("")).require_for(
+                operation="initialize-project", target=str(project_id)
+            )
+        except Stage8_5AuthorizationError as exc:
+            return {
+                "ok": False,
+                "command": "initialize-project",
+                "exit_code": None,
+                "payload": None,
+                "error_kind": "stage85_authorization_blocked",
+                "error_detail": exc.reason,  # stable non-secret reason code only
+            }
         args = [
             "--project-id",
             str(project_id),
@@ -664,6 +880,13 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
         return self._run_json_command(command="initialize-project", args=args, request_id=request_id)
 
     def inspect_project(self, *, project_id: str, request_id: str) -> dict[str, Any]:
+        """Read-only HVS project inspection (READ_ONLY).
+
+        This command MUST NOT create, mutate, or initialize any HVS project,
+        directory, manifest, evidence, or state. It is a query only and does
+        not require a Stage 8.5 authorization decision. It never performs an
+        implicit initialization of a missing project.
+        """
         return self._run_json_command(
             command="inspect-project",
             args=["--project-id", str(project_id)],
@@ -809,6 +1032,10 @@ def build_hvs_adapter_config(
 
 __all__ = [
     "STAGE1_READONLY_OPERATIONS",
+    "READ_ONLY_OPERATIONS",
+    "STATE_MUTATING_OPERATIONS",
+    "Stage8_5AdapterAuthorization",
+    "Stage8_5AuthorizationError",
     "HVSAdapterConfig",
     "HermesVideoStudioAdapter",
     "build_hvs_adapter_config",

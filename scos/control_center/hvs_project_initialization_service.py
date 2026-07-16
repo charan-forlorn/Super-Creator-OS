@@ -6,7 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .hvs_adapter import HVSAdapterConfig, HermesVideoStudioAdapter
+from .hvs_adapter import (
+    HVSAdapterConfig,
+    HermesVideoStudioAdapter,
+    Stage8_5AdapterAuthorization,
+    Stage8_5AuthorizationError,
+)
 from .hvs_commercial_proposal_models import _safe_text, canonical_json, stable_id
 from .hvs_contract_models import SCOSAssetRef, SCOSCaption, SCOSRenderTimelineProject, SCOSScene
 from .hvs_engagement_activation_models import (
@@ -324,11 +329,30 @@ def initialize_hvs_project(
     recorded_at: str,
     approve_initialization: bool,
     adapter: HermesVideoStudioAdapter | None = None,
+    stage85_authorization: Any = None,
 ) -> HVSProjectInitializationResult:
+    # --- Stage 8.5 authorization gate (Cohort 9F) ---------------------------
+    # Evaluated FIRST, before any filesystem/project/persistent side effect.
+    # The explicit operator/engagement approval (approve_initialization) is a
+    # necessary but NOT sufficient precondition; a valid, correctly bound
+    # Stage 8.5 activation decision (produced by
+    # evaluate_adapter_activation_authorization) is also required before any
+    # mutating HVS operation. Fail-closed: missing/malformed/unknown/denied/
+    # stale/mismatched authorization prevents even the contract-manifest write.
+    if approve_initialization is not True:
+        return _deny("INITIALIZATION_APPROVAL_REQUIRED", "explicit operator initialization approval is required")
+    if not isinstance(stage85_authorization, Stage8_5AdapterAuthorization):
+        # Accept a raw result dict or AdapterActivationAuthorizationResult and
+        # normalize it; a missing decision fails closed.
+        stage85_authorization = Stage8_5AdapterAuthorization.from_result(
+            stage85_authorization, operation="initialize-project", target=""
+        )
+    try:
+        stage85_authorization.require_for(operation="initialize-project", target="")
+    except Stage8_5AuthorizationError as exc:
+        return _deny("STAGE85_AUTHORIZATION_BLOCKED", exc.reason)
     try:
         operator = _safe_text("operator_id", operator_id)
-        if approve_initialization is not True:
-            return _deny("INITIALIZATION_APPROVAL_REQUIRED", "explicit operator initialization approval is required")
         prepared = prepare_hvs_project_initialization(
             production_kickoff_authorization_id=production_kickoff_authorization_id,
             production_input=production_input,
@@ -350,7 +374,8 @@ def initialize_hvs_project(
                 python_executable=str(hvs_python_executable),
                 timeout_seconds=120,
                 require_repo_local_python=True,
-            )
+            ),
+            stage85_authorization=stage85_authorization,
         )
         init_result = hvs_adapter.initialize_project(
             project_id=contract.hvs_project_id,
@@ -358,6 +383,7 @@ def initialize_hvs_project(
             expected_payload_hash=contract.stage2_payload_hash,
             approve_initialization=True,
             request_id=contract.initialization_contract_id,
+            stage85_authorization=stage85_authorization,
         )
         init_payload = init_result.get("payload") or {}
         if init_result.get("ok") is not True:

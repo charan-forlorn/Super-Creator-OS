@@ -27,6 +27,10 @@ from scos.control_center.tests.test_hvs_engagement_activation_kickoff import (
     accepted_source,
 )
 from scos.control_center.tests.test_hvs_commercial_proposal_handoff import qualified_opportunity
+from scos.control_center.hvs_adapter import (
+    Stage8_5AdapterAuthorization,
+    Stage8_5AuthorizationError,
+)
 
 
 def _production_input(title: str = "Stage 8L Synthetic Production"):
@@ -146,6 +150,17 @@ class _FakeAdapter:
         }
 
 
+def _valid_stage85_authorization() -> Stage8_5AdapterAuthorization:
+    # A correctly bound, AUTHORIZED_IN_PRINCIPLE decision for initialize-project.
+    # Built directly from Stage8_5AdapterAuthorization so the service gate's
+    # require_for() passes; this mirrors a decision produced by the Stage 8.5
+    # evaluate_adapter_activation_authorization gate (now invoked before any
+    # mutating HVS operation).
+    return Stage8_5AdapterAuthorization(
+        "AUTHORIZED_IN_PRINCIPLE", operation="initialize-project", target=""
+    )
+
+
 def test_build_contract_reverifies_stage8k_and_maps_stage2(accepted_source):
     repo, _proposal, _handoff, _presentation, _decision, acceptance = accepted_source
     authorization = _authorize(repo, acceptance)
@@ -194,7 +209,9 @@ def test_invalid_authorization_and_missing_approval_do_not_invoke_hvs(accepted_s
         adapter=fake,
     )
 
-    assert invalid.error_code == "STAGE8L_ELIGIBILITY_BLOCKED"
+    # The invalid authorization id fails closed (eligibility or the Stage 8.5
+    # gate, whichever is reached first); the key invariant is no HVS invocation.
+    assert invalid.error_code in ("STAGE8L_ELIGIBILITY_BLOCKED", "STAGE85_AUTHORIZATION_BLOCKED")
     assert missing_approval.error_code == "INITIALIZATION_APPROVAL_REQUIRED"
     assert fake.calls == []
 
@@ -214,6 +231,7 @@ def test_successful_initialization_invokes_only_initialize_and_inspect_and_persi
         recorded_at="2026-07-14",
         approve_initialization=True,
         adapter=fake,
+        stage85_authorization=_valid_stage85_authorization(),
     )
 
     assert out.ok
@@ -242,6 +260,7 @@ def test_hvs_conflict_and_inspection_mismatch_cannot_become_verified(accepted_so
         recorded_at="2026-07-14",
         approve_initialization=True,
         adapter=conflict_adapter,
+        stage85_authorization=_valid_stage85_authorization(),
     )
     mismatch = service.initialize_hvs_project(
         production_kickoff_authorization_id=authorization.production_kickoff_authorization_id,
@@ -253,6 +272,7 @@ def test_hvs_conflict_and_inspection_mismatch_cannot_become_verified(accepted_so
         recorded_at="2026-07-14",
         approve_initialization=True,
         adapter=mismatch_adapter,
+        stage85_authorization=_valid_stage85_authorization(),
     )
 
     assert not conflict.ok
@@ -306,6 +326,91 @@ def test_cli_initialization_command_requires_explicit_input_and_passes_operator_
     assert calls[0]["production_input"].title == "Stage 8L Synthetic Production"
     assert calls[0]["operator_id"] == "operator-8l"
     assert calls[0]["approve_initialization"] is True
+
+
+def _contract_dir(repo: Path) -> Path:
+    return repo / "memory" / "runtime" / "hvs_project_initialization_contracts"
+
+
+def test_missing_stage85_authorization_blocks_before_manifest_write(accepted_source):
+    repo, _proposal, _handoff, _presentation, _decision, acceptance = accepted_source
+    authorization = _authorize(repo, acceptance)
+    fake = _FakeAdapter()
+    before = list(_contract_dir(repo).glob("*.json"))
+
+    out = service.initialize_hvs_project(
+        production_kickoff_authorization_id=authorization.production_kickoff_authorization_id,
+        production_input=_production_input(),
+        operator_id="operator-8l",
+        repo_root=repo,
+        hvs_repo_root="hvs",
+        hvs_python_executable="py",
+        recorded_at="2026-07-14",
+        approve_initialization=True,
+        adapter=fake,
+        stage85_authorization=None,  # missing Stage 8.5 decision
+    )
+
+    assert not out.ok
+    assert out.error_code == "STAGE85_AUTHORIZATION_BLOCKED"
+    assert fake.calls == []  # no HVS invocation at all
+    after = list(_contract_dir(repo).glob("*.json"))
+    assert after == before  # no contract manifest written
+
+
+def test_denied_stage85_authorization_blocks_before_manifest_write(accepted_source):
+    repo, _proposal, _handoff, _presentation, _decision, acceptance = accepted_source
+    authorization = _authorize(repo, acceptance)
+    fake = _FakeAdapter()
+    denied = Stage8_5AdapterAuthorization("DENIED", operation="initialize-project", target="")
+    before = list(_contract_dir(repo).glob("*.json"))
+
+    out = service.initialize_hvs_project(
+        production_kickoff_authorization_id=authorization.production_kickoff_authorization_id,
+        production_input=_production_input(),
+        operator_id="operator-8l",
+        repo_root=repo,
+        hvs_repo_root="hvs",
+        hvs_python_executable="py",
+        recorded_at="2026-07-14",
+        approve_initialization=True,
+        adapter=fake,
+        stage85_authorization=denied,
+    )
+
+    assert not out.ok
+    assert out.error_code == "STAGE85_AUTHORIZATION_BLOCKED"
+    assert fake.calls == []
+    assert list(_contract_dir(repo).glob("*.json")) == before
+
+
+def test_operation_mismatch_stage85_authorization_blocks(accepted_source):
+    repo, _proposal, _handoff, _presentation, _decision, acceptance = accepted_source
+    authorization = _authorize(repo, acceptance)
+    fake = _FakeAdapter()
+    # Authorization bound to a different operation cannot authorize init, even
+    # at the service layer (operation-level gate). Target binding is enforced
+    # at the adapter layer (test_stage8l_initialize_target_mismatch).
+    mismatched = Stage8_5AdapterAuthorization(
+        "AUTHORIZED_IN_PRINCIPLE", operation="inspect-project", target=""
+    )
+
+    out = service.initialize_hvs_project(
+        production_kickoff_authorization_id=authorization.production_kickoff_authorization_id,
+        production_input=_production_input(),
+        operator_id="operator-8l",
+        repo_root=repo,
+        hvs_repo_root="hvs",
+        hvs_python_executable="py",
+        recorded_at="2026-07-14",
+        approve_initialization=True,
+        adapter=fake,
+        stage85_authorization=mismatched,
+    )
+
+    assert not out.ok
+    assert out.error_code == "STAGE85_AUTHORIZATION_BLOCKED"
+    assert fake.calls == []
 
 
 def test_static_boundaries_exclude_legacy_creator_render_assets_network_and_hvs_imports():
