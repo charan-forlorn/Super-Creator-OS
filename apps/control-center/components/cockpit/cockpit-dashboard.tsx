@@ -5,6 +5,7 @@ import { useLocale } from "@/lib/i18n";
 import { OrbitMascot } from "@/components/cockpit/orbit-mascot";
 import { CockpitShell } from "@/components/cockpit/cockpit-shell";
 import { OperatorDryRunPanel } from "@/components/operator-dry-run-panel";
+import { SoloOperatorWorkflowPanel } from "@/components/solo-operator-workflow-panel";
 import {
   DEMO_LABEL,
   useControlCenterData,
@@ -229,6 +230,10 @@ function CockpitSurface() {
 
         <section className="cockpit-panel">
           <OperatorDryRunPanel />
+        </section>
+
+        <section className="cockpit-panel">
+          <SoloOperatorWorkflowPanel />
         </section>
 
         <section className="cockpit-panel activity-panel">

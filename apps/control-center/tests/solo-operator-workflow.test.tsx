@@ -87,6 +87,24 @@ describe("SoloOperatorWorkflowPanel", () => {
     expect(screen.getByRole("button", { name: "Dispatch dry run" })).toBeDisabled();
   });
 
+  it("labels the UI state as runtime-memory demo state and resets after remount", () => {
+    const { unmount } = render(<SoloOperatorWorkflowPanel />);
+
+    expect(screen.getByText("Runtime memory only")).toBeInTheDocument();
+    expect(screen.getByText(/Demo request - not repository durable state/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit request" }));
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dispatch dry run" }));
+    expect(screen.getByText("dry_run_succeeded")).toBeInTheDocument();
+
+    unmount();
+    render(<SoloOperatorWorkflowPanel />);
+
+    expect(screen.getByText("approval_required")).toBeInTheDocument();
+    expect(screen.getByText("No result yet")).toBeInTheDocument();
+  });
+
   it("keeps the panel wired into the main app shell", () => {
     render(<AppShell />);
 

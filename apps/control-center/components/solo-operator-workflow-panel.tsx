@@ -51,7 +51,15 @@ export function SoloOperatorWorkflowPanel() {
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Cohort 10A control loop</p>
           <h3 id="solo-workflow-title" className="mt-1 text-sm font-semibold text-ink">Video-production request</h3>
-          <p className="mt-1 max-w-2xl text-xs text-ink-muted">Dry-run only. Approval and dispatch are separate actions.</p>
+          <p className="mt-1 max-w-2xl text-xs text-ink-muted">
+            Dry-run only. Approval and dispatch are separate actions. Demo request - not repository durable state.
+          </p>
+          <p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-status-review">
+            Runtime memory only
+          </p>
+          <p className="mt-1 max-w-2xl text-[11px] text-ink-faint">
+            This browser panel keeps state only while the component remains mounted. Refresh, remount, a fresh browser context, or server restart resets the demo request.
+          </p>
         </div>
         <Status status={projection.status} />
       </div>

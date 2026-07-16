@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import Page from "@/app/page";
 import { CockpitDashboard } from "@/components/cockpit/cockpit-dashboard";
 
 describe("Agent Operations Cockpit — truthful read-only bridge", () => {
@@ -37,9 +38,18 @@ describe("Agent Operations Cockpit — truthful read-only bridge", () => {
 
   it("mounts the Cohort 9B operator dry-run preview in the active cockpit surface", () => {
     render(<CockpitDashboard />);
-    expect(screen.getByRole("heading", { name: "Operator dry-run preview" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Preview dry run" })).toBeInTheDocument();
-    expect(screen.getByText("side_effects_performed = false")).toBeInTheDocument();
+    const dryRunPanel = screen.getByRole("region", { name: "Operator dry-run preview" });
+    expect(within(dryRunPanel).getByRole("heading", { name: "Operator dry-run preview" })).toBeInTheDocument();
+    expect(within(dryRunPanel).getByRole("button", { name: "Preview dry run" })).toBeInTheDocument();
+    expect(within(dryRunPanel).getByText("side_effects_performed = false")).toBeInTheDocument();
+  });
+
+  it("exposes the Cohort 10A workflow exactly once on the actual product route", () => {
+    render(<Page />);
+
+    expect(screen.getByText("SCOS")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "Video-production request" })).toHaveLength(1);
+    expect(screen.getByText("Cohort 10A control loop")).toBeInTheDocument();
   });
 
   it("renders Orbit as the static CSS-native mascot (no canvas, no runtime image)", () => {
