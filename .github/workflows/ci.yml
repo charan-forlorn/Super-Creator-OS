@@ -4,8 +4,10 @@ name: CI
 # the pinned runtime (CPython 3.11, matching requirements.txt "Tested on:
 # CPython 3.11.15"). Every push and PR to main triggers a smoke check plus a
 # static security-scan baseline; both exit non-zero on failure, so the job
-# fails closed. The full certified Standard + Explicit-Integration populations
-# are wired in by Cohort 8B, not here.
+# fails closed. Cohort 8B additionally wires the two certified pytest
+# populations as separate, fail-closed steps below: the Standard population
+# (-m "not integration") and the Explicit Integration population
+# (-m integration, certified hermetic HVS double).
 
 on:
   push:
@@ -47,3 +49,23 @@ jobs:
 
       - name: Security scan baseline
         run: python scripts/security_scan_baseline.py
+
+      - name: Certified Standard population
+        run: |
+          python -m pytest integrations scos scripts \
+            -m "not integration" \
+            -o "cache_dir=${{ runner.temp }}/scos-standard/cache" \
+            --basetemp "${{ runner.temp }}/scos-standard/basetemp" \
+            -W error::pytest.PytestConfigWarning \
+            -W error::pytest.PytestUnhandledThreadExceptionWarning \
+            -q
+
+      - name: Certified Explicit Integration population
+        run: |
+          python -m pytest integrations scos scripts \
+            -m integration \
+            -o "cache_dir=${{ runner.temp }}/scos-integration/cache" \
+            --basetemp "${{ runner.temp }}/scos-integration/basetemp" \
+            -W error::pytest.PytestConfigWarning \
+            -W error::pytest.PytestUnhandledThreadExceptionWarning \
+            -q
