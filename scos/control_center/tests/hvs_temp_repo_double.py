@@ -114,11 +114,25 @@ def _cmd_import_media(hvs_root: Path, argv: list[str]) -> dict[str, Any]:
 
 
 def _cmd_initialize_project(hvs_root: Path, argv: list[str]) -> dict[str, Any]:
-    """Emulate ``python -m hvs.cli initialize-project`` against the temp repo."""
+    """Emulate ``python -m hvs.cli initialize-project`` against the temp repo.
+
+    Validates the exact public HVS argv contract (fail-closed on malformed
+    argv) so the calling test can assert SCOS sent a *well-formed* handshake,
+    not just that a non-zero-returning double was invoked.
+    """
     parsed = _parse_kwargs(argv[4:])
     project_id = parsed.get("--project-id")
-    if not project_id:
-        return _fail("initialize-project", "missing required argument --project-id")
+    contract_path = parsed.get("--contract-path")
+    expected_hash = parsed.get("--expected-payload-hash")
+    approve = parsed.get("--approve-initialization")
+    # A flag may be present with an empty value (e.g. "--approve-initialization"
+    # carries no value); require the keys to be PRESENT, not non-empty.
+    required_keys = ("--project-id", "--contract-path",
+                     "--expected-payload-hash", "--approve-initialization")
+    missing = [k for k in required_keys if k not in parsed]
+    if missing:
+        return _fail("initialize-project",
+                     f"missing required argument(s): {', '.join(missing)}")
     proj = hvs_root / "projects" / project_id
     proj.mkdir(parents=True, exist_ok=True)
     manifest = {
@@ -133,7 +147,7 @@ def _cmd_initialize_project(hvs_root: Path, argv: list[str]) -> dict[str, Any]:
         "contract_name": "scos-hvs.project-initialization",
         "contract_version": "1",
         "contract_semantic_hash": "0" * 64,
-        "payload_hash": "0" * 16,
+        "payload_hash": str(expected_hash or "")[:16],
         "timeline_relative_path": "timelines/video_timeline.json",
     }
     (proj / _INIT_MANIFEST_REL).write_text(
@@ -142,7 +156,13 @@ def _cmd_initialize_project(hvs_root: Path, argv: list[str]) -> dict[str, Any]:
     )
     stdout = f"Initialized project: {project_id}\n"
     return {"ok": True, "command": "initialize-project", "exit_code": 0,
-            "error_kind": None, "error_detail": None, "stdout": stdout, "stderr": ""}
+            "error_kind": None, "error_detail": None, "stdout": stdout, "stderr": "",
+            # Captured argv so the test can verify a well-formed SCOS handshake.
+            "invoked_argv": list(argv),
+            "invoked_project_id": project_id,
+            "invoked_contract_path": contract_path,
+            "invoked_expected_payload_hash": expected_hash,
+            "invoked_approve_initialization": "--approve-initialization" in parsed}
 
 
 def _cmd_render_hyperframes(hvs_root: Path, argv: list[str], *,
@@ -162,7 +182,11 @@ def _cmd_render_hyperframes(hvs_root: Path, argv: list[str], *,
     payload = json.dumps({"verdict": "PASS", "output_path": out}, ensure_ascii=False)
     stdout = payload + "\n"
     return {"ok": True, "command": "render-hyperframes", "exit_code": 0,
-            "error_kind": None, "error_detail": None, "stdout": stdout, "stderr": ""}
+            "error_kind": None, "error_detail": None, "stdout": stdout, "stderr": "",
+            # Captured argv so the test can verify a well-formed SCOS render handshake.
+            "invoked_argv": list(argv),
+            "invoked_project_id": project_id,
+            "invoked_format": fmt}
 
 
 def _parse_kwargs(tokens: list[str]) -> dict[str, str]:

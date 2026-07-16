@@ -554,6 +554,17 @@ class TestRealHVSAcceptance:
             cwd=str(hvs_root), shell=False,
         )
         assert out["exit_code"] == 0
+        # The double must have received a WELL-FORMED SCOS handshake (not just
+        # any non-zero-returning invocation) — otherwise the boundary test
+        # would be vacuous. The double fails closed on missing required args.
+        assert out["invoked_project_id"] == project_id
+        assert out["invoked_contract_path"] == "n/a"
+        assert out["invoked_expected_payload_hash"] == "0" * 16
+        assert out["invoked_approve_initialization"] is True
+        argv = out["invoked_argv"]
+        assert argv[3] == "initialize-project"
+        assert "--project-id" in argv and "--contract-path" in argv
+        assert "--expected-payload-hash" in argv and "--approve-initialization" in argv
         # The temp HVS tree must contain ONLY the double's expected writes
         # (initialization_manifest.json); no unexpected external mutation.
         after = snapshot_paths(hvs_root)
