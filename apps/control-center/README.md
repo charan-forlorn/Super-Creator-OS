@@ -359,6 +359,37 @@ Types live in `lib/operator-command-view-types.ts`, data in
 there are no approval controls, no denial controls, no command-running
 controls, no network path, and no live transport behavior.
 
+## Cohort 10A - Solo Operator Workflow
+
+The "Solo Operator Workflow (Cohort 10A)" section adds one narrow
+video-production control loop backed by `scos/control_center/solo_operator_control_loop.py`.
+
+- Supported request: `video-production` with `project_id`, `title`, `language`,
+  `render_profile`, and `idempotency_key`.
+- Durable backend owner: the Python `SoloOperatorControlLoop` writes command,
+  approval, event, and fake dry-run result records through the existing SQLite
+  WAL store.
+- Lifecycle: `approval_required` -> `approved` or `rejected` ->
+  `dry_run_succeeded` for approved fake dispatches.
+- Idempotency: command identity derives from the idempotency key plus immutable
+  intent; duplicate submissions and duplicate dry-run dispatches return the
+  existing state/result.
+- Approval: dispatch is blocked unless an explicit approval is durably recorded
+  for the exact command id.
+- HVS boundary: Cohort 10A dispatch is fake HVS dry-run only. It imports no HVS
+  package, starts no subprocess, creates no render output, and never performs a
+  live render.
+- Recovery: status is projected from durable SQLite command, approval, result,
+  and event records after a service restart. Approved commands without a result
+  remain approved and do not auto-dispatch.
+
+Focused verification:
+
+```bash
+..\..\.venv\Scripts\python.exe -m pytest scos/control_center/tests/test_solo_operator_control_loop.py -q
+npm.cmd test -- solo-operator-workflow.test.tsx
+```
+
 ## Tech Stack
 
 - Next.js 15 App Router + React 19

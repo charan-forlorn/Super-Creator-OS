@@ -47,6 +47,7 @@ import { OperatorReadSurfacePanel } from "./operator-read-surface-panel";
 import { OperatorCommandViewsPanel } from "./operator-command-views-panel";
 import { ExecutionEvidenceSurfacePanel } from "./execution-evidence-surface-panel";
 import { OperatorDryRunPanel } from "./operator-dry-run-panel";
+import { SoloOperatorWorkflowPanel } from "./solo-operator-workflow-panel";
 
 import {
   AGENTS,
@@ -594,6 +595,14 @@ export function AppShell() {
                 title="Operator Dry Run (Cohort 9B)"
               />
               <OperatorDryRunPanel />
+            </section>
+
+            <section id="solo-operator-workflow" className="scroll-mt-6 space-y-3">
+              <SectionHeading
+                id="solo-operator-workflow-h"
+                title="Solo Operator Workflow (Cohort 10A)"
+              />
+              <SoloOperatorWorkflowPanel />
             </section>
 
             {/* 3: Kanban board */}
