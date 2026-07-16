@@ -565,16 +565,20 @@ def test_parent_directory_escape_rejected(tmp_path) -> None:
     (repo / "hvs" / "cli").mkdir(parents=True, exist_ok=True)
     cfg = HVSAdapterConfig(
         hvs_repo_path=str(repo),
-        python_executable="python",
+        python_executable=str(Path(sys.executable).resolve()),
         operation="hvs_capability_probe",
     )
+    assert cfg.validate() == ()
     captured: dict[str, Any] = {}
     HermesVideoStudioAdapter(
         cfg, subprocess_run=_FakeRun(captured=captured)
     ).run_readonly_probe(request_id="r1", created_at=_created_at())
     cwd = Path(captured["kwargs"]["cwd"]).resolve()
+    assert cwd == repo.resolve()
+    cwd_parts = cwd.parts
+    assert ".." not in cwd_parts
     check("cwd is the repo, not a parent escape", cwd == repo.resolve())
-    check("cwd does not escape via ..", ".." not in str(cwd).split("\\") if "\\" in str(cwd) else ".." not in str(cwd).split("/"))
+    check("cwd does not escape via ..", ".." not in cwd_parts)
 
 
 # --- 15. Timeout returns normalized failure --------------------------------

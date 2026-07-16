@@ -17,12 +17,12 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
 
 import pytest
-import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = REPO_ROOT / "scripts"
@@ -104,8 +104,55 @@ def _fake_runner_factory(record, rc_by_gate=None):
     return runner
 
 
+def _workflow_run_steps():
+    """Return ordered workflow steps with ``name`` and ``run`` using stdlib only.
+
+    The canonical verifier test must not depend on an undeclared YAML parser.
+    This reader intentionally covers only the committed CI workflow shape used
+    by these parity assertions: named steps with inline or literal-block ``run``
+    entries.
+    """
+    text = CI_YML.read_text(encoding="utf-8")
+    assert re.search(r"(?m)^on:\s*$", text), "GitHub Actions trigger key must stay literal"
+    assert "push:" in text and "pull_request:" in text and "workflow_dispatch:" in text
+
+    lines = text.splitlines()
+    steps = []
+    current_name = None
+    idx = 0
+    while idx < len(lines):
+        line = lines[idx]
+        name_match = re.match(r"^\s+-\s+name:\s*(.+?)\s*$", line)
+        if name_match:
+            current_name = name_match.group(1).strip("\"'")
+            idx += 1
+            continue
+
+        run_match = re.match(r"^(\s*)run:\s*(.*?)\s*$", line)
+        if current_name and run_match:
+            run_indent = len(run_match.group(1))
+            run_value = run_match.group(2)
+            if run_value == "|":
+                block = []
+                idx += 1
+                while idx < len(lines):
+                    block_line = lines[idx]
+                    if block_line.strip() and len(block_line) - len(block_line.lstrip(" ")) <= run_indent:
+                        break
+                    block.append(block_line.strip())
+                    idx += 1
+                steps.append({"name": current_name, "run": "\n".join(block)})
+                current_name = None
+                continue
+            steps.append({"name": current_name, "run": run_value.strip("\"'")})
+            current_name = None
+        idx += 1
+
+    return steps
+
+
 def _parse_ci_gates():
-    """Parse committed ci.yml and return ordered (name, run_text) verification gates.
+    """Read committed ci.yml and return ordered (name, run_text) verification gates.
 
     GitHub-host setup steps (checkout, setup-python, apt ffmpeg, pip install,
     setup-node, npm install) are excluded. Cohort 9D frontend gates
@@ -113,11 +160,8 @@ def _parse_ci_gates():
     recognized by their run text so the CI order matches the local verifier.
     """
     assert CI_YML.is_file(), f"missing committed workflow: {CI_YML}"
-    with CI_YML.open(encoding="utf-8") as fh:
-        doc = yaml.safe_load(fh)
-    steps = doc["jobs"]["test"]["steps"]
     gates = []
-    for step in steps:
+    for step in _workflow_run_steps():
         run = step.get("run")
         if not run:
             continue
