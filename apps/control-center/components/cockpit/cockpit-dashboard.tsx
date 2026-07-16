@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useLocale } from "@/lib/i18n";
 import { OrbitMascot } from "@/components/cockpit/orbit-mascot";
 import { CockpitShell } from "@/components/cockpit/cockpit-shell";
+import { OperatorDryRunPanel } from "@/components/operator-dry-run-panel";
 import {
   DEMO_LABEL,
   useControlCenterData,
@@ -225,6 +226,10 @@ function CockpitSurface() {
             </section>
           </aside>
         </div>
+
+        <section className="cockpit-panel">
+          <OperatorDryRunPanel />
+        </section>
 
         <section className="cockpit-panel activity-panel">
           <div className="panel-heading">

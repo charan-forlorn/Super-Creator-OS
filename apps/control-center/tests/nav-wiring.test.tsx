@@ -25,10 +25,10 @@ describe("navigation wiring", () => {
     expect(active).toHaveTextContent("Command Bridge");
   });
 
-  it("wires the global NAV_SECTIONS contract: 21 sections, deterministic order", () => {
+  it("wires the global NAV_SECTIONS contract: 22 sections, deterministic order", () => {
     // The app-shell renders one section per NAV_SECTIONS id; assert the
     // contract shape the UI is built against (no drift / missing section).
-    expect(NAV_SECTIONS.length).toBe(21);
+    expect(NAV_SECTIONS.length).toBe(22);
     expect(NAV_SECTIONS.map((s) => s.id)).toEqual([
       "overview",
       "live",
@@ -46,6 +46,7 @@ describe("navigation wiring", () => {
       "durable-state",
       "event-stream",
       "operator-read-surface",
+      "operator-dry-run",
       "board",
       "prompt",
       "inbox",

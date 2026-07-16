@@ -35,6 +35,13 @@ describe("Agent Operations Cockpit — truthful read-only bridge", () => {
     expect(window.localStorage.getItem("scos-cockpit-locale")).toBeNull();
   });
 
+  it("mounts the Cohort 9B operator dry-run preview in the active cockpit surface", () => {
+    render(<CockpitDashboard />);
+    expect(screen.getByRole("heading", { name: "Operator dry-run preview" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Preview dry run" })).toBeInTheDocument();
+    expect(screen.getByText("side_effects_performed = false")).toBeInTheDocument();
+  });
+
   it("renders Orbit as the static CSS-native mascot (no canvas, no runtime image)", () => {
     const { container } = render(<CockpitDashboard />);
     const briefing = container.querySelector(".orbit-briefing");

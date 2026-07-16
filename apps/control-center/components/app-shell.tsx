@@ -46,6 +46,7 @@ import { SyncHealthPanel } from "./sync-health-panel";
 import { OperatorReadSurfacePanel } from "./operator-read-surface-panel";
 import { OperatorCommandViewsPanel } from "./operator-command-views-panel";
 import { ExecutionEvidenceSurfacePanel } from "./execution-evidence-surface-panel";
+import { OperatorDryRunPanel } from "./operator-dry-run-panel";
 
 import {
   AGENTS,
@@ -582,6 +583,17 @@ export function AppShell() {
               />
               <OperatorCommandViewsPanel snapshot={operatorCommandViewSnapshot} />
               <ExecutionEvidenceSurfacePanel snapshot={operatorCommandViewSnapshot} />
+            </section>
+
+            {/* Cohort 9B: Safe operator dry-run preview surface.
+                Bounded request contracts only; no live execution, no approval
+                mutation, no render, no dispatch, and no persistent history. */}
+            <section id="operator-dry-run" className="scroll-mt-6 space-y-3">
+              <SectionHeading
+                id="operator-dry-run-h"
+                title="Operator Dry Run (Cohort 9B)"
+              />
+              <OperatorDryRunPanel />
             </section>
 
             {/* 3: Kanban board */}
