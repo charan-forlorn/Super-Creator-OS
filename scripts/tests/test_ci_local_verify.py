@@ -34,12 +34,25 @@ import ci_local_verify as civ  # noqa: E402
 CI_YML = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
 # Expected CI verification-gate order (GitHub-host setup steps are excluded).
+# Cohort 9D adds the Control Center frontend gate set (typecheck, lint,
+# frontend tests, production build, browser acceptance) between the security
+# scan and the certified pytest populations, in the SAME order as ci.yml.
 EXPECTED_GATE_ORDER = [
     "smoke",
     "security_scan",
+    "cc_typecheck",
+    "cc_lint",
+    "cc_frontend_tests",
+    "cc_build",
+    "cc_browser_acceptance",
     "standard_population",
     "integration_population",
 ]
+
+# Gates whose first argv token MUST be the canonical .venv python interpreter
+# (Python-driven gates). The Cohort 9D frontend gates (cc_*) legitimately run
+# node/npm/npx and are exempt from the interpreter assertion.
+_PYTHON_GATE_IDS = {"smoke", "security_scan", "cc_browser_acceptance"}
 
 
 # ---------------------------------------------------------------------------
@@ -52,10 +65,23 @@ def _identify_gate(argv):
         return "smoke"
     if any("security_scan_baseline.py" in str(a) for a in argv):
         return "security_scan"
+    if any("control_center_truth_gate.py" in str(a) for a in argv):
+        return "cc_browser_acceptance"
     if "not integration" in argv:
         return "standard_population"
     if "integration" in argv and "-m" in argv:
         return "integration_population"
+    # Frontend gates are identified by their working-directory marker in argv
+    # (e.g. node_modules/typescript/bin/tsc, vitest, next build).
+    joined = " ".join(str(a) for a in argv)
+    if "typescript" in joined and "tsc" in joined:
+        return "cc_typecheck"
+    if "run lint" in joined or "eslint" in joined:
+        return "cc_lint"
+    if "vitest" in joined:
+        return "cc_frontend_tests"
+    if "next build" in joined or "run build" in joined:
+        return "cc_build"
     return "unknown"
 
 
@@ -79,7 +105,13 @@ def _fake_runner_factory(record, rc_by_gate=None):
 
 
 def _parse_ci_gates():
-    """Parse committed ci.yml and return ordered (name, run_text) verification gates."""
+    """Parse committed ci.yml and return ordered (name, run_text) verification gates.
+
+    GitHub-host setup steps (checkout, setup-python, apt ffmpeg, pip install,
+    setup-node, npm install) are excluded. Cohort 9D frontend gates
+    (cc_typecheck/cc_lint/cc_frontend_tests/cc_build/cc_browser_acceptance) are
+    recognized by their run text so the CI order matches the local verifier.
+    """
     assert CI_YML.is_file(), f"missing committed workflow: {CI_YML}"
     with CI_YML.open(encoding="utf-8") as fh:
         doc = yaml.safe_load(fh)
@@ -93,6 +125,16 @@ def _parse_ci_gates():
             gates.append(("smoke", run))
         elif "security_scan_baseline.py" in run:
             gates.append(("security_scan", run))
+        elif "control_center_truth_gate.py" in run:
+            gates.append(("cc_browser_acceptance", run))
+        elif "tsc" in run and "noEmit" in run:
+            gates.append(("cc_typecheck", run))
+        elif "run lint" in run:
+            gates.append(("cc_lint", run))
+        elif "vitest" in run:
+            gates.append(("cc_frontend_tests", run))
+        elif "run build" in run or "next build" in run:
+            gates.append(("cc_build", run))
         elif "-m" in run and "integration" in run:
             # Two pytest populations differ only by marker expression.
             if "not integration" in run:
@@ -113,8 +155,10 @@ def test_gates_are_ordered_argv_lists():
     for g in gates:
         assert isinstance(g.argv, list)
         assert all(isinstance(tok, str) for tok in g.argv)
-        # first token is the canonical interpreter
-        assert g.argv[0] == str(interp)
+        # first token is the canonical interpreter for Python-driven gates;
+        # Cohort 9D frontend gates legitimately invoke node/npm/npx.
+        if g.gate_id in _PYTHON_GATE_IDS:
+            assert g.argv[0] == str(interp)
 
 
 def test_canonical_venv_interpreter_is_used():
@@ -124,7 +168,10 @@ def test_canonical_venv_interpreter_is_used():
     assert "python.exe" in str(interp)
     gates = civ.build_gates(REPO_ROOT, interp, REPO_ROOT / "tmp-never")
     for g in gates:
-        assert g.argv[0] == str(interp)
+        # Only Python-driven gates must use the venv interpreter. The Cohort 9D
+        # frontend gates (cc_*) run node/npm/npx and are intentionally exempt.
+        if g.gate_id in _PYTHON_GATE_IDS:
+            assert g.argv[0] == str(interp)
 
 
 def test_shell_true_never_used_and_cwd_correct(monkeypatch):
@@ -408,6 +455,42 @@ def test_ci_uses_python_interpreter_local_uses_venv(monkeypatch):
     local = {g.gate_id: g for g in civ.build_gates(REPO_ROOT, interp, Path(tempfile.gettempdir()) / "scos-test-parity")}
     assert str(interp) in local["smoke"].argv[0]
     assert str(interp) in local["security_scan"].argv[0]
+
+
+def test_cohort9d_frontend_gates_present_in_ci_and_local_parity():
+    """Cohort 9D: the Control Center frontend gate set must exist identically
+    in BOTH ci.yml and the local verifier, in the same order, with the same
+    command semantics (no CI-only or local-only bypass)."""
+    ci_gates = dict(_parse_ci_gates())
+    interp = civ.detect_interpreter(REPO_ROOT)
+    local = {g.gate_id: g for g in civ.build_gates(REPO_ROOT, interp, Path(tempfile.gettempdir()) / "scos-test-parity")}
+
+    # All five frontend gates exist in both.
+    for gid in ("cc_typecheck", "cc_lint", "cc_frontend_tests", "cc_build", "cc_browser_acceptance"):
+        assert gid in ci_gates, f"{gid} missing from ci.yml"
+        assert gid in local, f"{gid} missing from local verifier"
+
+    # Typecheck: tsc --noEmit --incremental false in both.
+    assert "tsc" in ci_gates["cc_typecheck"] and "--noEmit" in ci_gates["cc_typecheck"]
+    assert "tsc" in " ".join(local["cc_typecheck"].argv) and "--noEmit" in " ".join(local["cc_typecheck"].argv)
+
+    # Lint: npm run lint in both.
+    assert "run lint" in ci_gates["cc_lint"]
+    assert "run lint" in " ".join(local["cc_lint"].argv)
+
+    # Frontend tests: vitest run --no-file-parallelism in both.
+    assert "vitest" in ci_gates["cc_frontend_tests"] and "no-file-parallelism" in ci_gates["cc_frontend_tests"]
+    assert "vitest" in " ".join(local["cc_frontend_tests"].argv) and "--no-file-parallelism" in " ".join(local["cc_frontend_tests"].argv)
+
+    # Build: npm run build in both.
+    assert "run build" in ci_gates["cc_build"]
+    assert "run build" in " ".join(local["cc_build"].argv)
+
+    # Browser acceptance: the structural truth gate (install-free) in both.
+    assert "control_center_truth_gate.py" in ci_gates["cc_browser_acceptance"]
+    assert "control_center_truth_gate.py" in " ".join(local["cc_browser_acceptance"].argv)
+
+    # Order parity is already enforced by test_ci_verification_gate_order_matches_local.
 
 
 # ---------------------------------------------------------------------------

@@ -11,14 +11,30 @@ GitHub-host setup: checkout / setup-python / apt ffmpeg / pip install):
 
     1. Smoke                       ``python scripts/test_smoke.py``
     2. Security scan baseline      ``python scripts/security_scan_baseline.py``
-    3. Certified Standard pop.     ``python -m pytest integrations scos scripts
+    3. Control Center typecheck    ``node ./node_modules/typescript/bin/tsc
+                                       --noEmit --incremental false``
+                                     (cwd apps/control-center)
+    4. Control Center lint         ``npm run lint`` (cwd apps/control-center)
+    5. Control Center frontend     ``npx vitest run --no-file-parallelism``
+       tests                        (cwd apps/control-center)
+    6. Control Center production   ``npm run build`` (cwd apps/control-center)
+       build
+    7. Browser acceptance          ``python scripts/control_center_truth_gate.py``
+       (structural truth gate)
+    8. Certified Standard pop.     ``python -m pytest integrations scos scripts
                                        -m "not integration"
                                        -o cache_dir=<temp>/.../cache
                                        --basetemp <temp>/.../basetemp
                                        -W error::pytest.PytestConfigWarning
                                        -W error::pytest.PytestUnhandledThreadExceptionWarning
                                        -q``
-    4. Certified Explicit Integration pop.  (same, ``-m integration``)
+    9. Certified Explicit Integration pop.  (same, ``-m integration``)
+
+Cohort 9D: gates 3-7 are the Control Center frontend gate set, added to BOTH
+ci.yml and this verifier in the SAME order and with SAME semantics. The browser
+acceptance gate (7) is the structural, install-free, CI-safe truth-contract
+enforcer; the full desktop/mobile viewport matrix is executed out-of-band by the
+certifying agent and is not a subprocess here (no new browser driver, no egress).
 
 Design contract (Cohort 8C):
 - Repository root is located deterministically (this file lives in ``scripts/``).
@@ -44,6 +60,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -59,6 +76,21 @@ from typing import Callable, List, Optional, Sequence
 # Canonical interpreter relative form resolved against the detected repo root.
 _VENV_RELATIVE = Path(".venv") / "Scripts" / "python.exe"
 _VENV_RELATIVE_POSIX = Path(".venv") / "bin" / "python"  # non-Windows fallback
+
+# Control Center frontend (Cohort 9D). Node/npm/npx are resolved on PATH with
+# the SAME command semantics as CI (which runs `npm run lint`, `npx vitest run`,
+# `node tsc` directly). On Windows the bare names (`npm`) are `.cmd` shims that
+# CreateProcess cannot launch without the extension, so resolve the real
+# executable via shutil.which; the launched program and arguments are identical
+# to CI, preserving gate parity.
+_CONTROL_CENTER_DIR = Path("apps") / "control-center"
+_NPM_BIN = shutil.which("npm") or "npm"
+_NPX_BIN = shutil.which("npx") or "npx"
+_NODE_BIN = shutil.which("node") or "node"
+if os.name == "nt":
+    _TSC_BIN = "node_modules\\typescript\\bin\\tsc"
+else:
+    _TSC_BIN = "node_modules/.bin/tsc"
 
 # Process-local media contract (Cohort 8C §6).
 _MEDIA_SHIM_DIR = Path("C:/Users/chara/scoop/shims")
@@ -222,11 +254,54 @@ def build_gates(
               str(repo_root / "scripts" / "security_scan_baseline.py")],
     ))
 
-    # 3. Certified Standard population.
+    # 3. Control Center typecheck (frontend, Cohort 9D).
+    gates.append(Gate(
+        order=3,
+        gate_id="cc_typecheck",
+        argv=[_NODE_BIN,
+              _TSC_BIN,
+              "--noEmit", "--incremental", "false"],
+        extra_env={"CHANGE_DIR": str(repo_root / _CONTROL_CENTER_DIR)},
+    ))
+
+    # 4. Control Center lint (frontend, Cohort 9D).
+    gates.append(Gate(
+        order=4,
+        gate_id="cc_lint",
+        argv=[_NPM_BIN, "run", "lint"],
+        extra_env={"CHANGE_DIR": str(repo_root / _CONTROL_CENTER_DIR)},
+    ))
+
+    # 5. Control Center frontend tests (frontend, Cohort 9D).
+    gates.append(Gate(
+        order=5,
+        gate_id="cc_frontend_tests",
+        argv=[_NPX_BIN, "vitest", "run", "--no-file-parallelism"],
+        extra_env={"CHANGE_DIR": str(repo_root / _CONTROL_CENTER_DIR)},
+    ))
+
+    # 6. Control Center production build (frontend, Cohort 9D).
+    gates.append(Gate(
+        order=6,
+        gate_id="cc_build",
+        argv=[_NPM_BIN, "run", "build"],
+        extra_env={"CHANGE_DIR": str(repo_root / _CONTROL_CENTER_DIR)},
+    ))
+
+    # 7. Browser acceptance (structural truth gate, Cohort 9D). Install-free,
+    #    CI-safe, no subprocess egress. Mirrors the repo-supported command.
+    gates.append(Gate(
+        order=7,
+        gate_id="cc_browser_acceptance",
+        argv=[str(interpreter),
+              str(repo_root / "scripts" / "control_center_truth_gate.py")],
+    ))
+
+    # 8. Certified Standard population.
     std_cache = str(run_root / "standard" / "cache")
     std_base = str(run_root / "standard" / "basetemp")
     gates.append(Gate(
-        order=3,
+        order=8,
         gate_id="standard_population",
         argv=_pytest_population_args(interpreter, "not integration", std_cache, std_base),
         media_sensitive=True,
@@ -236,11 +311,11 @@ def build_gates(
         basetemp=std_base,
     ))
 
-    # 4. Certified Explicit Integration population.
+    # 9. Certified Explicit Integration population.
     int_cache = str(run_root / "integration" / "cache")
     int_base = str(run_root / "integration" / "basetemp")
     gates.append(Gate(
-        order=4,
+        order=9,
         gate_id="integration_population",
         argv=_pytest_population_args(interpreter, "integration", int_cache, int_base),
         media_sensitive=True,
@@ -277,10 +352,15 @@ def run_gate(
 
     ``runner`` mirrors ``subprocess.run(argv, cwd=..., env=...).returncode`` and
     is injectable for testing. The real runner applies the process-local media
-    environment for media-sensitive gates.
+    environment for media-sensitive gates. Cohort 9D: a gate may request a
+    different working directory via ``extra_env["CHANGE_DIR"]`` (used by the
+    Control Center frontend gates, which run in apps/control-center).
     """
+    cwd = repo_root
+    if gate.extra_env and "CHANGE_DIR" in gate.extra_env:
+        cwd = Path(gate.extra_env["CHANGE_DIR"])
     print(f"\n=== GATE {gate.order}: {gate.gate_id} ===")
-    print(f"  cwd : {repo_root}")
+    print(f"  cwd : {cwd}")
     print(f"  cmd : {_quote(gate.argv)}")
     if gate.is_pytest:
         print(f"  marker     : {gate.marker}")
@@ -303,7 +383,7 @@ def run_gate(
     env = None
     if gate.media_sensitive:
         env = build_media_env(dict(os.environ))
-    rc = runner(gate.argv, cwd=str(repo_root), env=env)
+    rc = runner(gate.argv, cwd=str(cwd), env=env)
     return rc
 
 
