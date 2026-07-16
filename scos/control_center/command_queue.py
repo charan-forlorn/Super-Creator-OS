@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +24,12 @@ except ImportError:  # direct-module execution (tests insert the package dir)
     from command_models import ApprovedCommand
 
 CONTROL_CENTER_COMMAND_QUEUE_SCHEMA_VERSION = 1
+_ROOT = Path(__file__).resolve().parents[2]
+_LEARNING_ROOT = _ROOT / "integrations" / "learning"
+if str(_LEARNING_ROOT) not in sys.path:
+    sys.path.insert(0, str(_LEARNING_ROOT))
+
+from _filelock import LockTimeout, file_lock  # noqa: E402
 
 _URL_PREFIXES = ("http://", "https://")
 _SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://")
@@ -50,8 +58,14 @@ def _append_jsonl_line(path: Any, label: str, payload: dict) -> str:
     target = _ensure_local_path(path, label)
     target.parent.mkdir(parents=True, exist_ok=True)
     line = _jsonl_line(payload)
-    with open(target, "a", encoding="utf-8", newline="\n") as handle:
-        handle.write(line + "\n")
+    try:
+        with file_lock(target):
+            with open(target, "a", encoding="utf-8", newline="\n") as handle:
+                handle.write(line + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+    except LockTimeout as exc:
+        raise RuntimeError(f"JSONL append lock busy: {exc}") from exc
     return hashlib.sha256(line.encode("utf-8")).hexdigest()
 
 

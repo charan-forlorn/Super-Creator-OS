@@ -62,8 +62,13 @@ def load_telemetry(path: str | os.PathLike | None = None) -> list[dict]:
     p = resolve_path(path)
     if not p.exists():
         return []
-    data = json.loads(p.read_text(encoding="utf-8"))
-    return data if isinstance(data, list) else []
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"telemetry store malformed: {exc.msg}") from exc
+    if not isinstance(data, list):
+        raise ValueError("telemetry store malformed: root is not a JSON array")
+    return data
 
 
 def append_telemetry(entry: dict, path: str | os.PathLike | None = None) -> tuple[bool, str]:
@@ -80,7 +85,10 @@ def append_telemetry(entry: dict, path: str | os.PathLike | None = None) -> tupl
     # so concurrent telemetry writers can't lose a row (audit scenario 3.5).
     try:
         with file_lock(p):
-            store = load_telemetry(p)
+            try:
+                store = load_telemetry(p)
+            except ValueError as exc:
+                return False, str(exc)
             serrs = validate_telemetry_store(store)
             if serrs:
                 return False, ("existing telemetry store invalid (refusing to write): "

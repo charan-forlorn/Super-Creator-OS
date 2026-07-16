@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -29,6 +30,11 @@ from typing import Any, Optional
 # --- store location -------------------------------------------------------
 _ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_STORE = _ROOT / "memory" / "jobs.jsonl"
+_LEARNING_ROOT = _ROOT / "integrations" / "learning"
+if str(_LEARNING_ROOT) not in sys.path:
+    sys.path.insert(0, str(_LEARNING_ROOT))
+
+from _filelock import LockTimeout, atomic_replace, file_lock  # noqa: E402
 
 # Pipeline states, in order. Keeps a single source of truth for valid transitions.
 STATES = ["lead", "accepted", "editing", "review", "done", "paid", "cancelled"]
@@ -66,22 +72,34 @@ def _load_all(store: Path) -> list[dict]:
         return []
     rows: list[dict] = []
     with store.open("r", encoding="utf-8") as fh:
-        for line in fh:
+        for lineno, line in enumerate(fh, start=1):
             line = line.strip()
             if not line:
                 continue
             try:
-                rows.append(json.loads(line))
+                payload = json.loads(line)
             except json.JSONDecodeError:
-                # skip corrupt lines but never crash the whole store
-                continue
+                raise ValueError(f"jobs store malformed at line {lineno}") from None
+            if not isinstance(payload, dict):
+                raise ValueError(f"jobs store malformed at line {lineno}: row is not an object")
+            rows.append(payload)
     return rows
 
 
-def _append(store: Path, record: dict) -> None:
+def _append_locked(store: Path, record: dict) -> None:
     store.parent.mkdir(parents=True, exist_ok=True)
     with store.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
+def _atomic_write_rows(store: Path, rows: list[dict]) -> None:
+    store.parent.mkdir(parents=True, exist_ok=True)
+    body = "\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n"
+    tmp = store.with_name(f"{store.name}.{os.getpid()}.{datetime.now().strftime('%H%M%S%f')}.tmp")
+    tmp.write_text(body, encoding="utf-8")
+    atomic_replace(tmp, store)
 
 
 def _next_id(rows: list[dict]) -> str:
@@ -108,29 +126,34 @@ def add_job(
 ) -> dict:
     if status not in _VALID_STATUS:
         raise SystemExit(f"ERROR: status ไม่รู้จัก: {status!r} (ใช้หนึ่งใน {STATES})")
-    rows = _load_all(store)
-    record = {
-        "job_id": _next_id(rows),
-        "client": client,
-        "title": title,
-        "amount": _coerce_amount(amount),
-        "status": status,
-        "due": _parse_due(due),
-        "note": note,
-        "created_at": _now_iso(),
-        "updated_at": _now_iso(),
-        "paid_at": _now_iso() if status == "paid" else None,
-    }
-    _append(store, record)
-    return record
+    try:
+        with file_lock(store):
+            rows = _load_all(store)
+            now = _now_iso()
+            record = {
+                "job_id": _next_id(rows),
+                "client": client,
+                "title": title,
+                "amount": _coerce_amount(amount),
+                "status": status,
+                "due": _parse_due(due),
+                "note": note,
+                "created_at": now,
+                "updated_at": now,
+                "paid_at": now if status == "paid" else None,
+            }
+            _append_locked(store, record)
+            return record
+    except LockTimeout as exc:
+        raise RuntimeError(f"jobs store lock busy: {exc}") from exc
 
 
-def update_job(store: Path, job_id: str, **changes) -> Optional[dict]:
+def _update_job_locked(store: Path, job_id: str, **changes) -> Optional[dict]:
     rows = _load_all(store)
     target = None
-    for r in rows:
-        if r.get("job_id") == job_id:
-            target = r
+    for row in rows:
+        if row.get("job_id") == job_id:
+            target = row
             break
     if target is None:
         return None
@@ -141,19 +164,23 @@ def update_job(store: Path, job_id: str, **changes) -> Optional[dict]:
         if key == "amount":
             val = _coerce_amount(val)
         if key == "status" and val not in _VALID_STATUS:
-            raise SystemExit(f"ERROR: status ไม่รู้จัก: {val!r}")
+            raise SystemExit(f"ERROR: status invalid: {val!r}")
         if key == "due":
             val = _parse_due(val)
         target[key] = val
     if changes.get("status") == "paid" and not target.get("paid_at"):
         target["paid_at"] = _now_iso()
     target["updated_at"] = _now_iso()
-    # rewrite whole file (small store; keeps append-only semantics for new rows)
-    store.write_text(
-        "\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n",
-        encoding="utf-8",
-    )
+    _atomic_write_rows(store, rows)
     return target
+
+
+def update_job(store: Path, job_id: str, **changes) -> Optional[dict]:
+    try:
+        with file_lock(store):
+            return _update_job_locked(store, job_id, **changes)
+    except LockTimeout as exc:
+        raise RuntimeError(f"jobs store lock busy: {exc}") from exc
 
 
 def set_status(store: Path, job_id: str, status: str) -> Optional[dict]:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -103,3 +105,55 @@ def test_dashboard_renders_html(tmp_path: Path):
 def test_all_statuses_valid():
     assert "paid" in STATES
     assert "cancelled" in STATES
+
+
+def test_malformed_store_fails_closed_and_preserves_bytes(tmp_path: Path):
+    store = _store(tmp_path)
+    store.write_text(
+        json.dumps({"job_id": "JOB-0001", "amount": 100, "status": "accepted"}) + "\n"
+        "{broken\n",
+        encoding="utf-8",
+    )
+    before = store.read_bytes()
+
+    try:
+        summarize(store)
+    except ValueError as exc:
+        assert "line 2" in str(exc)
+    else:
+        raise AssertionError("malformed jobs store must fail closed")
+
+    try:
+        add_job(store, "A", "j", 100)
+    except ValueError as exc:
+        assert "line 2" in str(exc)
+    else:
+        raise AssertionError("append onto malformed jobs store must be rejected")
+    assert store.read_bytes() == before
+
+
+def test_update_rewrites_atomically_without_temp_debris(tmp_path: Path):
+    store = _store(tmp_path)
+    rec = add_job(store, "A", "j", 1000, status="accepted")
+
+    updated = update_job(store, rec["job_id"], status="done", amount=1250)
+
+    assert updated is not None
+    assert updated["status"] == "done"
+    assert updated["amount"] == 1250.0
+    assert list(tmp_path.glob("*.tmp")) == []
+
+
+def test_concurrent_adds_are_serialized_with_unique_ids(tmp_path: Path):
+    store = _store(tmp_path)
+
+    def add_one(index: int) -> str:
+        return add_job(store, f"C{index}", f"j{index}", 100 + index)["job_id"]
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        ids = list(pool.map(add_one, range(16)))
+
+    assert sorted(ids) == [f"JOB-{i:04d}" for i in range(1, 17)]
+    rows = [json.loads(line) for line in store.read_text(encoding="utf-8").splitlines()]
+    assert len(rows) == 16
+    assert sorted(row["job_id"] for row in rows) == sorted(ids)

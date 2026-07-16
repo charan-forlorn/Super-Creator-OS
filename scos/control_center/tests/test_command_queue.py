@@ -81,6 +81,7 @@ def test_append_only(tmp: Path) -> None:
     commands = read_command_queue(queue_path=queue)
     check("append order preserved", [c.command_id for c in commands] == ["cmd-001", "cmd-002"])
     check("LF line endings only", "\r" not in second_text)
+    check("append lock sidecar created", (tmp / ".commands.jsonl.lock").is_file())
 
 
 def test_stable_line_sha256(tmp: Path) -> None:
