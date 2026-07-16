@@ -242,9 +242,36 @@ _FRONTEND_PATH_MARKERS = ("route.ts", "middleware.ts")
 # The scanner's structural heuristics (frontend_api_route /
 # frontend_route_or_middleware / frontend_transport) still flag ANY other new
 # transport; only these reviewed paths are exempt.
+# Cohort 9A + 9B reviewed same-origin transport allow-list.
+# These specific files implement the ONLY authorized local read-only bridges:
+#   * Cohort 9A: a GET-only, same-origin Next.js route handler that performs a
+#     single fs.readFileSync on a pre-generated committed snapshot artifact,
+#     plus the frontend adapter that fetches that same-origin route.
+#   * Cohort 9B: a POST-only, same-origin dry-run preview route that returns a
+#     deterministic preview produced by the dry-run planner (no subprocess, no
+#     HVS, no fs/db write, no external URL), plus the panel component that
+#     fetches that exact same-origin route.
+# No mutation method, no subprocess, no secret exposure, no external egress.
+# The scanner's structural heuristics (frontend_api_route /
+# frontend_route_or_middleware / frontend_transport) still flag ANY other new
+# transport; only these reviewed paths are exempt, and the transport exemption
+# is target-aware (see _FRONTEND_REVIEWED_FETCH_TARGETS below) so an absolute
+# or dynamic fetch inside an allowed file is still a finding.
 _FRONTEND_READ_ONLY_TRANSPORT_ALLOWLIST = {
     "apps/control-center/app/api/control-center-snapshot/route.ts",
     "apps/control-center/lib/control-center-snapshot.ts",
+    "apps/control-center/app/api/operator-dry-run/route.ts",
+    "apps/control-center/components/operator-dry-run-panel.tsx",
+}
+
+# Exact reviewed same-origin fetch target(s) permitted for each allow-listed
+# frontend file. The structural frontend_transport heuristic is exempted ONLY
+# when the fetch line references one of these exact fixed relative targets.
+# Any other fetch (absolute URL, dynamic host, different route) in the same
+# file remains a finding — so a future regression cannot silently open egress.
+_FRONTEND_REVIEWED_FETCH_TARGETS = {
+    "apps/control-center/lib/control-center-snapshot.ts": ("/api/control-center-snapshot",),
+    "apps/control-center/components/operator-dry-run-panel.tsx": ("/api/operator-dry-run",),
 }
 
 
@@ -336,15 +363,24 @@ def _is_test_path(rel: str) -> bool:
 
 
 def _append_control_center_findings(findings, rel: str, text: str) -> None:
-    for category, pattern in (
-        ("network_library_in_control_center", _CC_NETWORK_IMPORT_RE),
-        ("real_ai_dispatch_import", _CC_AI_IMPORT_RE),
-        ("browser_gui_clipboard_automation", _CC_GUI_IMPORT_RE),
-    ):
-        for match in pattern.finditer(text):
-            findings.append((rel, _line_no(text, match.start()), category, _redact(match.group(0))))
-
     runtime_module = not _is_test_path(rel)
+
+    if runtime_module:
+        # Only production Control Center modules are subject to the network /
+        # AI-dispatch / GUI-automation import screen. Recognized test paths are
+        # exempt: their imports (e.g. `socket` used solely to monkeypatch and
+        # trap network creation inside a side-effect containment test) are not
+        # production execution surfaces. A production socket/requests/urllib/
+        # aiohttp/etc. import remains detected because `runtime_module` is True
+        # for non-test paths.
+        for category, pattern in (
+            ("network_library_in_control_center", _CC_NETWORK_IMPORT_RE),
+            ("real_ai_dispatch_import", _CC_AI_IMPORT_RE),
+            ("browser_gui_clipboard_automation", _CC_GUI_IMPORT_RE),
+        ):
+            for match in pattern.finditer(text):
+                findings.append((rel, _line_no(text, match.start()), category, _redact(match.group(0))))
+
 
     for line_no, stripped in _code_lines(text):
         if not runtime_module:
@@ -386,12 +422,20 @@ def _append_frontend_findings(findings, rel: str, text: str, path: Path) -> None
         for category, token in _FRONTEND_FORBIDDEN_TOKENS:
             if token not in stripped:
                 continue
-            # The reviewed Cohort 9A read-only transport is exempt from the
-            # structural frontend_transport heuristic only; every other
-            # forbidden-token category (storage, clipboard, polling,
-            # nondeterminism, server-action) remains fully active even on the
-            # allowed paths, so real regressions are still caught.
-            if read_only_transport and category == "frontend_transport":
+            # The reviewed same-origin transport is exempt from the structural
+            # frontend_transport heuristic ONLY when this file is allow-listed
+            # AND the fetch line references its exact reviewed relative target
+            # (see _FRONTEND_REVIEWED_FETCH_TARGETS). Every other forbidden-token
+            # category (storage, clipboard, polling, nondeterminism,
+            # server-action) remains fully active even on the allowed paths, and
+            # an absolute URL, dynamic host, or different route in the same file
+            # is never exempted — so real regressions are still caught.
+            if (
+                read_only_transport
+                and category == "frontend_transport"
+                and rel in _FRONTEND_REVIEWED_FETCH_TARGETS
+                and any(t in stripped for t in _FRONTEND_REVIEWED_FETCH_TARGETS[rel])
+            ):
                 continue
             # Nondeterminism tokens: exempt in recognized test paths only when
             # the test actually mocks the API (existing behavior, unchanged).
