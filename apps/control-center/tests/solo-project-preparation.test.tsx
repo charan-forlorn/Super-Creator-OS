@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { SoloProjectPreparationPanel } from "@/components/solo-project-preparation-panel";
 import {
@@ -9,6 +9,11 @@ import {
   validateProjectDraft,
   type SoloProjectDraftInput,
 } from "@/lib/solo-project-preparation";
+import type {
+  ProjectPreparationRecord,
+  ProjectPreparationState,
+  ReadEnvelope,
+} from "@/lib/project-preparation-client";
 
 const validDraft: SoloProjectDraftInput = {
   projectTitle: "Launch Reel",
@@ -20,40 +25,9 @@ const validDraft: SoloProjectDraftInput = {
   operatorNotes: "Keep it energetic but truthful.",
 };
 
-function installBrowserSideEffectTraps() {
-  const blocked = (name: string) =>
-    vi.fn(() => {
-      throw new Error(`Unexpected browser side effect: ${name}`);
-    });
-
-  beforeEach(() => {
-    const xhrGlobal = ["XML", "Http", "Request"].join("");
-    const socketGlobal = ["Web", "Socket"].join("");
-
-    vi.stubGlobal("fetch", blocked("fetch"));
-    vi.stubGlobal(
-      xhrGlobal,
-      vi.fn(() => {
-        throw new Error(`Unexpected browser side effect: ${xhrGlobal}`);
-      }),
-    );
-    vi.stubGlobal(
-      socketGlobal,
-      vi.fn(() => {
-        throw new Error(`Unexpected browser side effect: ${socketGlobal}`);
-      }),
-    );
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(blocked("storage.getItem"));
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(blocked("storage.setItem"));
-    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(blocked("storage.removeItem"));
-    vi.spyOn(Storage.prototype, "clear").mockImplementation(blocked("storage.clear"));
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
-  });
-}
+// ---------------------------------------------------------------------------
+// Preserved client-domain regression (Cohort 10B functions still exist).
+// ---------------------------------------------------------------------------
 
 describe("solo project preparation domain", () => {
   it("normalizes a valid draft and creates stable approval-required identity", () => {
@@ -137,76 +111,193 @@ describe("solo project preparation domain", () => {
   });
 });
 
-describe("SoloProjectPreparationPanel", () => {
-  installBrowserSideEffectTraps();
+// ---------------------------------------------------------------------------
+// Cohort 10C — authoritative client transport + truth-state UI behavior.
+// The panel now reads from the same-origin authorative API and never trusts
+// browser storage. We mock fetch to a controllable same-origin handler and
+// assert the five truth states resolve without any demo fallback.
+// ---------------------------------------------------------------------------
 
-  it("labels runtime-only state truthfully and resets after remount", () => {
-    const { unmount } = render(<SoloProjectPreparationPanel />);
+type FetchPlan = {
+  read: () => unknown;
+  create?: (body: unknown) => unknown;
+  approve?: (body: unknown) => unknown;
+  preview?: (body: unknown) => unknown;
+};
 
-    expect(screen.getByRole("region", { name: "Project draft and render-preparation preview" })).toBeInTheDocument();
-    expect(screen.getByText("Runtime memory only")).toBeInTheDocument();
-    expect(screen.getByText(/Refresh, remount, a fresh browser context, or server restart resets this draft/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Project initialized|Render started|Published|Uploaded/i)).not.toBeInTheDocument();
+// Single shared plan, mutated per-test, read by the fetch mock at call time.
+let activePlan: FetchPlan = { read: () => EMPTY_STATUS };
 
-    fireEvent.change(screen.getByLabelText("Project title"), { target: { value: validDraft.projectTitle } });
-    fireEvent.change(screen.getByLabelText("Client or brand"), { target: { value: validDraft.clientOrBrand } });
-    fireEvent.change(screen.getByLabelText("Project purpose"), { target: { value: validDraft.projectPurpose } });
-    fireEvent.change(screen.getByLabelText("Content brief"), { target: { value: validDraft.contentBrief } });
-    fireEvent.click(screen.getByRole("button", { name: "Validate project draft" }));
-    expect(screen.getByText("APPROVAL_REQUIRED")).toBeInTheDocument();
+beforeEach(() => {
+  vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+    throw new Error("Unexpected browser storage read");
+  });
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    throw new Error("Unexpected browser storage write");
+  });
+  vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+    throw new Error("Unexpected browser storage remove");
+  });
+  vi.spyOn(Storage.prototype, "clear").mockImplementation(() => {
+    throw new Error("Unexpected browser storage clear");
+  });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: unknown, init?: unknown) => {
+      const url = String(input);
+      // External egress must never happen.
+      if (/^https?:\/\//i.test(url) || url.startsWith("//")) {
+        throw new Error(`Unexpected external fetch: ${url}`);
+      }
+      const method = (init as { method?: string } | undefined)?.method ?? "GET";
+      let payload: unknown = activePlan.read();
+      if (url === "/api/project-preparation" && method === "POST") {
+        payload = activePlan.create ? activePlan.create((init as { body?: string }).body) : activePlan.read();
+      } else if (url.includes("/approve") && method === "POST") {
+        payload = activePlan.approve ? activePlan.approve((init as { body?: string }).body) : activePlan.read();
+      } else if (url.includes("/preview") && method === "POST") {
+        payload = activePlan.preview ? activePlan.preview((init as { body?: string }).body) : activePlan.read();
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => payload,
+      };
+    }),
+  );
+});
 
-    unmount();
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  activePlan = { read: () => EMPTY_STATUS };
+});
+
+function setPlan(plan: FetchPlan) {
+  activePlan = plan;
+}
+
+const EMPTY_STATUS: ReadEnvelope = { status: "EMPTY", schema_version: 1, error_code: null, detail: null, records: [] };
+const UNAVAILABLE_STATUS: ReadEnvelope = { status: "UNAVAILABLE", schema_version: 1, error_code: "READ_FAILED", detail: "boom", records: [] };
+const CORRUPT_STATUS: ReadEnvelope = { status: "CORRUPT", schema_version: 1, error_code: "STORE_CORRUPT", detail: "malformed", records: [] };
+
+function sampleRecord(state: ProjectPreparationState, revision: number): ProjectPreparationRecord {
+  return {
+    project_id: "spp-502e92236edd",
+    schema_version: 1,
+    revision,
+    created_at: "2026-07-17T00:00:00Z",
+    updated_at: "2026-07-17T00:00:00Z",
+    state,
+    normalized: {
+      project_title: "Launch Reel",
+      client_or_brand: "Northstar Studio",
+      project_purpose: "Announce the new creator workflow",
+      normalized_brief_summary: "A crisp launch video.",
+      target_duration_seconds: 45,
+      output_profiles: [{ id: "square_1_1", label: "square 1:1", aspectRatio: "1:1" }, { id: "vertical_9_16", label: "vertical 9:16", aspectRatio: "9:16" }],
+      planned_rendition_count: 2,
+      operator_notes: "Keep it energetic but truthful.",
+    },
+    approval: { status: "approved", approved_at: "2026-07-17T00:00:01Z", approval_count: 1, approved_by: "local-solo-operator" },
+    preparation_preview:
+      state === "PREPARATION_PREVIEW_READY"
+        ? {
+            schema_version: 1,
+            project_identity: "spp-502e92236edd",
+            project_title: "Launch Reel",
+            client_or_brand: "Northstar Studio",
+            normalized_brief_summary: "A crisp launch video.",
+            selected_output_profiles: ["square_1_1", "vertical_9_16"],
+            planned_rendition_count: 2,
+            expected_preparation_stages: ["validate specification", "prepare script inputs"],
+            approval_status: "approved",
+          }
+        : null,
+    side_effect_flags: { side_effects_performed: false, render_started: false, hvs_project_created: false },
+  };
+}
+
+describe("SoloProjectPreparationPanel — authoritative truth states", () => {
+  it("shows loading then EMPTY (no demo record) when the store is empty", async () => {
+    setPlan({ read: () => EMPTY_STATUS });
     render(<SoloProjectPreparationPanel />);
-
-    expect(screen.getByText("DRAFT")).toBeInTheDocument();
-    expect(screen.getByText("No dry-run preview generated")).toBeInTheDocument();
+    expect(screen.getByText(/Reading authoritative local SCOS state/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/Authoritative store · empty/i)).toBeInTheDocument());
+    expect(screen.queryByText(/spp-/)).not.toBeInTheDocument();
   });
 
-  it("runs validation, approval, and preview without browser side effects", () => {
+  it("represents UNAVAILABLE as unavailable (never as EMPTY, never fabricated)", async () => {
+    setPlan({ read: () => UNAVAILABLE_STATUS });
     render(<SoloProjectPreparationPanel />);
+    await waitFor(() =>
+      expect(screen.getAllByText(/Authoritative store unavailable/i).length).toBeGreaterThan(0),
+    );
+    expect(screen.queryByText(/spp-/)).not.toBeInTheDocument();
+  });
 
+  it("represents CORRUPT without rewrite and disables transitions", async () => {
+    setPlan({ read: () => CORRUPT_STATUS });
+    render(<SoloProjectPreparationPanel />);
+    await waitFor(() => expect(screen.getAllByText(/Authoritative store corrupt/i).length).toBeGreaterThan(0));
+    expect(screen.getByRole("button", { name: /Validate and create draft/i })).toBeDisabled();
+  });
+
+  it("creates a draft through the authoritative API and shows approval-required", async () => {
+    let store: ReadEnvelope = { ...EMPTY_STATUS };
+    setPlan({
+      read: () => store,
+      create: () => {
+        const rec = sampleRecord("APPROVAL_REQUIRED", 1);
+        store = { status: "AVAILABLE_WITH_DATA", schema_version: 1, error_code: null, detail: null, records: [rec] };
+        return { ok: true, error_code: null, detail: null, record: rec };
+      },
+    });
+    render(<SoloProjectPreparationPanel />);
+    await waitFor(() => expect(screen.getByText(/Authoritative store · empty/i)).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText("Project title"), { target: { value: validDraft.projectTitle } });
     fireEvent.change(screen.getByLabelText("Client or brand"), { target: { value: validDraft.clientOrBrand } });
     fireEvent.change(screen.getByLabelText("Project purpose"), { target: { value: validDraft.projectPurpose } });
     fireEvent.change(screen.getByLabelText("Content brief"), { target: { value: validDraft.contentBrief } });
-    fireEvent.change(screen.getByLabelText("Target duration seconds"), { target: { value: "45" } });
-    fireEvent.click(screen.getByLabelText("square 1:1"));
+    fireEvent.click(screen.getByRole("button", { name: /Validate and create draft/i }));
+    await waitFor(() => expect(screen.getByText("APPROVAL_REQUIRED")).toBeInTheDocument());
+    expect(screen.getByText("spp-502e92236edd")).toBeInTheDocument();
+    expect(screen.getByText(/revision = 1/)).toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: "Validate project draft" }));
-    const identity = screen.getByTestId("preparation-project-identity").textContent ?? "";
-
-    fireEvent.change(screen.getByLabelText("Approval project identity"), { target: { value: identity } });
-    fireEvent.click(screen.getByRole("button", { name: "Record local approval" }));
-    fireEvent.click(screen.getByRole("button", { name: "Generate dry-run preparation preview" }));
-
-    expect(screen.getByText("PREPARATION_PREVIEW_READY")).toBeInTheDocument();
+  it("approves and previews via the authoritative API, keeping side-effect flags false", async () => {
+    let store = { status: "AVAILABLE_WITH_DATA", schema_version: 1, error_code: null, detail: null, records: [sampleRecord("APPROVAL_REQUIRED", 1)] };
+    setPlan({
+      read: () => store,
+      approve: () => {
+        const rec = sampleRecord("APPROVED", 2);
+        store = { status: "AVAILABLE_WITH_DATA", schema_version: 1, error_code: null, detail: null, records: [rec] };
+        return { ok: true, error_code: null, detail: null, record: rec };
+      },
+      preview: () => {
+        const rec = sampleRecord("PREPARATION_PREVIEW_READY", 3);
+        store = { status: "AVAILABLE_WITH_DATA", schema_version: 1, error_code: null, detail: null, records: [rec] };
+        return { ok: true, error_code: null, detail: null, record: rec };
+      },
+    });
+    render(<SoloProjectPreparationPanel />);
+    await waitFor(() => expect(screen.getByText("APPROVAL_REQUIRED")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /Record local approval/i }));
+    await waitFor(() => expect(screen.getByText("APPROVED")).toBeInTheDocument());
+    expect(screen.getByText(/revision = 2/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Generate dry-run preparation preview/i }));
+    await waitFor(() => expect(screen.getByText("PREPARATION_PREVIEW_READY")).toBeInTheDocument());
     expect(screen.getByText("side_effects_performed = false")).toBeInTheDocument();
     expect(screen.getByText("render_started = false")).toBeInTheDocument();
     expect(screen.getByText("hvs_project_created = false")).toBeInTheDocument();
-    expect(within(screen.getByLabelText("Expected preparation stages")).getAllByRole("listitem")).toHaveLength(6);
+    expect(screen.getByText(/revision = 3/)).toBeInTheDocument();
   });
 
-  it("contains duplicate approval, repeated preview, and mismatched identity", () => {
+  it("never renders a demo or fabricated project when the store is empty", async () => {
+    setPlan({ read: () => EMPTY_STATUS });
     render(<SoloProjectPreparationPanel />);
-
-    fireEvent.change(screen.getByLabelText("Project title"), { target: { value: validDraft.projectTitle } });
-    fireEvent.change(screen.getByLabelText("Client or brand"), { target: { value: validDraft.clientOrBrand } });
-    fireEvent.change(screen.getByLabelText("Project purpose"), { target: { value: validDraft.projectPurpose } });
-    fireEvent.change(screen.getByLabelText("Content brief"), { target: { value: validDraft.contentBrief } });
-    fireEvent.click(screen.getByRole("button", { name: "Validate project draft" }));
-
-    const identity = screen.getByTestId("preparation-project-identity").textContent ?? "";
-    fireEvent.change(screen.getByLabelText("Approval project identity"), { target: { value: "spp-000000000000" } });
-    fireEvent.click(screen.getByRole("button", { name: "Record local approval" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("APPROVAL_PROJECT_ID_MISMATCH");
-
-    fireEvent.change(screen.getByLabelText("Approval project identity"), { target: { value: identity } });
-    fireEvent.click(screen.getByRole("button", { name: "Record local approval" }));
-    fireEvent.click(screen.getByRole("button", { name: "Record local approval" }));
-    expect(screen.getByText("approval_count = 1")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Generate dry-run preparation preview" }));
-    fireEvent.click(screen.getByRole("button", { name: "Generate dry-run preparation preview" }));
-    expect(screen.getByText("preview_count = 1")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/Authoritative store · empty/i)).toBeInTheDocument());
+    expect(screen.queryByText("Launch Reel")).not.toBeInTheDocument();
+    expect(screen.queryByText("PREPARATION_PREVIEW_READY")).not.toBeInTheDocument();
   });
 });

@@ -58,7 +58,7 @@ describe("Agent Operations Cockpit — truthful read-only bridge", () => {
     render(<Page />);
 
     expect(screen.getAllByRole("heading", { name: "Project draft and render-preparation preview" })).toHaveLength(1);
-    expect(screen.getByText("Cohort 10B planning surface")).toBeInTheDocument();
+    expect(screen.getByText("Cohort 10C authoritative persistence")).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { name: "Video-production request" })).toHaveLength(1);
     expect(screen.queryByText(/Project initialized|Render started|Published|Uploaded/i)).not.toBeInTheDocument();
   });

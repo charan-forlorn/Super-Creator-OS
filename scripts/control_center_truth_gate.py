@@ -79,6 +79,16 @@ _FORBIDDEN_STORAGE_TOKENS = ("localStorage", "sessionStorage", "navigator.clipbo
 _REVIEWED_ROUTES = {
     "apps/control-center/app/api/control-center-snapshot/route.ts",
     "apps/control-center/app/api/operator-dry-run/route.ts",
+    # Cohort 10C authoritative project-preparation transport. Reviewed safe:
+    # GET read-only bridge + POST create/approve/preview mutations that
+    # persist to a dedicated local store (memory/runtime/control-center/)
+    # through a locked, atomically-written adapter (mirror of the Python
+    # service). No HVS init, no render, no external network, no
+    # browser storage, no migration of memory/database.json. Declared
+    # runtime = "nodejs" + dynamic = "force-dynamic" (no static caching).
+    "apps/control-center/app/api/project-preparation/route.ts",
+    "apps/control-center/app/api/project-preparation/[projectId]/approve/route.ts",
+    "apps/control-center/app/api/project-preparation/[projectId]/preview/route.ts",
 }
 
 

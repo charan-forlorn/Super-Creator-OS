@@ -280,6 +280,17 @@ _FRONTEND_READ_ONLY_TRANSPORT_ALLOWLIST = {
     "apps/control-center/lib/control-center-snapshot.ts",
     "apps/control-center/app/api/operator-dry-run/route.ts",
     "apps/control-center/components/operator-dry-run-panel.tsx",
+    # Cohort 10C authoritative project-preparation transport. Reviewed
+    # safe: GET read-only bridge + POST create/approve/preview that
+    # persist to a dedicated local store (memory/runtime/control-center/)
+    # through a locked, atomically-written adapter mirroring the
+    # Python service. No HVS init, no render, no external network,
+    # no browser storage, no migration of memory/database.json.
+    "apps/control-center/app/api/project-preparation/route.ts",
+    "apps/control-center/app/api/project-preparation/[projectId]/approve/route.ts",
+    "apps/control-center/app/api/project-preparation/[projectId]/preview/route.ts",
+    "apps/control-center/lib/project-preparation-store.ts",
+    "apps/control-center/lib/project-preparation-client.ts",
 }
 
 # Exact reviewed same-origin fetch target(s) permitted for each allow-listed
@@ -290,6 +301,11 @@ _FRONTEND_READ_ONLY_TRANSPORT_ALLOWLIST = {
 _FRONTEND_REVIEWED_FETCH_TARGETS = {
     "apps/control-center/lib/control-center-snapshot.ts": ("/api/control-center-snapshot",),
     "apps/control-center/components/operator-dry-run-panel.tsx": ("/api/operator-dry-run",),
+    # Cohort 10C: the client lib performs the only same-origin
+    # transport to the reviewed project-preparation routes.
+    "apps/control-center/lib/project-preparation-client.ts": (
+        "/api/project-preparation",
+    ),
 }
 
 

@@ -67,10 +67,17 @@ describe("cockpit bridge behavior (mocked transport)", () => {
     render(<CockpitDashboard />);
     await screen.findByText(/Live local read-only/i);
     const callsBefore = fetchMock.mock.calls.length;
-    fireEvent.click(screen.getByRole("button", { name: /Refresh|เรียกข้อมูลใหม่/i }));
+    // The cockpit's own refresh affordance is the Thai "เรียกข้อมูลใหม่"
+    // control; target it specifically so the re-read assertion holds against
+    // the snapshot route (the solo project preparation panel renders its own
+    // separate "Refresh authoritative state" control).
+    fireEvent.click(screen.getByRole("button", { name: /เรียกข้อมูลใหม่/i }));
     await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(callsBefore));
-    // The only URL touched is the same-origin read-only route.
+    // Every fetch stays same-origin (no external egress). The dashboard refresh
+    // re-reads /api/control-center-snapshot; the mounted solo project
+    // preparation panel independently reads its own same-origin route, so we
+    // assert local-only egress rather than a single hard-coded path.
     const urls = fetchMock.mock.calls.map((c) => c[0]);
-    expect(urls.every((u) => typeof u === "string" && u.includes("/api/control-center-snapshot"))).toBe(true);
+    expect(urls.every((u) => typeof u === "string" && u.startsWith("/api/"))).toBe(true);
   });
 });

@@ -75,3 +75,15 @@ project_audit/
 .continue/
 .pytest-tmp-stage8h/
 .pytest-tmp-stage8h-*/
+
+# --- Cohort 10C.1: exclude non-source / generated artifacts from commits ---
+# Browser-acceptance debug log (generated at runtime, not source).
+debug.log
+# App icon + design-reference assets (binary, not part of the 10C source change).
+apps/control-center/app/icon.svg
+apps/control-center/design-references/
+apps/control-center/public/
+# Local pytest basetemp / temp dirs (permission-denied leftovers from CI runs).
+.pytest-tmp-*/
+# Local runtime store / integrity markers (per-run, not source).
+apps/control-center/memory/
