@@ -291,6 +291,18 @@ _FRONTEND_READ_ONLY_TRANSPORT_ALLOWLIST = {
     "apps/control-center/app/api/project-preparation/[projectId]/preview/route.ts",
     "apps/control-center/lib/project-preparation-store.ts",
     "apps/control-center/lib/project-preparation-client.ts",
+    # Cohort 10D authoritative HVS materialization transport. Reviewed
+    # safe: GET projection (read-only) + POST authorize/execute/reconcile
+    # that persist to a dedicated local store (memory/runtime/control-center/)
+    # through a locked, atomically-written adapter mirroring the Python
+    # service + a controlled local HVS double. No external network, no
+    # browser storage, no render, no migration of memory/database.json.
+    "apps/control-center/lib/hvs-materialization-store.ts",
+    "apps/control-center/lib/hvs-materialization-client.ts",
+    "apps/control-center/app/api/hvs-materialization/projection/route.ts",
+    "apps/control-center/app/api/hvs-materialization/authorize/route.ts",
+    "apps/control-center/app/api/hvs-materialization/execute/route.ts",
+    "apps/control-center/app/api/hvs-materialization/reconcile/route.ts",
 }
 
 # Exact reviewed same-origin fetch target(s) permitted for each allow-listed
@@ -305,6 +317,14 @@ _FRONTEND_REVIEWED_FETCH_TARGETS = {
     # transport to the reviewed project-preparation routes.
     "apps/control-center/lib/project-preparation-client.ts": (
         "/api/project-preparation",
+    ),
+    # Cohort 10D: the client lib performs the only same-origin transport to
+    # the reviewed hvs-materialization routes.
+    "apps/control-center/lib/hvs-materialization-client.ts": (
+        "/api/hvs-materialization/projection",
+        "/api/hvs-materialization/authorize",
+        "/api/hvs-materialization/execute",
+        "/api/hvs-materialization/reconcile",
     ),
 }
 

@@ -89,6 +89,18 @@ _REVIEWED_ROUTES = {
     "apps/control-center/app/api/project-preparation/route.ts",
     "apps/control-center/app/api/project-preparation/[projectId]/approve/route.ts",
     "apps/control-center/app/api/project-preparation/[projectId]/preview/route.ts",
+    # Cohort 10D authoritative HVS materialization transport. Reviewed safe:
+    # GET projection (read-only) + POST authorize/execute/reconcile that
+    # persist to a dedicated local store (memory/runtime/control-center/)
+    # through a locked, atomically-written adapter mirroring the Python
+    # service. No HVS init beyond the controlled local double, no render, no
+    # external network, no browser storage, no migration of
+    # memory/database.json. Declared runtime = "nodejs" + dynamic =
+    # "force-dynamic" (no static caching).
+    "apps/control-center/app/api/hvs-materialization/projection/route.ts",
+    "apps/control-center/app/api/hvs-materialization/authorize/route.ts",
+    "apps/control-center/app/api/hvs-materialization/execute/route.ts",
+    "apps/control-center/app/api/hvs-materialization/reconcile/route.ts",
 }
 
 

@@ -227,6 +227,15 @@ def test_no_forbidden_runtime_source_markers_and_no_frontend_route_files() -> No
         Path("apps/control-center/app/api/project-preparation/route.ts"),
         Path("apps/control-center/app/api/project-preparation/[projectId]/approve/route.ts"),
         Path("apps/control-center/app/api/project-preparation/[projectId]/preview/route.ts"),
+        # Cohort 10D authorized HVS materialization boundary (GET projection +
+        # POST authorize/execute/reconcile). Reviewed same-origin, local-first
+        # mutation boundary that persists to a dedicated locked store and
+        # exposes no external egress, no HVS/render/publish, no subprocess, and
+        # rejects arbitrary paths/keys.
+        Path("apps/control-center/app/api/hvs-materialization/projection/route.ts"),
+        Path("apps/control-center/app/api/hvs-materialization/authorize/route.ts"),
+        Path("apps/control-center/app/api/hvs-materialization/execute/route.ts"),
+        Path("apps/control-center/app/api/hvs-materialization/reconcile/route.ts"),
     }
     route_files = [
         p

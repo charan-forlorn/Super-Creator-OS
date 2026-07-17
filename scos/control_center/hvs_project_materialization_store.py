@@ -1,0 +1,314 @@
+"""Cohort 10D — durable materialization attempt + authorization registry.
+
+This is the OUTCOME_STORE_OWNER. It persists exactly three
+authoritative collections, each under one locked, atomically
+replaced JSON envelope (mirrors the Cohort 10C
+``solo_project_preparation.py`` store contract 1:1):
+
+  * authorizations  (HvsProjectMaterializationAuthorization to_dict)
+  * capabilities    (HvsProjectMaterializationCapability to_dict)
+  * attempts        (HvsMaterializationAttempt to_dict)
+
+Restart durability: a server restart re-reads this file and
+recovers the exact authorization decision, the consumed
+capability state, the in-flight STARTING attempt, the
+confirmed HVS_PROJECT_MATERIALIZED outcome, and the
+unknown OUTCOME_UNKNOWN state — so no duplicate HVS
+project is created on recovery.
+
+Scope: this module ONLY persists materialization
+authorization/capability/attempt state. It performs NO
+filesystem mutation at the HVS destination, NO subprocess,
+NO render, NO network. The actual HVS materialization
+call lives behind an injected callable in the service.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+from typing import Any, Optional
+
+try:
+    from _filelock import atomic_replace, file_lock, lock_path_for
+except ImportError:  # direct-module execution (pytest inserts package dir)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "integrations" / "learning"))
+    from _filelock import atomic_replace, file_lock, lock_path_for  # type: ignore
+
+from .hvs_project_materialization_models import (  # noqa: E402
+    MATERIALIZATION_SCHEMA_VERSION,
+    STATE_MATERIALIZATION_AUTHORIZATION_REQUIRED,
+    STATE_MATERIALIZATION_AUTHORIZED,
+    STATE_MATERIALIZATION_STARTING,
+    HvsMaterializationAttempt,
+    HvsProjectMaterializationAuthorization,
+    HvsProjectMaterializationCapability,
+)
+
+# Canonical collection envelope kinds.
+_STORE_KIND = "scos.hvs_project_materialization.v1"
+_INTEGRITY_SUFFIX = ".integrity.json"
+_TMP_SUFFIX = ".tmp"
+
+# Truth states the store can resolve to (every read is exactly one).
+TRUTH_AVAILABLE_WITH_DATA = "AVAILABLE_WITH_DATA"
+TRUTH_EMPTY = "EMPTY"
+TRUTH_UNAVAILABLE = "UNAVAILABLE"
+TRUTH_CORRUPT = "CORRUPT"
+TRUTH_INCOMPATIBLE_SCHEMA = "INCOMPATIBLE_SCHEMA"
+
+ERR_STORE_UNAVAILABLE = "STORE_UNAVAILABLE"
+ERR_STORE_CORRUPT = "STORE_CORRUPT"
+ERR_SCHEMA_INCOMPATIBLE = "SCHEMA_INCOMPATIBLE"
+
+
+def _now_iso() -> str:
+    # Caller-supplied clock is preferred; this is a defensive default
+    # used only by the in-process store constructor when a writer
+    # does not thread its own recorded_at. The service always
+    # passes an explicit recorded_at.
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+class MaterializationStore:
+    """Single-writer authoritative persistence for materialization
+    authorizations, capabilities, and attempts.
+    """
+
+    def __init__(
+        self,
+        *,
+        store_path: Optional[Path] = None,
+        base_dir: Optional[Path] = None,
+    ) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        self._base_dir = (
+            Path(base_dir)
+            if base_dir is not None
+            else repo_root / "memory" / "runtime" / "control-center"
+        )
+        self._store_path = (
+            Path(store_path)
+            if store_path is not None
+            else self._base_dir / "hvs-project-materialization-v1.json"
+        )
+
+    @property
+    def store_path(self) -> Path:
+        return self._store_path
+
+    # -- low-level read -------------------------------------------------
+    def _read_raw(self) -> dict[str, Any]:
+        path = self._store_path
+        if not path.exists():
+            return {"status": TRUTH_EMPTY, "records": {}}
+        try:
+            text = path.read_text(encoding="utf-8")
+            data = json.loads(text)
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            return {"status": TRUTH_CORRUPT, "detail": f"malformed store: {exc}"}
+        if not isinstance(data, dict):
+            return {"status": TRUTH_CORRUPT, "detail": "store envelope is not an object"}
+        kind = data.get("store_kind")
+        if kind is not None and kind != _STORE_KIND:
+            return {"status": TRUTH_CORRUPT, "detail": f"unknown store_kind: {kind!r}"}
+        if data.get("schema_version") != MATERIALIZATION_SCHEMA_VERSION:
+            return {
+                "status": TRUTH_INCOMPATIBLE_SCHEMA,
+                "detail": "unsupported schema_version",
+            }
+        for key in ("authorizations", "capabilities", "attempts"):
+            if key not in data or not isinstance(data[key], dict):
+                return {"status": TRUTH_CORRUPT, "detail": f"missing collection: {key}"}
+        return {"status": TRUTH_AVAILABLE_WITH_DATA, "data": data}
+
+    def read(self) -> dict[str, Any]:
+        try:
+            return self._read_raw()
+        except Exception as exc:  # pragma: no cover - defensive
+            return {"status": TRUTH_UNAVAILABLE, "detail": f"read error: {exc}"}
+
+    # -- collections ------------------------------------------------------
+    def _collections(self) -> tuple[
+        dict[str, Any], dict[str, Any], dict[str, Any]
+    ]:
+        res = self._read_raw()
+        if res["status"] != TRUTH_AVAILABLE_WITH_DATA:
+            return {}, {}, {}
+        data = res["data"]
+        return data["authorizations"], data["capabilities"], data["attempts"]
+
+    def get_authorization(self, authorization_id: str) -> Optional[HvsProjectMaterializationAuthorization]:
+        auths, _, _ = self._collections()
+        row = auths.get(authorization_id)
+        return HvsProjectMaterializationAuthorization.from_dict(row) if row else None
+
+    def get_capability(self, capability_id: str) -> Optional[HvsProjectMaterializationCapability]:
+        _, caps, _ = self._collections()
+        row = caps.get(capability_id)
+        return HvsProjectMaterializationCapability.from_dict(row) if row else None
+
+    def get_attempt(self, attempt_id: str) -> Optional[HvsMaterializationAttempt]:
+        _, _, attempts = self._collections()
+        row = attempts.get(attempt_id)
+        return HvsMaterializationAttempt.from_dict(row) if row else None
+
+    def list_attempts_for_project(self, project_id: str) -> list[HvsMaterializationAttempt]:
+        _, _, attempts = self._collections()
+        return [
+            HvsMaterializationAttempt.from_dict(r)
+            for r in attempts.values()
+            if r.get("project_id") == project_id
+        ]
+
+    # -- low-level write -------------------------------------------------
+    def _write_envelope(self, data: dict[str, Any]) -> None:
+        path = self._store_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        envelope = {
+            "schema_version": MATERIALIZATION_SCHEMA_VERSION,
+            "store_kind": _STORE_KIND,
+            "written_at": _now_iso(),
+            "authorizations": data.get("authorizations", {}),
+            "capabilities": data.get("capabilities", {}),
+            "attempts": data.get("attempts", {}),
+        }
+        serialized = json.dumps(envelope, ensure_ascii=False, indent=2, sort_keys=True)
+        tmp = path.parent / f"{path.name}{_TMP_SUFFIX}.{__import__('os').getpid()}"
+        tmp.write_text(serialized, encoding="utf-8")
+        # Validate complete bytes before replace.
+        json.loads(tmp.read_text(encoding="utf-8"))
+        atomic_replace(tmp, path)
+
+    def _mutate(self, fn) -> None:
+        """Take the lock, call fn(collections dict), and persist."""
+        with file_lock(self._store_path):
+            res = self._read_raw()
+            if res["status"] == TRUTH_EMPTY:
+                data: dict[str, Any] = {
+                    "authorizations": {},
+                    "capabilities": {},
+                    "attempts": {},
+                }
+            elif res["status"] == TRUTH_AVAILABLE_WITH_DATA:
+                data = res["data"]
+            else:
+                # Corrupt / incompatible / unavailable store: fail closed,
+                # never implicitly recreate or mutate.
+                raise RuntimeError(f"store not writable: {res['status']}")
+            fn(data)
+            self._write_envelope(data)
+
+    # -- writes ---------------------------------------------------------
+    def put_authorization(self, auth: HvsProjectMaterializationAuthorization) -> None:
+        def _fn(data: dict[str, Any]) -> None:
+            data["authorizations"][auth.authorization_id] = auth.to_dict()
+        self._mutate(_fn)
+
+    def put_capability(self, cap: HvsProjectMaterializationCapability) -> None:
+        def _fn(data: dict[str, Any]) -> None:
+            data["capabilities"][cap.capability_id] = cap.to_dict()
+        self._mutate(_fn)
+
+    def put_attempt(self, attempt: HvsMaterializationAttempt) -> None:
+        def _fn(data: dict[str, Any]) -> None:
+            data["attempts"][attempt.attempt_id] = attempt.to_dict()
+        self._mutate(_fn)
+
+    def consume_capability(self, capability_id: str, *, consumed_at: str) -> Optional[HvsProjectMaterializationCapability]:
+        """Atomically mark a capability consumed; returns the prior state.
+
+        Returns the PRE-consumption capability (consumed_at None) on
+        success, or None if it was already consumed / missing. This
+        is the single-use enforcement primitive: two concurrent
+        consumers both call this under the lock; exactly one sees a
+        not-yet-consumed capability and wins.
+        """
+        prior: list[Optional[HvsProjectMaterializationCapability]] = [None]
+
+        def _fn(data: dict[str, Any]) -> None:
+            caps = data["capabilities"]
+            row = caps.get(capability_id)
+            if row is None:
+                return
+            cap = HvsProjectMaterializationCapability.from_dict(row)
+            if cap.is_consumed():
+                return  # already consumed; do not overwrite the timestamp
+            prior[0] = cap
+            updated = HvsProjectMaterializationCapability(
+                schema_version=cap.schema_version,
+                capability_id=cap.capability_id,
+                authorization_id=cap.authorization_id,
+                project_id=cap.project_id,
+                project_revision=cap.project_revision,
+                plan_hash=cap.plan_hash,
+                destination_identity=cap.destination_identity,
+                issued_at=cap.issued_at,
+                expires_at=cap.expires_at,
+                consumed_at=consumed_at,
+                operation=cap.operation,
+            )
+            caps[capability_id] = updated.to_dict()
+
+        self._mutate(_fn)
+        return prior[0]
+
+    def try_claim_inflight(self, *, project_id: str, attempt_id: str) -> bool:
+        """Atomically claim the single in-flight attempt slot for a project.
+
+        Returns True if THIS attempt may proceed (no other in-flight
+        attempt exists for the project). Returns False if another attempt
+        is already in-flight (duplicate containment; the caller must fail
+        closed without crossing the HVS boundary). Runs entirely under the
+        store lock so two concurrent requests cannot both win.
+        """
+        _INFLIGHT = (STATE_MATERIALIZATION_AUTHORIZATION_REQUIRED,
+                     STATE_MATERIALIZATION_AUTHORIZED,
+                     STATE_MATERIALIZATION_STARTING)
+        won: list[bool] = [False]
+
+        def _fn(data: dict[str, Any]) -> None:
+            attempts = data["attempts"]
+            for row in attempts.values():
+                if row.get("project_id") != project_id:
+                    continue
+                if row.get("state") in _INFLIGHT and row.get("attempt_id") != attempt_id:
+                    return  # another in-flight attempt owns the slot
+            won[0] = True
+
+        self._mutate(_fn)
+        return won[0]
+
+
+    def has_inflight_attempt(self, *, project_id: str, exclude_attempt_id: str) -> bool:
+        """Read-only check: is another attempt currently in-flight for project?"""
+        res = self._read_raw()
+        if res["status"] != TRUTH_AVAILABLE_WITH_DATA:
+            return False
+        _INFLIGHT = (STATE_MATERIALIZATION_AUTHORIZATION_REQUIRED,
+                     STATE_MATERIALIZATION_AUTHORIZED,
+                     STATE_MATERIALIZATION_STARTING)
+        for row in res["data"]["attempts"].values():
+            if row.get("project_id") != project_id:
+                continue
+            if row.get("state") in _INFLIGHT and row.get("attempt_id") != exclude_attempt_id:
+                return True
+        return False
+
+
+__all__ = sorted(
+    (
+        "TRUTH_AVAILABLE_WITH_DATA",
+        "TRUTH_EMPTY",
+        "TRUTH_UNAVAILABLE",
+        "TRUTH_CORRUPT",
+        "TRUTH_INCOMPATIBLE_SCHEMA",
+        "ERR_STORE_UNAVAILABLE",
+        "ERR_STORE_CORRUPT",
+        "ERR_SCHEMA_INCOMPATIBLE",
+        "MaterializationStore",
+    )
+)

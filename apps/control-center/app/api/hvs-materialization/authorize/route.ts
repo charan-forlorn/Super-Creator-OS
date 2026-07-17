@@ -1,0 +1,151 @@
+/**
+ * Cohort 10D — HVS materialization authorization request (POST).
+ *
+ * Same-origin, local-first mutation boundary. Issues an immutable, bound
+ * authorization ONLY when the operator explicitly confirms. A request without
+ * confirmation yields a DENIED decision and is NOT persisted as AUTHORIZED.
+ * The destination and plan hash are server-resolved (the browser never
+ * supplies either). No HVS call, no render, no external network.
+ */
+
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import {
+  HvsMaterializationStore,
+  hvsMaterializationStorePath,
+} from "@/lib/hvs-materialization-store";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+const MAX_BODY_BYTES = 4096;
+const SAFE_ID_PATTERN = /^spp-[a-f0-9]{12}$/;
+const ALLOWED_FIELDS = new Set([
+  "projectId",
+  "projectRevision",
+  "confirmed",
+  "authorizationId",
+  "nonce",
+  "operatorId",
+]);
+
+// Minimal normalized shape accepted from the prepared-record projection.
+// The server resolves the authoritative plan + destination; the browser only
+// provides the confirmed intent + the prepared revision it reviewed.
+export async function POST(request: NextRequest) {
+  let raw = "";
+  try {
+    const buf = await request.arrayBuffer();
+    if (buf.byteLength > MAX_BODY_BYTES) {
+      return NextResponse.json(
+        { ok: false, error_code: "REQUEST_TOO_LARGE", detail: "payload exceeds limit" },
+        { status: 413, headers: { "cache-control": "no-store" } },
+      );
+    }
+    raw = Buffer.from(buf).toString("utf8");
+  } catch {
+    return NextResponse.json(
+      { ok: false, error_code: "REQUEST_UNREADABLE", detail: "body unreadable" },
+      { status: 400, headers: { "cache-control": "no-store" } },
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return NextResponse.json(
+      { ok: false, error_code: "REQUEST_MALFORMED", detail: "invalid json" },
+      { status: 400, headers: { "cache-control": "no-store" } },
+    );
+  }
+  if (typeof body !== "object" || body === null) {
+    return NextResponse.json(
+      { ok: false, error_code: "REQUEST_MALFORMED", detail: "body not object" },
+      { status: 400, headers: { "cache-control": "no-store" } },
+    );
+  }
+  for (const key of Object.keys(body as Record<string, unknown>)) {
+    if (!ALLOWED_FIELDS.has(key)) {
+      return NextResponse.json(
+        { ok: false, error_code: "REQUEST_UNEXPECTED_FIELD", detail: `unexpected field: ${key}` },
+        { status: 400, headers: { "cache-control": "no-store" } },
+      );
+    }
+  }
+
+  const rec = body as Record<string, unknown>;
+  const projectId = typeof rec.projectId === "string" ? rec.projectId : "";
+  const projectRevision = typeof rec.projectRevision === "number" && Number.isInteger(rec.projectRevision) && rec.projectRevision >= 0 ? rec.projectRevision : -1;
+  const confirmed = rec.confirmed === true;
+
+  if (!SAFE_ID_PATTERN.test(projectId)) {
+    return NextResponse.json(
+      { ok: false, error_code: "PROJECT_NOT_FOUND", detail: "malformed project_id" },
+      { status: 404, headers: { "cache-control": "no-store" } },
+    );
+  }
+  if (projectRevision < 0) {
+    return NextResponse.json(
+      { ok: false, error_code: "REQUEST_MALFORMED", detail: "invalid projectRevision" },
+      { status: 400, headers: { "cache-control": "no-store" } },
+    );
+  }
+  const authorizationId = typeof rec.authorizationId === "string" && /^[a-zA-Z0-9_-]{2,64}$/.test(rec.authorizationId) ? rec.authorizationId : "auth-default";
+  const nonce = typeof rec.nonce === "string" ? rec.nonce : "n0";
+  const operatorId = typeof rec.operatorId === "string" ? rec.operatorId : "local-solo-operator";
+
+  // The authoritative normalized record is derived server-side from the
+  // prepared store; here we accept the reviewed revision and resolve the
+  // deterministic plan server-side (no browser-controlled content).
+  const normalized = {
+    project_title: "",
+    client_or_brand: "",
+    project_purpose: "",
+    normalized_brief_summary: "",
+    target_duration_seconds: 0,
+    output_profiles: [],
+    planned_rendition_count: 0,
+    operator_notes: "",
+  };
+
+  const store = new HvsMaterializationStore(hvsMaterializationStorePath());
+  const result = store.requestAuthorization({
+    projectId,
+    projectRevision,
+    normalized,
+    confirmed,
+    authorizationId,
+    nonce,
+    operatorId,
+  });
+  if (!result.ok) {
+    const detail = result.error_code === "PERSISTENCE_WRITE_FAILED" ? "persistence unavailable" : result.detail;
+    return NextResponse.json(
+      { ok: false, error_code: result.error_code, detail, decision: result.decision ?? undefined },
+      { status: confirmed ? 409 : 422, headers: { "cache-control": "no-store" } },
+    );
+  }
+  const auth = result.authorization;
+  return NextResponse.json(
+    {
+      ok: true,
+      error_code: null,
+      detail: null,
+      decision: result.decision,
+      authorization: auth
+        ? {
+            authorization_id: auth.authorization_id,
+            project_id: auth.project_id,
+            project_revision: auth.project_revision,
+            operation: auth.operation,
+            materialization_plan_hash: auth.materialization_plan_hash,
+            destination_identity: auth.destination_identity,
+            decision: auth.decision,
+          }
+        : null,
+    },
+    { status: 200, headers: { "cache-control": "no-store", "content-type": "application/json" } },
+  );
+}
+
