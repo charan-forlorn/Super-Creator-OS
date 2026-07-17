@@ -87,3 +87,4 @@ apps/control-center/public/
 .pytest-tmp-*/
 # Local runtime store / integrity markers (per-run, not source).
 apps/control-center/memory/
+memory/runtime/

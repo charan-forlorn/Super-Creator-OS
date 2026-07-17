@@ -12,23 +12,12 @@
  * NEVER trusts a browser-supplied path.
  */
 
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { ProjectPreparationStore } from "@/lib/project-preparation-store";
+import { ProjectPreparationStore, projectPreparationStorePath } from "@/lib/project-preparation-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const STORE_RELATIVE_PATH =
-  ".." + "/" + ".." + "/" + ".." + "/" + "memory" + "/" + "runtime" + "/" + "control-center" + "/" + "project-preparation-v1.json";
-
-function storePath(): string {
-  const base = dirname(fileURLToPath(import.meta.url));
-  // app/api/project-preparation/[projectId]/approve/route.ts -> memory/runtime/control-center/
-  return base + "/" + ".." + "/" + ".." + "/" + STORE_RELATIVE_PATH;
-}
 
 const MAX_BODY_BYTES = 2048;
 const SAFE_ID_PATTERN = /^spp-[a-f0-9]{12}$/;
@@ -85,7 +74,7 @@ export async function POST(
     }
   }
 
-  const store = new ProjectPreparationStore(storePath());
+  const store = new ProjectPreparationStore(projectPreparationStorePath());
   const result = store.approve(projectId, expectedRevision);
   if (!result.ok) {
     // Mask internal detail on persistence failure so the absolute store

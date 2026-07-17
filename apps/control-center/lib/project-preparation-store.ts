@@ -28,12 +28,23 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, openSync, closeSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join, basename } from "node:path";
 
-const STORE_RELATIVE_PATH = ".." + "/" + ".." + "/" + ".." + "/" + "memory" + "/" + "runtime" + "/" + "control-center" + "/" + "project-preparation-v1.json";
-const DEFAULT_STORE_PATH = STORE_RELATIVE_PATH;
+// Store path is anchored to the app package root via process.cwd() (Next runs
+// from apps/control-center, so ../.. reaches the repo root), resolving to the
+// repo-root memory/runtime/control-center/project-preparation-v1.json — identical
+// to the Python authoritative service. This is bundler-independent (import.meta.url
+// in the compiled lib points into .next, which would break the path) and is the
+// single source of truth; route handlers import projectPreparationStorePath() and
+// must NOT recompute a caller-relative path.
+const DEFAULT_STORE_PATH = join(process.cwd(), "..", "..", "memory", "runtime", "control-center", "project-preparation-v1.json");
 const INTEGRITY_SUFFIX = ".integrity.json";
 const TMP_SUFFIX = ".tmp";
+
+// Single source of truth for the authoritative store path (absolute).
+export function projectPreparationStorePath(): string {
+  return DEFAULT_STORE_PATH;
+}
 
 export const STORE_KIND = "scos.project_preparation.v1";
 export const SCHEMA_VERSION = 1;
@@ -314,10 +325,11 @@ export class ProjectPreparationStore {
   }
 
   private integrityMarkerPath(): string {
-    const idx = this.storePath.lastIndexOf("/");
-    const base = idx >= 0 ? this.storePath.slice(0, idx + 1) : "";
-    const name = idx >= 0 ? this.storePath.slice(idx + 1) : this.storePath;
-    return `${base}.${name}${INTEGRITY_SUFFIX}`;
+    // Use node:path basename/dirname so it works for both relative and
+    // absolute (Windows C:\...) store paths.
+    const base = dirname(this.storePath);
+    const name = basename(this.storePath);
+    return join(base, `.${name}${INTEGRITY_SUFFIX}`);
   }
 
   private sha256OfFileSync(path: string): string {
@@ -583,14 +595,17 @@ export class ProjectPreparationStore {
         if (prior === null) {
           return { ok: false, error_code: ERR.PROJECT_NOT_FOUND, detail: `project not found: ${projectId}`, record: null };
         }
+        // Stale-revision protection runs BEFORE the idempotent replay return,
+        // so a stale expected revision is rejected even when the record is
+        // already approved (mirrors the Python authoritative store).
+        if (expectedRevision !== null && expectedRevision !== prior.revision) {
+          return { ok: false, error_code: ERR.REVISION_CONFLICT, detail: `stale revision ${expectedRevision} != current ${prior.revision}`, record: null };
+        }
         if (prior.state === "APPROVED" || prior.state === "PREPARATION_PREVIEW_READY") {
           return { ok: true, error_code: null, detail: null, record: prior };
         }
         if (prior.state !== "APPROVAL_REQUIRED") {
           return { ok: false, error_code: ERR.INVALID_TRANSITION, detail: `cannot approve from state ${prior.state}`, record: null };
-        }
-        if (expectedRevision !== null && expectedRevision !== prior.revision) {
-          return { ok: false, error_code: ERR.REVISION_CONFLICT, detail: `stale revision ${expectedRevision} != current ${prior.revision}`, record: null };
         }
         const now = this.nowIso();
         const updated: ProjectPreparationRecord = {
@@ -623,14 +638,17 @@ export class ProjectPreparationStore {
         if (prior === null) {
           return { ok: false, error_code: ERR.PROJECT_NOT_FOUND, detail: `project not found: ${projectId}`, record: null };
         }
+        // Stale-revision protection runs BEFORE the idempotent replay return,
+        // so a stale expected revision is rejected even when the record is
+        // already preview-ready (mirrors the Python authoritative store).
+        if (expectedRevision !== null && expectedRevision !== prior.revision) {
+          return { ok: false, error_code: ERR.REVISION_CONFLICT, detail: `stale revision ${expectedRevision} != current ${prior.revision}`, record: null };
+        }
         if (prior.state === "PREPARATION_PREVIEW_READY") {
           return { ok: true, error_code: null, detail: null, record: prior };
         }
         if (prior.state !== "APPROVED") {
           return { ok: false, error_code: ERR.INVALID_TRANSITION, detail: `cannot preview from state ${prior.state}`, record: null };
-        }
-        if (expectedRevision !== null && expectedRevision !== prior.revision) {
-          return { ok: false, error_code: ERR.REVISION_CONFLICT, detail: `stale revision ${expectedRevision} != current ${prior.revision}`, record: null };
         }
         const now = this.nowIso();
         const preview: PreparationPreviewPayload = {

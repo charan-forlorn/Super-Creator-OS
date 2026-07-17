@@ -16,25 +16,16 @@
  * NEVER stores a browser-supplied path or secret.
  */
 
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
   ProjectPreparationStore,
   validateDraftInput,
+  projectPreparationStorePath,
 } from "@/lib/project-preparation-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const STORE_RELATIVE_PATH =
-  ".." + "/" + ".." + "/" + ".." + "/" + "memory" + "/" + "runtime" + "/" + "control-center" + "/" + "project-preparation-v1.json";
-
-function storePath(): string {
-  const base = dirname(fileURLToPath(import.meta.url));
-  return base + "/" + STORE_RELATIVE_PATH;
-}
 
 const MAX_BODY_BYTES = 8192;
 const ALLOWED_FIELDS = new Set([
@@ -48,7 +39,7 @@ const ALLOWED_FIELDS = new Set([
 ]);
 
 export async function GET(_request: NextRequest) {
-  const store = new ProjectPreparationStore(storePath());
+  const store = new ProjectPreparationStore(projectPreparationStorePath());
   const result = store.read();
   return NextResponse.json(
     {
@@ -128,7 +119,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const store = new ProjectPreparationStore(storePath());
+  const store = new ProjectPreparationStore(projectPreparationStorePath());
   const result = store.createDraft(input);
   if (!result.ok) {
     // Mask internal detail on persistence failure so the absolute store
