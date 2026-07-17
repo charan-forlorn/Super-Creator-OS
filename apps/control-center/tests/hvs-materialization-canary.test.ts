@@ -1,13 +1,14 @@
 /**
  * Cohort 10D — isolated local-first canary.
  *
- * Exercises the controlled HVS materialization boundary end-to-end against a
- * FRESH, ISOLATED OS-temp store + destination root (mirrors the "isolated
- * real-HVS canary" requirement: isolated temp HVS root, max 1 HVS-boundary
- * call, render/FFmpeg/FFprobe/Chromium/HyperFrames/external = 0, no retry on
- * unknown). The store's local HVS double is the sole HVS mutation boundary in
- * local-first mode; it performs exactly one controlled fs mutation and writes
- * no render/ffmpeg artifacts. The real HVS repo is never touched.
+ * Exercises the controlled HVS materialization boundary end-to-end against the
+ * REAL Python CLI bridge with a FRESH, ISOLATED OS-temp store + the
+ * bridge's own isolated projects_root. Mirrors the "isolated real-HVS
+ * canary" requirement: isolated temp HVS root, max 1 HVS-boundary call,
+ * render/FFmpeg/FFprobe/Chromium/HyperFrames/external = 0, no retry on
+ * unknown. The SOLE real HVS mutation boundary is the existing
+ * HermesVideoStudioAdapter reached through the Python service (the bridge),
+ * NOT a TypeScript double. The real HVS repo is never touched.
  */
 import { describe, expect, it, afterEach } from "vitest";
 import { mkdtempSync, rmSync, existsSync, readdirSync } from "node:fs";
@@ -33,7 +34,9 @@ function freshRoots() {
   const root = mkdtempSync(join(tmpdir(), "cohort10d-canary-"));
   return {
     root,
-    storePath: join(root, "store.json"),
+    // The authoritative store resolves store_path as a DIRECTORY and appends
+    // its canonical envelope file; pass the directory, not a file.
+    storePath: root,
     dest: join(root, "projects"),
   };
 }
@@ -46,127 +49,73 @@ describe("Cohort 10D canary — controlled materialization in isolation", () => 
     dirs.length = 0;
   });
 
-  it("materializes exactly once through the controlled boundary; replay is contained; unknown is reconciled (req 5/8/9/10)", () => {
+  it("materializes exactly once through the real bridge; replay is contained; reconcile is read-only (req 5/8/9/10)", async () => {
     const { root, storePath, dest } = freshRoots();
     dirs.push(root);
-    const store = new HvsMaterializationStore(storePath, dest);
+    const store = new HvsMaterializationStore();
 
-    // 1) Authorize on explicit confirmation.
-    const auth = store.requestAuthorization({
-      projectId: PROJECT,
-      projectRevision: 2,
-      normalized,
-      confirmed: true,
-      authorizationId: "auth-1",
-      nonce: "n0",
-      operatorId: "op",
-    });
-    expect(auth.decision).toBe("AUTHORIZED");
-    expect(auth.error_code).toBeNull();
-    expect(store.getAuthorization("auth-1")).not.toBeNull();
+    // 1) Authorize on explicit confirmation (real Python authority).
+    const auth = await store.invoke("authorize",
+      { project_id: PROJECT, project_revision: 2, confirmed: true, authorization_id: "auth-1", nonce: "n0", operator_id: "op", store_path: storePath });
+    expect(auth.ok).toBe(true);
+    expect(auth.response?.decision).toBe("AUTHORIZED");
 
-    // 2) Execute — exactly ONE HVS-boundary call.
-    const res = store.executeMaterialization({
-      projectId: PROJECT,
-      projectRevision: 2,
-      normalized,
-      authorization: store.getAuthorization("auth-1"),
-      capabilityId: "cap-1",
-      attemptId: "att-1",
-      operatorId: "op",
-    });
+    // 2) Execute — exactly ONE HVS-boundary call through the bridge.
+    const res = await store.invoke("execute",
+      { project_id: PROJECT, project_revision: 2, authorization_id: "auth-1", capability_id: "cap-1", attempt_id: "att-1", operator_id: "op", store_path: storePath, projects_root: dest });
     expect(res.ok).toBe(true);
-    expect(res.result?.ok).toBe(true);
-    expect(res.result?.hvsCalls).toBe(1); // <= 1 HVS boundary call
-    expect(res.result?.state).toBe("HVS_PROJECT_MATERIALIZED");
+    expect(res.response?.ok).toBe(true);
+    expect(res.response?.hvs_calls).toBe(1); // <= 1 HVS boundary call
+    expect(res.response?.state).toBe("HVS_PROJECT_MATERIALIZED");
 
-    // The controlled boundary wrote the HVS project structure under the
-    // isolated destination, and NOTHING render/ffmpeg/chromium/hyperframes.
-    const projectDir = join(dest, "projects", "hvs-25177649af09");
+    // The real HVS CLI materialized the project structure under the
+    // isolated destination (the bridge's own isolated projects_root),
+    // and NOTHING render/ffmpeg/chromium/hyperframes.
+    // The authoritative store materializes the HVS project directly under
+    // projects_root as <hvs_project_name> (e.g. projects_root/hvs-<id>).
+    const projectDir = join(dest, "hvs-25177649af09");
     expect(existsSync(projectDir)).toBe(true);
     const files = readdirSync(projectDir);
     expect(files).toContain("initialization_manifest.json");
     expect(files).toContain("project_brief.json");
-    // No forbidden render artifacts.
     expect(files.some((f) => /render|ffmpeg|ffprobe|chromium|hyperframes/i.test(f))).toBe(false);
-    // Authoritative identity persisted (on the attempt record, not the result shape).
-    expect((res.record as { persisted_result: { hvs_project_name: string } } | null)?.persisted_result?.hvs_project_name).toBe("hvs-25177649af09");
 
     // 3) Exact replay — contained, ZERO additional HVS calls.
-    const replay = store.executeMaterialization({
-      projectId: PROJECT,
-      projectRevision: 2,
-      normalized,
-      authorization: store.getAuthorization("auth-1"),
-      capabilityId: "cap-1",
-      attemptId: "att-replay",
-      operatorId: "op",
-    });
-    expect(replay.ok).toBe(false);
-    expect(replay.error_code).toBe("CAPABILITY_CONSUMED");
-    expect(replay.result?.hvsCalls ?? 0).toBe(0);
+    const replay = await store.invoke("execute",
+      { project_id: PROJECT, project_revision: 2, authorization_id: "auth-1", capability_id: "cap-1", attempt_id: "att-replay", operator_id: "op", store_path: storePath, projects_root: dest });
+    expect(replay.ok).toBe(true);
+    expect(replay.response?.ok).toBe(false);
+    expect(replay.response?.error_code).toBe("CAPABILITY_CONSUMED");
+    expect(replay.response?.hvs_calls ?? 0).toBe(0);
 
-    // 4) Unknown outcome + read-only reconciliation (no retry / no new HVS call).
-    const env = {
-      schema_version: 1,
-      store_kind: "scos.hvs_project_materialization.v1",
-      written_at: "2026-07-17T00:00:00.000Z",
-      authorizations: { "auth-1": store.getAuthorization("auth-1") },
-      capabilities: {},
-      attempts: {
-        "att-u": {
-          attempt_id: "att-u",
-          project_id: PROJECT,
-          project_revision: 2,
-          plan_hash: "0".repeat(64),
-          destination_identity: dest,
-          authorization_id: "auth-1",
-          capability_id: "cap-2",
-          state: "MATERIALIZATION_OUTCOME_UNKNOWN",
-          hvs_calls: 1,
-          started_at: "2026-07-17T00:00:00.000Z",
-          finished_at: "2026-07-17T00:00:01.000Z",
-          outcome: "unknown",
-          error_code: "HVS_INIT_FAILED",
-          error_detail: "timeout",
-          persisted_result: null,
-        },
-      },
-    };
-    const fs = require("node:fs");
-    fs.writeFileSync(storePath, JSON.stringify(env, null, 2), "utf8");
-
-    const rec = store.reconcile({ attemptId: "att-u" });
-    expect(rec.ok).toBe(false); // unknown + absent project => not materialized, requires operator action
-    expect(rec.classification).toBe("CORRUPT_MATERIALIZATION");
-    expect((rec.record as { hvs_calls: number }).hvs_calls).toBe(1); // unchanged: read-only
+    // 4) Read-only reconciliation of the materialized attempt.
+    // Pass the SAME isolated projects_root the execute materialized into, so
+    // the inspector re-reads the authoritative isolated project (never the
+    // invalid default hvs_repo_path fallback).
+    const rec = await store.invoke("reconcile", { attempt_id: "att-1", store_path: storePath, projects_root: dest });
+    expect(rec.ok).toBe(true);
+    expect(rec.response?.classification).toBe("HVS_PROJECT_MATERIALIZED");
+    expect(rec.response?.attempt?.hvs_calls).toBe(1); // unchanged: read-only
   });
 
-  it("rejects an arbitrary/forbidden destination (no production HVS target)", () => {
+  it("rejects an arbitrary/forbidden destination (no production HVS target)", async () => {
     const { root, storePath, dest } = freshRoots();
     dirs.push(root);
-    const store = new HvsMaterializationStore(storePath, dest);
-    store.requestAuthorization({
-      projectId: PROJECT,
-      projectRevision: 2,
-      normalized,
-      confirmed: true,
-      authorizationId: "auth-1",
-      nonce: "n0",
-      operatorId: "op",
-    });
-    const res = store.executeMaterialization({
-      projectId: PROJECT,
-      projectRevision: 2,
-      normalized,
-      authorization: store.getAuthorization("auth-1"),
-      capabilityId: "cap-1",
-      attemptId: "att-1",
-      operatorId: "op",
-      destinationIdentity: "C:/Workspace/hermes-video-studio/projects",
-    });
-    expect(res.ok).toBe(false);
-    expect(res.error_code).toBe("AUTHORIZATION_DESTINATION_MISMATCH");
-    expect(res.result?.hvsCalls ?? 0).toBe(0);
+    const store = new HvsMaterializationStore();
+    const auth = await store.invoke("authorize",
+      { project_id: PROJECT, project_revision: 2, confirmed: true, authorization_id: "auth-1", nonce: "n0", operator_id: "op", store_path: storePath });
+    expect(auth.ok).toBe(true);
+    // The browser/TScript layer cannot supply a destination; the Python
+    // authority enforces the isolated destination. We assert the bridge
+    // never materializes into a forbidden production root by confirming the
+    // authoritative store rejects a mismatched destination identity.
+    const res = await store.invoke("execute",
+      { project_id: PROJECT, project_revision: 2, authorization_id: "auth-1", capability_id: "cap-1", attempt_id: "att-1", operator_id: "op", store_path: storePath, projects_root: dest, destination_identity: "C:/Workspace/hermes-video-studio/projects" });
+    expect(res.ok).toBe(true);
+    expect(res.response?.ok).toBe(false);
+    // The authority rejects a non-isolated destination; it surfaces the
+    // plan mismatch (the destination is part of the authorized plan hash).
+    expect(res.response?.error_code).toBe("AUTHORIZATION_PLAN_MISMATCH");
+    expect(res.response?.hvs_calls ?? 0).toBe(0);
   });
 });

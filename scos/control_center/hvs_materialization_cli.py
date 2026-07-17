@@ -170,7 +170,16 @@ def _build_stage2_contract(project_id: str) -> dict[str, Any]:
         },
     }
     canonical_timeline = json.dumps(timeline, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    timeline["deterministic_hash"] = hashlib.sha256(canonical_timeline.encode("utf-8")).hexdigest()[:16]
+    # The real HVS initializer verifies `timeline.deterministic_hash` against
+    # its own Stage 2 semantic hash, NOT a plain timeline hash. Use the exact
+    # HVS implementation so the contract is accepted.
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "hermes-video-studio"))
+        from hvs.core.project_initializer import _stage2_semantic_hash  # type: ignore
+
+        timeline["deterministic_hash"] = _stage2_semantic_hash(timeline)
+    except Exception:
+        timeline["deterministic_hash"] = hashlib.sha256(canonical_timeline.encode("utf-8")).hexdigest()[:16]
     contract = {
         "schema_version": "hvs.project-initialization.v1",
         "contract_name": "scos-hvs.project-initialization",
@@ -197,21 +206,34 @@ def _hvs_initializer_factory(
     python_executable: str,
     projects_root: "str | None",
     auth: "HvsProjectMaterializationAuthorization | None",
+    now_iso: "str | None" = None,
 ) -> Any:
     """Return the real HVS initializer wired to the existing adapter.
 
     Seeds a deterministic Stage 2 contract under the (isolated, canary) root,
     then calls ``HermesVideoStudioAdapter.initialize_project`` — the SOLE real
     HVS mutation boundary. Returns the materialization contract shape.
+
+    NOTE: the isolation root is taken ONLY from the factory closure
+    (``projects_root``). The materialization service may call this initializer
+    with ``kwargs["projects_root"] = destination_identity`` (a logical binding,
+    NOT a filesystem path); that value is intentionally ignored here so the
+    real HVS project is always written under the intended isolated root (or
+    STUDIO_ROOT in production when ``None``).
     """
     adapter = _make_adapter(hvs_repo_path, python_executable)
-    now_iso = _now_iso()
+    _iso_root = projects_root  # closure-captured isolation root; never shadowed
+    _now_iso_ts = now_iso or _now_iso()
+    # Pass the raw Cohort-10D authorization record WITH the same now-timestamp
+    # the authoritative service used when issuing it, so the adapter's expiry
+    # check matches the service's comparison exactly. The adapter derives the
+    # Stage 8.5 decision ONCE; this factory must NOT pre-derive.
     auth_dict = auth.to_dict() if auth is not None else {}
-    auth_dict["_now_iso"] = now_iso
+    auth_dict["_now_iso"] = _now_iso_ts
 
     def _init(**kwargs: Any) -> dict[str, Any]:
         project_id = str(kwargs.get("project_id"))
-        root = Path(projects_root) if projects_root is not None else Path(hvs_repo_path)
+        root = Path(_iso_root) if _iso_root is not None else Path(hvs_repo_path)
         contracts_dir = root / _CONTRACTS_SUBDIR
         contracts_dir.mkdir(parents=True, exist_ok=True)
         contract = _build_stage2_contract(project_id)
@@ -225,7 +247,7 @@ def _hvs_initializer_factory(
             approve_initialization=True,
             request_id=str(kwargs.get("request_id") or project_id),
             cohort10d_authorization=auth_dict,
-            projects_root=projects_root,
+            projects_root=_iso_root,
         )
         payload = result.get("payload") or {}
         return {
@@ -253,10 +275,15 @@ def _hvs_inspector_factory(
     projects_root: "str | None",
 ) -> Any:
     adapter = _make_adapter(hvs_repo_path, python_executable)
+    _iso_root = projects_root  # closure-captured isolation root; never shadowed
 
     def _inspect(**kwargs: Any) -> dict[str, Any]:
         project_id = str(kwargs.get("project_id"))
-        result = adapter.inspect_project(project_id=project_id, request_id=str(kwargs.get("request_id") or project_id))
+        result = adapter.inspect_project(
+            project_id=project_id,
+            request_id=str(kwargs.get("request_id") or project_id),
+            projects_root=_iso_root,
+        )
         payload = result.get("payload") or {}
         return {
             "ok": bool(result.get("ok")),

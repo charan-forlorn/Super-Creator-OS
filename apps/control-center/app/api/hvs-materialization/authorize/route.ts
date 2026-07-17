@@ -2,17 +2,19 @@
  * Cohort 10D — HVS materialization authorization request (POST).
  *
  * Same-origin, local-first mutation boundary. Issues an immutable, bound
- * authorization ONLY when the operator explicitly confirms. A request without
- * confirmation yields a DENIED decision and is NOT persisted as AUTHORIZED.
- * The destination and plan hash are server-resolved (the browser never
- * supplies either). No HVS call, no render, no external network.
+ * authorization ONLY when the operator explicitly confirms. The authoritative
+ * decision, plan hash, capability, and persistence all live in the Python
+ * service reached through the bridge. The browser supplies only the reviewed
+ * intent + ids; the destination and plan hash are server-resolved. No
+ * HVS call, no render, no external network.
  */
 
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
   HvsMaterializationStore,
-  hvsMaterializationStorePath,
+  buildAuthorizePayload,
+  serverResolvedScope,
 } from "@/lib/hvs-materialization-store";
 
 export const dynamic = "force-dynamic";
@@ -29,9 +31,6 @@ const ALLOWED_FIELDS = new Set([
   "operatorId",
 ]);
 
-// Minimal normalized shape accepted from the prepared-record projection.
-// The server resolves the authoritative plan + destination; the browser only
-// provides the confirmed intent + the prepared revision it reviewed.
 export async function POST(request: NextRequest) {
   let raw = "";
   try {
@@ -95,57 +94,50 @@ export async function POST(request: NextRequest) {
   const nonce = typeof rec.nonce === "string" ? rec.nonce : "n0";
   const operatorId = typeof rec.operatorId === "string" ? rec.operatorId : "local-solo-operator";
 
-  // The authoritative normalized record is derived server-side from the
-  // prepared store; here we accept the reviewed revision and resolve the
-  // deterministic plan server-side (no browser-controlled content).
-  const normalized = {
-    project_title: "",
-    client_or_brand: "",
-    project_purpose: "",
-    normalized_brief_summary: "",
-    target_duration_seconds: 0,
-    output_profiles: [],
-    planned_rendition_count: 0,
-    operator_notes: "",
-  };
-
-  const store = new HvsMaterializationStore(hvsMaterializationStorePath());
-  const result = store.requestAuthorization({
-    projectId,
-    projectRevision,
-    normalized,
-    confirmed,
-    authorizationId,
-    nonce,
-    operatorId,
-  });
-  if (!result.ok) {
-    const detail = result.error_code === "PERSISTENCE_WRITE_FAILED" ? "persistence unavailable" : result.detail;
+  const scope = serverResolvedScope();
+  const store = new HvsMaterializationStore();
+  const bridge = await store.invoke(
+    "authorize",
+    buildAuthorizePayload({
+      projectId,
+      projectRevision,
+      confirmed,
+      authorizationId,
+      nonce,
+      operatorId,
+      storePath: scope.storePath,
+    }),
+  );
+  if (!bridge.ok || !bridge.response) {
     return NextResponse.json(
-      { ok: false, error_code: result.error_code, detail, decision: result.decision ?? undefined },
+      { ok: false, error_code: bridge.error_code ?? "BRIDGE_FAILED", detail: "authorization unavailable" },
+      { status: 409, headers: { "cache-control": "no-store" } },
+    );
+  }
+  const res = bridge.response;
+  if (!res.ok || !res.authorization) {
+    return NextResponse.json(
+      { ok: false, error_code: res.error_code ?? "REQUEST_REJECTED", detail: res.detail ?? null, decision: res.decision ?? undefined },
       { status: confirmed ? 409 : 422, headers: { "cache-control": "no-store" } },
     );
   }
-  const auth = result.authorization;
+  const auth = res.authorization;
   return NextResponse.json(
     {
       ok: true,
       error_code: null,
       detail: null,
-      decision: result.decision,
-      authorization: auth
-        ? {
-            authorization_id: auth.authorization_id,
-            project_id: auth.project_id,
-            project_revision: auth.project_revision,
-            operation: auth.operation,
-            materialization_plan_hash: auth.materialization_plan_hash,
-            destination_identity: auth.destination_identity,
-            decision: auth.decision,
-          }
-        : null,
+      decision: res.decision,
+      authorization: {
+        authorization_id: auth.authorization_id,
+        project_id: auth.project_id,
+        project_revision: auth.project_revision,
+        operation: auth.operation,
+        materialization_plan_hash: auth.materialization_plan_hash,
+        destination_identity: auth.destination_identity,
+        decision: auth.decision,
+      },
     },
     { status: 200, headers: { "cache-control": "no-store", "content-type": "application/json" } },
   );
 }
-

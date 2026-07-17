@@ -462,6 +462,7 @@ class HvsMaterializationAttempt:
     error_code: Optional[str] = None
     error_detail: Optional[str] = None
     persisted_result: Optional[dict[str, Any]] = None
+    expected_payload_hash: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -480,6 +481,7 @@ class HvsMaterializationAttempt:
             "error_code": self.error_code,
             "error_detail": self.error_detail,
             "persisted_result": self.persisted_result,
+            "expected_payload_hash": self.expected_payload_hash,
         }
 
     @classmethod
@@ -500,6 +502,7 @@ class HvsMaterializationAttempt:
             error_code=data.get("error_code") or None,
             error_detail=data.get("error_detail") or None,
             persisted_result=data.get("persisted_result"),
+            expected_payload_hash=data.get("expected_payload_hash") or None,
         )
 
 

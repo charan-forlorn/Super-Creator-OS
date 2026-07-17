@@ -402,3 +402,186 @@ def test_cohort9g_scanner_read_error_fails_closed(tmp_path: Path, monkeypatch):
 
     assert code == 1
     assert "unreadable_source_file" in output
+
+
+# ---------------------------------------------------------------------------
+# Cohort 10D — focused regression tests for the reviewed bounded child-kill
+# `setTimeout` classification repair (scanner de-obfuscation + narrow
+# exemption). Adds `scripts/security_scan_baseline.py` beyond the 14 Cohort
+# paths. The exemption is per-call-site on exactly two reviewed bridge files
+# and ONLY for a `setTimeout` whose body kills the owned child; setInterval and
+# any other `setTimeout` (polling/retry/refresh) stays a finding. The literal
+# `setTimeout` is the only accepted spelling; lexical splits are a finding.
+# ---------------------------------------------------------------------------
+
+_BRIDGE_TS = "apps/control-center/lib/hvs-materialization-store.ts"
+_BRIDGE_TEST = "apps/control-center/tests/hvs-materialization-store.test.ts"
+
+
+def test_cohort10d_approved_bounded_childkill_timeout_is_exempt(tmp_path: Path):
+    # The exact reviewed Cohort 10D transport pattern (literal setTimeout,
+    # body kills the owned child) must NOT be a finding.
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / _BRIDGE_TS,
+        "import { spawn } from 'node:child_process';\n"
+        "export function guard(child: any): void {\n"
+        "  const timer = setTimeout(() => {\n"
+        "    if (child && !child.killed) { try { child.kill('SIGKILL'); } catch {} }\n"
+        "  }, 30000);\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 0
+    assert "findings      : 0" in output
+    assert "frontend_polling" not in output
+
+
+def test_cohort10d_unapproved_setTimeout_second_site_in_same_file_flagged(tmp_path: Path):
+    # The exemption is call-site specific. A second `setTimeout` in the same
+    # reviewed file that does NOT kill the owned child (here a refresh/again
+    # pattern) must remain a frontend_polling finding.
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / _BRIDGE_TS,
+        "import { spawn } from 'node:child_process';\n"
+        "export function guard(child: any): void {\n"
+        "  const timer = setTimeout(() => {\n"
+        "    if (child && !child.killed) { try { child.kill('SIGKILL'); } catch {} }\n"
+        "  }, 30000);\n"
+        "  setTimeout(() => { refresh(); again(); }, 5000);\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_polling" in output
+
+
+def test_cohort10d_setInterval_in_bridge_file_still_flagged(tmp_path: Path):
+    # setInterval is never exempted (no browser polling allowed from a
+    # server-side bridge file either).
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / _BRIDGE_TS,
+        "export function poll(): void {\n"
+        "  setInterval(() => { healthCheck(); }, 1000);\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_polling" in output
+
+
+def test_cohort10d_setTimeout_outside_bridge_files_still_flagged(tmp_path: Path):
+    # The exemption is restricted to the two reviewed bridge files. An identical
+    # bounded child-kill setTimeout in any OTHER frontend file is still a
+    # finding (no broad path/file token allowlist was added).
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / "apps" / "control-center" / "lib" / "other-bridge.ts",
+        "export function guard(child: any): void {\n"
+        "  const timer = setTimeout(() => {\n"
+        "    if (child && !child.killed) { try { child.kill('SIGKILL'); } catch {} }\n"
+        "  }, 30000);\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_polling" in output
+
+
+def test_cohort10d_obfuscated_timer_spelling_is_a_finding(tmp_path: Path):
+    # Lexical splits of the timer primitive (the original defect) must now be a
+    # finding named exactly, so it can never silently pass the scanner again.
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / _BRIDGE_TS,
+        "const schedule = (globalThis as any)['set' + 'Timeout'] as any;\n"
+        "export function guard(child: any): void {\n"
+        "  const timer = schedule(() => { child.kill('SIGKILL'); }, 30000);\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "obfuscated_timer_primitive" in output
+
+
+def test_cohort10d_transport_and_storage_rules_unchanged(tmp_path: Path):
+    # Transport (fetch) and browser-storage rules must remain fully active,
+    # including inside the reviewed bridge files.
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / _BRIDGE_TS,
+        "export function load() {\n"
+        "  const x = " + ("fet" + "ch") + "('/api/x');\n"
+        "  const y = " + ("local" + "Storage") + ".getItem('k');\n"
+        "  const z = " + ("set" + "Interval") + "(() => {}, 1000);\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_transport" in output
+    assert "frontend_storage" in output
+    assert "frontend_polling" in output
+
+
+def test_cohort10d_no_broad_path_exemption_added(tmp_path: Path):
+    # Negative: a broad path/file-level token allowlist was NOT added. Prove a
+    # generic dangerous frontend-runtime token (WebSocket) inside a reviewed
+    # bridge file is still caught by its normal category.
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / _BRIDGE_TS,
+        "export function connect(): void {\n"
+        "  const ws = new " + ("Web" + "Socket") + "('wss://example.invalid');\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_transport" in output
+
+
+def test_cohort10d_full_scanner_zero_findings_on_repo_final_bytes(tmp_path: Path):
+    # Integration: the live repo root must scan clean (0 findings) with the new
+    # classification. Uses the real sorted list of scanned files invariant.
+    root = Path(__file__).resolve().parents[2]
+    code, output = _run_scan(root)
+
+    assert code == 0
+    assert "findings      : 0" in output
+    assert "SECURITY SCAN: PASS" in output

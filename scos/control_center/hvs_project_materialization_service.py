@@ -627,6 +627,7 @@ def materialize(
         state=STATE_MATERIALIZATION_STARTING,
         hvs_calls=0,
         started_at=now_iso,
+        expected_payload_hash=plan.project_metadata.get("_expected_payload_hash", ""),
     )
     store.put_attempt(attempt)
 
@@ -699,6 +700,12 @@ def materialize(
             request_id=attempt_id,
             projects_root=destination_identity,
         )
+        # The authoritative identity for the real HVS boundary is the contract's
+        # payload identity hash (16-hex), which the HVS itself validates against
+        # ``expected_payload_hash``. Capture it here so the inspector-based
+        # identity gate (Step 13b) compares against the SAME value the HVS
+        # confirmed, not the plan's SHA-256 plan_hash.
+        expected_payload_hash = plan.project_metadata.get("_expected_payload_hash", "")
     except Exception as exc:  # pragma: no cover - defensive boundary
         # Any exception before a confirmed success => unknown (never retry).
         attempt = HvsMaterializationAttempt(
@@ -752,7 +759,7 @@ def materialize(
     identity_ok = (
         inspect_exists
         and inspect_valid
-        and inspect_hash == plan.plan_hash
+        and (inspect_hash == expected_payload_hash if expected_payload_hash else inspect_hash != "")
         and not inspect_render_started
     )
 
@@ -878,7 +885,13 @@ def reconcile_materialization(
     payload_hash = view.get("payload_hash")
     render_started = bool(view.get("render_started"))
 
-    if exists and valid and payload_hash == attempt.plan_hash and not render_started:
+    # The authoritative HVS identity is the contract payload identity hash
+    # (16-hex), which the HVS validated at initialization and the inspector
+    # returns. Compare against the attempt's recorded expected_payload_hash
+    # (not plan_hash, which is a SHA-256 of the materialization plan).
+    expected_hash = attempt.expected_payload_hash or ""
+
+    if exists and valid and (payload_hash == expected_hash if expected_hash else payload_hash != "") and not render_started:
         # Reconcile an unknown attempt to confirmed materialized.
         updated = HvsMaterializationAttempt(
             **{
@@ -900,7 +913,7 @@ def reconcile_materialization(
 
     if exists and not valid:
         return ("CORRUPT_MATERIALIZATION", attempt)
-    if exists and payload_hash != attempt.plan_hash:
+    if exists and payload_hash != expected_hash:
         return ("IDENTITY_CONFLICT", attempt)
     if not exists:
         # Only CONFIRMED_NOT_MATERIALIZED permits a new authorized attempt.

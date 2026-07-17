@@ -2,16 +2,21 @@
  * Cohort 10D — read-only reconciliation of a materialization attempt (POST).
  *
  * Same-origin, local-first, READ-ONLY boundary. Classifies an existing
- * attempt's project presence at the destination. Never creates, repairs,
- * re-runs, renders, deletes, moves, or publishes. No HVS mutation, no
- * external network, no automatic retry.
+ * attempt's project presence at the destination through the Python
+ * authority reached via the bridge. This route performs NO reconciliation
+ * authority of its own: it validates the request, invokes exactly one
+ * read-only bridge operation, and maps the classification. Never creates,
+ * repairs, re-runs, renders, deletes, moves, or publishes. No HVS
+ * mutation, no external network, no automatic retry, no browser-supplied
+ * cwd/store/projects_root/command.
  */
 
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
   HvsMaterializationStore,
-  hvsMaterializationStorePath,
+  buildReconcilePayload,
+  serverResolvedScope,
 } from "@/lib/hvs-materialization-store";
 
 export const dynamic = "force-dynamic";
@@ -72,32 +77,24 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const store = new HvsMaterializationStore(hvsMaterializationStorePath());
-  const result = store.reconcile({ attemptId });
-  if (!result.ok) {
-    const detail = result.error_code === "PERSISTENCE_WRITE_FAILED" ? "persistence unavailable" : result.detail;
-    // Include the attempt (when found) so clients can render the
-    // reconciliation classification without guessing. Attempt-not-found has no
-    // attempt, so tolerate null.
+  const scope = serverResolvedScope();
+  const store = new HvsMaterializationStore();
+  const bridge = await store.invoke("reconcile", buildReconcilePayload({ attemptId, storePath: scope.storePath }));
+  if (!bridge.ok || !bridge.response) {
     return NextResponse.json(
-      {
-        ok: false,
-        error_code: result.error_code,
-        detail,
-        classification: result.classification,
-        attempt: result.classification === "ATTEMPT_NOT_FOUND" ? null : store.getAttempt(attemptId),
-      },
-      { status: result.classification === "ATTEMPT_NOT_FOUND" ? 404 : 409, headers: { "cache-control": "no-store" } },
+      { ok: false, error_code: bridge.error_code ?? "BRIDGE_FAILED", detail: "reconciliation unavailable" },
+      { status: 409, headers: { "cache-control": "no-store" } },
     );
   }
+  const res = bridge.response;
   return NextResponse.json(
     {
-      ok: true,
+      ok: res.ok,
       error_code: null,
-      detail: null,
-      classification: result.classification,
-      attempt: store.getAttempt(attemptId),
+      detail: null, // redacted
+      classification: res.classification,
+      attempt: res.attempt ?? null,
     },
-    { status: 200, headers: { "cache-control": "no-store", "content-type": "application/json" } },
+    { status: res.ok ? 200 : 409, headers: { "cache-control": "no-store", "content-type": "application/json" } },
   );
 }

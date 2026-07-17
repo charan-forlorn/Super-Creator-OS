@@ -50,6 +50,8 @@ from .hvs_project_materialization_models import (  # noqa: E402
 _STORE_KIND = "scos.hvs_project_materialization.v1"
 _INTEGRITY_SUFFIX = ".integrity.json"
 _TMP_SUFFIX = ".tmp"
+# Canonical file name written inside the resolved store directory.
+_STORE_FILE_NAME = "hvs-project-materialization-v1.json"
 
 # Truth states the store can resolve to (every read is exactly one).
 TRUTH_AVAILABLE_WITH_DATA = "AVAILABLE_WITH_DATA"
@@ -90,11 +92,18 @@ class MaterializationStore:
             if base_dir is not None
             else repo_root / "memory" / "runtime" / "control-center"
         )
-        self._store_path = (
-            Path(store_path)
-            if store_path is not None
-            else self._base_dir / "hvs-project-materialization-v1.json"
-        )
+        if store_path is not None:
+            p = Path(store_path)
+            # `store_path` may be a directory (isolation harness) or a bare
+            # name; resolve to the canonical envelope file inside it so the
+            # read/write paths are always a FILE (never a directory, which
+            # would raise PermissionError on read_text and surface as CORRUPT).
+            if p.is_dir() or p.name != _STORE_FILE_NAME:
+                self._store_path = p / _STORE_FILE_NAME
+            else:
+                self._store_path = p
+        else:
+            self._store_path = self._base_dir / _STORE_FILE_NAME
 
     @property
     def store_path(self) -> Path:

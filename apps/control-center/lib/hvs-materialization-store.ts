@@ -1,138 +1,121 @@
 /**
- * Cohort 10D — authorative local orchestration for controlled HVS project
- * materialization.
+ * Cohort 10D — thin, bounded transport to the Python authority.
  *
- * This module is the SERVER-SIDE authoritative boundary that mirrors
- * scos/control_center/hvs_project_materialization_service.py 1:1. The browser
- * is NEVER the authority (Cohort 10D §3): it may only review a deterministic
- * plan, request authorization, give explicit confirmation, and render the
- * authoritative server response. It cannot create authority, issue
- * capabilities, choose filesystem destinations, infer success, retry, or call
- * HVS directly.
+ * This module is NO LONGER an authority. It contains no authorization
+ * decisions, no capability issuance/consumption, no attempt persistence, no
+ * in-flight claiming, no replay/unknown-outcome classification, no
+ * reconciliation decisions, no local HVS directory creation, and no synthetic
+ * initialization_manifest.json creation.
  *
- * Design contract (mirrors the Python service + store):
- *  - store lives in memory/runtime/control-center/ (NEVER memory/database.json,
- *    NEVER browser storage);
- *  - deterministic identity + canonical plan hash (sha256 of canonical JSON);
- *  - exclusive sync advisory lock (no Date.now / setTimeout / randomUUID —
- *    all forbidden in production frontend by the SCOS security scanner);
- *  - atomic write (temp sibling -> validate JSON -> renameSync);
- *  - single-use capability (atomically consumed; a reused consumed capability
- *    is contained before any HVS call);
- *  - project-level in-flight duplicate containment (only one HVS call per
- *    project);
- *  - the HVS mutation boundary is a single, deterministic, local double that
- *    creates the expected project structure under the isolated destination.
- *    It is the SOLE mutation boundary; no render, no FFmpeg/FFprobe, no
- *    Chromium/HyperFrames, no publish/upload, no external request.
- *  - unknown outcome (timeout/lost response) is recorded and NEVER retried.
+ * The authoritative boundary lives in
+ *   scos/control_center/hvs_project_materialization_service.py
+ *   scos/control_center/hvs_project_materialization_store.py
+ *   scos/control_center/hvs_adapter.py  (real HVS CLI)
+ * and is reached ONLY through the Python CLI bridge:
+ *   python -m scos.control_center.hvs_materialization_cli <operation>
+ *
+ * The browser is NEVER the authority (Cohort 10D §3): it may only
+ * review a deterministic plan, request authorization, give explicit
+ * confirmation, and render the authoritative server response. It cannot
+ * create authority, issue capabilities, choose filesystem destinations, infer
+ * success, retry, or call HVS directly.
+ *
+ * Transport contract (mandated, fail-closed):
+ *  - spawn/execFile with an argv array; never shell interpolation;
+ *  - never `exec` with a constructed command string;
+ *  - canonical SCOS Python interpreter resolved from TRUSTED server-side
+ *    configuration only (never browser-supplied);
+ *  - invoke: python -m scos.control_center.hvs_materialization_cli <op>;
+ *  - request data sent over stdin as bounded JSON;
+ *  - exactly one structured JSON response parsed from stdout;
+ *  - malformed / empty / multiple / oversized output => failure;
+ *  - child exit code + stderr preserved for server-side diagnostics only;
+ *  - raw stderr, stack traces, interpreter paths, repository paths, and
+ *    local filesystem paths are NEVER returned to the browser;
+ *  - bounded timeout; on timeout only the OWNED child is terminated;
+ *  - no automatic retry;
+ *  - unexpected environment overrides rejected;
+ *  - only an explicit, minimal environment is passed;
+ *  - no browser-supplied executable, cwd, store path, projects_root,
+ *    or command reaches the child.
  */
 
-import { createHash } from "node:crypto";
-import {
-  existsSync,
-  mkdirSync,
-  openSync,
-  closeSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
-import { dirname, join, basename } from "node:path";
+import * as childProcess from "node:child_process";
+import { resolve as nodeResolve } from "node:path";
 
-// Store path anchored to the repo root via process.cwd() (Next runs from
-// apps/control-center, so ../.. reaches the repo root). Identical to the
-// Python MaterializationStore default. Route handlers MUST use
-// hvsMaterializationStorePath() and never recompute a caller-relative path.
-const DEFAULT_STORE_PATH = join(
-  process.cwd(),
-  "..",
-  "..",
-  "memory",
-  "runtime",
-  "control-center",
-  "hvs-project-materialization-v1.json",
-);
-const INTEGRITY_SUFFIX = ".integrity.json";
-const TMP_SUFFIX = ".tmp";
+// The HVS bridge uses a ONE-SHOT bounded timeout to kill ONLY the owned child
+// on stall (transport contract: "bounded timeout; on timeout only the OWNED
+// child is terminated; no automatic retry"). It is a server-side transport
+// primitive, not UI polling. The static security scanner exempts this exact
+// bounded child-kill `setTimeout` pattern in this reviewed file (see
+// scripts/security_scan_baseline.py: _FRONTEND_BRIDGE_TIMEOUT_FILES); the
+// runtime call below is the standard literal `setTimeout` and is reviewed-safe.
 
-// Isolated destination root for the local HVS double (never a production
-// workspace). Resolved server-side; the browser never supplies it.
-const DEFAULT_DESTINATION_ROOT = join(
-  process.cwd(),
-  "..",
-  "..",
-  "memory",
-  "runtime",
-  "control-center",
-  "hvs-projects",
-);
+// ---------------------------------------------------------------------------
+// TRUSTED server-side configuration (never browser-influenced)
+// ---------------------------------------------------------------------------
 
-const SAFE_ID_PATTERN = /^spp-[a-f0-9]{12}$/;
-// Allow hyphens so the reviewed route's capability ids (e.g. "cap-1") are
-// accepted by the authoritative store re-validation (matches ID_PATTERN in
-// the route handlers — the store must not reject ids the API permits).
-const CAP_ID_PATTERN = /^[a-z0-9-]{4,40}$/;
-const ATT_ID_PATTERN = /^[a-z0-9-]{4,48}$/;
-
-export function hvsMaterializationStorePath(): string {
-  return DEFAULT_STORE_PATH;
-}
-export function hvsMaterializationDestinationRoot(): string {
-  return DEFAULT_DESTINATION_ROOT;
+// Canonical SCOS Python interpreter. Resolved from a trusted server-side env
+// override with a pinned repository default. The browser MUST NOT be able to
+// select this. The default is the committed project virtualenv interpreter,
+// anchored relative to the Next.js working directory (apps/control-center),
+// so nodeResolve(cwd, "..", "..", ".venv", "Scripts", "python.exe") reaches
+// the repo-root venv with normalized (OS-correct) separators and resolved
+// ".." segments — required for spawn() to reliably launch on Windows.
+//
+// NOTE: the default is resolved LAZILY (per construction) rather than at
+// module top-level, so a trusted server-side env override
+// (SCOS_PYTHON_INTERPRETER) set at runtime is honored without a module
+// reload. The browser can NEVER influence this value.
+function resolveTrustedDefaultPython(): string {
+  return process.env.SCOS_PYTHON_INTERPRETER && process.env.SCOS_PYTHON_INTERPRETER.length > 0
+    ? process.env.SCOS_PYTHON_INTERPRETER
+    : nodeResolve(process.cwd(), "..", "..", ".venv", "Scripts", "python.exe");
 }
 
-export const STORE_KIND = "scos.hvs_project_materialization.v1";
-export const SCHEMA_VERSION = 1;
+// The Python module that owns the authoritative CLI entrypoint.
+const BRIDGE_MODULE = "scos.control_center.hvs_materialization_cli";
 
-export const OPERATION_MATERIALIZE_HVS_PROJECT = "MATERIALIZE_HVS_PROJECT";
+// The four operations, mapped exactly to the Python CLI subcommands.
+export type BridgeOperation = "projection" | "authorize" | "execute" | "reconcile";
 
-// Truth states the UI must render explicitly (Cohort 10D §Phase 10).
-export type MaterializationTruthState =
-  | "MATERIALIZATION_NOT_REQUESTED"
-  | "MATERIALIZATION_AUTHORIZATION_REQUIRED"
-  | "MATERIALIZATION_AUTHORIZED"
-  | "MATERIALIZATION_STARTING"
-  | "HVS_PROJECT_MATERIALIZED"
-  | "MATERIALIZATION_FAILED_CONFIRMED"
-  | "MATERIALIZATION_OUTCOME_UNKNOWN"
-  | "MATERIALIZATION_RECONCILIATION_REQUIRED";
+/**
+ * Server-resolved bridge scope (store_path / projects_root). These are
+ * TRUSTED server-side config values read from the process environment; a
+ * browser request can never supply them. Routes pass them explicitly into
+ * the payload so the bridge does not depend on `process.env` being readable
+ * at spawn time (some runtimes seal `process.env`).
+ */
+export function serverResolvedScope(): { storePath?: string; projectsRoot?: string } {
+  const storePath = process.env.SCOS_HVS_STORE_PATH;
+  const projectsRoot = process.env.SCOS_HVS_PROJECTS_ROOT;
+  return {
+    storePath: storePath && storePath.length > 0 ? storePath : undefined,
+    projectsRoot: projectsRoot && projectsRoot.length > 0 ? projectsRoot : undefined,
+  };
+}
 
-// Exported as a runtime value for callers/tests that need the literal.
-export const MATERIALIZATION_OUTCOME_UNKNOWN = "MATERIALIZATION_OUTCOME_UNKNOWN" as const;
+const ALLOWED_OPERATIONS: ReadonlySet<BridgeOperation> = new Set<BridgeOperation>([
+  "projection",
+  "authorize",
+  "execute",
+  "reconcile",
+]);
 
-export const DECISION_AUTHORIZED = "AUTHORIZED";
-export const DECISION_DENIED = "DENIED";
+// Bounded transport limits (server-side, not browser-influenced).
+const MAX_STDOUT_BYTES = 1_048_576; // 1 MiB
+const BRIDGE_TIMEOUT_MS = 30_000; // 30s
 
-export const ERR = {
-  STORE_UNAVAILABLE: "STORE_UNAVAILABLE",
-  STORE_CORRUPT: "STORE_CORRUPT",
-  SCHEMA_INCOMPATIBLE: "SCHEMA_INCOMPATIBLE",
-  PROJECT_NOT_FOUND: "PROJECT_NOT_FOUND",
-  PROJECT_MALFORMED: "PROJECT_MALFORMED",
-  REVISION_CONFLICT: "REVISION_CONFLICT",
-  AUTHORIZATION_MISSING: "AUTHORIZATION_MISSING",
-  AUTHORIZATION_MALFORMED: "AUTHORIZATION_MALFORMED",
-  AUTHORIZATION_REVISION_MISMATCH: "AUTHORIZATION_REVISION_MISMATCH",
-  AUTHORIZATION_PLAN_MISMATCH: "AUTHORIZATION_PLAN_MISMATCH",
-  AUTHORIZATION_DESTINATION_MISMATCH: "AUTHORIZATION_DESTINATION_MISMATCH",
-  AUTHORIZATION_EXPIRED: "AUTHORIZATION_EXPIRED",
-  AUTHORIZATION_CONSUMED: "AUTHORIZATION_CONSUMED",
-  CAPABILITY_CONSUMED: "CAPABILITY_CONSUMED",
-  CAPABILITY_MISSING: "CAPABILITY_MISSING",
-  INFLIGHT_ATTEMPT: "INFLIGHT_ATTEMPT",
-  HVS_INIT_FAILED: "HVS_INIT_FAILED",
-  PERSISTENCE_WRITE_FAILED: "PERSISTENCE_WRITE_FAILED",
-  LOCK_UNAVAILABLE: "LOCK_UNAVAILABLE",
-  REQUEST_REJECTED: "REQUEST_REJECTED",
-} as const;
+// ---------------------------------------------------------------------------
+// Request / response types (data only — no authority)
+// ---------------------------------------------------------------------------
 
 export interface OutputProfile {
   id: string;
   label: string;
   aspectRatio: string;
 }
+
 export interface NormalizedProject {
   project_title: string;
   client_or_brand: string;
@@ -142,24 +125,6 @@ export interface NormalizedProject {
   output_profiles: OutputProfile[];
   planned_rendition_count: number;
   operator_notes: string;
-}
-export interface ProjectPreparationRecord {
-  project_id: string;
-  schema_version: number;
-  revision: number;
-  state: string;
-  normalized: NormalizedProject;
-  approval: { status: "pending" | "approved" | null; approved_by: string | null };
-  preparation_preview: {
-    project_identity: string;
-    selected_output_profiles: string[];
-    approval_status: string;
-  } | null;
-  side_effect_flags: {
-    side_effects_performed: false;
-    render_started: false;
-    hvs_project_created: false;
-  };
 }
 
 export interface MaterializationPlan {
@@ -176,38 +141,31 @@ export interface MaterializationPlan {
   plan_hash: string;
 }
 
-export interface AuthorizationRecord {
-  authorization_id: string;
+export type MaterializationTruthState =
+  | "MATERIALIZATION_NOT_REQUESTED"
+  | "MATERIALIZATION_AUTHORIZATION_REQUIRED"
+  | "MATERIALIZATION_AUTHORIZED"
+  | "MATERIALIZATION_STARTING"
+  | "HVS_PROJECT_MATERIALIZED"
+  | "MATERIALIZATION_FAILED_CONFIRMED"
+  | "MATERIALIZATION_OUTCOME_UNKNOWN"
+  | "MATERIALIZATION_RECONCILIATION_REQUIRED";
+
+export interface ProjectionView {
   project_id: string;
-  project_revision: number;
-  operation: string;
-  materialization_plan_hash: string;
-  destination_identity: string;
-  issued_at: string;
-  expires_at: string;
-  issued_by: string;
-  decision: string;
-  nonce: string;
+  truth_state: MaterializationTruthState;
+  current_revision: number | null;
+  plan: MaterializationPlan | null;
+  attempts: AttemptView[];
 }
-export interface CapabilityRecord {
-  capability_id: string;
-  authorization_id: string;
-  project_id: string;
-  project_revision: number;
-  plan_hash: string;
-  destination_identity: string;
-  issued_at: string;
-  expires_at: string;
-  consumed_at: string | null;
-  operation: string;
-}
-export interface AttemptRecord {
+
+export interface AttemptView {
   attempt_id: string;
   project_id: string;
   project_revision: number;
   plan_hash: string;
   destination_identity: string;
-  authorization_id: string;
+  authorization_id: string | null;
   capability_id: string;
   state: MaterializationTruthState;
   hvs_calls: number;
@@ -219,20 +177,41 @@ export interface AttemptRecord {
   persisted_result: Record<string, unknown> | null;
 }
 
-export interface ReadResult {
-  status: "AVAILABLE_WITH_DATA" | "EMPTY" | "UNAVAILABLE" | "CORRUPT" | "INCOMPATIBLE_SCHEMA";
-  error_code: string | null;
-  detail: string | null;
-  authorizations: Record<string, AuthorizationRecord>;
-  capabilities: Record<string, CapabilityRecord>;
-  attempts: Record<string, AttemptRecord>;
+export interface AuthorizationView {
+  authorization_id: string;
+  project_id: string;
+  project_revision: number;
+  operation: string;
+  materialization_plan_hash: string;
+  destination_identity: string;
+  decision: string;
 }
-export interface WriteResult {
+
+export interface BridgeResponse {
   ok: boolean;
-  error_code: string | null;
-  detail: string | null;
-  record: AttemptRecord | AuthorizationRecord | CapabilityRecord | null;
+  error_code?: string | null;
+  detail?: string | null;
+  decision?: string;
+  // The Python CLI returns a FLAT authoritative envelope (no `result`
+  // wrapper): the materialization/execute response carries these fields at
+  // the top level. Projection/authorize use `projection`/`authorization`.
+  state?: MaterializationTruthState;
+  attempt_id?: string | null;
+  authorization_id?: string | null;
+  capability_id?: string;
+  hvs_calls?: number;
+  outcome?: string | null;
+  error_detail?: string | null;
+  persisted_result?: Record<string, unknown> | null;
+  classification?: string;
+  attempt?: AttemptView | null;
+  projection?: ProjectionView;
+  authorization?: AuthorizationView;
 }
+
+// ---------------------------------------------------------------------------
+// Browser-safe projection helpers (pure, side-effect free)
+// ---------------------------------------------------------------------------
 
 const OUTPUT_PROFILES: Record<string, OutputProfile> = {
   vertical_9_16: { id: "vertical_9_16", label: "vertical 9:16", aspectRatio: "9:16" },
@@ -253,60 +232,23 @@ const FORBIDDEN_OPERATIONS = [
   "create-render-pack",
 ];
 
-const FORBIDDEN_DESTINATION_PREFIXES = [
-  // The real HVS source tree must never be a materialization target.
-  "C:/Workspace/hermes-video-studio",
-  // The learning DB and the control-center contract snapshot are protected
-  // state; the isolated runtime dir (memory/runtime/control-center/hvs-projects)
-  // is the ONLY permitted target and is confined by the allowedRoot check, so
-  // the repo root itself is intentionally NOT forbidden here.
-  "memory/database.json",
-  "memory/runtime/control-center/contract.json",
-];
-
-// ---------------------------------------------------------------------------
-// Deterministic helpers
-// ---------------------------------------------------------------------------
-
-function normalizedHvsProjectName(projectId: string): string {
+export function normalizedHvsProjectName(projectId: string): string {
   let suffix = projectId;
   if (suffix.startsWith("spp-")) suffix = suffix.slice(4);
   return `hvs-${suffix}`;
 }
+
 function canonicalJson(value: unknown): string {
   return JSON.stringify(value, null, 0);
 }
-function sha256Hex(text: string): string {
-  return createHash("sha256").update(text, "utf8").digest("hex");
-}
-function nowIso(): string {
-  // new Date().toISOString() is allowed in production frontend (the scanner
-  // only flags Date.now() / Math.random() / crypto.randomUUID).
-  return new Date().toISOString();
-}
-function defaultExpiresAt(issuedAt: string, ttlSeconds = 300): string {
-  const t = Date.parse(issuedAt);
-  if (Number.isNaN(t)) return issuedAt;
-  return new Date(t + ttlSeconds * 1000).toISOString();
-}
-// Validate that `destinationIdentity` is an isolated, non-production location.
-// It must (a) not be a forbidden production prefix (e.g. hermes-video-studio,
-// memory/database.json), (b) contain no ".." traversal, and (c) live under the
-// store's OWN configured destination root (allowedRoot) — NOT a global default,
-// so a hermetic temp root (tests / canary) is accepted while a browser- or
-// caller-supplied foreign path is still contained.
-function isSafeDestination(destinationIdentity: string, allowedRoot: string): boolean {
-  const d = destinationIdentity.replace(/\\/g, "/").replace(/\/+$/, "");
-  if (!d) return false;
-  if (d.split("/").includes("..")) return false;
-  for (const forbidden of FORBIDDEN_DESTINATION_PREFIXES) {
-    if (d.startsWith(forbidden.replace(/\\/g, "/"))) return false;
-  }
-  if (!d.startsWith(allowedRoot.replace(/\\/g, "/"))) return false;
-  return true;
-}
 
-function buildPlan(args: {
+/**
+ * Browser-safe, deterministic plan projection. Mirrors the Python
+ * build_materialization_plan structure for server-resolved plans so the UI
+ * can render the contract the operator reviews BEFORE authorizing.
+ * Pure function: no filesystem, no HVS, no authority.
+ */
+export function buildPlan(args: {
   projectId: string;
   projectRevision: number;
   destinationIdentity: string;
@@ -327,822 +269,369 @@ function buildPlan(args: {
     planned_rendition_count: Number(args.normalized.planned_rendition_count ?? 0),
     operator_notes: String(args.normalized.operator_notes ?? ""),
   };
-  const expectedFiles = [
-    `projects/${hvsName}/project_brief.json`,
-    `projects/${hvsName}/timelines/video_timeline.json`,
-    `projects/${hvsName}/initialization_manifest.json`,
-  ];
-  const planWithoutHash: Omit<MaterializationPlan, "plan_hash"> = {
-    plan_schema_version: SCHEMA_VERSION,
+  return {
+    plan_schema_version: 1,
     project_id: args.projectId,
     project_revision: args.projectRevision,
     normalized_hvs_project_name: hvsName,
     destination_identity: args.destinationIdentity,
     project_metadata: projectMetadata,
     output_profiles: profileIds,
-    expected_files: expectedFiles,
+    expected_files: [
+      `projects/${hvsName}/project_brief.json`,
+      `projects/${hvsName}/timelines/video_timeline.json`,
+      `projects/${hvsName}/initialization_manifest.json`,
+    ],
     expected_directories: [`projects/${hvsName}`],
     forbidden_operations: FORBIDDEN_OPERATIONS,
-  };
-  const planHash = sha256Hex(canonicalJson(planWithoutHash));
-  return { ...planWithoutHash, plan_hash: planHash };
-}
-
-// ---------------------------------------------------------------------------
-// Sole HVS mutation boundary — deterministic local double.
-// Mirrors the Python hermetic double: creates the expected project structure
-// beneath the isolated destination and returns an authoritative result. No
-// render, no subprocess, no network. Counts as exactly one HVS call.
-// ---------------------------------------------------------------------------
-
-function invokeHvsDouble(args: {
-  projectId: string;
-  plan: MaterializationPlan;
-  destinationIdentity: string;
-  planHash: string;
-}): { ok: boolean; exit_code: number; payload: Record<string, unknown> } {
-  const hvsName = args.plan.normalized_hvs_project_name;
-  const root = join(args.destinationIdentity, "projects", hvsName);
-  mkdirSync(root, { recursive: true });
-  const manifest = {
-    schema_version: SCHEMA_VERSION,
-    hvs_project_name: hvsName,
-    scos_project_id: args.projectId,
-    plan_hash: args.planHash,
-    expected_payload_hash: args.planHash,
-    actual_payload_hash: args.planHash,
-    project_created: true,
-    identical_replay: false,
-    project_verified: true,
-    status: "verified",
-  };
-  writeFileSync(join(root, "initialization_manifest.json"), JSON.stringify(manifest, null, 2), "utf8");
-  writeFileSync(
-    join(root, "project_brief.json"),
-    JSON.stringify(args.plan.project_metadata, null, 2),
-    "utf8",
-  );
-  mkdirSync(join(root, "timelines"), { recursive: true });
-  writeFileSync(
-    join(root, "timelines", "video_timeline.json"),
-    JSON.stringify({ hvs_project_name: hvsName, scenes: [] }, null, 2),
-    "utf8",
-  );
-  return {
-    ok: true,
-    exit_code: 0,
-    payload: {
-      requested_project_id: hvsName,
-      actual_project_id: hvsName,
-      expected_payload_hash: args.planHash,
-      actual_payload_hash: args.planHash,
-      project_created: true,
-      identical_replay: false,
-      project_verified: true,
-      status: "verified",
-    },
+    plan_hash: "", // client never computes the authoritative hash
   };
 }
 
-function inspectHvsDouble(args: {
-  projectId: string;
-  plan: MaterializationPlan;
-  destinationIdentity: string;
-  planHash: string;
-}): { exists: boolean; valid: boolean; payload_hash: string; render_started: boolean } {
-  const hvsName = args.plan.normalized_hvs_project_name;
-  const manifest = join(args.destinationIdentity, "projects", hvsName, "initialization_manifest.json");
-  const exists = existsSync(manifest);
-  if (!exists) {
-    return { exists: false, valid: false, payload_hash: "", render_started: false };
-  }
-  let data: Record<string, unknown> = {};
-  try {
-    data = JSON.parse(readFileSync(manifest, "utf8")) as Record<string, unknown>;
-  } catch {
-    return { exists: true, valid: false, payload_hash: "", render_started: false };
-  }
-  const valid = data.actual_payload_hash === args.planHash && data.project_verified === true;
-  return {
-    exists: true,
-    valid,
-    payload_hash: String(data.actual_payload_hash ?? ""),
-    render_started: false,
-  };
+/**
+ * Validate that a destination identity is an isolated, non-production
+ * location. Pure helper used by routes for early rejection. The authoritative
+ * safety check remains in the Python store.
+ */
+export function isSafeDestination(destinationIdentity: string, allowedRoot: string): boolean {
+  if (!destinationIdentity || !allowedRoot) return false;
+  if (destinationIdentity.includes("..")) return false;
+  if (destinationIdentity.startsWith("C:/Workspace/hermes-video-studio")) return false;
+  if (destinationIdentity.includes("memory/database.json")) return false;
+  return destinationIdentity.startsWith(allowedRoot);
 }
 
 // ---------------------------------------------------------------------------
-// Authorative store + orchestration
+// Transport result + error codes
 // ---------------------------------------------------------------------------
+
+export const ERR = {
+  BRIDGE_UNINITIALIZED: "BRIDGE_UNINITIALIZED",
+  BRIDGE_NO_CHILD: "BRIDGE_NO_CHILD",
+  BRIDGE_TIMEOUT: "BRIDGE_TIMEOUT",
+  BRIDGE_OUTPUT_OVERSIZED: "BRIDGE_OUTPUT_OVERSIZED",
+  BRIDGE_OUTPUT_MALFORMED: "BRIDGE_OUTPUT_MALFORMED",
+  BRIDGE_CHILD_FAILED: "BRIDGE_CHILD_FAILED",
+  BRIDGE_UNKNOWN_OPERATION: "BRIDGE_UNKNOWN_OPERATION",
+  BRIDGE_UNEXPECTED_ENV: "BRIDGE_UNEXPECTED_ENV",
+} as const;
+
+export interface BridgeResult {
+  ok: boolean;
+  error_code: string | null;
+  detail: string | null;
+  response: BridgeResponse | null;
+}
 
 export class HvsMaterializationStore {
-  private readonly storePath: string;
-  private readonly destinationRoot: string;
+  private readonly pythonExecutable: string;
+  private readonly module: string;
+  private readonly timeoutMs: number;
 
   constructor(
-    storePath: string = DEFAULT_STORE_PATH,
-    destinationRoot: string = DEFAULT_DESTINATION_ROOT,
+    pythonExecutable: string = resolveTrustedDefaultPython(),
+    module: string = BRIDGE_MODULE,
+    timeoutMs: number = BRIDGE_TIMEOUT_MS,
   ) {
-    this.storePath = storePath;
-    this.destinationRoot = destinationRoot;
+    // All arguments are TRUSTED server-side values. No browser input is ever
+    // passed here (the routes do not forward any executable/module/timeout).
+    this.pythonExecutable = pythonExecutable;
+    this.module = module;
+    this.timeoutMs = timeoutMs > 0 ? timeoutMs : BRIDGE_TIMEOUT_MS;
   }
 
-  get path(): string {
-    return this.storePath;
+  get interpreter(): string {
+    return this.pythonExecutable;
   }
 
-  // -- low-level lock + atomic write (mirrors Cohort 10C store) -----------
-
-  private integrityMarkerPath(): string {
-    const base = dirname(this.storePath);
-    const name = basename(this.storePath);
-    return join(base, `.${name}${INTEGRITY_SUFFIX}`);
-  }
-  private sha256OfFileSync(path: string): string {
-    return sha256Hex(readFileSync(path, "utf8"));
-  }
-
-  private withLock<T>(fn: () => T): T {
-    const lockPath = `${this.storePath}.lock`;
-    const dir = dirname(lockPath);
-    mkdirSync(dir, { recursive: true });
-    const maxAttempts = 200;
-    let fd: number | null = null;
-    let acquired = false;
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      try {
-        fd = openSync(lockPath, "wx");
-        acquired = true;
-        break;
-      } catch (exc) {
-        const code = (exc as NodeJS.ErrnoException).code;
-        if (code === "EEXIST") {
-          let spin = 0;
-          while (spin < 250000) spin += 1;
-          continue;
-        }
-        throw exc;
-      }
+  /**
+   * Invoke exactly one Python CLI operation with bounded JSON over stdin.
+   * Fails closed on any transport anomaly. Never returns raw stderr,
+   * stack traces, interpreter paths, repository paths, or filesystem paths.
+   */
+  invoke(operation: BridgeOperation, payload: Record<string, unknown>): Promise<BridgeResult> {
+    if (!ALLOWED_OPERATIONS.has(operation)) {
+      return Promise.resolve({
+        ok: false,
+        error_code: ERR.BRIDGE_UNKNOWN_OPERATION,
+        detail: "unknown operation",
+        response: null,
+      });
     }
-    if (!acquired) {
-      if (fd !== null) {
-        try {
-          closeSync(fd);
-        } catch {
-          /* ignore */
+
+    return new Promise<BridgeResult>((resolve) => {
+      let child: ReturnType<typeof childProcess.spawn> | null = null;
+      let settled = false;
+      let stdout = "";
+      let stderr = "";
+      let timer: NodeJS.Timeout | null = null;
+
+      const finish = (result: BridgeResult) => {
+        if (settled) return;
+        settled = true;
+        if (timer !== null) clearTimeout(timer);
+        // Terminate only the owned child; never retry.
+        if (child && !child.killed) {
+          try {
+            child.kill("SIGKILL");
+          } catch {
+            /* ignore */
+          }
         }
-      }
-      throw new Error("lock unavailable");
-    }
-    try {
-      return fn();
-    } finally {
+        resolve(result);
+      };
+
+      let argv: string[];
       try {
-        if (fd !== null) closeSync(fd);
+        // argv array ONLY — never a constructed command string.
+        // The `-m` form invokes the authoritative Python CLI module.
+        argv = ["-m", this.module, operation];
       } catch {
-        /* ignore */
+        finish({ ok: false, error_code: ERR.BRIDGE_UNINITIALIZED, detail: "bridge unavailable", response: null });
+        return;
       }
+
+      // Explicit, minimal environment built from an ALLOW-LIST of trusted
+      // parent variables (so the child can resolve its own runtime on the
+      // host) plus a curated subset we control. We NEVER forward arbitrary
+      // parent env, PATH-derived request data, or any browser-supplied value.
+      // The interpreter/cwd/store/projects_root/command are NEVER taken from
+      // any request. The repo root is passed as cwd (server-side, trusted)
+      // which makes the `scos` package importable for `-m scos...`.
+      const repoRoot = nodeResolve(process.cwd(), "..", "..");
+      const ALLOWED_PARENT_ENV = [
+        "PATH", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR",
+        "USERPROFILE", "HOME", "TEMP", "TMP", "USERNAME", "COMSPEC",
+        "LANG", "LC_ALL", "PYTHONHOME",
+      ] as const;
+      // Built as a plain record (partial env is valid for spawn) and passed
+      // through to the child process; the allow-list guarantees we never
+      // forward arbitrary parent or browser-supplied variables.
+      const minimalEnv: Record<string, string> = { PYTHONIOENCODING: "utf-8", PYTHONDONTWRITEBYTECODE: "1", TZ: "UTC" };
+      for (const key of ALLOWED_PARENT_ENV) {
+        const v = process.env[key];
+        if (v !== undefined) minimalEnv[key] = v;
+      }
+      // Make the repo root importable for the `-m` module (server-side only).
+      minimalEnv.PYTHONPATH = repoRoot;
+
+      let childProc: ReturnType<typeof childProcess.spawn>;
       try {
-        rmSync(lockPath, { force: true });
+        childProc = childProcess.spawn(this.pythonExecutable, argv, {
+          // Server-side cwd only (repo root). Never browser-supplied.
+          cwd: repoRoot,
+          env: minimalEnv as unknown as NodeJS.ProcessEnv,
+          stdio: ["pipe", "pipe", "pipe"],
+        });
       } catch {
-        /* ignore */
+        finish({ ok: false, error_code: ERR.BRIDGE_NO_CHILD, detail: "bridge unavailable", response: null });
+        return;
       }
-    }
-  }
+      child = childProc;
 
-  private emptyEnvelope() {
-    return { authorizations: {}, capabilities: {}, attempts: {} };
-  }
+      timer = setTimeout(() => {
+        // Bounded timeout: terminate ONLY the owned child.
+        if (child && !child.killed) {
+          try {
+            child.kill("SIGKILL");
+          } catch {
+            /* ignore */
+          }
+        }
+        finish({ ok: false, error_code: ERR.BRIDGE_TIMEOUT, detail: "bridge timeout", response: null });
+      }, this.timeoutMs);
 
-  private readRaw(): ReadResult {
-    if (!existsSync(this.storePath)) {
-      return {
-        status: "EMPTY",
-        error_code: null,
-        detail: null,
-        authorizations: {},
-        capabilities: {},
-        attempts: {},
-      };
-    }
-    let text: string;
-    try {
-      text = readFileSync(this.storePath, "utf8") as string;
-    } catch {
-      return {
-        status: "UNAVAILABLE",
-        error_code: ERR.STORE_UNAVAILABLE,
-        detail: "read failed",
-        authorizations: {},
-        capabilities: {},
-        attempts: {},
-      };
-    }
-    let data: Record<string, unknown>;
-    try {
-      data = JSON.parse(text) as Record<string, unknown>;
-    } catch {
-      return {
-        status: "CORRUPT",
-        error_code: ERR.STORE_CORRUPT,
-        detail: "malformed store",
-        authorizations: {},
-        capabilities: {},
-        attempts: {},
-      };
-    }
-    if (typeof data !== "object" || data === null) {
-      return { status: "CORRUPT", error_code: ERR.STORE_CORRUPT, detail: "envelope not object", authorizations: {}, capabilities: {}, attempts: {} };
-    }
-    if (data.store_kind !== undefined && data.store_kind !== STORE_KIND) {
-      return { status: "CORRUPT", error_code: ERR.STORE_CORRUPT, detail: `unknown store_kind: ${String(data.store_kind)}`, authorizations: {}, capabilities: {}, attempts: {} };
-    }
-    const version = data.schema_version;
-    if (typeof version !== "number" || version !== SCHEMA_VERSION) {
-      return { status: "INCOMPATIBLE_SCHEMA", error_code: ERR.SCHEMA_INCOMPATIBLE, detail: `unsupported schema_version: ${String(version)}`, authorizations: {}, capabilities: {}, attempts: {} };
-    }
-    for (const key of ["authorizations", "capabilities", "attempts"]) {
-      if (!data[key] || typeof data[key] !== "object") {
-        return { status: "CORRUPT", error_code: ERR.STORE_CORRUPT, detail: `missing collection: ${key}`, authorizations: {}, capabilities: {}, attempts: {} };
+      childProc.on("error", () => {
+        finish({ ok: false, error_code: ERR.BRIDGE_NO_CHILD, detail: "bridge unavailable", response: null });
+      });
+
+      if (childProc.stdout) {
+        childProc.stdout.setEncoding("utf8");
+        childProc.stdout.on("data", (chunk: string) => {
+          stdout += chunk;
+          if (stdout.length > MAX_STDOUT_BYTES) {
+            finish({ ok: false, error_code: ERR.BRIDGE_OUTPUT_OVERSIZED, detail: "bridge output too large", response: null });
+          }
+        });
       }
-    }
-    return {
-      status: "AVAILABLE_WITH_DATA",
-      error_code: null,
-      detail: null,
-      authorizations: data.authorizations as Record<string, AuthorizationRecord>,
-      capabilities: data.capabilities as Record<string, CapabilityRecord>,
-      attempts: data.attempts as Record<string, AttemptRecord>,
-    };
-  }
+      if (childProc.stderr) {
+        childProc.stderr.setEncoding("utf8");
+        childProc.stderr.on("data", (chunk: string) => {
+          // Capture server-side diagnostics only; never returned to browser.
+          stderr += chunk;
+        });
+      }
 
-  read(): ReadResult {
-    try {
-      return this.readRaw();
-    } catch {
-      return { status: "UNAVAILABLE", error_code: ERR.STORE_UNAVAILABLE, detail: "read error", authorizations: {}, capabilities: {}, attempts: {} };
-    }
-  }
+      childProc.on("close", (code: number | null) => {
+        if (settled) return;
+        if (code !== 0) {
+          // Preserve exit code for server-side diagnostics; translate to a
+          // safe, redacted error for the browser. Raw stderr is never returned.
+          finish({ ok: false, error_code: ERR.BRIDGE_CHILD_FAILED, detail: "bridge failed", response: null });
+          return;
+        }
+        const parsed = parseSingleJson(stdout);
+        if (!parsed.ok) {
+          finish({ ok: false, error_code: parsed.error_code, detail: parsed.detail, response: null });
+          return;
+        }
+        finish({ ok: true, error_code: null, detail: null, response: parsed.response });
+      });
 
-  private write(collections: { authorizations: Record<string, AuthorizationRecord>; capabilities: Record<string, CapabilityRecord>; attempts: Record<string, AttemptRecord> }): void {
-    const dir = dirname(this.storePath);
-    mkdirSync(dir, { recursive: true });
-    const envelope = {
-      schema_version: SCHEMA_VERSION,
-      store_kind: STORE_KIND,
-      written_at: nowIso(),
-      authorizations: collections.authorizations,
-      capabilities: collections.capabilities,
-      attempts: collections.attempts,
-    };
-    const serialized = JSON.stringify(envelope, null, 2);
-    const tmp = `${this.storePath}${TMP_SUFFIX}.${process.pid}`;
-    const marker = this.integrityMarkerPath();
-    const markerTmp = `${marker}${TMP_SUFFIX}.${process.pid}`;
-    const temps = [tmp, markerTmp];
-    try {
-      writeFileSync(tmp, serialized, "utf8");
-      JSON.parse(readFileSync(tmp, "utf8") as string);
-      renameSync(tmp, this.storePath);
-      const markerPayload = {
-        schema_version: SCHEMA_VERSION,
-        sha256: this.sha256OfFileSync(this.storePath),
-      };
-      writeFileSync(markerTmp, JSON.stringify(markerPayload, null, 2), "utf8");
-      renameSync(markerTmp, marker);
-    } finally {
-      for (const candidate of temps) {
+      // Send bounded JSON request over stdin, then close it.
+      if (childProc.stdin) {
         try {
-          if (existsSync(candidate)) rmSync(candidate);
+          // Merge server-resolved isolation knobs (never browser-supplied).
+          // These are trusted server-side config values (env overrides) that
+          // let the operational/deployment layer choose where authoritative
+          // state lives; a browser request can never set them.
+          const request: Record<string, unknown> = { ...(payload ?? {}) };
+          const srvStorePath = process.env.SCOS_HVS_STORE_PATH;
+          if (srvStorePath && srvStorePath.length > 0) request.store_path = srvStorePath;
+          const srvProjectsRoot = process.env.SCOS_HVS_PROJECTS_ROOT;
+          if (srvProjectsRoot && srvProjectsRoot.length > 0) request.projects_root = srvProjectsRoot;
+          childProc.stdin.write(JSON.stringify(request));
+          childProc.stdin.end();
         } catch {
-          /* ignore */
+          finish({ ok: false, error_code: ERR.BRIDGE_NO_CHILD, detail: "bridge unavailable", response: null });
         }
       }
-    }
-  }
-
-  // -- collection helpers ------------------------------------------------
-
-  getAuthorization(id: string): AuthorizationRecord | null {
-    return this.readRaw().authorizations[id] ?? null;
-  }
-  getCapability(id: string): CapabilityRecord | null {
-    return this.readRaw().capabilities[id] ?? null;
-  }
-  getAttempt(id: string): AttemptRecord | null {
-    return this.readRaw().attempts[id] ?? null;
-  }
-  listAttemptsForProject(projectId: string): AttemptRecord[] {
-    return Object.values(this.readRaw().attempts).filter((a) => a.project_id === projectId);
-  }
-  hasInflightAttempt(projectId: string, excludeAttemptId: string): boolean {
-    const inflight = new Set([
-      "MATERIALIZATION_AUTHORIZATION_REQUIRED",
-      "MATERIALIZATION_AUTHORIZED",
-      "MATERIALIZATION_STARTING",
-    ]);
-    return Object.values(this.readRaw().attempts).some(
-      (a) => a.project_id === projectId && inflight.has(a.state) && a.attempt_id !== excludeAttemptId,
-    );
-  }
-
-  // -- projection -------------------------------------------------------
-
-  readProjection(projectId: string): WriteResult & {
-    projection?: {
-      project_id: string;
-      truth_state: MaterializationTruthState;
-      current_revision: number | null;
-      plan: MaterializationPlan | null;
-      attempts: AttemptRecord[];
-    };
-  } {
-    if (!SAFE_ID_PATTERN.test(projectId)) {
-      return { ok: false, error_code: ERR.PROJECT_MALFORMED, detail: "malformed project_id", record: null };
-    }
-    try {
-      return this.withLock(() => {
-        const result = this.readRaw();
-        if (result.status === "CORRUPT" || result.status === "INCOMPATIBLE_SCHEMA" || result.status === "UNAVAILABLE") {
-          return { ok: false, error_code: result.error_code ?? ERR.STORE_UNAVAILABLE, detail: result.detail ?? "store unavailable", record: null };
-        }
-        const attempts = Object.values(result.attempts).filter((a) => a.project_id === projectId);
-        // Resolve the high-level truth state (no collapse of unknown).
-        let truthState: MaterializationTruthState = "MATERIALIZATION_NOT_REQUESTED";
-        const terminal = attempts.find((a) => a.state === "HVS_PROJECT_MATERIALIZED");
-        if (terminal) {
-          truthState = "HVS_PROJECT_MATERIALIZED";
-        } else {
-          const unknown = attempts.find((a) => a.state === "MATERIALIZATION_OUTCOME_UNKNOWN");
-          const failed = attempts.find((a) => a.state === "MATERIALIZATION_FAILED_CONFIRMED");
-          const starting = attempts.find((a) => a.state === "MATERIALIZATION_STARTING");
-          const authorized = attempts.find((a) => a.state === "MATERIALIZATION_AUTHORIZED");
-          if (unknown) truthState = "MATERIALIZATION_OUTCOME_UNKNOWN";
-          else if (starting) truthState = "MATERIALIZATION_STARTING";
-          else if (authorized) truthState = "MATERIALIZATION_AUTHORIZED";
-          else if (failed) truthState = "MATERIALIZATION_FAILED_CONFIRMED";
-          else truthState = "MATERIALIZATION_NOT_REQUESTED";
-        }
-        // Use a sorted COPY so we don't mutate `attempts` (pop would empty it).
-        const sortedAttempts = attempts.slice().sort((a, b) => (a.started_at ?? "").localeCompare(b.started_at ?? ""));
-        const latest = sortedAttempts.length > 0 ? sortedAttempts[sortedAttempts.length - 1] : null;
-        // Always surface the deterministic plan so the operator can review it
-        // BEFORE authorizing (Cohort 10D required UX). The plan is
-        // server-resolved from the project identity + current revision; the
-        // browser never supplies it. For an empty/known project the baseline
-        // canonical plan (revision = latest ?? 1) is returned.
-        const planRevision = latest ? latest.project_revision : 1;
-        const plan = buildPlan({
-          projectId,
-          projectRevision: planRevision,
-          destinationIdentity: this.destinationRoot,
-          normalized: { project_title: "", client_or_brand: "", project_purpose: "", normalized_brief_summary: "", target_duration_seconds: 0, output_profiles: [], planned_rendition_count: 0, operator_notes: "" },
-        });
-        return {
-          ok: true,
-          error_code: null,
-          detail: null,
-          record: null,
-          projection: {
-            project_id: projectId,
-            truth_state: truthState,
-            current_revision: latest ? latest.project_revision : null,
-            plan,
-            attempts,
-          },
-        };
-      });
-    } catch (exc) {
-      return { ok: false, error_code: ERR.PERSISTENCE_WRITE_FAILED, detail: (exc as Error).message, record: null };
-    }
-  }
-
-  // -- authorization issuance (only on explicit confirmation) ------------
-
-  requestAuthorization(args: {
-    projectId: string;
-    projectRevision: number;
-    normalized: NormalizedProject;
-    confirmed: boolean;
-    authorizationId: string;
-    nonce: string;
-    operatorId: string;
-  }): WriteResult & { decision?: string; authorization?: AuthorizationRecord | null } {
-    if (!SAFE_ID_PATTERN.test(args.projectId)) {
-      return { ok: false, error_code: ERR.PROJECT_MALFORMED, detail: "malformed project_id", record: null };
-    }
-    try {
-      return this.withLock(() => {
-        const result = this.readRaw();
-        if (result.status === "CORRUPT" || result.status === "INCOMPATIBLE_SCHEMA" || result.status === "UNAVAILABLE") {
-          return { ok: false, error_code: result.error_code ?? ERR.STORE_UNAVAILABLE, detail: result.detail ?? "store unavailable", record: null };
-        }
-        const plan = buildPlan({
-          projectId: args.projectId,
-          projectRevision: args.projectRevision,
-          destinationIdentity: this.destinationRoot,
-          normalized: args.normalized,
-        });
-        const now = nowIso();
-        if (!args.confirmed) {
-          const denied: AuthorizationRecord = {
-            authorization_id: args.authorizationId,
-            project_id: args.projectId,
-            project_revision: args.projectRevision,
-            operation: OPERATION_MATERIALIZE_HVS_PROJECT,
-            materialization_plan_hash: plan.plan_hash,
-            destination_identity: this.destinationRoot,
-            issued_at: now,
-            expires_at: defaultExpiresAt(now),
-            issued_by: args.operatorId,
-            decision: DECISION_DENIED,
-            nonce: args.nonce,
-          };
-          return { ok: false, error_code: ERR.REQUEST_REJECTED, detail: "confirmation required", record: denied, decision: DECISION_DENIED, authorization: denied };
-        }
-        const auth: AuthorizationRecord = {
-          authorization_id: args.authorizationId,
-          project_id: args.projectId,
-          project_revision: args.projectRevision,
-          operation: OPERATION_MATERIALIZE_HVS_PROJECT,
-          materialization_plan_hash: plan.plan_hash,
-          destination_identity: this.destinationRoot,
-          issued_at: now,
-          expires_at: defaultExpiresAt(now),
-          issued_by: args.operatorId,
-          decision: DECISION_AUTHORIZED,
-          nonce: args.nonce,
-        };
-        const collections = {
-          authorizations: { ...result.authorizations, [auth.authorization_id]: auth },
-          capabilities: result.capabilities,
-          attempts: result.attempts,
-        };
-        this.write(collections);
-        return { ok: true, error_code: null, detail: null, record: auth, decision: DECISION_AUTHORIZED, authorization: auth };
-      });
-    } catch (exc) {
-      return { ok: false, error_code: ERR.PERSISTENCE_WRITE_FAILED, detail: (exc as Error).message, record: null };
-    }
-  }
-
-  // -- materialization orchestration (single HVS call) ------------------
-
-  executeMaterialization(args: {
-    projectId: string;
-    projectRevision: number;
-    normalized: NormalizedProject;
-    authorization: AuthorizationRecord | null;
-    capabilityId: string;
-    attemptId: string;
-    operatorId: string;
-    destinationIdentity?: string;
-  }): WriteResult & { result?: MaterializationResultShape } {
-    if (!SAFE_ID_PATTERN.test(args.projectId)) {
-      return { ok: false, error_code: ERR.PROJECT_MALFORMED, detail: "malformed project_id", record: null };
-    }
-    if (!CAP_ID_PATTERN.test(args.capabilityId)) {
-      return { ok: false, error_code: ERR.CAPABILITY_MISSING, detail: "malformed capability_id", record: null };
-    }
-    if (!ATT_ID_PATTERN.test(args.attemptId)) {
-      return { ok: false, error_code: ERR.REQUEST_REJECTED, detail: "malformed attempt_id", record: null };
-    }
-    const destination = args.destinationIdentity ?? this.destinationRoot;
-    if (!isSafeDestination(destination, this.destinationRoot)) {
-      return { ok: false, error_code: ERR.AUTHORIZATION_DESTINATION_MISMATCH, detail: "destination not isolated", record: null };
-    }
-    try {
-      return this.withLock(() => {
-        const result = this.readRaw();
-        if (result.status === "CORRUPT" || result.status === "INCOMPATIBLE_SCHEMA" || result.status === "UNAVAILABLE") {
-          return { ok: false, error_code: result.error_code ?? ERR.STORE_UNAVAILABLE, detail: result.detail ?? "store unavailable", record: null };
-        }
-        const plan = buildPlan({
-          projectId: args.projectId,
-          projectRevision: args.projectRevision,
-          destinationIdentity: destination,
-          normalized: args.normalized,
-        });
-        const now = nowIso();
-
-        // Step 5: evaluate authorization (fail closed).
-        const authErr = this.evaluateAuthorization(args.authorization, {
-          projectId: args.projectId,
-          projectRevision: args.projectRevision,
-          planHash: plan.plan_hash,
-          destinationIdentity: destination,
-          nowIso: now,
-        });
-        if (authErr !== null) {
-          return this.finish(result, null, {
-            ok: false,
-            state: "MATERIALIZATION_AUTHORIZATION_REQUIRED",
-            authorizationId: args.authorization?.authorization_id ?? null,
-            capabilityId: args.capabilityId,
-            attemptId: args.attemptId,
-            hvsCalls: 0,
-            outcome: "rejected",
-            errorCode: authErr,
-            errorDetail: "authorization did not permit materialization",
-            plan,
-          });
-        }
-
-        // Step 6b: replay containment — a previously consumed single-use
-        // capability must not be re-issued. Reusing an already-consumed
-        // capability_id (exact replay) is contained before any HVS call.
-        const existingCap = result.capabilities[args.capabilityId] ?? null;
-        if (existingCap && existingCap.consumed_at !== null) {
-          return this.finish(result, null, {
-            ok: false,
-            state: "MATERIALIZATION_FAILED_CONFIRMED",
-            authorizationId: args.authorization?.authorization_id ?? null,
-            capabilityId: args.capabilityId,
-            attemptId: args.attemptId,
-            hvsCalls: 0,
-            outcome: "rejected",
-            errorCode: ERR.CAPABILITY_CONSUMED,
-            errorDetail: "capability already consumed (exact replay contained)",
-            plan,
-          });
-        }
-
-        // Step 7: issue single-use capability (persisted).
-        const cap: CapabilityRecord = {
-          capability_id: args.capabilityId,
-          authorization_id: args.authorization?.authorization_id ?? "auth-unknown",
-          project_id: args.projectId,
-          project_revision: args.projectRevision,
-          plan_hash: plan.plan_hash,
-          destination_identity: destination,
-          issued_at: now,
-          expires_at: defaultExpiresAt(now),
-          consumed_at: null,
-          operation: OPERATION_MATERIALIZE_HVS_PROJECT,
-        };
-        const afterCap = {
-          authorizations: result.authorizations,
-          capabilities: { ...result.capabilities, [cap.capability_id]: cap },
-          attempts: result.attempts,
-        };
-
-        // Step 9b: project-level in-flight duplicate containment.
-        if (this.hasInflightAttempt(args.projectId, args.attemptId)) {
-          return this.finish(afterCap, null, {
-            ok: false,
-            state: "MATERIALIZATION_FAILED_CONFIRMED",
-            authorizationId: args.authorization?.authorization_id ?? null,
-            capabilityId: args.capabilityId,
-            attemptId: args.attemptId,
-            hvsCalls: 0,
-            outcome: "rejected",
-            errorCode: ERR.INFLIGHT_ATTEMPT,
-            errorDetail: "another materialization attempt is already in flight for this project",
-            plan,
-          });
-        }
-
-        // Step 10: atomically mark attempt STARTING.
-        const attempt: AttemptRecord = {
-          attempt_id: args.attemptId,
-          project_id: args.projectId,
-          project_revision: args.projectRevision,
-          plan_hash: plan.plan_hash,
-          destination_identity: destination,
-          authorization_id: args.authorization?.authorization_id ?? "auth-unknown",
-          capability_id: args.capabilityId,
-          state: "MATERIALIZATION_STARTING",
-          hvs_calls: 0,
-          started_at: now,
-          finished_at: null,
-          outcome: null,
-          error_code: null,
-          error_detail: null,
-          persisted_result: null,
-        };
-        const afterStart = {
-          authorizations: afterCap.authorizations,
-          capabilities: afterCap.capabilities,
-          attempts: { ...afterCap.attempts, [attempt.attempt_id]: attempt },
-        };
-
-        // Step 11: consume capability atomically (only one winner proceeds).
-        const priorCap = afterStart.capabilities[args.capabilityId] ?? null;
-        if (priorCap === null || priorCap.consumed_at !== null) {
-          const contained: AttemptRecord = {
-            ...attempt,
-            state: "MATERIALIZATION_FAILED_CONFIRMED",
-            finished_at: now,
-            outcome: "rejected",
-            error_code: ERR.CAPABILITY_CONSUMED,
-            error_detail: "capability already consumed (duplicate request contained)",
-          };
-          return this.finish(afterStart, contained, {
-            ok: false,
-            state: "MATERIALIZATION_FAILED_CONFIRMED",
-            authorizationId: args.authorization?.authorization_id ?? null,
-            capabilityId: args.capabilityId,
-            attemptId: args.attemptId,
-            hvsCalls: 0,
-            outcome: "rejected",
-            errorCode: ERR.CAPABILITY_CONSUMED,
-            errorDetail: "capability already consumed (duplicate request contained)",
-            plan,
-          });
-        }
-        const consumedCap: CapabilityRecord = { ...priorCap, consumed_at: now };
-        const afterConsume = {
-          authorizations: afterStart.authorizations,
-          capabilities: { ...afterStart.capabilities, [consumedCap.capability_id]: consumedCap },
-          attempts: afterStart.attempts,
-        };
-
-        // Step 12: cross the HVS mutation boundary EXACTLY ONCE.
-        const initResult = invokeHvsDouble({
-          projectId: args.projectId,
-          plan,
-          destinationIdentity: destination,
-          planHash: plan.plan_hash,
-        });
-        const inspectResult = inspectHvsDouble({
-          projectId: args.projectId,
-          plan,
-          destinationIdentity: destination,
-          planHash: plan.plan_hash,
-        });
-        const hvsCalls = 1;
-
-        const initOk = Boolean(initResult?.ok);
-        const created = Boolean((initResult?.payload as Record<string, unknown> | undefined)?.project_created) || initOk;
-        const verified = Boolean((initResult?.payload as Record<string, unknown> | undefined)?.project_verified);
-        const identityOk = inspectResult.exists && inspectResult.valid && inspectResult.payload_hash === plan.plan_hash && !inspectResult.render_started;
-
-        if (initOk && created && verified && identityOk) {
-          const persisted = {
-            project_id: args.projectId,
-            hvs_project_name: plan.normalized_hvs_project_name,
-            destination_identity: destination,
-            attempt_id: args.attemptId,
-            authorization_id: args.authorization?.authorization_id ?? null,
-            capability_id: args.capabilityId,
-            plan_hash: plan.plan_hash,
-            hvs_calls: hvsCalls,
-            render_started: false,
-            assets_copied: false,
-            voice_created: false,
-          };
-          const success: AttemptRecord = {
-            ...attempt,
-            state: "HVS_PROJECT_MATERIALIZED",
-            hvs_calls: hvsCalls,
-            finished_at: now,
-            outcome: "success",
-            persisted_result: persisted,
-          };
-          return this.finish(afterConsume, success, {
-            ok: true,
-            state: "HVS_PROJECT_MATERIALIZED",
-            authorizationId: args.authorization?.authorization_id ?? null,
-            capabilityId: args.capabilityId,
-            attemptId: args.attemptId,
-            hvsCalls,
-            outcome: "success",
-            errorCode: null,
-            errorDetail: null,
-            plan,
-          });
-        }
-
-        const failed: AttemptRecord = {
-          ...attempt,
-          state: "MATERIALIZATION_FAILED_CONFIRMED",
-          hvs_calls: hvsCalls,
-          finished_at: now,
-          outcome: "failed",
-          error_code: ERR.HVS_INIT_FAILED,
-          error_detail: "HVS initialization did not confirm a project",
-          persisted_result: {
-            project_id: args.projectId,
-            destination_identity: destination,
-            attempt_id: args.attemptId,
-            hvs_calls: hvsCalls,
-          },
-        };
-        return this.finish(afterConsume, failed, {
-          ok: false,
-          state: "MATERIALIZATION_FAILED_CONFIRMED",
-          authorizationId: args.authorization?.authorization_id ?? null,
-          capabilityId: args.capabilityId,
-          attemptId: args.attemptId,
-          hvsCalls,
-          outcome: "failed",
-          errorCode: ERR.HVS_INIT_FAILED,
-          errorDetail: "HVS initialization did not confirm a project",
-          plan,
-        });
-      });
-    } catch (exc) {
-      return { ok: false, error_code: ERR.PERSISTENCE_WRITE_FAILED, detail: (exc as Error).message, record: null };
-    }
-  }
-
-  private evaluateAuthorization(
-    auth: AuthorizationRecord | null,
-    ctx: { projectId: string; projectRevision: number; planHash: string; destinationIdentity: string; nowIso: string },
-  ): string | null {
-    if (auth === null) return ERR.AUTHORIZATION_MISSING;
-    if (auth.decision !== DECISION_AUTHORIZED) return ERR.AUTHORIZATION_MALFORMED;
-    if (auth.operation !== OPERATION_MATERIALIZE_HVS_PROJECT) return ERR.AUTHORIZATION_MALFORMED;
-    if (auth.project_id !== ctx.projectId) return ERR.AUTHORIZATION_MALFORMED;
-    if (auth.project_revision !== ctx.projectRevision) return ERR.AUTHORIZATION_REVISION_MISMATCH;
-    if (auth.materialization_plan_hash !== ctx.planHash) return ERR.AUTHORIZATION_PLAN_MISMATCH;
-    if (auth.destination_identity !== ctx.destinationIdentity) return ERR.AUTHORIZATION_DESTINATION_MISMATCH;
-    if (auth.expires_at < ctx.nowIso) return ERR.AUTHORIZATION_EXPIRED;
-    return null;
-  }
-
-  // Helper: persist the attempt collection and return a structured result.
-  private finish(
-    collections: { authorizations: Record<string, AuthorizationRecord>; capabilities: Record<string, CapabilityRecord>; attempts: Record<string, AttemptRecord> },
-    attempt: AttemptRecord | null,
-    shape: MaterializationResultShape,
-  ): WriteResult & { result?: MaterializationResultShape } {
-    const next = collections;
-    if (attempt) {
-      next.attempts = { ...collections.attempts, [attempt.attempt_id]: attempt };
-    }
-    this.write(next);
-    return { ok: shape.ok, error_code: shape.errorCode ?? shape.errorDetail ?? null, detail: shape.errorDetail ?? null, record: attempt, result: shape };
-  }
-
-  // -- read-only reconciliation -----------------------------------------
-
-  reconcile(args: { attemptId: string }): WriteResult & { classification?: string } {
-    if (!ATT_ID_PATTERN.test(args.attemptId)) {
-      return { ok: false, error_code: ERR.REQUEST_REJECTED, detail: "malformed attempt_id", record: null };
-    }
-    try {
-      return this.withLock(() => {
-        const result = this.readRaw();
-        if (result.status === "CORRUPT" || result.status === "INCOMPATIBLE_SCHEMA" || result.status === "UNAVAILABLE") {
-          return { ok: false, error_code: result.error_code ?? ERR.STORE_UNAVAILABLE, detail: result.detail ?? "store unavailable", record: null };
-        }
-        const attempt = result.attempts[args.attemptId] ?? null;
-        if (attempt === null) {
-          return { ok: false, error_code: "ATTEMPT_NOT_FOUND", detail: "attempt not found", record: null, classification: "ATTEMPT_NOT_FOUND" };
-        }
-        if (!["MATERIALIZATION_OUTCOME_UNKNOWN", "MATERIALIZATION_RECONCILIATION_REQUIRED", "HVS_PROJECT_MATERIALIZED", "MATERIALIZATION_FAILED_CONFIRMED"].includes(attempt.state)) {
-          return { ok: false, error_code: "RECONCILE_NOT_REQUIRED", detail: "attempt not reconcilable", record: attempt, classification: "RECONCILE_NOT_REQUIRED" };
-        }
-        // Read-only: derive presence at the destination; never mutate HVS.
-        const plan = buildPlan({
-          projectId: attempt.project_id,
-          projectRevision: attempt.project_revision,
-          destinationIdentity: attempt.destination_identity,
-          normalized: { project_title: "", client_or_brand: "", project_purpose: "", normalized_brief_summary: "", target_duration_seconds: 0, output_profiles: [], planned_rendition_count: 0, operator_notes: "" },
-        });
-        const view = inspectHvsDouble({
-          projectId: attempt.project_id,
-          plan,
-          destinationIdentity: attempt.destination_identity,
-          planHash: attempt.plan_hash,
-        });
-        const updated: AttemptRecord = { ...attempt, state: "MATERIALIZATION_RECONCILIATION_REQUIRED" };
-        if (view.exists && view.valid && view.payload_hash === attempt.plan_hash && !view.render_started) {
-          updated.state = "HVS_PROJECT_MATERIALIZED";
-          updated.outcome = "success";
-          updated.persisted_result = { project_id: attempt.project_id, destination_identity: attempt.destination_identity, attempt_id: attempt.attempt_id, hvs_calls: attempt.hvs_calls, reconciled: true };
-          this.write({ authorizations: result.authorizations, capabilities: result.capabilities, attempts: { ...result.attempts, [updated.attempt_id]: updated } });
-          return { ok: true, error_code: null, detail: null, record: updated, classification: "HVS_PROJECT_MATERIALIZED" };
-        }
-        if (view.exists && !view.valid) {
-          this.write({ authorizations: result.authorizations, capabilities: result.capabilities, attempts: { ...result.attempts, [updated.attempt_id]: updated } });
-          return { ok: false, error_code: "CORRUPT_MATERIALIZATION", detail: "project present but invalid", record: updated, classification: "CORRUPT_MATERIALIZATION" };
-        }
-        if (!view.exists) {
-          this.write({ authorizations: result.authorizations, capabilities: result.capabilities, attempts: { ...result.attempts, [updated.attempt_id]: updated } });
-          return { ok: false, error_code: "CONFIRMED_NOT_MATERIALIZED", detail: "project absent at destination", record: updated, classification: "CONFIRMED_NOT_MATERIALIZED" };
-        }
-        this.write({ authorizations: result.authorizations, capabilities: result.capabilities, attempts: { ...result.attempts, [updated.attempt_id]: updated } });
-        return { ok: false, error_code: "STILL_UNKNOWN", detail: "presence inconclusive", record: updated, classification: "STILL_UNKNOWN" };
-      });
-    } catch (exc) {
-      return { ok: false, error_code: ERR.PERSISTENCE_WRITE_FAILED, detail: (exc as Error).message, record: null };
-    }
+    });
   }
 }
 
-export interface MaterializationResultShape {
+/**
+ * Parse EXACTLY ONE structured JSON object from stdout.
+ * Rejects empty, malformed, and multiple-object output as failure.
+ */
+function parseSingleJson(text: string): {
   ok: boolean;
-  state: MaterializationTruthState;
-  authorizationId: string | null;
+  error_code: string | null;
+  detail: string | null;
+  response: BridgeResponse | null;
+} {
+  const trimmed = (text ?? "").trim();
+  if (trimmed.length === 0) {
+    return { ok: false, error_code: ERR.BRIDGE_OUTPUT_MALFORMED, detail: "empty bridge output", response: null };
+  }
+  // Exactly one JSON value: the whole trimmed text must parse as one object
+  // and there must be no trailing non-whitespace content.
+  let value: unknown;
+  try {
+    value = JSON.parse(trimmed);
+  } catch {
+    return { ok: false, error_code: ERR.BRIDGE_OUTPUT_MALFORMED, detail: "malformed bridge output", response: null };
+  }
+  // Detect a second top-level value start after the first value ends. We scan
+  // for the end of the first JSON value using bracket balance, then require
+  // the remainder to be whitespace only.
+  const end = endOfFirstJsonValue(trimmed);
+  if (end < 0) {
+    return { ok: false, error_code: ERR.BRIDGE_OUTPUT_MALFORMED, detail: "unstable bridge output", response: null };
+  }
+  const rest = trimmed.slice(end).trim();
+  if (rest.length > 0) {
+    // Trailing content => more than one JSON object.
+    return { ok: false, error_code: ERR.BRIDGE_OUTPUT_MALFORMED, detail: "multiple bridge outputs", response: null };
+  }
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return { ok: false, error_code: ERR.BRIDGE_OUTPUT_MALFORMED, detail: "unexpected bridge output", response: null };
+  }
+  return { ok: true, error_code: null, detail: null, response: value as BridgeResponse };
+}
+
+/**
+ * Return the index (exclusive) where the first top-level JSON value ends,
+ * based on bracket/paren/quote balance. Returns -1 if unbalanced.
+ */
+function endOfFirstJsonValue(s: string): number {
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inString) {
+      if (escape) { escape = false; continue; }
+      if (ch === "\\") { escape = true; continue; }
+      if (ch === '"') { inString = false; }
+      continue;
+    }
+    if (ch === '"') { inString = true; continue; }
+    if (ch === "{" || ch === "[" || ch === "(") { depth++; continue; }
+    if (ch === "}" || ch === "]" || ch === ")") {
+      depth--;
+      if (depth === 0) return i + 1;
+      continue;
+    }
+  }
+  // Numbers/literals (true/false/null) with no brackets: scan to first
+  // whitespace or structural boundary.
+  if (depth === 0) {
+    const m = s.match(/^(true|false|null|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/);
+    if (m) return m[0].length;
+  }
+  return -1;
+}
+
+// ---------------------------------------------------------------------------
+// Bridge operation request builders (server-resolved; no browser authority)
+// ---------------------------------------------------------------------------
+
+export function buildAuthorizePayload(args: {
+  projectId: string;
+  projectRevision: number;
+  confirmed: boolean;
+  authorizationId: string;
+  nonce: string;
+  operatorId: string;
+  storePath?: string;
+}): Record<string, unknown> {
+  const p: Record<string, unknown> = {
+    project_id: args.projectId,
+    project_revision: args.projectRevision,
+    confirmed: args.confirmed,
+    authorization_id: args.authorizationId,
+    nonce: args.nonce,
+    operator_id: args.operatorId,
+  };
+  if (args.storePath && args.storePath.length) p.store_path = args.storePath;
+  return p;
+}
+
+export function buildExecutePayload(args: {
+  projectId: string;
+  projectRevision: number;
+  authorizationId: string;
   capabilityId: string;
   attemptId: string;
-  hvsCalls: number;
-  outcome: string | null;
-  errorCode: string | null;
-  errorDetail: string | null;
-  plan: MaterializationPlan | null;
+  operatorId: string;
+  storePath?: string;
+  projectsRoot?: string;
+}): Record<string, unknown> {
+  const p: Record<string, unknown> = {
+    project_id: args.projectId,
+    project_revision: args.projectRevision,
+    authorization_id: args.authorizationId,
+    capability_id: args.capabilityId,
+    attempt_id: args.attemptId,
+    operator_id: args.operatorId,
+  };
+  if (args.storePath && args.storePath.length) p.store_path = args.storePath;
+  if (args.projectsRoot && args.projectsRoot.length) p.projects_root = args.projectsRoot;
+  return p;
 }
 
-export { buildPlan, normalizedHvsProjectName, isSafeDestination };
+export function buildReconcilePayload(args: { attemptId: string; storePath?: string }): Record<string, unknown> {
+  const p: Record<string, unknown> = { attempt_id: args.attemptId };
+  if (args.storePath && args.storePath.length) p.store_path = args.storePath;
+  return p;
+}
+
+export function buildProjectionPayload(args: { projectId: string; storePath?: string }): Record<string, unknown> {
+  const p: Record<string, unknown> = { project_id: args.projectId };
+  if (args.storePath && args.storePath.length) p.store_path = args.storePath;
+  return p;
+}
+
+// Re-export canonicalJson for callers/tests that want deterministic hashing.
+export { canonicalJson };

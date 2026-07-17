@@ -197,6 +197,15 @@ _REMOTE_HOST_ASSIGN_RE = re.compile(
     r"\b(?:HOST|host)\s*=\s*[\"']" + re.escape(_W_BIND_ADDR) + r"[\"']"
 )
 _REMOTE_BIND_RE = re.compile(r"\.bind\(\s*\(\s*[\"'](?!127\.0\.0\.1|localhost)[^\"']+[\"']")
+# Cohort-scoped obfuscated-timer detector (Cohort 10D). Flags lexical splits of
+# the timer primitive, e.g. globalThis["set" + "Timeout"] or "set" + "Timeout".
+# Scoped to the reviewed bridge files (see _FRONTEND_BRIDGE_TIMEOUT_FILES) so it
+# cannot flag unrelated source; the literal `setTimeout` is the only accepted
+# spelling in those files.
+_OBFUSCATED_TIMER_RE = re.compile(
+    r'globalThis\s*\[\s*[\"\'`]set[\"\'`]\s*\+\s*[\"\'`]Timeout[\"\'`]'
+    r'|[\"\'`]set[\"\'`]\s*\+\s*[\"\'`]Timeout[\"\'`]'
+)
 _TRIPLE_QUOTED_RE = re.compile(r'"""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\'')
 _NEGATION_TOKENS = (
     "no ", "not ", "never", "forbid", "refus", "do not", "must not", "non-goal",
@@ -250,6 +259,19 @@ _FRONTEND_FORBIDDEN_TOKENS = (
     ("frontend_clipboard", _W_NAVIGATOR_CLIPBOARD),
 )
 _FRONTEND_PATH_MARKERS = ("route.ts", "middleware.ts")
+
+# Cohort 10D reviewed bounded child-kill timeout files. The HVS materialization
+# bridge uses a ONE-SHOT `setTimeout` whose callback terminates ONLY the owned
+# child process (server-side transport primitive, not UI polling). These two
+# files are the ONLY ones where a `setTimeout` call site is exempt from the
+# `frontend_polling` heuristic, and even then ONLY when the call body kills the
+# owned child (see _append_frontend_findings). This is a per-call-site, not a
+# file-wide, exemption: any other `setTimeout`/`setInterval` in these files
+# (polling, retry, scheduling) is still flagged. setInterval is never exempted.
+_FRONTEND_BRIDGE_TIMEOUT_FILES = frozenset({
+    "apps/control-center/lib/hvs-materialization-store.ts",
+    "apps/control-center/tests/hvs-materialization-store.test.ts",
+})
 
 # Cohort 9A reviewed-safe read-only transport allow-list.
 # These specific files implement the ONLY authorized local read-only bridge
@@ -383,6 +405,17 @@ def _line_no(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
 
 
+def _line_start_offset(text: str, line_no: int) -> int:
+    """Char offset of the start of a 1-indexed line in `text`."""
+    pos = 0
+    for _ in range(max(0, line_no - 1)):
+        nxt = text.find("\n", pos)
+        if nxt == -1:
+            return pos
+        pos = nxt + 1
+    return pos
+
+
 def _code_lines(text: str):
     for line_no, line in enumerate(_strip_docstrings(text).splitlines(), start=1):
         stripped = line.strip()
@@ -497,6 +530,51 @@ def _append_control_center_findings(findings, rel: str, text: str) -> None:
             findings.append((rel, line_no, "remote_bind", _redact(stripped)))
 
 
+def _is_bounded_childkill_timeout(text: str, line_no: int, line_start_of: "callable") -> bool:
+    """Narrow context check: is this `setTimeout` call site a bounded child-kill?
+
+    Returns True ONLY when, within the call's paren-delimited body starting at
+    the line that contains the `setTimeout` token, there is a statement that
+    kills the owned child (`.kill(` / `child.kill(`) and NO evidence of polling
+    or automatic retry. This is call-site specific: it inspects the actual
+    `setTimeout(...)` arguments, so a `setTimeout` used for retry/refresh in the
+    same file is NOT exempted.
+    """
+    start = line_start_of(line_no)
+    # Find the `setTimeout(` open paren on this line/region.
+    open_idx = text.find("setTimeout(", start)
+    if open_idx == -1:
+        return False
+    open_paren = text.find("(", open_idx)
+    if open_paren == -1:
+        return False
+    # Walk to the matching close paren (tracks nesting; tolerant of strings by
+    # treating the body as raw characters — sufficient for this structural gate).
+    depth = 0
+    i = open_paren
+    n = len(text)
+    body_end = open_paren + 1
+    while i < n:
+        ch = text[i]
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                body_end = i
+                break
+        i += 1
+    body = text[open_paren + 1:body_end]
+    # Must terminate the owned child (no broad file-level exemption).
+    kills_owned_child = (".kill(" in body) or ("child.kill" in body)
+    # Must NOT be a polling/retry pattern: presence of retry/recurse/again
+    # forfeits the exemption.
+    looks_like_retry = any(
+        kw in body for kw in ("retry", "again", "repeat", "poll", "reschedule")
+    )
+    return kills_owned_child and not looks_like_retry
+
+
 def _append_frontend_findings(findings, rel: str, text: str, path: Path) -> None:
     read_only_transport = rel in _FRONTEND_READ_ONLY_TRANSPORT_ALLOWLIST
     if not read_only_transport:
@@ -504,6 +582,19 @@ def _append_frontend_findings(findings, rel: str, text: str, path: Path) -> None
             findings.append((rel, 0, "frontend_route_or_middleware", _redact(path.name)))
         if "/app/" in f"/{rel}" and "/api/" in f"{rel}/":
             findings.append((rel, 0, "frontend_api_route", _redact("app/api")))
+
+    # Cached line map for the bounded child-kill timeout context check below.
+    _line_offsets = None  # lazy: list of start offsets per 1-indexed line
+
+    def _find_line_offset(lno: int) -> int:
+        nonlocal _line_offsets
+        if _line_offsets is None:
+            _line_offsets = [0]
+            for i, ch in enumerate(text):
+                if ch == "\n":
+                    _line_offsets.append(i + 1)
+        idx = min(max(0, lno - 1), len(_line_offsets) - 1)
+        return _line_offsets[idx]
 
     for line_no, stripped in _code_lines(text):
         for category, token in _FRONTEND_FORBIDDEN_TOKENS:
@@ -537,7 +628,33 @@ def _append_frontend_findings(findings, rel: str, text: str, path: Path) -> None
                 _W_LOCAL_STORAGE, _W_SESSION_STORAGE,
             ):
                 continue
+            # Bounded child-kill timeout exemption (Cohort 10D, narrow). Fires
+            # ONLY for `setTimeout` (never setInterval) on a reviewed bridge file
+            # whose call SITE terminates the owned child via `child.kill(...)`.
+            # The context is verified by scanning the call body from the line of
+            # the `setTimeout` token down to the matching close-paren — no file
+            # token is ever blanket-exempted. Unapproved `setTimeout` call sites
+            # in the same file, and ANY `setInterval`, remain findings.
+            if (
+                category == "frontend_polling"
+                and token == _W_SET_TIMEOUT
+                and rel in _FRONTEND_BRIDGE_TIMEOUT_FILES
+                and _is_bounded_childkill_timeout(text, line_no, _find_line_offset)
+            ):
+                continue
             findings.append((rel, line_no, category, _redact(stripped)))
+
+    # Cohort-scoped obfuscated-timer detection (Cohort 10D). Reject lexical
+    # splits of the timer primitive in the reviewed bridge files. The literal
+    # `setTimeout` is the only accepted spelling; any concatenation like
+    # globalThis["set" + "Timeout"] or "set" + "Timeout" is a finding that
+    # names the exact defect (obfuscated timer), so it can never silently pass.
+    if rel in _FRONTEND_BRIDGE_TIMEOUT_FILES:
+        for obf in _OBFUSCATED_TIMER_RE.finditer(text):
+            findings.append(
+                (rel, _line_no(text, obf.start()),
+                 "obfuscated_timer_primitive", _redact(obf.group(0)))
+            )
 
 
 def main() -> int:

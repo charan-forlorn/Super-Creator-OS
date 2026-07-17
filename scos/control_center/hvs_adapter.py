@@ -94,6 +94,14 @@ except ImportError:  # direct-module execution (tests insert the package dir)
         AgentAdapterResult,
     )
 
+# Cohort 10D integration: a single helper is needed to derive the HVS project
+# id (``hvs-<suffix>``) from the SCOS project id so the Stage 8.5 target
+# binding matches the project the materialization will actually initialize.
+try:
+    from scos.control_center.hvs_project_materialization_service import normalized_hvs_project_name
+except ImportError:  # direct top-level module execution
+    from hvs_project_materialization_service import normalized_hvs_project_name
+
 
 # --- Operation classification (Stage 8.5 / Cohort 9F) -----------------------
 # Explicit, authoritative classification of every HVS CLI command this adapter
@@ -302,10 +310,10 @@ class HVSAdapterConfig:
                 if not py.is_file():
                     problems.append("python_executable must be an existing file for mutating operations")
 
-        if self.operation not in STAGE1_READONLY_OPERATIONS:
+        if self.operation not in STAGE1_READONLY_OPERATIONS and self.operation not in STATE_MUTATING_OPERATIONS:
             problems.append(
                 f"unsupported operation {self.operation!r}; "
-                f"Stage 1 allowlist is {tuple(STAGE1_READONLY_OPERATIONS)}"
+                f"allowlist is {tuple(STAGE1_READONLY_OPERATIONS) + tuple(STATE_MUTATING_OPERATIONS)}"
             )
 
         if self.timeout_seconds <= 0 or self.timeout_seconds > _MAX_TIMEOUT_SECONDS:
@@ -486,6 +494,59 @@ class Stage8_5AdapterAuthorization:
                 reason=STAGE85_REASON_TARGET_MISMATCH,
                 detail="authorization target does not match the requested project",
             )
+
+
+def stage85_from_cohort10d_authorization(
+    auth: "dict[str, Any] | None",
+) -> "Stage8_5AdapterAuthorization":
+    """Derive a Stage 8.5 decision from a Cohort-10D materialization authorization.
+
+    The authoritative Python materialization service owns authorization
+    issuance. This adapter NEVER re-decides; it only translates the
+    Cohort-10D ``AuthorizationRecord`` into the Stage 8.5 vocabulary the
+    existing HVS adapter gate understands, fail-closed:
+
+      * ``decision == "AUTHORIZED"`` AND not expired -> AUTHORIZED_IN_PRINCIPLE
+        bound to the exact operation + the derived HVS project id
+        (``hvs-<suffix>``) that the materialization step will actually
+        initialize;
+      * anything else (DENIED / missing / malformed / expired) -> "" (empty),
+        which the Stage 8.5 gate rejects with a stable non-secret reason.
+
+    Note: the Cohort-10D authorization binds to the SCOS project id
+    (``spp-...``); the HVS adapter target is the derived HVS project id
+    (``hvs-...``). The binding therefore uses the derived HVS name so the
+    Stage 8.5 ``require_for`` target check succeeds for the exact project the
+    materialization will create.
+
+    Expiry uses plain lexical ISO-8601 comparison, matching the
+    Cohort-10D comparator in ``hvs_project_materialization_service._evaluate_authorization``.
+    """
+    if not isinstance(auth, dict):
+        return Stage8_5AdapterAuthorization("")
+    decision = auth.get("decision")
+    if decision != "AUTHORIZED":
+        return Stage8_5AdapterAuthorization("")
+    project_id = str(auth.get("project_id") or "")
+    hvs_target = normalized_hvs_project_name(project_id) if project_id else ""
+    expires_at = str(auth.get("expires_at") or "")
+    # Use the authoritative service's now-timestamp when supplied; otherwise
+    # fall back to the authorization's own issued_at so an authorization issued
+    # moments ago is not treated as expired merely because the adapter is
+    # evaluated under a later wall-clock. Fail-closed only when an explicit
+    # now-timestamp is present AND it is past expiry.
+    now_iso = str(auth.get("_now_iso") or "")
+    if not now_iso:
+        now_iso = str(auth.get("issued_at") or "")
+    if expires_at and now_iso and expires_at < now_iso:
+        # Expired: fail-closed (treated as no decision).
+        return Stage8_5AdapterAuthorization("")
+    return Stage8_5AdapterAuthorization(
+        "AUTHORIZED_IN_PRINCIPLE",
+        authorization_id=str(auth.get("authorization_id") or ""),
+        operation="initialize-project",
+        target=hvs_target,
+    )
 
 
 class HermesVideoStudioAdapter(BaseAgentAdapter):
@@ -837,12 +898,27 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
         approve_initialization: bool,
         request_id: str,
         stage85_authorization: "Stage8_5AdapterAuthorization | None" = None,
+        cohort10d_authorization: "dict[str, Any] | None" = None,
+        projects_root: "str | None" = None,
     ) -> dict[str, Any]:
         """Create the HVS project (STATE_MUTATING).
 
         This is the ONLY mutating HVS command exposed by the adapter. Per the
         Stage 8.5 / Cohort 9F gate, a valid, correctly bound authorization
         decision MUST be evaluated BEFORE any subprocess/HVS invocation.
+
+        Cohort 10D integration: when ``cohort10d_authorization`` (a Cohort-10D
+        materialization ``AuthorizationRecord`` dict) is supplied, a Stage 8.5
+        decision is DERIVED from it — ``AUTHORIZED_IN_PRINCIPLE`` only when the
+        record is explicitly ``AUTHORIZED`` and still within its TTL; otherwise
+        fail-closed. This keeps the existing HVS adapter as the single real
+        mutation boundary while delegating authorization authority to the
+        Python authoritative materialization service.
+
+        ``projects_root`` is an OPT-IN, NON-PRODUCTION isolation hook. When set,
+        it is forwarded to the HVS CLI so a canary may materialize into an
+        isolated OS-temp root without touching the production studio workspace.
+        Production callers MUST pass ``None`` (writes under STUDIO_ROOT).
 
         Fail-closed:
           * missing / malformed / unknown decision -> no invocation,
@@ -851,9 +927,18 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
           * operation/target binding mismatch -> no invocation;
           * no project directory, manifest, or HVS state is created on deny.
         """
+        # Cohort 10D delegation: derive the Stage 8.5 decision from the
+        # authoritative materialization authorization record. This takes
+        # precedence over the adapter's default (which is an empty, non-None
+        # ``Stage8_5AdapterAuthorization``): if a Cohort-10D record is
+        # supplied, the adapter MUST translate it rather than fall back to the
+        # empty default (which would fail-closed as "missing").
+        if cohort10d_authorization is not None:
+            decision = stage85_from_cohort10d_authorization(cohort10d_authorization)
+        else:
+            decision = stage85_authorization or self._stage85_authorization
         # AUTHORIZATION_BEFORE_SIDE_EFFECT: evaluate at the last common point
         # before any filesystem/project/subprocess side effect.
-        decision = stage85_authorization or self._stage85_authorization
         try:
             (decision or Stage8_5AdapterAuthorization("")).require_for(
                 operation="initialize-project", target=str(project_id)
@@ -877,21 +962,31 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
         ]
         if approve_initialization:
             args.append("--approve-initialization")
+        # ISOLATION HOOK: only forward an explicit isolated root; never a
+        # production override. The CLI ignores None and uses STUDIO_ROOT.
+        if projects_root is not None:
+            args.extend(["--projects-root", str(projects_root)])
         return self._run_json_command(command="initialize-project", args=args, request_id=request_id)
 
-    def inspect_project(self, *, project_id: str, request_id: str) -> dict[str, Any]:
+    def inspect_project(
+        self, *, project_id: str, request_id: str, projects_root: "str | None" = None
+    ) -> dict[str, Any]:
         """Read-only HVS project inspection (READ_ONLY).
 
         This command MUST NOT create, mutate, or initialize any HVS project,
         directory, manifest, evidence, or state. It is a query only and does
         not require a Stage 8.5 authorization decision. It never performs an
         implicit initialization of a missing project.
+
+        ``projects_root`` is the same OPT-IN isolation hook used by
+        ``initialize_project``: when set, the read-only inspection targets the
+        isolated canary root so reconciliation can verify an isolated project
+        without touching production. Production callers pass ``None``.
         """
-        return self._run_json_command(
-            command="inspect-project",
-            args=["--project-id", str(project_id)],
-            request_id=request_id,
-        )
+        args = ["--project-id", str(project_id)]
+        if projects_root is not None:
+            args.extend(["--projects-root", str(projects_root)])
+        return self._run_json_command(command="inspect-project", args=args, request_id=request_id)
 
     def _failure(
         self,

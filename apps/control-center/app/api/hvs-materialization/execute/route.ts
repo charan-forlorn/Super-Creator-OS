@@ -1,21 +1,25 @@
 /**
  * Cohort 10D — controlled HVS materialization execution (POST).
  *
- * Same-origin, local-first mutation boundary. Runs the authoritative
- * materialization orchestration (authorization eval, single-use capability,
- * in-flight containment, EXACTLY ONE HVS mutation through the controlled
- * local boundary, identity gate, persistence). The browser supplies only the
- * reviewed intent + ids; the destination and plan hash are server-resolved.
- * No render, no FFmpeg/FFprobe/Chromium/HyperFrames, no external network, no
- * automatic retry.
+ * Same-origin, local-first mutation boundary. Delegates the EXACT
+ * authoritative orchestration (authorization eval, single-use capability,
+ * in-flight containment, EXACTLY ONE real HVS mutation through the
+ * adapter, identity gate, persistence) to the Python service reached via
+ * the bridge. This route performs NO authority of its own: it validates
+ * the request, invokes exactly one bridge operation, and maps the
+ * structured response without inventing state. The browser supplies only
+ * the reviewed intent + ids; the destination and plan hash are
+ * server-resolved by the Python authority. No render, no FFmpeg/FFprobe/
+ * Chromium/HyperFrames, no external network, no automatic retry, no
+ * browser-supplied cwd/store/projects_root/command.
  */
 
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
   HvsMaterializationStore,
-  hvsMaterializationStorePath,
-  type AttemptRecord,
+  buildExecutePayload,
+  serverResolvedScope,
 } from "@/lib/hvs-materialization-store";
 
 export const dynamic = "force-dynamic";
@@ -102,47 +106,32 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Load the authoritative authorization issued by the authorize route.
-  const store = new HvsMaterializationStore(hvsMaterializationStorePath());
-  const authorization = store.getAuthorization(authorizationId);
-
-  const result = store.executeMaterialization({
-    projectId,
-    projectRevision,
-    normalized: {
-      project_title: "",
-      client_or_brand: "",
-      project_purpose: "",
-      normalized_brief_summary: "",
-      target_duration_seconds: 0,
-      output_profiles: [],
-      planned_rendition_count: 0,
-      operator_notes: "",
-    },
-    authorization,
-    capabilityId,
-    attemptId,
-    operatorId,
-  });
-
-  if (!result.ok || !result.result) {
-    const detail = result.error_code === "PERSISTENCE_WRITE_FAILED" ? "persistence unavailable" : result.detail;
-    // Still return the structured result so clients can render the contained
-    // outcome (e.g. CAPABILITY_CONSUMED / INFLIGHT_ATTEMPT) without guessing.
-    const shaped = result.result
-      ? {
-          ok: result.result.ok,
-          state: result.result.state,
-          attempt_id: result.result.attemptId,
-          authorization_id: result.result.authorizationId,
-          capability_id: result.result.capabilityId,
-          hvs_calls: result.result.hvsCalls,
-          outcome: result.result.outcome,
-          error_code: result.result.errorCode,
-          error_detail: result.result.errorDetail,
-          persisted_result: null,
-        }
-      : {
+  // Invoke exactly ONE bridge operation. All authority lives in Python.
+  const scope = serverResolvedScope();
+  const store = new HvsMaterializationStore();
+  const bridge = await store.invoke(
+    "execute",
+    buildExecutePayload({
+      projectId,
+      projectRevision,
+      authorizationId,
+      capabilityId,
+      attemptId,
+      operatorId,
+      storePath: scope.storePath,
+      projectsRoot: scope.projectsRoot,
+    }),
+  );
+  if (!bridge.ok || !bridge.response) {
+    const detail = bridge.error_code === "BRIDGE_TIMEOUT" ? "bridge timeout"
+      : bridge.error_code === "BRIDGE_OUTPUT_OVERSIZED" ? "bridge output too large"
+      : "execution unavailable";
+    return NextResponse.json(
+      {
+        ok: false,
+        error_code: bridge.error_code ?? "BRIDGE_FAILED",
+        detail,
+        result: {
           ok: false,
           state: "MATERIALIZATION_FAILED_CONFIRMED",
           attempt_id: attemptId,
@@ -150,33 +139,41 @@ export async function POST(request: NextRequest) {
           capability_id: capabilityId,
           hvs_calls: 0,
           outcome: "rejected",
-          error_code: result.error_code,
-          error_detail: detail,
+          error_code: bridge.error_code ?? "BRIDGE_FAILED",
+          error_detail: null,
           persisted_result: null,
-        };
-    return NextResponse.json(
-      { ok: false, error_code: result.error_code, detail, result: shaped },
+        },
+      },
       { status: 409, headers: { "cache-control": "no-store" } },
     );
   }
+
+  // The Python CLI returns a FLAT authoritative envelope
+  // ({ok, state, attempt_id, ..., hvs_calls, ...}) — there is no `result`
+  // wrapper. Map it into the route's `result` shape. The transport verdict
+  // is `bridge.ok` (exit 0 + structured JSON); the authority verdict lives
+  // inside the envelope's own `ok`/`error_code` and is surfaced verbatim.
+  const flat = bridge.response as unknown as Record<string, unknown> | null;
+  const shaped = {
+    ok: Boolean(flat?.ok ?? false),
+    state: (flat?.state as string) ?? "MATERIALIZATION_FAILED_CONFIRMED",
+    attempt_id: (flat?.attempt_id as string) ?? attemptId,
+    authorization_id: (flat?.authorization_id as string) ?? authorizationId,
+    capability_id: (flat?.capability_id as string) ?? capabilityId,
+    hvs_calls: Number(flat?.hvs_calls ?? 0),
+    outcome: (flat?.outcome as string | null) ?? null,
+    error_code: (flat?.error_code as string | null) ?? null,
+    error_detail: null, // never leak raw detail/paths to browser
+    persisted_result: (flat?.persisted_result as Record<string, unknown> | null) ?? null,
+  };
+
   return NextResponse.json(
     {
-      ok: result.result.ok,
-      error_code: result.result.errorCode,
-      detail: result.result.errorDetail,
-      result: {
-        ok: result.result.ok,
-        state: result.result.state,
-        attempt_id: result.result.attemptId,
-        authorization_id: result.result.authorizationId,
-        capability_id: result.result.capabilityId,
-        hvs_calls: result.result.hvsCalls,
-        outcome: result.result.outcome,
-        error_code: result.result.errorCode,
-        error_detail: result.result.errorDetail,
-        persisted_result: (result.record as AttemptRecord | null)?.persisted_result ?? null,
-      },
+      ok: bridge.ok,
+      error_code: shaped.error_code,
+      detail: null, // redacted
+      result: shaped,
     },
-    { status: 200, headers: { "cache-control": "no-store", "content-type": "application/json" } },
+    { status: bridge.ok ? 200 : 409, headers: { "cache-control": "no-store", "content-type": "application/json" } },
   );
 }
