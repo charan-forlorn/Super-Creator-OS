@@ -271,6 +271,8 @@ _FRONTEND_PATH_MARKERS = ("route.ts", "middleware.ts")
 _FRONTEND_BRIDGE_TIMEOUT_FILES = frozenset({
     "apps/control-center/lib/hvs-materialization-store.ts",
     "apps/control-center/tests/hvs-materialization-store.test.ts",
+    "apps/control-center/lib/hvs-render-store.ts",
+    "apps/control-center/tests/hvs-render-store.test.ts",
 })
 
 # Cohort 9A reviewed-safe read-only transport allow-list.
@@ -325,6 +327,23 @@ _FRONTEND_READ_ONLY_TRANSPORT_ALLOWLIST = {
     "apps/control-center/app/api/hvs-materialization/authorize/route.ts",
     "apps/control-center/app/api/hvs-materialization/execute/route.ts",
     "apps/control-center/app/api/hvs-materialization/reconcile/route.ts",
+    "apps/control-center/lib/hvs-render-store.ts",
+    "apps/control-center/lib/hvs-render-client.ts",
+    "apps/control-center/app/api/hvs-render/projection/route.ts",
+    "apps/control-center/app/api/hvs-render/authorize/route.ts",
+    "apps/control-center/app/api/hvs-render/execute/route.ts",
+    "apps/control-center/app/api/hvs-render/reconcile/route.ts",
+    # Cohort 10E — reviewed same-origin Brand Kit transport. Bounded local-first
+    # store bridge (GET read + POST upsert with strict ALLOWED_FIELDS,
+    # unexpected-field rejection, fail-closed persistence). No HVS init, no
+    # render, no external network, no browser storage, no memory/database.json.
+    "apps/control-center/app/api/brand-kit/route.ts",
+    "apps/control-center/lib/brand-kit-client.ts",
+    # Cohort 10E — reviewed controlled export stub (read-only projection of a
+    # deterministic package envelope; fail-closed unless SCOS_EXPORT_STUB_ENABLED,
+    # no subprocess/network/render/db). The client's export call targets this
+    # same-origin route only.
+    "apps/control-center/app/api/hvs-render/export/route.ts",
 }
 
 # Exact reviewed same-origin fetch target(s) permitted for each allow-listed
@@ -347,6 +366,17 @@ _FRONTEND_REVIEWED_FETCH_TARGETS = {
         "/api/hvs-materialization/authorize",
         "/api/hvs-materialization/execute",
         "/api/hvs-materialization/reconcile",
+    ),
+    "apps/control-center/lib/hvs-render-client.ts": (
+        "/api/hvs-render/projection",
+        "/api/hvs-render/authorize",
+        "/api/hvs-render/execute",
+        "/api/hvs-render/reconcile",
+        "/api/hvs-render/export",
+    ),
+    # Cohort 10E: bounded same-origin Brand Kit transport.
+    "apps/control-center/lib/brand-kit-client.ts": (
+        "/api/brand-kit",
     ),
 }
 

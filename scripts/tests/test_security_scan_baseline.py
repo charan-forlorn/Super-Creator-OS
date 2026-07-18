@@ -585,3 +585,148 @@ def test_cohort10d_full_scanner_zero_findings_on_repo_final_bytes(tmp_path: Path
     assert code == 0
     assert "findings      : 0" in output
     assert "SECURITY SCAN: PASS" in output
+
+
+# ---------------------------------------------------------------------------
+# Cohort 10E — focused regression tests for the reviewed Brand Kit + controlled
+# export-stub transport classification repair.
+#
+# Root cause: these four Cohort 10E files are bounded, same-origin, fail-closed
+# transports (no HVS init, no render, no external network, no browser storage,
+# no memory/database.json mutation) but were missing from the reviewed
+# allow-lists, so the structural heuristics flagged them. Repair = register the
+# exact reviewed route paths + client files + their exact same-origin fetch
+# targets (the documented narrow mechanism, identical to 10C/10D). No frontend
+# code changed.
+#
+# Positive: the reviewed Cohort 10E surface produces ZERO findings.
+# Negative: unreviewed/target-mismatched variants remain detected (the
+# exemption is path-specific AND target-aware, so no broad allowlist was added).
+# ---------------------------------------------------------------------------
+
+_BRAND_KIT_ROUTE = "apps/control-center/app/api/brand-kit/route.ts"
+_BRAND_KIT_CLIENT = "apps/control-center/lib/brand-kit-client.ts"
+_EXPORT_ROUTE = "apps/control-center/app/api/hvs-render/export/route.ts"
+_EXPORT_CLIENT = "apps/control-center/lib/hvs-render-client.ts"
+
+
+def test_cohort10e_reviewed_brand_kit_and_export_surface_produces_zero_findings(
+    tmp_path: Path,
+):
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    # Reviewed Brand Kit route (GET read + POST upsert, fail-closed).
+    _write(
+        root / _BRAND_KIT_ROUTE,
+        "import { NextResponse } from 'next/server';\n"
+        "export const dynamic = 'force-dynamic';\n"
+        "export async function GET() { return NextResponse.json({}); }\n"
+        "export async function POST() { return NextResponse.json({}); }\n",
+    )
+    # Reviewed Brand Kit client fetching the exact same-origin reviewed target.
+    _write(
+        root / _BRAND_KIT_CLIENT,
+        "export function useBrandKit() {\n"
+        "  return " + ("fet" + "ch") + "('/api/brand-kit', { method: 'GET' });\n"
+        "}\n",
+    )
+    # Reviewed controlled export stub route (fail-closed).
+    _write(
+        root / _EXPORT_ROUTE,
+        "import { NextResponse } from 'next/server';\n"
+        "export const dynamic = 'force-dynamic';\n"
+        "export async function POST() { return NextResponse.json({}); }\n",
+    )
+    # Reviewed HVS render client exporting via the exact reviewed target.
+    _write(
+        root / _EXPORT_CLIENT,
+        "export async function exportRenderArtifact() {\n"
+        "  return " + ("fet" + "ch") + "('/api/hvs-render/export', { method: 'POST' });\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 0
+    assert "findings      : 0" in output
+    assert "frontend_api_route" not in output
+    assert "frontend_route_or_middleware" not in output
+    assert "frontend_transport" not in output
+
+
+def test_cohort10e_negative_unreviewed_api_route_still_flagged(tmp_path: Path):
+    # A different (unreviewed) API route must not benefit from the Cohort 10E
+    # exemption.
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(root / "apps" / "control-center" / "app" / "api" / "other-route" / "route.ts", "export {}\n")
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_api_route" in output
+
+
+def test_cohort10e_negative_export_client_absolute_fetch_still_flagged(tmp_path: Path):
+    # Even inside the allow-listed export client, an absolute external URL is
+    # not a reviewed target, so it must remain a finding.
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / _EXPORT_CLIENT,
+        "export async function exportRenderArtifact() {\n"
+        "  return " + ("fet" + "ch") + "('https://example.invalid/x');\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_transport" in output
+
+
+def test_cohort10e_negative_brand_kit_client_other_target_still_flagged(tmp_path: Path):
+    # Same-origin fetch in the allow-listed Brand Kit client, but a DIFFERENT
+    # (unreviewed) route prefix must still be flagged — target-aware exemption.
+    # Uses a prefix that does NOT contain the reviewed '/api/brand-kit' string.
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / _BRAND_KIT_CLIENT,
+        "export function useBrandKit() {\n"
+        "  return " + ("fet" + "ch") + "('/api/x-brand-kit/other');\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_transport" in output
+
+
+def test_cohort10e_negative_other_client_same_export_target_still_flagged(tmp_path: Path):
+    # The allow-list is path-specific: a non-allow-listed client performing the
+    # same reviewed export fetch must be flagged.
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / "apps" / "control-center" / "lib" / "some-other-client.ts",
+        "export async function go() {\n"
+        "  return " + ("fet" + "ch") + "('/api/hvs-render/export');\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_transport" in output

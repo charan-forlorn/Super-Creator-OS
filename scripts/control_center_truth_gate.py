@@ -101,6 +101,18 @@ _REVIEWED_ROUTES = {
     "apps/control-center/app/api/hvs-materialization/authorize/route.ts",
     "apps/control-center/app/api/hvs-materialization/execute/route.ts",
     "apps/control-center/app/api/hvs-materialization/reconcile/route.ts",
+    "apps/control-center/app/api/hvs-render/projection/route.ts",
+    "apps/control-center/app/api/hvs-render/authorize/route.ts",
+    "apps/control-center/app/api/hvs-render/execute/route.ts",
+    "apps/control-center/app/api/hvs-render/reconcile/route.ts",
+    # Cohort 10E — reviewed same-origin Brand Kit transport (GET read + POST
+    # upsert, strict ALLOWED_FIELDS, fail-closed). Declares runtime = "nodejs"
+    # + dynamic = "force-dynamic".
+    "apps/control-center/app/api/brand-kit/route.ts",
+    # Cohort 10E — reviewed controlled export stub (fail-closed unless
+    # SCOS_EXPORT_STUB_ENABLED). Declares runtime = "nodejs" + dynamic =
+    # "force-dynamic".
+    "apps/control-center/app/api/hvs-render/export/route.ts",
 }
 
 
