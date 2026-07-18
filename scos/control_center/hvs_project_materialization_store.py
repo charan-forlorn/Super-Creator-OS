@@ -44,6 +44,9 @@ from .hvs_project_materialization_models import (  # noqa: E402
     HvsMaterializationAttempt,
     HvsProjectMaterializationAuthorization,
     HvsProjectMaterializationCapability,
+    HvsRenderInputsAuthorization,
+    HvsRenderInputsCapability,
+    HvsRenderInputsAttempt,
 )
 
 # Canonical collection envelope kinds.
@@ -132,6 +135,9 @@ class MaterializationStore:
         for key in ("authorizations", "capabilities", "attempts"):
             if key not in data or not isinstance(data[key], dict):
                 return {"status": TRUTH_CORRUPT, "detail": f"missing collection: {key}"}
+        # `downstream` is an additive Cohort 10E extension; tolerate its
+        # absence in stores written before this change (backward compatible).
+        data.setdefault("downstream", {})
         return {"status": TRUTH_AVAILABLE_WITH_DATA, "data": data}
 
     def read(self) -> dict[str, Any]:
@@ -142,31 +148,31 @@ class MaterializationStore:
 
     # -- collections ------------------------------------------------------
     def _collections(self) -> tuple[
-        dict[str, Any], dict[str, Any], dict[str, Any]
+        dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]
     ]:
         res = self._read_raw()
         if res["status"] != TRUTH_AVAILABLE_WITH_DATA:
-            return {}, {}, {}
+            return {}, {}, {}, {}
         data = res["data"]
-        return data["authorizations"], data["capabilities"], data["attempts"]
+        return data["authorizations"], data["capabilities"], data["attempts"], data["downstream"]
 
     def get_authorization(self, authorization_id: str) -> Optional[HvsProjectMaterializationAuthorization]:
-        auths, _, _ = self._collections()
+        auths, _, _, _ = self._collections()
         row = auths.get(authorization_id)
         return HvsProjectMaterializationAuthorization.from_dict(row) if row else None
 
     def get_capability(self, capability_id: str) -> Optional[HvsProjectMaterializationCapability]:
-        _, caps, _ = self._collections()
+        _, caps, _, _ = self._collections()
         row = caps.get(capability_id)
         return HvsProjectMaterializationCapability.from_dict(row) if row else None
 
     def get_attempt(self, attempt_id: str) -> Optional[HvsMaterializationAttempt]:
-        _, _, attempts = self._collections()
+        _, _, attempts, _ = self._collections()
         row = attempts.get(attempt_id)
         return HvsMaterializationAttempt.from_dict(row) if row else None
 
     def list_attempts_for_project(self, project_id: str) -> list[HvsMaterializationAttempt]:
-        _, _, attempts = self._collections()
+        _, _, attempts, _ = self._collections()
         return [
             HvsMaterializationAttempt.from_dict(r)
             for r in attempts.values()
@@ -184,6 +190,7 @@ class MaterializationStore:
             "authorizations": data.get("authorizations", {}),
             "capabilities": data.get("capabilities", {}),
             "attempts": data.get("attempts", {}),
+            "downstream": data.get("downstream", {}),
         }
         serialized = json.dumps(envelope, ensure_ascii=False, indent=2, sort_keys=True)
         tmp = path.parent / f"{path.name}{_TMP_SUFFIX}.{__import__('os').getpid()}"
@@ -201,6 +208,7 @@ class MaterializationStore:
                     "authorizations": {},
                     "capabilities": {},
                     "attempts": {},
+                    "downstream": {},
                 }
             elif res["status"] == TRUTH_AVAILABLE_WITH_DATA:
                 data = res["data"]
@@ -306,6 +314,103 @@ class MaterializationStore:
             if row.get("state") in _INFLIGHT and row.get("attempt_id") != exclude_attempt_id:
                 return True
         return False
+
+
+    # -- Cohort 10E downstream render-input materialization sub-ledger ------
+    # The SAME store, SAME lock, SAME authority as the materialization ledger
+    # above. The downstream operation is a separate, narrower lifecycle, so its
+    # authorizations/capabilities/attempts are segregated into a dedicated
+    # `downstream` collection to avoid co-mingling contract shapes (different
+    # operation identity, different state machine). No second store/authority
+    # is introduced.
+
+    def get_render_inputs_authorization(self, authorization_id: str) -> Optional[HvsRenderInputsAuthorization]:
+        _, _, _, ds = self._collections()
+        row = ds.get("render_inputs_authorizations", {}).get(authorization_id)
+        return HvsRenderInputsAuthorization.from_dict(row) if row else None
+
+    def get_render_inputs_capability(self, capability_id: str) -> Optional[HvsRenderInputsCapability]:
+        _, _, _, ds = self._collections()
+        row = ds.get("render_inputs_capabilities", {}).get(capability_id)
+        return HvsRenderInputsCapability.from_dict(row) if row else None
+
+    def get_render_inputs_attempt(self, attempt_id: str) -> Optional[HvsRenderInputsAttempt]:
+        _, _, _, ds = self._collections()
+        row = ds.get("render_inputs_attempts", {}).get(attempt_id)
+        return HvsRenderInputsAttempt.from_dict(row) if row else None
+
+    def list_render_inputs_attempts_for_project(self, project_id: str) -> list[HvsRenderInputsAttempt]:
+        _, _, _, ds = self._collections()
+        return [
+            HvsRenderInputsAttempt.from_dict(r)
+            for r in ds.get("render_inputs_attempts", {}).values()
+            if r.get("source_project_id") == project_id or r.get("hvs_project_id") == project_id
+        ]
+
+    def put_render_inputs_authorization(self, auth: HvsRenderInputsAuthorization) -> None:
+        def _fn(data: dict[str, Any]) -> None:
+            ds = data.setdefault("downstream", {})
+            coll = ds.setdefault("render_inputs_authorizations", {})
+            coll[auth.authorization_id] = auth.to_dict()
+        self._mutate(_fn)
+
+    def put_render_inputs_capability(self, cap: HvsRenderInputsCapability) -> None:
+        def _fn(data: dict[str, Any]) -> None:
+            ds = data.setdefault("downstream", {})
+            coll = ds.setdefault("render_inputs_capabilities", {})
+            cap_problems = cap.validate()
+            if cap_problems:
+                # Never persist a malformed capability; surface via caller.
+                return
+            coll[cap.capability_id] = cap.to_dict()
+        self._mutate(_fn)
+
+    def put_render_inputs_attempt(self, attempt: HvsRenderInputsAttempt) -> None:
+        def _fn(data: dict[str, Any]) -> None:
+            ds = data.setdefault("downstream", {})
+            coll = ds.setdefault("render_inputs_attempts", {})
+            coll[attempt.attempt_id] = attempt.to_dict()
+        self._mutate(_fn)
+
+    def consume_render_inputs_capability(
+        self, capability_id: str, *, consumed_at: str
+    ) -> Optional[HvsRenderInputsCapability]:
+        """Atomically mark a downstream capability consumed; return prior state.
+
+        Returns the PRE-consumption capability (consumed_at None) on success,
+        or None if already consumed / missing — the single-use enforcement
+        primitive for the downstream operation.
+        """
+        prior: list[Optional[HvsRenderInputsCapability]] = [None]
+
+        def _fn(data: dict[str, Any]) -> None:
+            ds = data.setdefault("downstream", {})
+            caps = ds.setdefault("render_inputs_capabilities", {})
+            row = caps.get(capability_id)
+            if row is None:
+                return
+            cap = HvsRenderInputsCapability.from_dict(row)
+            if cap.is_consumed():
+                return
+            prior[0] = cap
+            updated = HvsRenderInputsCapability(
+                schema_version=cap.schema_version,
+                capability_id=cap.capability_id,
+                authorization_id=cap.authorization_id,
+                source_project_id=cap.source_project_id,
+                hvs_project_id=cap.hvs_project_id,
+                project_revision=cap.project_revision,
+                initialization_fingerprint=cap.initialization_fingerprint,
+                destination_identity=cap.destination_identity,
+                issued_at=cap.issued_at,
+                expires_at=cap.expires_at,
+                consumed_at=consumed_at,
+                operation=cap.operation,
+            )
+            caps[capability_id] = updated.to_dict()
+
+        self._mutate(_fn)
+        return prior[0]
 
 
 __all__ = sorted(

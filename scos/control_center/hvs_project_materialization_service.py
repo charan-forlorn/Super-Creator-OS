@@ -76,6 +76,48 @@ from .hvs_project_materialization_models import (  # noqa: E402
     STATE_MATERIALIZATION_RECONCILIATION_REQUIRED,
     STATE_MATERIALIZATION_STARTING,
 )
+from .hvs_project_materialization_models import (  # noqa: E402
+    OPERATION_MATERIALIZE_HVS_RENDER_INPUTS,
+    STATE_HVS_PROJECT_INITIALIZED,
+    STATE_HVS_PROJECT_INITIALIZING,
+    STATE_HVS_RENDER_INPUTS_AUTHORIZATION_REQUIRED,
+    STATE_HVS_RENDER_INPUTS_AUTHORIZED,
+    STATE_HVS_RENDER_INPUTS_MATERIALIZING,
+    STATE_HVS_RENDER_INPUTS_MATERIALIZED,
+    STATE_HVS_RENDER_INPUTS_FAILED_CONFIRMED,
+    STATE_HVS_RENDER_INPUTS_OUTCOME_UNKNOWN,
+    STATE_HVS_RENDER_INPUTS_RECONCILIATION_REQUIRED,
+    STATE_HVS_RENDER_READY,
+    STATE_HVS_RENDER_NOT_READY,
+    ERR_RENDER_INPUTS_AUTHORIZATION_MISSING,
+    ERR_RENDER_INPUTS_AUTHORIZATION_MALFORMED,
+    ERR_RENDER_INPUTS_AUTHORIZATION_DENIED,
+    ERR_RENDER_INPUTS_AUTHORIZATION_EXPIRED,
+    ERR_RENDER_INPUTS_AUTHORIZATION_CONSUMED,
+    ERR_RENDER_INPUTS_AUTHORIZATION_REVISION_MISMATCH,
+    ERR_RENDER_INPUTS_AUTHORIZATION_OPERATION_MISMATCH,
+    ERR_RENDER_INPUTS_AUTHORIZATION_IDENTITY_MISMATCH,
+    ERR_RENDER_INPUTS_CAPABILITY_MISSING,
+    ERR_RENDER_INPUTS_CAPABILITY_MALFORMED,
+    ERR_RENDER_INPUTS_CAPABILITY_CONSUMED,
+    ERR_RENDER_INPUTS_CAPABILITY_EXPIRED,
+    ERR_RENDER_INPUTS_CAPABILITY_REVISION_MISMATCH,
+    ERR_RENDER_INPUTS_CAPABILITY_OPERATION_MISMATCH,
+    ERR_RENDER_INPUTS_CAPABILITY_IDENTITY_MISMATCH,
+    ERR_RENDER_INPUTS_INITIALIZATION_MISSING,
+    ERR_RENDER_INPUTS_PARTIAL,
+    ERR_RENDER_INPUTS_CONFLICT,
+    ERR_RENDER_INPUTS_HVS_FAILED,
+    ERR_RENDER_INPUTS_OUTCOME_UNKNOWN,
+    ERR_RENDER_INPUTS_RECONCILE_REQUIRED,
+    DECISION_AUTHORIZED,
+    DECISION_DENIED,
+    DEFAULT_TTL_SECONDS,
+    HvsRenderInputsAuthorization,
+    HvsRenderInputsCapability,
+    HvsRenderInputsAttempt,
+    evaluate_render_inputs_readiness,
+)
 from .hvs_project_materialization_store import MaterializationStore  # noqa: E402
 
 # Prerequisite truth states (Cohort 10D §7).
@@ -111,6 +153,42 @@ class MaterializationResult:
             "outcome": self.outcome,
             "error_code": self.error_code,
             "error_detail": self.error_detail,
+            "persisted_result": self.persisted_result,
+        }
+
+
+@dataclass
+class DownstreamRenderInputsResult:
+    """Authoritative result for the downstream render-input materialization."""
+
+    ok: bool
+    state: str
+    attempt_id: Optional[str] = None
+    authorization_id: Optional[str] = None
+    capability_id: Optional[str] = None
+    hvs_calls: int = 0
+    replayed: bool = False
+    created_artifacts: tuple[str, ...] = ()
+    outcome: Optional[str] = None
+    error_code: Optional[str] = None
+    error_detail: Optional[str] = None
+    render_ready: Optional[bool] = None
+    persisted_result: Optional[dict[str, Any]] = None
+
+    def to_response(self) -> dict[str, Any]:
+        return {
+            "ok": self.ok,
+            "state": self.state,
+            "attempt_id": self.attempt_id,
+            "authorization_id": self.authorization_id,
+            "capability_id": self.capability_id,
+            "hvs_calls": self.hvs_calls,
+            "replayed": self.replayed,
+            "created_artifacts": list(self.created_artifacts),
+            "outcome": self.outcome,
+            "error_code": self.error_code,
+            "error_detail": self.error_detail,
+            "render_ready": self.render_ready,
             "persisted_result": self.persisted_result,
         }
 
@@ -921,15 +999,582 @@ def reconcile_materialization(
     return ("STILL_UNKNOWN", attempt)
 
 
+# ==========================================================================
+# Cohort 10E — Downstream render-input materialization service
+# --------------------------------------------------------------------------
+# Runs AFTER a successful HVS project initialization. Materializes the three
+# downstream render-input artifacts (template_selection.json,
+# voice_manifest.json, asset_manifest.json) via the certified narrow HVS
+# `materialize-render-inputs` command, validates render-readiness (all five
+# render-required artifacts present), and persists HVS_RENDER_READY only when
+# the readiness gate passes. Never renders; never invokes HyperFrames/
+# Chromium/FFmpeg; never reaches the network. Reuses the SAME MaterializationStore
+# (one authority) via its downstream sub-ledger.
+# ==========================================================================
+
+DOWNSTREAM_RENDER_INPUT_ARTIFACTS = (
+    "templates/template_selection.json",
+    "voice/voice_manifest.json",
+    "assets/placeholders/asset_manifest.json",
+)
+
+
+def issue_render_inputs_authorization(
+    *,
+    store: MaterializationStore,
+    source_project_id: str,
+    hvs_project_id: str,
+    project_revision: int,
+    initialization_fingerprint: str,
+    destination_identity: str,
+    authorization_id: str,
+    capability_id: str,
+    attempt_id: str,
+    issued_by: str,
+    now_iso: str,
+    nonce: str,
+    decision: str = DECISION_AUTHORIZED,
+) -> "tuple[HvsRenderInputsAuthorization, str]":
+    """Issue a dedicated, bound downstream render-input authorization.
+
+    The authorization binds to the DISTINCT ``MATERIALIZE_HVS_RENDER_INPUTS``
+    operation (never reused from initialization/rendering), the exact source
+    project, hvs project, revision, initialization fingerprint, and the
+    destination (projects root) without browser-visible path disclosure.
+    The capability is NOT issued here; it is issued only after the caller
+    confirms the authorization decision (single-use, persisted before mutation).
+    """
+    auth = HvsRenderInputsAuthorization(
+        schema_version=MATERIALIZATION_SCHEMA_VERSION,
+        authorization_id=authorization_id,
+        source_project_id=source_project_id,
+        hvs_project_id=hvs_project_id,
+        project_revision=int(project_revision),
+        operation=OPERATION_MATERIALIZE_HVS_RENDER_INPUTS,
+        initialization_fingerprint=initialization_fingerprint,
+        destination_identity=destination_identity,
+        issued_at=now_iso,
+        expires_at=_default_expires_at(now_iso),
+        issued_by=issued_by,
+        decision=decision,
+        nonce=nonce,
+    )
+    problems = auth.validate()
+    if problems:
+        return (auth, ERR_RENDER_INPUTS_AUTHORIZATION_MALFORMED)
+    store.put_render_inputs_authorization(auth)
+    return (auth, decision)
+
+
+def _evaluate_render_inputs_authorization(
+    auth: Optional[HvsRenderInputsAuthorization],
+    *,
+    source_project_id: str,
+    hvs_project_id: str,
+    project_revision: int,
+    initialization_fingerprint: str,
+    destination_identity: str,
+    now_iso: str,
+) -> "Optional[str]":
+    """Return an error code if the authorization does not permit materialization."""
+    if auth is None:
+        return ERR_RENDER_INPUTS_AUTHORIZATION_MISSING
+    if not auth.is_authorized():
+        return ERR_RENDER_INPUTS_AUTHORIZATION_DENIED
+    if auth.operation != OPERATION_MATERIALIZE_HVS_RENDER_INPUTS:
+        return ERR_RENDER_INPUTS_AUTHORIZATION_OPERATION_MISMATCH
+    if auth.source_project_id != source_project_id:
+        return ERR_RENDER_INPUTS_AUTHORIZATION_IDENTITY_MISMATCH
+    if auth.hvs_project_id != hvs_project_id:
+        return ERR_RENDER_INPUTS_AUTHORIZATION_IDENTITY_MISMATCH
+    if auth.project_revision != project_revision:
+        return ERR_RENDER_INPUTS_AUTHORIZATION_REVISION_MISMATCH
+    if auth.initialization_fingerprint != initialization_fingerprint:
+        return ERR_RENDER_INPUTS_AUTHORIZATION_IDENTITY_MISMATCH
+    # destination_identity is an OPT-IN isolation hook. An empty authorized
+    # destination is a wildcard (production writes under STUDIO_ROOT) and must
+    # not block a non-empty materialize call; only a non-empty authorized
+    # destination is bound for strict identity comparison.
+    if auth.destination_identity and auth.destination_identity != destination_identity:
+        return ERR_RENDER_INPUTS_AUTHORIZATION_IDENTITY_MISMATCH
+    if auth.is_expired(now_iso=now_iso):
+        return ERR_RENDER_INPUTS_AUTHORIZATION_EXPIRED
+    return None
+
+
+def materialize_render_inputs(
+    *,
+    store: MaterializationStore,
+    source_project_id: str,
+    hvs_project_id: str,
+    project_revision: int,
+    initialization_fingerprint: str,
+    destination_identity: str,
+    authorization: HvsRenderInputsAuthorization,
+    authorization_id: str,
+    capability_id: str,
+    attempt_id: str,
+    now_iso: str,
+    hvs_render_inputs_invoker: "Callable[..., dict[str, Any]]",
+    timeout_during_invoke: bool = False,
+) -> "DownstreamRenderInputsResult":
+    """Execute the controlled downstream render-input materialization.
+
+    Exactly ONE HVS ``materialize-render-inputs`` call may occur, guarded by a
+    single-use capability consumed atomically. Any rejection returns with
+    ``hvs_calls == 0`` and the isolated destination untouched. An unknown
+    outcome is recorded and never retried automatically. ``render_ready`` is
+    set only after the read-only readiness gate validates all five
+    render-required artifacts.
+    """
+    # Step 1: evaluate authorization (fail closed).
+    auth_err = _evaluate_render_inputs_authorization(
+        authorization,
+        source_project_id=source_project_id,
+        hvs_project_id=hvs_project_id,
+        project_revision=project_revision,
+        initialization_fingerprint=initialization_fingerprint,
+        destination_identity=destination_identity,
+        now_iso=now_iso,
+    )
+    if auth_err is not None:
+        return DownstreamRenderInputsResult(
+            ok=False,
+            state=STATE_HVS_RENDER_INPUTS_AUTHORIZATION_REQUIRED,
+            authorization_id=authorization_id,
+            hvs_calls=0,
+            outcome="rejected",
+            error_code=auth_err,
+            error_detail="authorization did not permit downstream render-input materialization",
+        )
+
+    # Step 2: replay containment — an already-consumed capability must NOT be
+    # re-issued; reusing a consumed capability_id is contained before HVS.
+    existing_cap = store.get_render_inputs_capability(capability_id)
+    if existing_cap is not None and existing_cap.is_consumed():
+        return DownstreamRenderInputsResult(
+            ok=False,
+            state=STATE_HVS_RENDER_INPUTS_FAILED_CONFIRMED,
+            authorization_id=authorization_id,
+            capability_id=capability_id,
+            hvs_calls=0,
+            outcome="rejected",
+            error_code=ERR_RENDER_INPUTS_CAPABILITY_CONSUMED,
+            error_detail="capability already consumed (exact replay contained)",
+        )
+
+    # Step 3: issue single-use capability (persisted before mutation).
+    cap = HvsRenderInputsCapability(
+        schema_version=MATERIALIZATION_SCHEMA_VERSION,
+        capability_id=capability_id,
+        authorization_id=authorization_id,
+        source_project_id=source_project_id,
+        hvs_project_id=hvs_project_id,
+        project_revision=int(project_revision),
+        initialization_fingerprint=initialization_fingerprint,
+        destination_identity=destination_identity,
+        issued_at=now_iso,
+        expires_at=_default_expires_at(now_iso),
+        consumed_at=None,
+        operation=OPERATION_MATERIALIZE_HVS_RENDER_INPUTS,
+    )
+    cap_problems = cap.validate()
+    if cap_problems:
+        return DownstreamRenderInputsResult(
+            ok=False,
+            state=STATE_HVS_RENDER_INPUTS_AUTHORIZATION_REQUIRED,
+            authorization_id=authorization_id,
+            capability_id=capability_id,
+            hvs_calls=0,
+            outcome="rejected",
+            error_code=ERR_RENDER_INPUTS_CAPABILITY_MALFORMED,
+            error_detail="; ".join(cap_problems),
+        )
+    store.put_render_inputs_capability(cap)
+
+    # Step 4: concurrency containment — at most one in-flight attempt per
+    # (source_project_id). A second concurrent request fails closed here.
+    inflight = store.list_render_inputs_attempts_for_project(source_project_id)
+    for a in inflight:
+        if a.attempt_id != attempt_id and a.state in (
+            STATE_HVS_RENDER_INPUTS_AUTHORIZED,
+            STATE_HVS_RENDER_INPUTS_MATERIALIZING,
+        ):
+            return DownstreamRenderInputsResult(
+                ok=False,
+                state=STATE_HVS_RENDER_INPUTS_FAILED_CONFIRMED,
+                authorization_id=authorization_id,
+                capability_id=capability_id,
+                hvs_calls=0,
+                outcome="rejected",
+                error_code="RENDER_INPUTS_INFLIGHT_ATTEMPT",
+                error_detail="another downstream render-input attempt is already in flight",
+            )
+
+    # Step 5: atomically mark attempt MATERIALIZING (persisted before HVS).
+    attempt = HvsRenderInputsAttempt(
+        attempt_id=attempt_id,
+        source_project_id=source_project_id,
+        hvs_project_id=hvs_project_id,
+        project_revision=int(project_revision),
+        initialization_fingerprint=initialization_fingerprint,
+        destination_identity=destination_identity,
+        authorization_id=authorization_id,
+        capability_id=capability_id,
+        operation=OPERATION_MATERIALIZE_HVS_RENDER_INPUTS,
+        state=STATE_HVS_RENDER_INPUTS_MATERIALIZING,
+        hvs_calls=0,
+        started_at=now_iso,
+        finished_at=None,
+        outcome=None,
+        error_code=None,
+        error_detail=None,
+        expected_payload_hash=initialization_fingerprint,
+        created_artifacts=(),
+        replayed=False,
+        persisted_result=None,
+    )
+    store.put_render_inputs_attempt(attempt)
+
+    # Step 6: consume capability atomically (only one winner proceeds).
+    prior_cap = store.consume_render_inputs_capability(capability_id, consumed_at=now_iso)
+    if prior_cap is None:
+        attempt = HvsRenderInputsAttempt(
+            **{
+                **attempt.to_dict(),
+                "state": STATE_HVS_RENDER_INPUTS_FAILED_CONFIRMED,
+                "finished_at": now_iso,
+                "outcome": "rejected",
+                "error_code": ERR_RENDER_INPUTS_CAPABILITY_CONSUMED,
+                "error_detail": "capability already consumed (duplicate request contained)",
+            }
+        )
+        store.put_render_inputs_attempt(attempt)
+        return DownstreamRenderInputsResult(
+            ok=False,
+            state=STATE_HVS_RENDER_INPUTS_FAILED_CONFIRMED,
+            attempt_id=attempt_id,
+            authorization_id=authorization_id,
+            capability_id=capability_id,
+            hvs_calls=0,
+            outcome="rejected",
+            error_code=ERR_RENDER_INPUTS_CAPABILITY_CONSUMED,
+            error_detail="capability already consumed (duplicate request contained)",
+        )
+
+    # Step 7: cross the HVS mutation boundary EXACTLY ONCE.
+    hvs_calls = 0
+    result: Optional[dict[str, Any]] = None
+    try:
+        hvs_calls = 1
+        if timeout_during_invoke:
+            attempt = HvsRenderInputsAttempt(
+                **{
+                    **attempt.to_dict(),
+                    "state": STATE_HVS_RENDER_INPUTS_OUTCOME_UNKNOWN,
+                    "hvs_calls": hvs_calls,
+                    "finished_at": now_iso,
+                    "outcome": "unknown",
+                    "error_code": ERR_RENDER_INPUTS_OUTCOME_UNKNOWN,
+                    "error_detail": "HVS render-input materializer did not return (timeout/lost response)",
+                }
+            )
+            store.put_render_inputs_attempt(attempt)
+            return DownstreamRenderInputsResult(
+                ok=False,
+                state=STATE_HVS_RENDER_INPUTS_OUTCOME_UNKNOWN,
+                attempt_id=attempt_id,
+                authorization_id=authorization_id,
+                capability_id=capability_id,
+                hvs_calls=hvs_calls,
+                outcome="unknown",
+                error_code=ERR_RENDER_INPUTS_OUTCOME_UNKNOWN,
+                error_detail="HVS render-input materializer did not return (timeout/lost response)",
+            )
+        result = hvs_render_inputs_invoker(
+            project_id=hvs_project_id,
+            request_id=attempt_id,
+            projects_root=destination_identity,
+            expected_payload_hash=initialization_fingerprint,
+        )
+    except Exception as exc:  # pragma: no cover - defensive boundary
+        attempt = HvsRenderInputsAttempt(
+            **{
+                **attempt.to_dict(),
+                "state": STATE_HVS_RENDER_INPUTS_OUTCOME_UNKNOWN,
+                "hvs_calls": hvs_calls,
+                "finished_at": now_iso,
+                "outcome": "unknown",
+                "error_code": ERR_RENDER_INPUTS_OUTCOME_UNKNOWN,
+                "error_detail": f"HVS render-input materializer raised: {type(exc).__name__}",
+            }
+        )
+        store.put_render_inputs_attempt(attempt)
+        return DownstreamRenderInputsResult(
+            ok=False,
+            state=STATE_HVS_RENDER_INPUTS_OUTCOME_UNKNOWN,
+            attempt_id=attempt_id,
+            authorization_id=authorization_id,
+            capability_id=capability_id,
+            hvs_calls=hvs_calls,
+            outcome="unknown",
+            error_code=ERR_RENDER_INPUTS_OUTCOME_UNKNOWN,
+            error_detail=f"HVS render-input materializer raised: {type(exc).__name__}",
+        )
+
+    # Step 8: classify the HVS result.
+    res_payload = (result or {}).get("payload") or result or {}
+    ok = bool((result or {}).get("ok"))
+    replayed = bool(res_payload.get("replayed"))
+    created = tuple(res_payload.get("created_artifacts") or ())
+    state = str(res_payload.get("state") or "")
+
+    if not ok:
+        # HVS returned non-success => confirmed failure (never unknown).
+        attempt = HvsRenderInputsAttempt(
+            **{
+                **attempt.to_dict(),
+                "state": STATE_HVS_RENDER_INPUTS_FAILED_CONFIRMED,
+                "hvs_calls": hvs_calls,
+                "finished_at": now_iso,
+                "outcome": "failed",
+                "error_code": ERR_RENDER_INPUTS_HVS_FAILED,
+                "error_detail": (res_payload.get("error_detail") or "HVS render-input materialization failed"),
+                "replayed": replayed,
+                "created_artifacts": created,
+            }
+        )
+        store.put_render_inputs_attempt(attempt)
+        return DownstreamRenderInputsResult(
+            ok=False,
+            state=STATE_HVS_RENDER_INPUTS_FAILED_CONFIRMED,
+            attempt_id=attempt_id,
+            authorization_id=authorization_id,
+            capability_id=capability_id,
+            hvs_calls=hvs_calls,
+            replayed=replayed,
+            created_artifacts=created,
+            outcome="failed",
+            error_code=ERR_RENDER_INPUTS_HVS_FAILED,
+            error_detail=(res_payload.get("error_detail") or "HVS render-input materialization failed"),
+        )
+
+    # Step 9: read-only render-readiness validation across the FIVE required
+    # artifacts (3 init + 3 downstream). Success requires a complete, valid
+    # five-artifact project. The downstream artifact set is taken from what
+    # HVS ACTUALLY created (from the trusted payload), never assumed.
+    present = list(created) if created else list(DOWNSTREAM_RENDER_INPUT_ARTIFACTS)
+    init_artifacts = [
+        "project_brief.json",
+        "timelines/video_timeline.json",
+    ]
+    present = init_artifacts + present
+    # If the HVS result reported a partial or conflicting state, fail closed.
+    if state in (STATE_HVS_RENDER_INPUTS_FAILED_CONFIRMED, STATE_HVS_RENDER_INPUTS_OUTCOME_UNKNOWN):
+        attempt = HvsRenderInputsAttempt(
+            **{
+                **attempt.to_dict(),
+                "state": STATE_HVS_RENDER_INPUTS_FAILED_CONFIRMED,
+                "hvs_calls": hvs_calls,
+                "finished_at": now_iso,
+                "outcome": "failed",
+                "error_code": ERR_RENDER_INPUTS_PARTIAL,
+                "error_detail": "HVS reported partial/conflicting downstream state",
+                "replayed": replayed,
+                "created_artifacts": created,
+            }
+        )
+        store.put_render_inputs_attempt(attempt)
+        return DownstreamRenderInputsResult(
+            ok=False,
+            state=STATE_HVS_RENDER_INPUTS_FAILED_CONFIRMED,
+            attempt_id=attempt_id,
+            authorization_id=authorization_id,
+            capability_id=capability_id,
+            hvs_calls=hvs_calls,
+            replayed=replayed,
+            created_artifacts=created,
+            outcome="failed",
+            error_code=ERR_RENDER_INPUTS_PARTIAL,
+            error_detail="HVS reported partial/conflicting downstream state",
+        )
+
+    ready, blockers = evaluate_render_inputs_readiness(
+        hvs_project_exists=True,
+        present_artifacts=tuple(present),
+    )
+    if ready:
+        persisted = {
+            "source_project_id": source_project_id,
+            "hvs_project_id": hvs_project_id,
+            "attempt_id": attempt_id,
+            "authorization_id": authorization_id,
+            "capability_id": capability_id,
+            "hvs_calls": hvs_calls,
+            "replayed": replayed,
+            "created_artifacts": list(created),
+            "render_ready": True,
+        }
+        attempt = HvsRenderInputsAttempt(
+            **{
+                **attempt.to_dict(),
+                "state": STATE_HVS_RENDER_INPUTS_MATERIALIZED,
+                "hvs_calls": hvs_calls,
+                "finished_at": now_iso,
+                "outcome": "success",
+                "replayed": replayed,
+                "created_artifacts": created,
+                "persisted_result": persisted,
+            }
+        )
+        store.put_render_inputs_attempt(attempt)
+        # Ready gate => HVS_RENDER_READY (distinct from MATERIALIZED).
+        attempt = HvsRenderInputsAttempt(
+            **{
+                **attempt.to_dict(),
+                "state": STATE_HVS_RENDER_READY,
+            }
+        )
+        store.put_render_inputs_attempt(attempt)
+        return DownstreamRenderInputsResult(
+            ok=True,
+            state=STATE_HVS_RENDER_READY,
+            attempt_id=attempt_id,
+            authorization_id=authorization_id,
+            capability_id=capability_id,
+            hvs_calls=hvs_calls,
+            replayed=replayed,
+            created_artifacts=created,
+            outcome="success",
+            render_ready=True,
+            persisted_result=persisted,
+        )
+
+    # Materialized but not all five artifacts valid => NOT ready (fail closed).
+    attempt = HvsRenderInputsAttempt(
+        **{
+            **attempt.to_dict(),
+            "state": STATE_HVS_RENDER_NOT_READY,
+            "hvs_calls": hvs_calls,
+            "finished_at": now_iso,
+            "outcome": "success",
+            "replayed": replayed,
+            "created_artifacts": created,
+            "error_code": ERR_RENDER_INPUTS_INITIALIZATION_MISSING if blockers else ERR_RENDER_INPUTS_PARTIAL,
+            "error_detail": ("; ".join(blockers) if blockers else "render readiness gate not satisfied"),
+            "persisted_result": {
+                "source_project_id": source_project_id,
+                "hvs_project_id": hvs_project_id,
+                "attempt_id": attempt_id,
+                "hvs_calls": hvs_calls,
+                "replayed": replayed,
+                "created_artifacts": list(created),
+                "render_ready": False,
+            },
+        }
+    )
+    store.put_render_inputs_attempt(attempt)
+    return DownstreamRenderInputsResult(
+        ok=False,
+        state=STATE_HVS_RENDER_NOT_READY,
+        attempt_id=attempt_id,
+        authorization_id=authorization_id,
+        capability_id=capability_id,
+        hvs_calls=hvs_calls,
+        replayed=replayed,
+        created_artifacts=created,
+        outcome="success",
+        error_code=ERR_RENDER_INPUTS_INITIALIZATION_MISSING if blockers else ERR_RENDER_INPUTS_PARTIAL,
+        error_detail=("; ".join(blockers) if blockers else "render readiness gate not satisfied"),
+        render_ready=False,
+        persisted_result={
+            "source_project_id": source_project_id,
+            "hvs_project_id": hvs_project_id,
+            "attempt_id": attempt_id,
+            "hvs_calls": hvs_calls,
+            "replayed": replayed,
+            "created_artifacts": list(created),
+            "render_ready": False,
+        },
+    )
+
+
+def reconcile_render_inputs(
+    *,
+    store: MaterializationStore,
+    attempt_id: str,
+    hvs_artifact_lister: "Callable[[str, str], dict[str, Any]]",
+) -> "tuple[str, Optional[HvsRenderInputsAttempt]]":
+    """Read-only reconciliation for a downstream render-input attempt.
+
+    Never invokes materialize-render-inputs / initialize-project / render;
+    never writes HVS artifacts. Inspects the existing attempt + the artifact
+    set present at the destination and classifies readiness. A complete, valid
+    five-artifact project may reconcile to HVS_RENDER_READY; a partial or
+    conflicting artifact set must NOT reconcile to success.
+    """
+    attempt = store.get_render_inputs_attempt(attempt_id)
+    if attempt is None:
+        return ("RENDER_INPUTS_ATTEMPT_NOT_FOUND", None)
+    if attempt.state not in (
+        STATE_HVS_RENDER_INPUTS_OUTCOME_UNKNOWN,
+        STATE_HVS_RENDER_INPUTS_RECONCILIATION_REQUIRED,
+        STATE_HVS_RENDER_INPUTS_MATERIALIZED,
+        STATE_HVS_RENDER_INPUTS_FAILED_CONFIRMED,
+        STATE_HVS_RENDER_READY,
+        STATE_HVS_RENDER_NOT_READY,
+    ):
+        return (ERR_RENDER_INPUTS_RECONCILE_REQUIRED, attempt)
+    try:
+        view = hvs_artifact_lister(
+            project_id=attempt.hvs_project_id,
+            request_id=attempt_id,
+        )
+    except Exception:
+        view = None
+    if view is None:
+        return ("RENDER_INPUTS_INSPECT_FAILED", attempt)
+
+    present = tuple(view.get("present_artifacts") or ())
+    project_exists = bool(view.get("exists", True))
+    ready, blockers = evaluate_render_inputs_readiness(
+        hvs_project_exists=project_exists,
+        present_artifacts=present,
+    )
+    if ready:
+        updated = HvsRenderInputsAttempt(
+            **{
+                **attempt.to_dict(),
+                "state": STATE_HVS_RENDER_READY,
+                "outcome": "success",
+                "persisted_result": {
+                    **(attempt.persisted_result or {}),
+                    "reconciled": True,
+                    "render_ready": True,
+                },
+            }
+        )
+        store.put_render_inputs_attempt(updated)
+        return (STATE_HVS_RENDER_READY, updated)
+    if not project_exists:
+        return ("RENDER_INPUTS_CONFIRMED_NOT_READY", attempt)
+    return (STATE_HVS_RENDER_NOT_READY, attempt)
+
+
 __all__ = sorted(
     (
         "MaterializationResult",
+        "DownstreamRenderInputsResult",
         "normalized_hvs_project_name",
         "build_materialization_plan",
         "evaluate_prerequisites",
         "issue_authorization",
         "materialize",
         "reconcile_materialization",
+        "issue_render_inputs_authorization",
+        "materialize_render_inputs",
+        "reconcile_render_inputs",
+        "DOWNSTREAM_RENDER_INPUT_ARTIFACTS",
         "DEFAULT_TTL_SECONDS",
     )
 )

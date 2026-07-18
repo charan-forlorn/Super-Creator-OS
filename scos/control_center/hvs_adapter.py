@@ -69,6 +69,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -110,7 +111,7 @@ except ImportError:  # direct top-level module execution
 READ_ONLY_OPERATIONS = ("hvs_capability_probe", "inspect-project")
 # Commands that create or mutate HVS project state. These MUST receive a valid,
 # correctly bound Stage 8.5 authorization decision before invocation.
-STATE_MUTATING_OPERATIONS = ("initialize-project",)
+STATE_MUTATING_OPERATIONS = ("initialize-project", "render-hyperframes", "materialize-render-inputs")
 # Read-only capability/help probes are permitted by the config allowlist only.
 STAGE1_READONLY_OPERATIONS = ("hvs_capability_probe",)
 
@@ -189,7 +190,6 @@ _FORBIDDEN_HVS_SUBCOMMANDS = frozenset(
         "create-project",
         "assemble-media",
         "export-project",
-        "render-hyperframes",
         "plan-real-render-batch",
         "run-real-render-batch",
         "create-render-pack",
@@ -200,6 +200,16 @@ _FORBIDDEN_HVS_SUBCOMMANDS = frozenset(
         "backup-project",
         "dashboard",
         "release-gate",
+    }
+)
+
+# The ONLY mutating HVS subcommands the Cohort 10E controlled render path is
+# permitted to drive (reached solely through the adapter's bound methods,
+# after the Python render authority + single-use capability gate).
+_ALLOWED_MUTATING_HVS_SUBCOMMANDS = frozenset(
+    {
+        "initialize-project",
+        "render-hyperframes",
     }
 )
 
@@ -549,6 +559,73 @@ def stage85_from_cohort10d_authorization(
     )
 
 
+def stage85_from_cohort10e_authorization(
+    auth: "dict[str, Any] | None",
+) -> "Stage8_5AdapterAuthorization":
+    """Derive a Stage 8.5 decision from a Cohort-10E render authorization.
+
+    Mirrors ``stage85_from_cohort10d_authorization`` but binds to the
+    ``render-hyperframes`` operation and the derived HVS project id
+    (``hvs-<suffix>``). The authoritative Python render service owns
+    issuance; this adapter only translates fail-closed.
+    """
+    if not isinstance(auth, dict):
+        return Stage8_5AdapterAuthorization("")
+    decision = auth.get("decision")
+    if decision != "AUTHORIZED":
+        return Stage8_5AdapterAuthorization("")
+    project_id = str(auth.get("project_id") or "")
+    hvs_target = normalized_hvs_project_name(project_id) if project_id else ""
+    expires_at = str(auth.get("expires_at") or "")
+    now_iso = str(auth.get("_now_iso") or "")
+    if not now_iso:
+        now_iso = str(auth.get("issued_at") or "")
+    if expires_at and now_iso and expires_at < now_iso:
+        return Stage8_5AdapterAuthorization("")
+    return Stage8_5AdapterAuthorization(
+        "AUTHORIZED_IN_PRINCIPLE",
+        authorization_id=str(auth.get("authorization_id") or ""),
+        operation="render-hyperframes",
+        target=hvs_target,
+    )
+
+
+def stage85_from_cohort10e_render_inputs_authorization(
+    auth: "dict[str, Any] | None",
+) -> "Stage8_5AdapterAuthorization":
+    """Derive a Stage 8.5 decision from a Cohort-10E downstream render-input authorization.
+
+    Uses a DEDICATED operation binding (``materialize-render-inputs``) so the
+    downstream materialization is authorized ONLY by its own capability, never
+    merely because initialization or rendering was authorized. Fail-closed on
+    missing/denied/malformed/expired records.
+    """
+    if not isinstance(auth, dict):
+        return Stage8_5AdapterAuthorization("")
+    decision = auth.get("decision")
+    if decision != "AUTHORIZED":
+        return Stage8_5AdapterAuthorization("")
+    project_id = str(auth.get("hvs_project_id") or auth.get("project_id") or "")
+    # NOTE: the downstream render-input authorization's hvs_project_id is ALREADY
+    # the final HVS project name issued by the authoritative Python service
+    # (it is not an SPP id). Use it directly as the Stage 8.5 target — do NOT
+    # re-apply normalized_hvs_project_name(), which would double-prefix it
+    # (hvs-<id> -> hvs-hvs-<id>) and break the exact target binding.
+    hvs_target = project_id
+    expires_at = str(auth.get("expires_at") or "")
+    now_iso = str(auth.get("_now_iso") or "")
+    if not now_iso:
+        now_iso = str(auth.get("issued_at") or "")
+    if expires_at and now_iso and expires_at < now_iso:
+        return Stage8_5AdapterAuthorization("")
+    return Stage8_5AdapterAuthorization(
+        "AUTHORIZED_IN_PRINCIPLE",
+        authorization_id=str(auth.get("authorization_id") or ""),
+        operation="materialize-render-inputs",
+        target=hvs_target,
+    )
+
+
 class HermesVideoStudioAdapter(BaseAgentAdapter):
     """SCOS adapter for the Hermes Video Studio (HVS) production engine.
 
@@ -755,14 +832,136 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
         )
 
     # --- helpers ------------------------------------------------------------
-    def _safe_env(self):
-        """Explicitly minimal environment: never a full os.environ dump.
+    # The pinned external HyperFrames tool root. A validated HyperFrames
+    # identity MUST reside under a directory containing this fragment, which
+    # encodes BOTH the approved external location AND the exact version
+    # (0.7.45). Launchers outside this root are rejected fail-closed.
+    APPROVED_HYPERFRAMES_TOOL_ROOT_FRAGMENT = "hyperframes-0.7.45"
 
-        We pass ``env={}`` so the child gets no inherited shell environment,
-        secrets, or variables. This is the safest choice for a read-only probe
-        and guarantees no secret values reach the subprocess command line.
+    @staticmethod
+    def validate_tool_path(
+        bin_path: "str | None",
+        *,
+        require_approved_root: bool = False,
+    ) -> "tuple[str | None, str | None]":
+        """Validate an explicit executable identity (fail-closed).
+
+        Returns ``(canonical_abs_path, error_code)``. On success
+        ``error_code`` is ``None``. On ANY failure the path is ``None`` and
+        ``error_code`` is a stable, NON-SECRET code; the absolute path is NEVER
+        returned in the error.
+
+        When ``require_approved_root`` is True the file MUST reside under the
+        pinned external HyperFrames 0.7.45 tool root (outside both repos). This
+        doubles as the version check: the packaged directory name pins 0.7.45.
         """
-        return {}
+        if not bin_path or not bin_path.strip():
+            return (None, "HF_IDENTITY_EMPTY")
+        raw = Path(bin_path).expanduser()
+        try:
+            p = raw.resolve(strict=False)
+        except (OSError, ValueError):
+            return (None, "HF_IDENTITY_UNRESOLVABLE")
+        if not p.is_absolute():
+            return (None, "HF_IDENTITY_NOT_ABSOLUTE")
+        try:
+            real = p.resolve(strict=True)
+        except (OSError, ValueError):
+            return (None, "HF_IDENTITY_NOT_FOUND")
+        if not real.is_file():
+            return (None, "HF_IDENTITY_NOT_A_FILE")
+        # Symlink / traversal escape guard.
+        if ".." in p.parts:
+            return (None, "HF_IDENTITY_TRAVERSAL")
+        # The launcher must live OUTSIDE the SCOS repo and the HVS repo.
+        repo_root = Path(__file__).resolve().parents[3]
+        scos_pkg_root = Path(__file__).resolve().parents[1]
+        try:
+            real.relative_to(repo_root)
+            inside_repo = True
+        except ValueError:
+            inside_repo = False
+        try:
+            real.relative_to(scos_pkg_root)
+            inside_scos = True
+        except ValueError:
+            inside_scos = False
+        if inside_repo or inside_scos:
+            return (None, "HF_IDENTITY_INSIDE_REPO")
+        if require_approved_root and (
+            HermesVideoStudioAdapter.APPROVED_HYPERFRAMES_TOOL_ROOT_FRAGMENT
+            not in str(real)
+        ):
+            return (None, "HF_IDENTITY_OUTSIDE_APPROVED_ROOT")
+        return (str(real), None)
+
+    def _synthetic_render_path(
+        self,
+        hyperframes_bin: str,
+        node_bin: "str | None" = None,
+    ) -> "str | None":
+        """Build a minimal SYNTHETIC PATH from validated tool identities.
+
+        Contains ONLY:
+          * the directory of the validated HyperFrames ``.cmd`` launcher, and
+          * (when provided) the directory of the validated ``node.exe``.
+
+        No parent ``PATH`` is inherited, no global package discovery occurs,
+        and no ``npx`` / ``latest`` lookup is performed. Returns ``None`` when
+        the identity cannot be used, so the caller fails closed.
+        """
+        hf_canon, hf_err = self.validate_tool_path(
+            hyperframes_bin, require_approved_root=True
+        )
+        if hf_err or not hf_canon:
+            return None
+        dirs = [str(Path(hf_canon).parent)]
+        if node_bin:
+            node_canon, node_err = self.validate_tool_path(
+                node_bin, require_approved_root=False
+            )
+            if not node_err and node_canon:
+                d = str(Path(node_canon).parent)
+                if d not in dirs:
+                    dirs.append(d)
+        return os.pathsep.join(dirs)
+
+    def _safe_env(
+        self,
+        *,
+        hyperframes_bin: "str | None" = None,
+        node_bin: "str | None" = None,
+    ):
+        """Construct a minimal, non-secret environment for the HVS subprocess.
+
+        FAIL-CLOSED: NO parent environment is inherited. The previously
+        certified ``env={}`` contract is preserved for read-only operations;
+        only the state-mutating ``render-hyperframes`` path (which requires the
+        HyperFrames launcher) receives a SYNTHETIC, server-controlled PATH.
+
+        The synthetic PATH contains ONLY the directory of the validated
+        ``SCOS_HYPERFRAMES_BIN`` launcher and (when configured) the validated
+        ``node.exe`` directory. No parent ``PATH`` is copied, no global package
+        discovery occurs, and no secret/credential variable is forwarded.
+
+        Required Windows OS values (SYSTEMROOT/SYSTEMDRIVE/WINDIR/COMSPEC/TEMP/
+        TMP/PYTHONIOENCODING/PATHEXT) are taken from the process environment
+        only when present and cannot redirect the renderer to an untrusted
+        location.
+        """
+        env: dict[str, str] = {}
+        for key in (
+            "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC",
+            "TEMP", "TMP", "PYTHONIOENCODING", "PATHEXT",
+        ):
+            val = os.environ.get(key)
+            if val:
+                env[key] = val
+        if hyperframes_bin:
+            synth = self._synthetic_render_path(hyperframes_bin, node_bin=node_bin)
+            if synth:
+                env["PATH"] = synth
+        return env
 
     def _run_json_command(
         self,
@@ -770,9 +969,11 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
         command: str,
         args: list[str],
         request_id: str,
+        hyperframes_bin: "str | None" = None,
+        node_bin: "str | None" = None,
     ) -> dict[str, Any]:
         """Run one approved HVS JSON command through the bounded CLI boundary."""
-        if command not in {"initialize-project", "inspect-project"}:
+        if command not in {"initialize-project", "inspect-project", "render-hyperframes", "materialize-render-inputs"}:
             return {
                 "ok": False,
                 "command": command,
@@ -802,6 +1003,12 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
                 "error_detail": "constructed argv contained a shell metacharacter",
             }
         cwd = Path(self._config.hvs_repo_path).resolve()
+        # Read-only / initialize operations keep the FAIL-CLOSED empty-env
+        # contract (no PATH, no inherited secrets). Only the render path may
+        # receive the synthetic, server-validated HyperFrames PATH.
+        safe_env = self._safe_env()
+        if command == "render-hyperframes":
+            safe_env = self._safe_env(hyperframes_bin=hyperframes_bin, node_bin=node_bin)
         try:
             proc = self._subprocess_run(
                 list(argv),
@@ -814,7 +1021,7 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
                 text=False,
                 timeout=self._config.timeout_seconds,
                 input="",
-                env=self._safe_env(),
+                env=safe_env,
             )
         except subprocess.TimeoutExpired:
             return {
@@ -987,6 +1194,189 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
         if projects_root is not None:
             args.extend(["--projects-root", str(projects_root)])
         return self._run_json_command(command="inspect-project", args=args, request_id=request_id)
+
+    def materialize_render_inputs(
+        self,
+        *,
+        project_id: str,
+        request_id: str,
+        projects_root: "str | None" = None,
+        expected_payload_hash: "str | None" = None,
+        cohort10e_render_inputs_authorization: "dict[str, Any] | None" = None,
+    ) -> dict[str, Any]:
+        """Materialize downstream render-input artifacts (STATE_MUTATING).
+
+        Invokes ONLY the certified narrow HVS ``materialize-render-inputs``
+        command. This is the downstream companion to ``initialize_project``:
+        it runs AFTER a validated initialization and produces exactly the three
+        downstream render-input artifacts (template_selection.json,
+        voice_manifest.json, asset_manifest.json). It NEVER renders, NEVER
+        invokes HyperFrames/Chromium/FFmpeg, and NEVER writes outside the
+        trusted ``projects_root``.
+
+        Authorization gate (Stage 8.5, Cohort 10E): a dedicated, correctly
+        bound authorization decision MUST be evaluated BEFORE the subprocess.
+        The decision is DERIVED from the authoritative Cohort-10E downstream
+        render-input authorization record (``cohort10e_render_inputs_authorization``)
+        which binds to the ``materialize-render-inputs`` operation and the
+        derived HVS project id. Fail-closed on missing/denied/expired/mismatch.
+
+        ``projects_root`` is an OPT-IN, NON-PRODUCTION isolation hook (absolute
+        trusted path only). When set, it is forwarded to the HVS CLI so a
+        canary may materialize into an isolated OS-temp root. The adapter
+        REJECTS a non-absolute root before any subprocess. Production callers
+        pass ``None`` (writes under STUDIO_ROOT).
+        """
+        # Reject an invalid (non-absolute) projects root before any subprocess.
+        if projects_root is not None:
+            try:
+                root = Path(projects_root)
+                if not root.is_absolute():
+                    return {
+                        "ok": False,
+                        "command": "materialize-render-inputs",
+                        "exit_code": None,
+                        "payload": None,
+                        "error_kind": "invalid_projects_root",
+                        "error_detail": "projects_root must be an absolute trusted path",
+                    }
+            except (ValueError, OSError):
+                return {
+                    "ok": False,
+                    "command": "materialize-render-inputs",
+                    "exit_code": None,
+                    "payload": None,
+                    "error_kind": "invalid_projects_root",
+                    "error_detail": "projects_root is not a resolvable path",
+                }
+        # Reject an invalid hvs-* identity before subprocess.
+        if not project_id or not project_id.lower().startswith("hvs-"):
+            return {
+                "ok": False,
+                "command": "materialize-render-inputs",
+                "exit_code": None,
+                "payload": None,
+                "error_kind": "invalid_project_identity",
+                "error_detail": "project_id must be a validated hvs-* identity",
+            }
+        # AUTHORIZATION_BEFORE_SIDE_EFFECT (dedicated operation binding).
+        if cohort10e_render_inputs_authorization is not None:
+            decision = stage85_from_cohort10e_render_inputs_authorization(
+                cohort10e_render_inputs_authorization
+            )
+        else:
+            decision = self._stage85_authorization
+        try:
+            (decision or Stage8_5AdapterAuthorization("")).require_for(
+                operation="materialize-render-inputs", target=str(project_id)
+            )
+        except Stage8_5AuthorizationError as exc:
+            return {
+                "ok": False,
+                "command": "materialize-render-inputs",
+                "exit_code": None,
+                "payload": None,
+                "error_kind": "stage85_authorization_blocked",
+                "error_detail": exc.reason,  # stable non-secret reason code only
+            }
+        args = ["--project-id", str(project_id)]
+        if projects_root is not None:
+            args.extend(["--projects-root", str(projects_root)])
+        if expected_payload_hash:
+            args.extend(["--expected-payload-hash", str(expected_payload_hash)])
+        # Read-only / initialize operations keep the FAIL-CLOSED empty-env
+        # contract (no PATH, no inherited secrets). No render/network side
+        # effects are reachable from this command.
+        return self._run_json_command(
+            command="materialize-render-inputs", args=args, request_id=request_id
+        )
+
+    def render_project(
+        self,
+        *,
+        project_id: str,
+        fmt: str,
+        request_id: str,
+        output_root: "str | None" = None,
+        cohort10e_authorization: "dict[str, Any] | None" = None,
+        projects_root: "str | None" = None,
+        hyperframes_bin: "str | None" = None,
+        node_bin: "str | None" = None,
+    ) -> dict[str, Any]:
+        """Render the HVS project (STATE_MUTATING).
+
+        This is the ONLY mutating render command exposed by the adapter and
+        the sole render side-effect boundary for Cohort 10E. The Stage 8.5
+        decision is derived from the Cohort-10E render authorization record
+        (``cohort10e_authorization``), which the authoritative Python render
+        service issued ONLY on explicit operator confirmation. A missing /
+        denied / expired / mismatched authorization fails closed with no HVS
+        invocation.
+
+        ``hyperframes_bin`` is the EXPLICIT, server-validated HyperFrames
+        launcher identity (passed through from ``SCOS_HYPERFRAMES_BIN``). It is
+        validated here and forwarded to the certified HVS ``render_project`` as
+        an explicit parameter — no ``PATH``-based discovery is used. An invalid
+        identity fails closed BEFORE any HVS subprocess is spawned. ``None``
+        means "no trusted identity configured", which also fails closed for the
+        real render path.
+
+        ``output_root`` / ``projects_root`` are OPT-IN, NON-PRODUCTION
+        isolation hooks: when set, they are forwarded to the HVS CLI so a
+        canary may render into an isolated OS-temp root without touching the
+        production studio workspace. Production callers MUST pass ``None``.
+        """
+        if cohort10e_authorization is not None:
+            decision = stage85_from_cohort10e_authorization(cohort10e_authorization)
+        else:
+            decision = self._stage85_authorization
+        try:
+            (decision or Stage8_5AdapterAuthorization("")).require_for(
+                operation="render-hyperframes", target=str(project_id)
+            )
+        except Stage8_5AuthorizationError as exc:
+            return {
+                "ok": False,
+                "command": "render-hyperframes",
+                "exit_code": None,
+                "payload": None,
+                "error_kind": "stage85_authorization_blocked",
+                "error_detail": exc.reason,
+            }
+        # Explicit identity gate: validate BEFORE any subprocess.
+        if hyperframes_bin is None:
+            return {
+                "ok": False,
+                "command": "render-hyperframes",
+                "exit_code": None,
+                "payload": None,
+                "error_kind": "hf_identity_missing",
+                "error_detail": "no trusted HyperFrames identity configured",
+            }
+        _, hf_err = self.validate_tool_path(hyperframes_bin, require_approved_root=True)
+        if hf_err:
+            return {
+                "ok": False,
+                "command": "render-hyperframes",
+                "exit_code": None,
+                "payload": None,
+                "error_kind": "hf_identity_invalid",
+                "error_detail": hf_err,  # stable, non-secret code
+            }
+        args = ["--project-id", str(project_id), "--format", str(fmt)]
+        if output_root is not None:
+            args.extend(["--output-root", str(output_root)])
+        if projects_root is not None:
+            args.extend(["--projects-root", str(projects_root)])
+        if node_bin:
+            args.extend(["--node-bin", str(node_bin)])
+        return self._run_json_command(
+            command="render-hyperframes",
+            args=args,
+            request_id=request_id,
+            hyperframes_bin=hyperframes_bin,
+            node_bin=node_bin,
+        )
 
     def _failure(
         self,
