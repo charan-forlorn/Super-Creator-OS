@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-07-19 — Phase 2 Security Sign-off (net-new local-first routes)
+
+Operator (Nott) reviewed and approved two net-new Phase 2 route boundaries for
+registration in the security allowlist (`_REVIEWED_ROUTES` in
+`scos/control_center/tests/test_file_snapshot_refresh_transport.py`):
+
+- **`apps/control-center/app/api/brand-kit/route.ts`** — Brand Kit authoritative
+  transport (GET/POST). Same-origin, local-first boundary with a strict
+  `ALLOWED_FIELDS` allow-list, bounded 8192-byte body, unexpected-field
+  rejection, and fail-closed persistence to a dedicated brand-kit store. No
+  subprocess, no external network, no write to `memory/database.json`.
+- **`apps/control-center/app/api/hvs-render/export/route.ts`** — Export Package
+  endpoint, registered as a **controlled fail-closed stub**. Returns
+  `EXPORT_NOT_READY` (409) unless `SCOS_EXPORT_STUB_ENABLED=1`, which only yields
+  a deterministic `data:` URL + sha256 envelope for the Golden Project E2E
+  test-double. No subprocess, no network, no mutation, no `memory/database.json`
+  write. The real Python export backend remains unbuilt; this route is inert by
+  design until then.
+
+Effect: the security gate test
+`test_no_forbidden_runtime_source_markers_and_no_frontend_route_files` now passes
+(previously `FAILED` because these two routes were unreviewed). Both routes follow
+project discipline (Bounded Payload, Controlled Fail-closed Stub).
+
 ## 2026-07-19 — Phase 1.5 (technical-debt clearance)
 
 ### Backend / Control Center contract

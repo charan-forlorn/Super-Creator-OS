@@ -236,6 +236,27 @@ def test_no_forbidden_runtime_source_markers_and_no_frontend_route_files() -> No
         Path("apps/control-center/app/api/hvs-materialization/authorize/route.ts"),
         Path("apps/control-center/app/api/hvs-materialization/execute/route.ts"),
         Path("apps/control-center/app/api/hvs-materialization/reconcile/route.ts"),
+        # Cohort 10E authorized HVS render boundary (GET projection + POST
+        # authorize/execute/reconcile). Reviewed same-origin, local-first
+        # mutation boundary that persists to a dedicated locked store and
+        # exposes no external egress, no HVS/render/publish, no subprocess, and
+        # rejects arbitrary paths/keys.
+        Path("apps/control-center/app/api/hvs-render/projection/route.ts"),
+        Path("apps/control-center/app/api/hvs-render/authorize/route.ts"),
+        Path("apps/control-center/app/api/hvs-render/execute/route.ts"),
+        Path("apps/control-center/app/api/hvs-render/reconcile/route.ts"),
+        # Phase 2 sign-off (Operator Nott, 2026-07-19): Brand Kit authoritative
+        # transport (GET/POST). Reviewed same-origin, local-first boundary with a
+        # strict ALLOWED_FIELDS allow-list, bounded 8192-byte body, unexpected-field
+        # rejection, and fail-closed persistence to a dedicated brand-kit store.
+        # No subprocess, no external network, no write to memory/database.json.
+        Path("apps/control-center/app/api/brand-kit/route.ts"),
+        # Phase 2 sign-off (Operator Nott, 2026-07-19): Export Package endpoint.
+        # Reviewed as a CONTROLLED FAIL-CLOSED STUB. Returns EXPORT_NOT_READY (409)
+        # unless SCOS_EXPORT_STUB_ENABLED=1, which only yields a deterministic
+        # data: URL + sha256 envelope for the Golden Project E2E test-double.
+        # No subprocess, no network, no mutation, no memory/database.json write.
+        Path("apps/control-center/app/api/hvs-render/export/route.ts"),
     }
     route_files = [
         p
