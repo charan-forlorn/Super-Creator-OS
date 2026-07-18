@@ -1,0 +1,9 @@
+{
+  "files": [
+    "tests/phase2-render-double-store.test.ts",
+    "tests/phase2-happy-path.test.tsx",
+    "tests/phase2-negative-paths.test.tsx",
+    "tests/phase2-a11y-baseline.test.tsx",
+    "tests/phase2-protected-repo-guard.test.ts"
+  ]
+}

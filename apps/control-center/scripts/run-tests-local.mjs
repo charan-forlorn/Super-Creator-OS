@@ -27,7 +27,24 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_DIR = resolve(__dirname, "..");
 const OUT_DIR = resolve(APP_DIR, "test-reports");
-const EXTRA_ARGS = process.argv.slice(2);
+
+// Phase 2 — curated acceptance manifest (Only these suites run for --phase2).
+const PHASE2_MANIFEST = resolve(APP_DIR, "tests", "phase2-acceptance-manifest.json");
+
+const argv = process.argv.slice(2);
+const phase2 = argv.includes("--phase2");
+const gate = argv.includes("--gate");
+// Strip our own flags so they don't reach Vitest.
+const EXTRA_ARGS = argv.filter((a) => a !== "--phase2" && a !== "--gate");
+
+if (phase2) {
+  // Replace the test file set with the curated manifest. If the caller also
+  // passed explicit files, those take precedence (still no baseline change).
+  if (EXTRA_ARGS.length === 0) {
+    const manifest = JSON.parse(readFileSync(PHASE2_MANIFEST, "utf8"));
+    EXTRA_ARGS.push(...manifest.files);
+  }
+}
 
 mkdirSync(OUT_DIR, { recursive: true });
 
@@ -78,7 +95,9 @@ for (const suite of suites) {
 }
 
 const total = passed + failed + pending;
-const exitCode = failed === 0 ? 0 : 1;
+// --gate: Phase-2 acceptance gate. Distinct exit code (2) from a generic
+// failure (1) so the orchestrator can tell a RED gate apart from a broken run.
+const exitCode = failed === 0 ? 0 : gate ? 2 : 1;
 
 const txt =
   `Control Center — Local Vitest Report\n` +

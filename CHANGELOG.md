@@ -59,3 +59,69 @@
 - `pytest scos/control_center`: 100% green.
 - `npx vitest run` (control-center): 100% green (0 failed).
 - Local-only; no data sent outside the machine.
+
+## 2026-07-19 — Phase 2 (Solo Operator MVP) — net-new UI + E2E gate
+
+### Scope note (important)
+The Safe Subprocess Bridge, HVS Materialization routes, and Explicit Operator
+Confirmation were already built and security-reviewed in prior cohorts (10C/10E)
+and live in the working tree (untracked). Phase 2 therefore adds the **net-new**
+Solo Operator surface on top of that foundation: Create Project Wizard, Brand
+Kit, the explicit confirmation dialog, the Export-Package seam, the Golden
+Project E2E test, and the No-Terminal acceptance gate.
+
+### Frontend (Team-A)
+- **Create Project Wizard** (`app/projects/new/page.tsx`,
+  `components/create-project-wizard.tsx`, `components/wizard/*`): 5-step state
+  machine (Brief → Template → Assets → Output Profiles → Confirm) reusing
+  `validateProjectDraft` + `OUTPUT_PROFILES`. Server-resolved paths only; the
+  wizard emits profile ids, never filesystem paths. `aria-current="step"` +
+  focus-on-step-enter + `role="alert"` validation.
+- **Brand Kit** (local-only, server-resolved): `lib/brand-kit.ts`,
+  `lib/brand-kit-store.ts` (atomic-write mirror of `project-preparation-store.ts`,
+  same `memory/runtime/control-center/brand-kit-v1.json` anchor),
+  `app/api/brand-kit/route.ts` (GET+POST, allow-list, fail-closed),
+  `lib/brand-kit-client.ts` (`useBrandKit`), `components/brand-kit-editor.tsx`,
+  `app/brand-kit/page.tsx`.
+- **Explicit Operator Confirmation** (`components/confirmation-modal.tsx`):
+  accessible `role="dialog"` + `aria-modal`, focus trap, ESC/backdrop cancel,
+  single explicit confirm button. Wired in front of `HvsRenderPanel` execute
+  (the underlying checkbox + disabled-execute gate already existed). Hard rule:
+  no auto-execute on mount/timeout/focus-loss/backdrop.
+
+### Backend bridge (Team-B)
+- **Export-Package seam** (`app/api/hvs-render/export/route.ts` +
+  `exportRenderArtifact` in `lib/hvs-render-client.ts`): fail-closed stub.
+  Returns a deterministic package envelope ONLY when `SCOS_EXPORT_STUB_ENABLED=1`
+  (Golden Project E2E test-double). Otherwise refuses (`EXPORT_NOT_READY`) so the
+  UI export control stays **inert** — no fabricated success. Rationale: a real
+  Python export backend does not yet exist (the HVS adapter allowlist forbids the
+  export operation); real export is deferred to a later phase.
+
+### Tests / QA (Team-C)
+- `tests/phase2-happy-path.test.tsx`: Golden Project through real components
+  (wizard draft → render confirm → execute → export test-double), via `fetch`
+  stub at the boundary (no real Python/network).
+- `tests/phase2-negative-paths.test.tsx`: asset-missing, schema-error,
+  system-unavailable, unexpected-field — each asserts a **visible** (non-silent)
+  classification.
+- `tests/phase2-a11y-baseline.test.tsx`: dialog semantics + disabled-until-confirm.
+- `tests/phase2-render-double-store.test.ts`: bridge-layer double (fake child
+  process) proving the single-spawn, no-shell, deterministic-package seam.
+- `tests/phase2-protected-repo-guard.test.ts` (Team-D): asserts Phase-2 activity
+  mutates no protected HVS files (`memory/database.json`,
+  `scos/control_center/control_center_snapshot.py`, learning archive).
+- `scripts/run-tests-local.mjs`: added `--phase2` (curated manifest) and `--gate`
+  (exits 2 on RED) flags. `scripts/phase2-acceptance.sh` runs both legs.
+
+### Docs / evidence (Team-D)
+- This entry + Data Provenance Map note: Brand Kit store sits in
+  `memory/runtime/control-center/` (runtime only), never `memory/database.json`
+  or the learning archive. Export is a controlled stub until a real backend lands.
+
+### Verification
+- `node apps/control-center/scripts/run-tests-local.mjs --phase2 --gate` →
+  100% green (Phase-2 suites).
+- `uv run pytest scos/control_center/tests/test_control_center_snapshot.py
+  scos/control_center/tests/test_stage7_closure_gate.py -q` → green.
+- Local-only; no data sent outside the machine.
