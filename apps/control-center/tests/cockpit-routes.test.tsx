@@ -13,9 +13,9 @@ function defaultSnapshotLike() {
     queue_summary: { available: true, status: "AVAILABLE_EMPTY", data: { count: 0, items: [] }, reason_code: "READ_SOURCE_EMPTY", observed_at: "2026-07-16T00:00:00Z" },
     approval_summary: { available: true, status: "AVAILABLE_WITH_DATA", data: { approval_count: 2, audit_record_count: 0 }, reason_code: null, observed_at: "2026-07-16T00:00:00Z" },
     project_summary: { available: true, status: "AVAILABLE_WITH_DATA", data: { state_tables_present: ["projects"], has_dedicated_project_model: false }, reason_code: null, observed_at: "2026-07-16T00:00:00Z" },
-    evidence_summary: { available: false, status: "UNAVAILABLE", data: null, reason_code: "READ_SOURCE_MISSING", observed_at: "2026-07-16T00:00:00Z" },
+    evidence_summary: { available: true, status: "AVAILABLE_WITH_DATA", data: { event_record_count: 0, audit_record_count: 8 }, reason_code: null, observed_at: "2026-07-16T00:00:00Z" },
     recent_activity: { available: true, status: "AVAILABLE_WITH_DATA", data: { count: 0, items: [] }, reason_code: null, observed_at: "2026-07-16T00:00:00Z" },
-    degradation_reasons: ["READ_SOURCE_MISSING"],
+    degradation_reasons: [],
   };
 }
 
@@ -69,9 +69,20 @@ describe("Cockpit V0.2 routes — truthful read-only bridge", () => {
   });
 
   it("shows a truthful unavailable state for evidence when the source cannot be read", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ...defaultSnapshotLike(),
+          evidence_summary: { available: false, status: "UNAVAILABLE", data: null, reason_code: "READ_SOURCE_MISSING", observed_at: "2026-07-16T00:00:00Z" },
+        }),
+      }),
+    );
     render(<EvidenceScreen />);
-    // The live snapshot's evidence section is UNAVAILABLE in current SCOS
-    // state; the UI must not claim "no evidence" as a zero count.
+    // When the evidence read surface genuinely cannot be read, the UI must
+    // not claim "no evidence" as a zero count.
     expect(await screen.findByText(/could not be read|ไม่สามารถอ่าน/i)).toBeInTheDocument();
   });
 

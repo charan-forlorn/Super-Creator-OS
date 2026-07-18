@@ -44,7 +44,11 @@ try:
     )
     from .operator_read_models import OperatorReadModelResult  # type: ignore
     from .read_surface_facade import query_control_center_read_surface
-    from .read_surface_models import ReadSurfaceError, ReadSurfaceSnapshot  # type: ignore
+    from .read_surface_models import (  # type: ignore
+        ReadSurfaceError,
+        ReadSurfaceResult,
+        ReadSurfaceSnapshot,
+    )
 except ImportError:  # direct-module execution (tests insert the package dir)
     from backend_health import (  # type: ignore
         DEFAULT_COMMAND_QUEUE_RELATIVE_PATH,
@@ -57,7 +61,11 @@ except ImportError:  # direct-module execution (tests insert the package dir)
     )
     from operator_read_models import OperatorReadModelResult  # type: ignore
     from read_surface_facade import query_control_center_read_surface  # type: ignore
-    from read_surface_models import ReadSurfaceError, ReadSurfaceSnapshot  # type: ignore
+    from read_surface_models import (  # type: ignore
+        ReadSurfaceError,
+        ReadSurfaceResult,
+        ReadSurfaceSnapshot,
+    )
 
 CONTROL_CENTER_SNAPSHOT_SCHEMA_VERSION = 1
 SOURCE_MODE = "LIVE_LOCAL_READ_ONLY"
@@ -167,9 +175,16 @@ def _read_surface_metadata(repo_root: Path, checked_at: str) -> dict[str, dict[s
         query_type="FULL_LOCAL_READ_SURFACE",
         checked_at=checked_at,
     )
+    # The facade returns a ReadSurfaceResult whose `.snapshot` holds the
+    # ReadSurfaceSnapshot (or None). The earlier code checked for
+    # ReadSurfaceSnapshot directly, which was always False, so records stayed
+    # empty and Approvals/Evidence were falsely reported UNAVAILABLE.
+    snapshot = None
+    if isinstance(result, ReadSurfaceResult):
+        snapshot = result.snapshot
     records = []
-    if isinstance(result, ReadSurfaceSnapshot) and result.records:
-        records = list(result.records)
+    if isinstance(snapshot, ReadSurfaceSnapshot) and snapshot.records:
+        records = list(snapshot.records)
     by_type: dict[str, dict[str, Any]] = {}
     for record in records:
         meta = record.metadata

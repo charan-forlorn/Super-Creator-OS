@@ -16,6 +16,7 @@ import pytest
 from scos.control_center.read_surface_models import (
     FrozenMap,
     ReadSurfaceRecord,
+    ReadSurfaceResult,
     ReadSurfaceSnapshot,
 )
 from scos.control_center.operator_read_models import (
@@ -74,6 +75,8 @@ class _ReadSurfaceSnapshot:
 
 
 class _ReadSurfaceResult:
+    # Mirrors the real facade return type (ReadSurfaceResult wrapping a
+    # ReadSurfaceSnapshot). The production builder unwraps `.snapshot`.
     def __init__(self, snapshot):
         self.snapshot = snapshot
 
@@ -106,9 +109,9 @@ def _read_surface_result(records):
         )
         for rt, meta in records
     ]
-    # The facade returns a ReadSurfaceSnapshot directly (the module checks
-    # isinstance(result, ReadSurfaceSnapshot)). Do NOT wrap it.
-    return ReadSurfaceSnapshot(
+    # The facade returns a ReadSurfaceResult wrapping a ReadSurfaceSnapshot.
+    # Wrap it so the production builder can unwrap `.snapshot` correctly.
+    snapshot = ReadSurfaceSnapshot(
         snapshot_id="rs-1",
         checked_at=CHECKED_AT,
         query_id="q-1",
@@ -116,6 +119,15 @@ def _read_surface_result(records):
         readiness=FrozenMap(items=()),
         blockers=(),
         warnings=(),
+    )
+    return ReadSurfaceResult(
+        accepted=True,
+        go_no_go="GO",
+        readiness_score=100,
+        snapshot=snapshot,
+        blockers=(),
+        warnings=(),
+        checked_at=CHECKED_AT,
     )
 
 

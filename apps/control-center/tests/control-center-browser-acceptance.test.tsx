@@ -23,9 +23,9 @@ function snapshotLike(overrides: Partial<ControlCenterSnapshot> = {}): ControlCe
     queue_summary: { available: true, status: "AVAILABLE_EMPTY", data: { count: 0, items: [] }, reason_code: "READ_SOURCE_EMPTY", observed_at: "2026-07-16T00:00:00Z" },
     approval_summary: { available: true, status: "AVAILABLE_WITH_DATA", data: { approval_count: 2, audit_record_count: 0 }, reason_code: null, observed_at: "2026-07-16T00:00:00Z" },
     project_summary: { available: true, status: "AVAILABLE_WITH_DATA", data: { state_tables_present: ["projects"], has_dedicated_project_model: false }, reason_code: null, observed_at: "2026-07-16T00:00:00Z" },
-    evidence_summary: { available: false, status: "UNAVAILABLE", data: null, reason_code: "READ_SOURCE_MISSING", observed_at: "2026-07-16T00:00:00Z" },
-    recent_activity: { available: true, status: "AVAILABLE_WITH_DATA", data: { count: 1, items: [{ activity_id: "a1", activity_type: "CERT", status: "ok", summary: "x", occurred_at: "2026-07-16T00:00:00Z" }] }, reason_code: null, observed_at: "2026-07-16T00:00:00Z" },
-    degradation_reasons: ["READ_SOURCE_MISSING"],
+    evidence_summary: { available: true, status: "AVAILABLE_WITH_DATA", data: { event_record_count: 0, audit_record_count: 8 }, reason_code: null, observed_at: "2026-07-16T00:00:00Z" },
+    recent_activity: { available: true, status: "AVAILABLE_WITH_DATA", data: { count: 0, items: [] }, reason_code: null, observed_at: "2026-07-16T00:00:00Z" },
+    degradation_reasons: [],
   };
   return { ...base, ...overrides };
 }

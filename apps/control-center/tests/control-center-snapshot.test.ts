@@ -15,11 +15,11 @@ function liveSnapshot(overrides: Partial<ControlCenterSnapshot> = {}): ControlCe
     source_mode: "LIVE_LOCAL_READ_ONLY",
     health: { available: true, status: "AVAILABLE_WITH_DATA", data: { health_status: "healthy", artifact_count: 1, event_count: 0, command_record_count: 0, audit_record_count: 0, warning_count: 0, blocker_count: 0, source_coverage: [] }, reason_code: null, observed_at: "2026-07-16T00:00:00Z" },
     queue_summary: { available: true, status: "AVAILABLE_EMPTY", data: { count: 0, items: [] }, reason_code: "READ_SOURCE_EMPTY", observed_at: "2026-07-16T00:00:00Z" },
-    approval_summary: { available: false, status: "UNAVAILABLE", data: null, reason_code: "READ_SOURCE_MISSING", observed_at: "2026-07-16T00:00:00Z" },
+    approval_summary: { available: true, status: "AVAILABLE_EMPTY", data: { approval_count: 0, audit_record_count: 8 }, reason_code: "READ_SOURCE_EMPTY", observed_at: "2026-07-16T00:00:00Z" },
     project_summary: { available: true, status: "AVAILABLE_WITH_DATA", data: { state_tables_present: ["a", "b"], has_dedicated_project_model: false }, reason_code: null, observed_at: "2026-07-16T00:00:00Z" },
-    evidence_summary: { available: false, status: "UNAVAILABLE", data: null, reason_code: "READ_SOURCE_MISSING", observed_at: "2026-07-16T00:00:00Z" },
+    evidence_summary: { available: true, status: "AVAILABLE_WITH_DATA", data: { event_record_count: 0, audit_record_count: 8 }, reason_code: null, observed_at: "2026-07-16T00:00:00Z" },
     recent_activity: { available: true, status: "AVAILABLE_WITH_DATA", data: { count: 1, items: [{ activity_id: "a1", activity_type: "CERT", status: "ok", summary: "did a thing", occurred_at: "2026-07-16T00:00:00Z" }] }, reason_code: null, observed_at: "2026-07-16T00:00:00Z" },
-    degradation_reasons: ["READ_SOURCE_MISSING"],
+    degradation_reasons: [],
   };
   return { ...base, ...overrides };
 }
@@ -30,16 +30,18 @@ describe("control-center-snapshot adapter", () => {
     expect(view.sourceMode).toBe("LIVE");
     expect(view.health.available).toBe(true);
     expect(view.health.healthStatus).toBe("healthy");
-    // Unavailable approvals are NOT represented as zero.
-    expect(view.approvals.available).toBe(false);
-    expect(view.approvals.count).toBeNull();
+    // In a healthy repo the read surface holds records: approvals are
+    // AVAILABLE_EMPTY (zero records), evidence AVAILABLE_WITH_DATA.
+    expect(view.approvals.available).toBe(true);
+    expect(view.approvals.count).toBe(0);
     // Empty queue is distinct from unavailable.
     expect(view.queue.available).toBe(true);
     expect(view.queue.count).toBe(0);
     expect(view.queue.status).toBe("AVAILABLE_EMPTY");
-    // Unavailable evidence is not represented as no evidence.
-    expect(view.evidence.available).toBe(false);
-    expect(view.evidence.eventCount).toBeNull();
+    // Evidence holds audit records in a healthy repo.
+    expect(view.evidence.available).toBe(true);
+    expect(view.evidence.eventCount).toBe(0);
+    expect(view.evidence.auditCount).toBe(8);
   });
 
   it("demo mode uses the separate demo dataset and is labeled", () => {

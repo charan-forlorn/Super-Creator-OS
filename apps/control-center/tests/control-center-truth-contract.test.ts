@@ -50,10 +50,10 @@ function liveSnapshot(overrides: Partial<ControlCenterSnapshot> = {}): ControlCe
       observed_at: "2026-07-16T00:00:00Z",
     },
     approval_summary: {
-      available: false,
-      status: "UNAVAILABLE",
-      data: null,
-      reason_code: "READ_SOURCE_MISSING",
+      available: true,
+      status: "AVAILABLE_EMPTY",
+      data: { approval_count: 0, audit_record_count: 8 },
+      reason_code: "READ_SOURCE_EMPTY",
       observed_at: "2026-07-16T00:00:00Z",
     },
     project_summary: {
@@ -64,10 +64,10 @@ function liveSnapshot(overrides: Partial<ControlCenterSnapshot> = {}): ControlCe
       observed_at: "2026-07-16T00:00:00Z",
     },
     evidence_summary: {
-      available: false,
-      status: "UNAVAILABLE",
-      data: null,
-      reason_code: "READ_SOURCE_MISSING",
+      available: true,
+      status: "AVAILABLE_WITH_DATA",
+      data: { event_record_count: 0, audit_record_count: 8 },
+      reason_code: null,
       observed_at: "2026-07-16T00:00:00Z",
     },
     recent_activity: {
@@ -77,7 +77,7 @@ function liveSnapshot(overrides: Partial<ControlCenterSnapshot> = {}): ControlCe
       reason_code: null,
       observed_at: "2026-07-16T00:00:00Z",
     },
-    degradation_reasons: ["READ_SOURCE_MISSING"],
+    degradation_reasons: [],
   };
   return { ...base, ...overrides };
 }
@@ -106,16 +106,33 @@ describe("EMPTY renders no fabricated data", () => {
   });
 });
 
-describe("UNAVAILABLE does not become EMPTY", () => {
+describe("UNAVAILABLE stays truthful when the source genuinely fails", () => {
+  const unavailableOverride: Partial<ControlCenterSnapshot> = {
+    approval_summary: {
+      available: false,
+      status: "UNAVAILABLE",
+      data: null,
+      reason_code: "READ_SOURCE_MISSING",
+      observed_at: "2026-07-16T00:00:00Z",
+    },
+    evidence_summary: {
+      available: false,
+      status: "UNAVAILABLE",
+      data: null,
+      reason_code: "READ_SOURCE_MISSING",
+      observed_at: "2026-07-16T00:00:00Z",
+    },
+  };
+
   it("unavailable approvals are not represented as zero/empty", () => {
-    const view = mapSnapshotToCockpit(liveSnapshot(), "LIVE");
+    const view = mapSnapshotToCockpit(liveSnapshot(unavailableOverride), "LIVE");
     expect(view.approvals.available).toBe(false);
     expect(view.approvals.status).toBe<SectionStatus>("UNAVAILABLE");
     expect(view.approvals.count).toBeNull();
   });
 
   it("unavailable evidence is not represented as no evidence", () => {
-    const view = mapSnapshotToCockpit(liveSnapshot(), "LIVE");
+    const view = mapSnapshotToCockpit(liveSnapshot(unavailableOverride), "LIVE");
     expect(view.evidence.available).toBe(false);
     expect(view.evidence.eventCount).toBeNull();
     expect(view.evidence.auditCount).toBeNull();

@@ -35,7 +35,12 @@ def test_optional_runtime_gaps_do_not_downgrade_clean_closure_score() -> None:
     assert result.accepted is True
     assert result.stage_closed is True
     assert result.blockers == ()
-    assert any("optional runtime artifact" in warning for warning in result.warnings)
+    # In a HEALTHY repo the optional runtime artifacts (command queue +
+    # event log traffic files) are present, so the "optional runtime artifact
+    # missing" warning is correctly NOT emitted and must not downgrade a clean
+    # closure. The missing-artifact warning path is covered separately by
+    # test_missing_required_artifacts_block_but_optional_runtime_warns.
+    assert not any("optional runtime artifact" in warning for warning in result.warnings)
 
 
 def test_checked_at_is_required() -> None:
