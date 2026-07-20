@@ -5,6 +5,7 @@ import { useLocale } from "@/lib/i18n";
 import { OrbitMascot } from "@/components/cockpit/orbit-mascot";
 import { CockpitShell } from "@/components/cockpit/cockpit-shell";
 import { OperatorDryRunPanel } from "@/components/operator-dry-run-panel";
+import { GoldenRenderPanel } from "@/components/golden-render-panel";
 import { SoloOperatorWorkflowPanel } from "@/components/solo-operator-workflow-panel";
 import { SoloProjectPreparationPanel } from "@/components/solo-project-preparation-panel";
 import {
@@ -231,6 +232,10 @@ function CockpitSurface() {
 
         <section className="cockpit-panel">
           <OperatorDryRunPanel />
+        </section>
+
+        <section className="cockpit-panel">
+          <GoldenRenderPanel />
         </section>
 
         <section className="cockpit-panel">
