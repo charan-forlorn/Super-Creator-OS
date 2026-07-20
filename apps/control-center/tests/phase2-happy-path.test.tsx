@@ -28,7 +28,20 @@ function installFetch(overrides: Record<string, unknown> = {}) {
       forbidden_operations: ["publish", "upload", "render-hyperframes"],
       plan_hash: PLAN_HASH,
     },
-    attempts: [
+    authorization: {
+      authorization_id: "auth-1",
+      capability_id: "cap-1",
+      attempt_id: "att-1",
+      project_id: PROJECT,
+      project_revision: 1,
+      operation: "RENDER_HVS_PROJECT",
+      materialization_attempt_id: "mat-1",
+      render_profile_id: "vertical",
+      render_plan_hash: PLAN_HASH,
+      output_root_identity: "isolated-render-root",
+      decision: "AUTHORIZED",
+    },
+        attempts: [
       {
         attempt_id: "att-1",
         project_id: PROJECT,

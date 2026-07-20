@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useHvsRender,
   exportRenderArtifact,
@@ -59,7 +59,7 @@ function PlanCard({ plan }: Readonly<{ plan: import("@/lib/hvs-render-client").R
         <dd className="font-mono break-all">{plan.plan_hash}</dd>
       </dl>
       <p className="mt-2 text-[11px] text-muted-foreground">
-        Forbidden operations: {plan.forbidden_operations.join(", ")}
+        Forbidden operations: {(plan.forbidden_operations ?? []).join(", ")}
       </p>
       <p className="mt-1 text-[11px] font-semibold text-status-failed">
         No render starts automatically. Authorization is server-issued on explicit confirmation.
@@ -103,18 +103,21 @@ export function HvsRenderPanel({ projectId }: Readonly<{ projectId: string }>) {
   const [exporting, setExporting] = useState(false);
   const [exportResult, setExportResult] = useState<ExportResponse | null>(null);
 
+  useEffect(() => { r.refresh(projectId); }, [projectId, r.refresh]);
+
   const projection = r.projection;
   const state: RenderTruthState = projection?.truth_state ?? "RENDER_NOT_REQUESTED";
   const plan = projection?.plan ?? null;
   const revision = projection?.current_revision ?? 2;
 
   const trusted = r.loadState === "ready" && r.errorCode === null;
-  const canAuthorize = trusted && (state === "RENDER_NOT_REQUESTED" || state === "RENDER_AUTHORIZATION_REQUIRED");
+  const planHashValid = !!plan?.materialization_plan_hash && plan.materialization_plan_hash.length >= 8;
+  const canAuthorize = trusted && planHashValid && (state === "RENDER_NOT_REQUESTED" || state === "RENDER_AUTHORIZATION_REQUIRED");
   const canExecute =
     trusted &&
     state !== "RENDER_STARTING" &&
     state !== "RENDER_RUNNING" &&
-    (state === "RENDER_AUTHORIZED" || state === "RENDER_NOT_REQUESTED" || state === "RENDER_FAILED_CONFIRMED" || state === "RENDER_RECONCILIATION_REQUIRED");
+    state === "RENDER_AUTHORIZED" && Boolean(projection?.authorization?.authorization_id && projection.authorization.capability_id && projection.authorization.attempt_id);
   const canReconcile =
     trusted &&
     (state === "RENDER_OUTCOME_UNKNOWN" || state === "RENDER_RECONCILIATION_REQUIRED");
@@ -126,10 +129,9 @@ export function HvsRenderPanel({ projectId }: Readonly<{ projectId: string }>) {
       projectId,
       revision,
       true,
-      "mat-unknown",
-      "",
+      plan?.materialization_attempt_id ?? "",
+      plan?.materialization_plan_hash ?? "",
       "vertical",
-      "ISOLATED_OUTPUT_ROOT",
     );
     setLastDetail(res.detail ?? res.error_code ?? null);
     setSubmitted(false);
@@ -140,19 +142,20 @@ export function HvsRenderPanel({ projectId }: Readonly<{ projectId: string }>) {
     setModalOpen(false);
     setSubmitted(true);
     const lastAttempt = projection?.attempts[projection.attempts.length - 1];
-    const authId = `auth-${projectId}`;
-    const capId = lastAttempt?.capability_id ?? "cap-1";
-    const attId = lastAttempt?.attempt_id ?? "att-1";
+    const latestAuth = projection?.authorization;
+    const authId = latestAuth?.authorization_id ?? lastAttempt?.authorization_id;
+    const capId = latestAuth?.capability_id ?? lastAttempt?.capability_id;
+    const attId = latestAuth?.attempt_id ?? lastAttempt?.attempt_id;
+    if (!authId || !capId || !attId) { setLastDetail("authority identity missing"); setSubmitted(false); return; }
     const res = await r.execute(
       projectId,
       revision,
       authId,
       capId,
       attId,
-      "mat-unknown",
-      "",
+      plan?.materialization_attempt_id ?? "",
+      plan?.materialization_plan_hash ?? "",
       "vertical",
-      "ISOLATED_OUTPUT_ROOT",
     );
     setLastDetail(res.detail ?? res.error_code ?? null);
     setSubmitted(false);
@@ -162,7 +165,8 @@ export function HvsRenderPanel({ projectId }: Readonly<{ projectId: string }>) {
   async function onExport() {
     if (exporting) return;
     const lastAttempt = projection?.attempts[projection.attempts.length - 1];
-    const attId = lastAttempt?.attempt_id ?? "att-1";
+    if (!lastAttempt?.attempt_id) { setExportResult({ ok: false, error_code: "ATTEMPT_ID_MISSING", detail: null, download_url: null, sha256: null }); return; }
+    const attId = lastAttempt.attempt_id;
     setExporting(true);
     const res = await exportRenderArtifact(attId);
     setExportResult(res);
@@ -198,6 +202,10 @@ export function HvsRenderPanel({ projectId }: Readonly<{ projectId: string }>) {
         <p className="mt-1 text-[11px] text-muted-foreground">Truth state: {state}</p>
       )}
 
+      {trusted && projection && !planHashValid && (
+        <p className="mt-1 text-[11px] font-semibold text-status-failed">Render plan unavailable — authorization disabled until a valid plan hash is provided.</p>
+      )}
+
       <PlanCard plan={plan} />
 
       <label className="mt-3 flex items-center gap-2 text-[12px]">
@@ -223,7 +231,8 @@ export function HvsRenderPanel({ projectId }: Readonly<{ projectId: string }>) {
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          disabled={!canExecute || !confirmed || submitted || r.pending}
+          disabled={!canExecute || submitted || r.pending}
+          data-testid="execute-render"
           className="rounded-md border border-status-failed/50 bg-status-failed/10 px-3 py-1.5 text-[12px] font-semibold disabled:opacity-40"
         >
           {r.pending && submitted ? "Rendering…" : "Execute render (single request)"}
@@ -277,7 +286,7 @@ export function HvsRenderPanel({ projectId }: Readonly<{ projectId: string }>) {
         title="Confirm render execution"
         description="This starts a single, explicit render request. There is no automatic retry. Confirm only if you authorized this render."
         confirmLabel="Confirm render"
-        disabled={!canExecute || !confirmed}
+        disabled={!confirmed}
         disabledReason={!confirmed ? "Check the explicit confirmation box first." : undefined}
         pending={r.pending || submitted}
         onConfirm={onExecuteConfirmed}

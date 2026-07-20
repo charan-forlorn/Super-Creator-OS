@@ -47,7 +47,7 @@ export interface UseHvsRender {
   detail: string | null;
   observedAt: string | null;
   pending: boolean;
-  refresh: () => void;
+  refresh: (projectId: string) => void;
   requestAuthorization: (
     projectId: string,
     projectRevision: number,
@@ -55,7 +55,6 @@ export interface UseHvsRender {
     materializationAttemptId: string,
     materializationPlanHash: string,
     renderProfileId: string,
-    outputRootIdentity: string,
   ) => Promise<RenderResponse>;
   execute: (
     projectId: string,
@@ -66,7 +65,6 @@ export interface UseHvsRender {
     materializationAttemptId: string,
     materializationPlanHash: string,
     renderProfileId: string,
-    outputRootIdentity: string,
   ) => Promise<RenderResponse>;
   reconcile: (attemptId: string) => Promise<RenderResponse>;
 }
@@ -115,10 +113,18 @@ export function useHvsRender(): UseHvsRender {
   const [pending, setPending] = useState<boolean>(false);
   const requestSeq = useRef(0);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback((projectId: string) => {
     const seq = ++requestSeq.current;
     setLoadState("loading");
-    fetch("/api/hvs-render/projection", { method: "GET", cache: "no-store" })
+    if (!projectIdSafe({ projectId })) {
+      setProjection(null);
+      setErrorCode("PROJECT_NOT_FOUND");
+      setDetail("malformed project_id");
+      setObservedAt(new Date().toISOString());
+      setLoadState("ready");
+      return;
+    }
+    fetch(`/api/hvs-render/projection?projectId=${encodeURIComponent(projectId)}`, { method: "GET", cache: "no-store" })
       .then((res) => {
         if (!res.ok) throw new Error(`http_${res.status}`);
         return res.json();
@@ -126,7 +132,9 @@ export function useHvsRender(): UseHvsRender {
       .then((payload: unknown) => {
         if (seq !== requestSeq.current) return;
         const env = parseResponse(payload);
-        setProjection(env.projection ?? null);
+        const raw = payload as Record<string, unknown> | null;
+        const proj = env.projection ?? (raw && raw.project_id ? (raw as unknown as RenderProjectionView) : null);
+        setProjection(proj);
         setErrorCode(env.error_code);
         setDetail(env.detail);
         setObservedAt(new Date().toISOString());
@@ -142,9 +150,8 @@ export function useHvsRender(): UseHvsRender {
       });
   }, []);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  // Initial load is driven by the component with the authoritative project id.
+  useEffect(() => undefined, []);
 
   const requestAuthorization = useCallback(
     async (
@@ -154,7 +161,6 @@ export function useHvsRender(): UseHvsRender {
       materializationAttemptId: string,
       materializationPlanHash: string,
       renderProfileId: string,
-      outputRootIdentity: string,
     ): Promise<RenderResponse> => {
       if (!projectIdSafe({ projectId })) {
         return { ok: false, error_code: "PROJECT_NOT_FOUND", detail: "malformed project_id" };
@@ -169,17 +175,14 @@ export function useHvsRender(): UseHvsRender {
             projectId,
             projectRevision,
             confirmed,
-            authorizationId: `auth-${projectId}`,
-            nonce: "n0",
             operatorId: "local-solo-operator",
             materializationAttemptId,
             materializationPlanHash,
             renderProfileId,
-            outputRootIdentity,
           }),
         });
         const env = parseResponse(await res.json());
-        if (env.ok) refresh();
+        if (env.ok && projection?.project_id) refresh(projection.project_id);
         return env;
       } catch (err: unknown) {
         return { ok: false, error_code: "REQUEST_FAILED", detail: err instanceof Error ? err.message : "unknown_error" };
@@ -200,7 +203,6 @@ export function useHvsRender(): UseHvsRender {
       materializationAttemptId: string,
       materializationPlanHash: string,
       renderProfileId: string,
-      outputRootIdentity: string,
     ): Promise<RenderResponse> => {
       if (!projectIdSafe({ projectId })) {
         return { ok: false, error_code: "PROJECT_NOT_FOUND", detail: "malformed project_id" };
@@ -221,11 +223,10 @@ export function useHvsRender(): UseHvsRender {
             materializationAttemptId,
             materializationPlanHash,
             renderProfileId,
-            outputRootIdentity,
           }),
         });
         const env = parseResponse(await res.json());
-        if (env.ok) refresh();
+        if (env.ok && projection?.project_id) refresh(projection.project_id);
         return env;
       } catch (err: unknown) {
         return { ok: false, error_code: "REQUEST_FAILED", detail: err instanceof Error ? err.message : "unknown_error" };
@@ -247,7 +248,7 @@ export function useHvsRender(): UseHvsRender {
           body: JSON.stringify({ attemptId }),
         });
         const env = parseResponse(await res.json());
-        if (env.ok) refresh();
+        if (env.ok && projection?.project_id) refresh(projection.project_id);
         return env;
       } catch (err: unknown) {
         return { ok: false, error_code: "REQUEST_FAILED", detail: err instanceof Error ? err.message : "unknown_error" };

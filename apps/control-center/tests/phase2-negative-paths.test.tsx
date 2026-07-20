@@ -19,6 +19,11 @@ function renderFetch(status: number, body: unknown) {
           truth_state: "RENDER_AUTHORIZED",
           current_revision: 2,
           plan: { plan_hash: "a".repeat(64) },
+    authorization: {
+      authorization_id: "auth-1",
+      capability_id: "cap-1",
+      attempt_id: "att-1",
+    },
           attempts: [],
         }),
       } as Response;
