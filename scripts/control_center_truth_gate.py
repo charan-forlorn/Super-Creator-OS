@@ -113,6 +113,12 @@ _REVIEWED_ROUTES = {
     # SCOS_EXPORT_STUB_ENABLED). Declares runtime = "nodejs" + dynamic =
     # "force-dynamic".
     "apps/control-center/app/api/hvs-render/export/route.ts",
+    # Cohort 10G — reviewed same-origin golden-render execute transport.
+    # Strict ALLOWED_FIELDS POST server-controlled HVS render bridge; no
+    # external network, no browser storage, no migration of
+    # memory/database.json. Declares runtime = "nodejs" + dynamic =
+    # "force-dynamic" (no static caching).
+    "apps/control-center/app/api/golden-render/execute/route.ts",
 }
 
 

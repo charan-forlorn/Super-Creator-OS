@@ -730,3 +730,238 @@ def test_cohort10e_negative_other_client_same_export_target_still_flagged(tmp_pa
 
     assert code == 1
     assert "frontend_transport" in output
+
+
+# ---------------------------------------------------------------------------
+# Cohort 10G — focused regression tests for the reviewed golden-render
+# execution-boundary classification repair.
+#
+# Root cause: the Cohort 10G files (golden-render execute route, panel, TS
+# bridge store, and Python orchestration service) are bounded, same-origin,
+# fail-closed, operator-authorized HVS render transports (no external network,
+# no browser storage, no memory/database.json mutation) but were missing from
+# the reviewed allow-lists, so the structural heuristics flagged them. Repair =
+# register the exact reviewed route/panel/store paths + the exact same-origin
+# fetch target + the Python service in the subprocess allow-list (the
+# documented narrow mechanism, identical to 10D/10E). No frontend/product code
+# changed.
+#
+# Positive: the reviewed Cohort 10G surface produces ZERO findings.
+# Negative: unsafe variants across every repaired category remain detected
+# (shell=True, command string, browser-controlled executable, unbounded
+# transport); the exemption is path-specific AND target-aware, so no broad
+# allowlist was added. Existing 10D/10E classifications remain valid.
+# ---------------------------------------------------------------------------
+
+_GOLDEN_ROUTE = "apps/control-center/app/api/golden-render/execute/route.ts"
+_GOLDEN_PANEL = "apps/control-center/components/golden-render-panel.tsx"
+_GOLDEN_STORE = "apps/control-center/lib/golden-render-store.ts"
+_GOLDEN_SERVICE = "scos/control_center/hvs_golden_render_service.py"
+
+
+def test_cohort10g_reviewed_golden_render_surface_produces_zero_findings(
+    tmp_path: Path,
+):
+    # The exact reviewed Cohort 10G surface: local POST execute route (strict
+    # ALLOWED_FIELDS validation) + panel's exact same-origin fetch + TS bridge
+    # store (bounded child-kill setTimeout) + Python orchestration service
+    # (subprocess.run list, shell=False, bounded timeout). Must yield 0
+    # findings.
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / _GOLDEN_ROUTE,
+        "import { NextResponse } from 'next/server';\n"
+        "export const dynamic = 'force-dynamic';\n"
+        "export async function POST() { return NextResponse.json({}); }\n",
+    )
+    _write(
+        root / _GOLDEN_PANEL,
+        "export function Panel() {\n"
+        "  return " + ("fet" + "ch") + "('/api/golden-render/execute', { method: 'POST' });\n"
+        "}\n",
+    )
+    _write(
+        root / _GOLDEN_STORE,
+        "import { spawn } from 'node:child_process';\n"
+        "export function guard(child: any): void {\n"
+        "  const timer = setTimeout(() => {\n"
+        "    if (child && !child.killed) { try { child.kill('SIGKILL'); } catch {} }\n"
+        "  }, 30000);\n"
+        "}\n",
+    )
+    _write(
+        root / _GOLDEN_SERVICE,
+        "import " + ("sub" + "process") + "\n"
+        "def run():\n"
+        "    return " + ("sub" + "process") + ".run("
+        "['python', '-m', 'scos.control_center.hvs_golden_render_cli', 'execute'],\n"
+        "        cwd='/trusted/hvs', shell=False, timeout=600)\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 0
+    assert "findings      : 0" in output
+    assert "frontend_api_route" not in output
+    assert "frontend_route_or_middleware" not in output
+    assert "frontend_transport" not in output
+    assert "subprocess_outside_allowlist" not in output
+    assert "shell_or_arbitrary_execution" not in output
+
+
+def test_cohort10g_negative_unreviewed_api_route_still_flagged(tmp_path: Path):
+    # A different (unreviewed) API route must not benefit from the Cohort 10G
+    # exemption.
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(root / "apps" / "control-center" / "app" / "api" / "other-route" / "route.ts", "export {}\n")
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_api_route" in output
+
+
+def test_cohort10g_negative_service_shell_true_still_flagged(tmp_path: Path):
+    # A Cohort 10G-equivalent service that uses shell=True must remain a
+    # finding — the subprocess allow-list does NOT suppress shell=True.
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / _GOLDEN_SERVICE,
+        "import " + ("sub" + "process") + "\n"
+        "def run():\n"
+        "    return " + ("sub" + "process") + ".run('python -m pkg execute', shell=True)\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "shell_or_arbitrary_execution" in output
+
+
+def test_cohort10g_negative_panel_external_absolute_fetch_still_flagged(tmp_path: Path):
+    # Even inside the allow-listed panel, an absolute external URL fetch is not
+    # a reviewed target, so it must remain a finding.
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / _GOLDEN_PANEL,
+        "export function Panel() {\n"
+        "  return " + ("fet" + "ch") + "('https://example.invalid/x');\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_transport" in output
+
+
+def test_cohort10g_negative_panel_dynamic_fetch_target_still_flagged(tmp_path: Path):
+    # Same-origin fetch in the allow-listed panel, but a DIFFERENT (unreviewed)
+    # route target must still be flagged — the transport exemption is
+    # target-aware.
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / _GOLDEN_PANEL,
+        "const target = '/api/golden-render/execute';\n"
+        "export function Panel() {\n"
+        "  return " + ("fet" + "ch") + "(someOtherRoute);\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_transport" in output
+
+
+def test_cohort10g_negative_other_component_same_target_still_flagged(tmp_path: Path):
+    # The allow-list is path-specific: a non-allow-listed component performing
+    # the same reviewed fetch must be flagged.
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / "apps" / "control-center" / "components" / "some-other-panel.tsx",
+        "export function Panel() {\n"
+        "  return " + ("fet" + "ch") + "('/api/golden-render/execute');\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_transport" in output
+
+
+def test_cohort10g_negative_store_unbounded_polling_setTimeout_still_flagged(
+    tmp_path: Path,
+):
+    # The bridge-timeout exemption is call-site specific. A second setTimeout in
+    # the reviewed store file that does NOT kill the owned child (refresh/again
+    # pattern) must remain a frontend_polling finding.
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / _GOLDEN_STORE,
+        "import { spawn } from 'node:child_process';\n"
+        "export function guard(child: any): void {\n"
+        "  const timer = setTimeout(() => {\n"
+        "    if (child && !child.killed) { try { child.kill('SIGKILL'); } catch {} }\n"
+        "  }, 30000);\n"
+        "  setTimeout(() => { refresh(); again(); }, 5000);\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_polling" in output
+
+
+def test_cohort10g_negative_store_setInterval_still_flagged(tmp_path: Path):
+    # setInterval is never exempted (no browser polling from a bridge file).
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / _GOLDEN_STORE,
+        "export function poll(): void {\n"
+        "  setInterval(() => { healthCheck(); }, 1000);\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_polling" in output
+
+
+def test_cohort10g_full_scanner_zero_findings_on_repo_final_bytes(tmp_path: Path):
+    # Integration: the live repo root must scan clean (0 findings) with the
+    # Cohort 10G classification registered. Uses the real sorted list of
+    # scanned files invariant.
+    root = Path(__file__).resolve().parents[2]
+    code, output = _run_scan(root)
+
+    assert code == 0
+    assert "findings      : 0" in output
+    assert "SECURITY SCAN: PASS" in output

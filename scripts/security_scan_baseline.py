@@ -240,6 +240,14 @@ _CONTROL_CENTER_SUBPROCESS_ALLOWLIST = {
     # no render inference from exit code, no network, no shell interpolation.
     # Added alongside the Stage 8N implementation.
     "scos/control_center/hvs_render_completion_service.py",
+    # Cohort 10G approval-gated golden render dispatch + artifact QA. Drives the
+    # EXISTING HVS `run-real-render-batch` boundary AND ffprobe/ffmpeg QA ONLY
+    # via subprocess.run(list, shell=False, fixed executable, fixed cwd,
+    # bounded timeout, no caller-controlled fragments). Same safe pattern as
+    # hvs_render_completion_service.py / hvs_render_dispatch.py; no shell
+    # interpolation, no network inference from exit code, no browser/request-
+    # selectable executable. Added alongside the Cohort 10G implementation.
+    "scos/control_center/hvs_golden_render_service.py",
     "scripts/security_scan_baseline.py",
 }
 _FRONTEND_FORBIDDEN_TOKENS = (
@@ -273,6 +281,11 @@ _FRONTEND_BRIDGE_TIMEOUT_FILES = frozenset({
     "apps/control-center/tests/hvs-materialization-store.test.ts",
     "apps/control-center/lib/hvs-render-store.ts",
     "apps/control-center/tests/hvs-render-store.test.ts",
+    # Cohort 10G golden-render bridge: one-shot bounded child-kill setTimeout
+    # (same pattern as hvs-render-store.ts). The callback terminates ONLY the
+    # owned child process spawned for the HVS golden-render CLI; no polling,
+    # retry, reschedule, or refresh. Per-call-site exemption only.
+    "apps/control-center/lib/golden-render-store.ts",
 })
 
 # Cohort 9A reviewed-safe read-only transport allow-list.
@@ -344,6 +357,16 @@ _FRONTEND_READ_ONLY_TRANSPORT_ALLOWLIST = {
     # no subprocess/network/render/db). The client's export call targets this
     # same-origin route only.
     "apps/control-center/app/api/hvs-render/export/route.ts",
+    # Cohort 10G — reviewed same-origin golden-render execute transport. Bounded
+    # local-first operator-authorized HVS render bridge. The route accepts only
+    # a strict ALLOWED_FIELDS POST (projectId/hvsProjectId/profileId/
+    # authorizationId/operatorId), rejects unexpected fields, resolves the HVS
+    # module name at call time from a SERVER-controlled env (never browser),
+    # and persists to a dedicated local store. No external network, no browser
+    # storage, no memory/database.json mutation. The panel's fetch targets this
+    # exact same-origin route only.
+    "apps/control-center/app/api/golden-render/execute/route.ts",
+    "apps/control-center/components/golden-render-panel.tsx",
 }
 
 # Exact reviewed same-origin fetch target(s) permitted for each allow-listed
@@ -377,6 +400,11 @@ _FRONTEND_REVIEWED_FETCH_TARGETS = {
     # Cohort 10E: bounded same-origin Brand Kit transport.
     "apps/control-center/lib/brand-kit-client.ts": (
         "/api/brand-kit",
+    ),
+    # Cohort 10G: the golden-render panel performs the only same-origin
+    # transport to the reviewed golden-render execute route.
+    "apps/control-center/components/golden-render-panel.tsx": (
+        "/api/golden-render/execute",
     ),
 }
 

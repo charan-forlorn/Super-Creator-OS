@@ -396,6 +396,12 @@ def test_no_forbidden_runtime_source_markers_and_no_frontend_route_files() -> No
         # data: URL + sha256 envelope for the Golden Project E2E test-double.
         # No subprocess, no network, no mutation, no memory/database.json write.
         Path("apps/control-center/app/api/hvs-render/export/route.ts"),
+        # Cohort 10G — reviewed same-origin golden-render execute transport.
+        # Strict ALLOWED_FIELDS POST, operator approval gated, bounded child
+        # execution via fixed trusted python.exe in trusted cwd; no
+        # subprocess/request/shell/arbitrary URL/executable forwarding; no
+        # memory/database.json mutation; no external egress.
+        Path("apps/control-center/app/api/golden-render/execute/route.ts"),
     }
     route_files = [
         p
