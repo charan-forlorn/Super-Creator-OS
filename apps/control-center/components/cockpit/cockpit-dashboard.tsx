@@ -8,6 +8,7 @@ import { OperatorDryRunPanel } from "@/components/operator-dry-run-panel";
 import { GoldenRenderPanel } from "@/components/golden-render-panel";
 import { SoloOperatorWorkflowPanel } from "@/components/solo-operator-workflow-panel";
 import { SoloProjectPreparationPanel } from "@/components/solo-project-preparation-panel";
+import { PaidPilotDeliveryPanel } from "@/components/paid-pilot-delivery-panel";
 import {
   DEMO_LABEL,
   useControlCenterData,
@@ -244,6 +245,10 @@ function CockpitSurface() {
 
         <section className="cockpit-panel">
           <SoloProjectPreparationPanel />
+        </section>
+
+        <section className="cockpit-panel">
+          <PaidPilotDeliveryPanel />
         </section>
 
         <section className="cockpit-panel activity-panel">

@@ -286,6 +286,14 @@ _FRONTEND_BRIDGE_TIMEOUT_FILES = frozenset({
     # owned child process spawned for the HVS golden-render CLI; no polling,
     # retry, reschedule, or refresh. Per-call-site exemption only.
     "apps/control-center/lib/golden-render-store.ts",
+    # Cohort 10H paid-pilot delivery bridge: server-only module (imported
+    # ONLY by the delivery API route, never by a client component). Its lone
+    # setTimeout is a one-shot bounded child-kill (kills ONLY the owned
+    # childProcess spawned for `python -m scos.control_center.hvs_paid_pilot_delivery_cli`,
+    # argv array, no shell interpolation, trusted-env interpreter, no retry/
+    # refresh/poll). Exact per-call-site exemption, same pattern as the
+    # materialization/render/golden bridges above.
+    "apps/control-center/lib/paid-pilot-delivery-bridge.ts",
 })
 
 # Cohort 9A reviewed-safe read-only transport allow-list.
@@ -367,6 +375,19 @@ _FRONTEND_READ_ONLY_TRANSPORT_ALLOWLIST = {
     # exact same-origin route only.
     "apps/control-center/app/api/golden-render/execute/route.ts",
     "apps/control-center/components/golden-render-panel.tsx",
+    # Cohort 10H — reviewed same-origin paid-pilot delivery boundary.
+    # Server-side mutation authority reached only through the python bridge;
+    # the browser supplies bounded intent + opaque ids. No fs paths, no
+    # secrets, no HVS calls, no external network.
+    "apps/control-center/app/api/paid-pilot/delivery/route.ts",
+    # Cohort 10H — reviewed same-origin paid-pilot package download. Server
+    # resolves the sealed package path from the trusted store root (never
+    # browser-supplied); safe filename only, no traversal, no absolute/repo path.
+    "apps/control-center/app/api/paid-pilot/delivery/download/route.ts",
+    # Cohort 10H — reviewed pure-fetch client. Every transition is a
+    # same-origin POST/GET to the exact reviewed target below; no node
+    # builtins, no fs, no storage, no polling loop, no auto-retry.
+    "apps/control-center/lib/paid-pilot-delivery-client.ts",
 }
 
 # Exact reviewed same-origin fetch target(s) permitted for each allow-listed
@@ -405,6 +426,12 @@ _FRONTEND_REVIEWED_FETCH_TARGETS = {
     # transport to the reviewed golden-render execute route.
     "apps/control-center/components/golden-render-panel.tsx": (
         "/api/golden-render/execute",
+    ),
+    # Cohort 10H: the paid-pilot delivery client performs the only
+    # same-origin transport to the reviewed delivery API (covers both the
+    # POST mutations and the GET projection/list calls).
+    "apps/control-center/lib/paid-pilot-delivery-client.ts": (
+        "/api/paid-pilot/delivery",
     ),
 }
 

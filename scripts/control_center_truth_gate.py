@@ -119,6 +119,15 @@ _REVIEWED_ROUTES = {
     # memory/database.json. Declares runtime = "nodejs" + dynamic =
     # "force-dynamic" (no static caching).
     "apps/control-center/app/api/golden-render/execute/route.ts",
+    # Cohort 10H — reviewed same-origin paid-pilot delivery transport. GET
+    # projection (read-only) + POST submitRightsReview/createDeliveryPackage/
+    # approveDelivery/markHandoffReady that persist to the dedicated local HVS
+    # paid-pilot store via the controlled server-side bridge
+    # (lib/paid-pilot-delivery-bridge.ts). No external network, no browser
+    # storage, no migration of memory/database.json. Declares runtime =
+    # "nodejs" + dynamic = "force-dynamic" (no static caching).
+    "apps/control-center/app/api/paid-pilot/delivery/route.ts",
+    "apps/control-center/app/api/paid-pilot/delivery/download/route.ts",
 }
 
 
