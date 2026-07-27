@@ -15,6 +15,7 @@ import {
   getDelivery,
   listDeliveries,
   markHandoffReady,
+  runQa,
   submitRightsReview,
 } from "@/lib/paid-pilot-delivery-bridge";
 import type { RightsChecklistEntryView } from "@/lib/paid-pilot-types";
@@ -123,6 +124,22 @@ export async function POST(request: NextRequest) {
       rightsRevision: String(rec.rightsRevision ?? ""),
       rightsStatus: String(rec.rightsStatus ?? ""),
       retentionClass: typeof rec.retentionClass === "string" ? rec.retentionClass : "MANUAL_PURGE_REQUIRED",
+    });
+    return NextResponse.json(res, { status: res.ok ? 200 : 409, headers: { "cache-control": "no-store" } });
+  }
+
+  if (op === "qa") {
+    const deliveryId = typeof rec.deliveryId === "string" ? rec.deliveryId : "";
+    if (!ID_PATTERN.test(deliveryId)) {
+      return NextResponse.json({ ok: false, error_code: "REQUEST_MALFORMED", detail: "missing delivery id" }, { status: 400, headers: { "cache-control": "no-store" } });
+    }
+    const res = await runQa({
+      deliveryId,
+      qaReportId: typeof rec.qaReportId === "string" ? rec.qaReportId : "",
+      qaState: typeof rec.qaState === "string" ? rec.qaState : "",
+      artifactId: typeof rec.artifactId === "string" ? rec.artifactId : "",
+      artifactSha256: typeof rec.artifactSha256 === "string" ? rec.artifactSha256 : "",
+      recordedAt: typeof rec.recordedAt === "string" ? rec.recordedAt : "",
     });
     return NextResponse.json(res, { status: res.ok ? 200 : 409, headers: { "cache-control": "no-store" } });
   }

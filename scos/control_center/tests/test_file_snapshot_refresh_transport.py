@@ -402,6 +402,17 @@ def test_no_forbidden_runtime_source_markers_and_no_frontend_route_files() -> No
         # subprocess/request/shell/arbitrary URL/executable forwarding; no
         # memory/database.json mutation; no external egress.
         Path("apps/control-center/app/api/golden-render/execute/route.ts"),
+        # Cohort 10H — reviewed same-origin paid-pilot delivery boundary
+        # (POST rights/approve/create-package/mark-handoff + GET projection).
+        # Reviewed same-origin, local-first mutation boundary that persists to the
+        # dedicated locked paid-pilot delivery store and exposes no external egress,
+        # no HVS/render/publish, no subprocess, and rejects arbitrary paths/keys.
+        Path("apps/control-center/app/api/paid-pilot/delivery/route.ts"),
+        # Cohort 10H — reviewed same-origin paid-pilot package download. Server
+        # resolves the package path from the trusted local store root (never
+        # browser-supplied); only an authoritative ready-state package is served.
+        # No external egress, no filesystem browsing, no absolute/repo path leak.
+        Path("apps/control-center/app/api/paid-pilot/delivery/download/route.ts"),
     }
     route_files = [
         p

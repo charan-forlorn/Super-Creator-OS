@@ -40,6 +40,7 @@ from scos.control_center.hvs_paid_pilot_delivery_models import (
     stable_delivery_id,
 )
 from scos.control_center.hvs_paid_pilot_delivery_service import (
+    apply_qa_result,
     approve_delivery,
     create_package,
     mark_ready_for_handoff,
@@ -140,6 +141,7 @@ def test_qa_required_enforcement(repo: Path):
         store=store, delivery_id=rid, project_id="p1", operator_id="op", reviewed_at="2026-07-21T00:00:00Z",
         entries=_rights_ok(),
     )
+    # QA state still NOT_RUN -> record is DELIVERY_BLOCKED_QA_REQUIRED, not approved.
     res = approve_delivery(
         store=store, delivery_id=chk.delivery_id, operator_id="op",
         decided_at="2026-07-21T00:00:00Z", decision=APPROVED_FOR_DELIVERY,
@@ -165,6 +167,14 @@ def test_full_approval_package_backup_flow(repo: Path, tmp_path: Path):
     )
     art = tmp_path / "out.mp4"
     _make_artifact(art)
+    qa = apply_qa_result(
+        store=store, delivery_id=chk.delivery_id,
+        qa_report_id="q1", qa_state="QA_PASSED",
+        artifact_id="art1", artifact_sha256="x" * 64,
+        recorded_at="2026-07-21T00:00:00Z",
+    )
+    assert qa.ok is True
+    assert qa.record.state == "QA_PASSED_GATE_OPEN"
     res = approve_delivery(
         store=store, delivery_id=chk.delivery_id, operator_id="op",
         decided_at="2026-07-21T00:00:00Z", decision=APPROVED_FOR_DELIVERY,

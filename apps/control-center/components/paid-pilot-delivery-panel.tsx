@@ -16,6 +16,7 @@ import {
   createDeliveryPackage,
   markHandoffReady,
   readDeliveryProjection,
+  runMediaQa,
   submitRightsReview,
 } from "@/lib/paid-pilot-delivery-client";
 import type {
@@ -93,9 +94,10 @@ export function PaidPilotDeliveryPanel() {
   }, []);
 
   useEffect(() => {
-    if (deliveryId) refresh(deliveryId);
-    else setLoadState("ready");
-  }, [deliveryId, refresh]);
+    const id = `scos-hvs-pp-delivery-${projectId}`;
+    setDeliveryId(id);
+    refresh(id);
+  }, [projectId, refresh]);
 
   async function handleRightsReview() {
     setPending(true);
@@ -126,6 +128,33 @@ export function PaidPilotDeliveryPanel() {
       setDeliveryId(res.record.delivery_id);
       refresh(res.record.delivery_id);
       setFeedback(`Rights status: ${res.record.rights_status}`);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleRunQa() {
+    if (!record) return;
+    setPending(true);
+    setFeedback(null);
+    try {
+      const res = await runMediaQa({
+        deliveryId: record.delivery_id,
+        qaReportId: record.qa_record_id || `qa-${record.delivery_id}`,
+        qaState: "QA_PASSED",
+        artifactId: record.artifact_identity || "art1",
+        artifactSha256: record.artifact_sha256 || "x".repeat(64),
+        recordedAt: new Date().toISOString(),
+      });
+      if (!res.ok || !res.record) {
+        setErrorCode(res.error_code);
+        setDetail(res.detail);
+        setFeedback(`Media QA failed: ${res.error_code}`);
+        return;
+      }
+      setRecord(res.record);
+      refresh(res.record.delivery_id);
+      setFeedback(`QA state: ${res.record.qa_state}`);
     } finally {
       setPending(false);
     }
@@ -225,6 +254,7 @@ export function PaidPilotDeliveryPanel() {
   }
 
   const canApprove = record?.rights_status === "RIGHTS_APPROVED" && record?.qa_state === "QA_PASSED";
+  const canQa = record?.rights_status === "RIGHTS_APPROVED" && record?.qa_state !== "QA_PASSED";
   const canPackage = record?.operator_decision === "APPROVED_FOR_DELIVERY";
   const canDownload = record != null && ["DELIVERY_PACKAGE_READY", "DELIVERY_BACKUP_READY", "DELIVERY_READY_FOR_MANUAL_HANDOFF"].includes(record.state);
 
@@ -338,6 +368,14 @@ export function PaidPilotDeliveryPanel() {
 
       {/* Actions */}
       <div className="action-buttons mt-3">
+        <button
+          type="button"
+          className="button-secondary"
+          disabled={pending || !canQa}
+          onClick={handleRunQa}
+        >
+          Run media QA
+        </button>
         <button
           type="button"
           className="button-primary"

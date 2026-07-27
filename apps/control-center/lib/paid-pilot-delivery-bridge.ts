@@ -16,7 +16,8 @@
  */
 
 import * as childProcess from "node:child_process";
-import { resolve as nodeResolve } from "node:path";
+import * as nodeFs from "node:fs";
+import { dirname, join, resolve as nodeResolve } from "node:path";
 
 import type {
   BackupReceiptView,
@@ -52,7 +53,19 @@ function buildDeliveryPayload(extra: Record<string, unknown> = {}): Record<strin
 export function invokeBridge(payload: Record<string, unknown>): Promise<DeliveryResponse> {
   return new Promise((resolve) => {
     const python = resolveTrustedDefaultPython();
-    const repoRoot = nodeResolve(process.cwd(), "..", "..");
+    // Detect repo root: prefer SCOS_REPO_ROOT env, else walk up from cwd to find scos/control_center
+    let repoRoot = process.env.SCOS_REPO_ROOT;
+    if (!repoRoot) {
+      let cwd = process.cwd();
+      for (let i = 0; i < 3; i++) {
+        if (nodeFs.existsSync(join(cwd, "scos", "control_center"))) {
+          repoRoot = cwd;
+          break;
+        }
+        cwd = dirname(cwd);
+      }
+      if (!repoRoot) repoRoot = nodeResolve(process.cwd(), "..", "..");
+    }
     const child = childProcess.spawn(
       python,
       ["-m", BRIDGE_MODULE, payload.operation as string],
@@ -109,10 +122,12 @@ export function invokeBridge(payload: Record<string, unknown>): Promise<Delivery
       clearTimeout(timer);
       const body = stdout.trim();
       if (!body) {
+        // Do NOT surface raw stderr to the browser. Log server-side only.
+        console.error("[paid-pilot-bridge] empty output:", stderr.slice(0, 200));
         resolve({
           ok: false,
           error_code: "BRIDGE_EMPTY_OUTPUT",
-          detail: stderr.slice(0, 200) || "no response",
+          detail: "no response from delivery authority",
           record: null,
           package_sha256: null,
           package_path: null,
@@ -122,13 +137,20 @@ export function invokeBridge(payload: Record<string, unknown>): Promise<Delivery
       }
       try {
         const parsed = JSON.parse(body) as Record<string, unknown>;
+        // Browser-safe envelope: never expose absolute filesystem paths or
+        // raw stderr. The authoritative package is fetched via the download
+        // route using the delivery id, never by an absolute path.
+        const record = parsed.record as DeliveryRecordView | null;
+        if (record && typeof record === "object") {
+          delete (record as unknown as Record<string, unknown>).package_path;
+        }
         resolve({
           ok: Boolean(parsed.ok),
           error_code: (parsed.error_code as string | null) ?? null,
           detail: (parsed.detail as string | null) ?? null,
-          record: (parsed.record as DeliveryRecordView | null) ?? null,
+          record,
           package_sha256: (parsed.package_sha256 as string | null) ?? null,
-          package_path: (parsed.package_path as string | null) ?? null,
+          package_path: null,
           backup_receipt: (parsed.backup_receipt as BackupReceiptView | null) ?? null,
         });
       } catch {
@@ -232,6 +254,27 @@ export async function createDeliveryPackage(opts: {
     rights_status: opts.rightsStatus,
     retention_class: opts.retentionClass,
   }));
+}
+
+export async function runQa(opts: {
+  deliveryId: string;
+  qaReportId: string;
+  qaState: string;
+  artifactId: string;
+  artifactSha256: string;
+  recordedAt: string;
+}): Promise<DeliveryResponse> {
+  return invokeBridge(
+    buildDeliveryPayload({
+      operation: "qa",
+      delivery_id: opts.deliveryId,
+      qa_report_id: opts.qaReportId,
+      qa_state: opts.qaState,
+      artifact_id: opts.artifactId,
+      artifact_sha256: opts.artifactSha256,
+      recorded_at: opts.recordedAt,
+    }),
+  );
 }
 
 export async function markHandoffReady(deliveryId: string): Promise<DeliveryResponse> {

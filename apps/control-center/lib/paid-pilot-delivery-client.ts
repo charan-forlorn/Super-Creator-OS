@@ -58,10 +58,10 @@ export async function submitRightsReview(opts: {
   attestation?: string;
 }): Promise<DeliveryResponse> {
   return post("rights-review", {
-    delivery_id: opts.deliveryId,
-    project_id: opts.projectId,
-    operator_id: opts.operatorId,
-    reviewed_at: opts.reviewedAt,
+    deliveryId: opts.deliveryId,
+    projectId: opts.projectId,
+    operatorId: opts.operatorId,
+    reviewedAt: opts.reviewedAt,
     entries: opts.entries,
     attestation: opts.attestation ?? "",
   });
@@ -84,20 +84,20 @@ export async function approveDelivery(opts: {
   recordedAt: string;
 }): Promise<DeliveryResponse> {
   return post("approve", {
-    delivery_id: opts.deliveryId,
-    operator_id: opts.operatorId,
-    decided_at: opts.decidedAt,
+    deliveryId: opts.deliveryId,
+    operatorId: opts.operatorId,
+    decidedAt: opts.decidedAt,
     decision: opts.decision,
-    source_render_attempt_id: opts.sourceRenderAttemptId,
-    artifact_identity: opts.artifactIdentity,
-    artifact_sha256: opts.artifactSha256,
-    artifact_size: opts.artifactSize,
-    media_profile: opts.mediaProfile,
-    qa_record_id: opts.qaRecordId,
-    qa_state: opts.qaState,
-    rights_revision: opts.rightsRevision,
-    rights_status: opts.rightsStatus,
-    recorded_at: opts.recordedAt,
+    sourceRenderAttemptId: opts.sourceRenderAttemptId,
+    artifactIdentity: opts.artifactIdentity,
+    artifactSha256: opts.artifactSha256,
+    artifactSize: opts.artifactSize,
+    mediaProfile: opts.mediaProfile,
+    qaRecordId: opts.qaRecordId,
+    qaState: opts.qaState,
+    rightsRevision: opts.rightsRevision,
+    rightsStatus: opts.rightsStatus,
+    recordedAt: opts.recordedAt,
   });
 }
 
@@ -116,23 +116,41 @@ export async function createDeliveryPackage(opts: {
   retentionClass: string;
 }): Promise<DeliveryResponse> {
   return post("create-package", {
-    delivery_id: opts.deliveryId,
-    project_id: opts.projectId,
-    hvs_project_id: opts.hvsProjectId,
-    attempt_id: opts.attemptId,
-    profile_id: opts.profileId,
-    qa_report_id: opts.qaReportId,
-    artifact_path: opts.artifactPath,
-    operator_id: opts.operatorId,
-    recorded_at: opts.recordedAt,
-    rights_revision: opts.rightsRevision,
-    rights_status: opts.rightsStatus,
-    retention_class: opts.retentionClass,
+    deliveryId: opts.deliveryId,
+    projectId: opts.projectId,
+    hvsProjectId: opts.hvsProjectId,
+    attemptId: opts.attemptId,
+    profileId: opts.profileId,
+    qaReportId: opts.qaReportId,
+    artifactPath: opts.artifactPath,
+    operatorId: opts.operatorId,
+    recordedAt: opts.recordedAt,
+    rightsRevision: opts.rightsRevision,
+    rightsStatus: opts.rightsStatus,
+    retentionClass: opts.retentionClass,
+  });
+}
+
+export async function runMediaQa(opts: {
+  deliveryId: string;
+  qaReportId: string;
+  qaState: string;
+  artifactId: string;
+  artifactSha256: string;
+  recordedAt: string;
+}): Promise<DeliveryResponse> {
+  return post("qa", {
+    deliveryId: opts.deliveryId,
+    qaReportId: opts.qaReportId,
+    qaState: opts.qaState,
+    artifactId: opts.artifactId,
+    artifactSha256: opts.artifactSha256,
+    recordedAt: opts.recordedAt,
   });
 }
 
 export async function markHandoffReady(deliveryId: string): Promise<DeliveryResponse> {
-  return post("mark-handoff-ready", { delivery_id: deliveryId });
+  return post("mark-handoff-ready", { deliveryId });
 }
 
 export async function getDelivery(deliveryId: string): Promise<DeliveryResponse> {

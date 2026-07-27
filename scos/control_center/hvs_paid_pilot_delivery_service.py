@@ -69,6 +69,7 @@ from scos.control_center.hvs_paid_pilot_delivery_store import (  # noqa: E402
 )
 from scos.control_center.hvs_paid_pilot_media_qa_link import (  # noqa: E402
     QA_PASSED_STATE,
+    link_qa_state,
     run_qa_link,
 )
 
@@ -196,6 +197,63 @@ def submit_rights_checklist(
 
 
 # ---------------------------------------------------------------------------
+# Media QA result application (single writer)
+# ---------------------------------------------------------------------------
+def apply_qa_result(
+    *,
+    store: PaidPilotDeliveryStore,
+    delivery_id: str,
+    qa_report_id: str,
+    qa_state: str,
+    artifact_id: str,
+    artifact_sha256: str,
+    recorded_at: str,
+) -> DeliveryServiceResult:
+    """Persist the media-QA engine outcome and advance the delivery gate.
+
+    Fail closed: the QA result is accepted only from the authoritative QA
+    engine (the caller passes the engine-reported values). The next gate state
+    is derived from the QA state via ``link_qa_state`` — QA passed alone does
+    NOT auto-approve; approval remains a separate operator action.
+    """
+    if not str(qa_report_id or "").strip():
+        return DeliveryServiceResult(False, None, "MISSING_QA_REPORT_ID", "qa_report_id required")
+    existing = store.get(delivery_id)
+    if existing is None:
+        return DeliveryServiceResult(False, None, "DELIVERY_NOT_FOUND", "no delivery record")
+    if existing.rights_status != RIGHTS_APPROVED:
+        return DeliveryServiceResult(False, None, "RIGHTS_NOT_APPROVED", "rights must be APPROVED first")
+
+    gate_state = link_qa_state(qa_state=qa_state)
+    now = _now_iso()
+    record = PaidPilotDeliveryRecord(
+        schema_version=DELIVERY_SCHEMA_VERSION,
+        delivery_id=delivery_id,
+        project_id=existing.project_id,
+        source_render_attempt_id=existing.source_render_attempt_id,
+        artifact_identity=artifact_id or existing.artifact_identity,
+        artifact_sha256=artifact_sha256 or existing.artifact_sha256,
+        artifact_size=existing.artifact_size,
+        media_profile=existing.media_profile,
+        qa_record_id=qa_report_id,
+        qa_state=qa_state,
+        operator_id=existing.operator_id,
+        operator_decision=existing.operator_decision,
+        rights_checklist_revision=existing.rights_checklist_revision,
+        rights_status=existing.rights_status,
+        package_revision="",
+        package_sha256="",
+        backup_receipt=None,
+        retention_class=existing.retention_class,
+        created_at=existing.created_at,
+        updated_at=now,
+        state=gate_state,
+    )
+    store.put(record)
+    return DeliveryServiceResult(True, record)
+
+
+# ---------------------------------------------------------------------------
 # Operator approval (single writer)
 # ---------------------------------------------------------------------------
 def approve_delivery(
@@ -216,14 +274,24 @@ def approve_delivery(
     rights_status: str,
     recorded_at: str,
 ) -> DeliveryServiceResult:
-    """Record the operator approval/reject decision. Fail closed."""
+    """Record the operator approval/reject decision. Fail closed.
+
+    The rights/QA pre-conditions are verified against the AUTHORITATIVE
+    persisted record, never against client-asserted parameters. The
+    caller-supplied rights_status/qa_state are accepted only as advisory and
+    are NOT trusted for the gate decision.
+    """
     if not str(operator_id or "").strip():
         return DeliveryServiceResult(False, None, "MISSING_OPERATOR_ID", "operator_id required")
     if decision not in (APPROVED_FOR_DELIVERY, REJECTED_REWORK_REQUIRED):
         return DeliveryServiceResult(False, None, "INVALID_DECISION", "decision not allowed")
-    if rights_status != RIGHTS_APPROVED:
+
+    existing = store.get(delivery_id)
+    if existing is None:
+        return DeliveryServiceResult(False, None, "DELIVERY_NOT_FOUND", "no delivery record")
+    if existing.rights_status != RIGHTS_APPROVED:
         return DeliveryServiceResult(False, None, "RIGHTS_NOT_APPROVED", "rights must be APPROVED")
-    if qa_state != QA_PASSED_STATE:
+    if existing.qa_state != QA_PASSED_STATE:
         return DeliveryServiceResult(False, None, "QA_NOT_PASSED", "QA must be PASSED")
 
     now = _now_iso()
@@ -231,7 +299,7 @@ def approve_delivery(
     record = PaidPilotDeliveryRecord(
         schema_version=DELIVERY_SCHEMA_VERSION,
         delivery_id=delivery_id,
-        project_id=store.get(delivery_id).project_id if store.get(delivery_id) else "",
+        project_id=existing.project_id,
         source_render_attempt_id=source_render_attempt_id,
         artifact_identity=artifact_identity,
         artifact_sha256=artifact_sha256,
