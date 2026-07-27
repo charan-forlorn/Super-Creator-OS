@@ -14,7 +14,7 @@ import { readFile } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
-import { getDelivery } from "@/lib/paid-pilot-delivery-client";
+import { getDelivery } from "@/lib/paid-pilot-delivery-bridge";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
