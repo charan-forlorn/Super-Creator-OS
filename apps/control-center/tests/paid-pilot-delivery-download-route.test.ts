@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { NextRequest } from "next/server";
 
 // --- mock next/server so the route handler is unit-testable ---
 // NextResponse must be a CLASS (the route does `new NextResponse(...)`).
@@ -23,7 +24,21 @@ class FakeNextResponse {
     return new FakeNextResponse(JSON.stringify(data), { ...init, headers: { ...(init?.headers ?? {}), "content-type": "application/json" } });
   }
 }
-vi.mock("next/server", () => ({ NextResponse: FakeNextResponse, NextRequest: class { nextUrl: any; constructor(u: string) { this.nextUrl = { searchParams: new URL(u).searchParams }; } } }));
+
+// A minimal typed stand-in for the route's request shape.
+interface DownloadRequest {
+  nextUrl: { searchParams: URLSearchParams };
+}
+
+vi.mock("next/server", () => ({
+  NextResponse: FakeNextResponse,
+  NextRequest: class {
+    nextUrl: { searchParams: URLSearchParams };
+    constructor(u: string) {
+      this.nextUrl = { searchParams: new URL(u).searchParams };
+    }
+  },
+}));
 
 const DELIVERY_ID = "scos-hvs-pp-delivery-spp-paidpilot-10h";
 const SAFE_NAME = DELIVERY_ID.replace(/[^a-z0-9_-]/gi, "_") + ".zip";
@@ -51,10 +66,20 @@ vi.mock("@/lib/paid-pilot-delivery-client", () => ({
   runMediaQa: vi.fn(), markHandoffReady: vi.fn(), readDeliveryProjection: vi.fn(), listDeliveries: vi.fn(),
 }));
 
+type DownloadRouteResponse = {
+  status: number;
+  headers: { get(name: string): string | null };
+  body: Uint8Array | null;
+};
+
 const { GET } = await import("@/app/api/paid-pilot/delivery/download/route");
 
-function makeReq(id: string) {
-  return { nextUrl: { searchParams: new URLSearchParams(`deliveryId=${id}`) } } as any;
+function makeReq(id: string): NextRequest {
+  return { nextUrl: { searchParams: new URLSearchParams(`deliveryId=${id}`) } } as NextRequest;
+}
+
+function callGet(id: string): Promise<DownloadRouteResponse> {
+  return GET(makeReq(id)) as Promise<DownloadRouteResponse>;
 }
 
 describe("paid-pilot download route server boundary", () => {
@@ -72,8 +97,8 @@ describe("paid-pilot download route server boundary", () => {
     // (browser client relative fetch failing under Node) is reproduced by the
     // bridge returning the same REQUEST_FAILED envelope the client produced.
     bridgeGetDelivery.mockResolvedValue({ ok: false, error_code: "REQUEST_FAILED", detail: "Failed to parse URL from /api/paid-pilot/delivery?deliveryId=" + DELIVERY_ID, record: null, package_sha256: null, package_path: null, backup_receipt: null });
-    const res: any = await GET(makeReq(DELIVERY_ID));
-    const body = JSON.parse(new TextDecoder().decode(res.body));
+    const res = await callGet(DELIVERY_ID);
+    const body = JSON.parse(new TextDecoder().decode(res.body ?? new Uint8Array())) as { ok: boolean; error_code: string; detail: string };
     expect(body.ok).toBe(false);
     expect(body.error_code).toBe("REQUEST_FAILED");
     expect(String(body.detail)).toContain("Failed to parse URL");
@@ -82,32 +107,32 @@ describe("paid-pilot download route server boundary", () => {
 
   it("uses the server bridge and returns downloadable bytes after repair", async () => {
     bridgeGetDelivery.mockResolvedValue({ ok: true, error_code: null, detail: null, record: { state: "DELIVERY_READY_FOR_MANUAL_HANDOFF", package_sha256: PKG_SHA }, package_sha256: PKG_SHA, package_path: null, backup_receipt: null });
-    const res: any = await GET(makeReq(DELIVERY_ID));
+    const res = await callGet(DELIVERY_ID);
     expect(bridgeGetDelivery).toHaveBeenCalledWith(DELIVERY_ID);
     expect(res.status).toBe(200);
-    expect(res.headers.get("content-disposition")).not.toMatch(/[A-Za-z]:\\|^\//);
+    expect(res.headers.get("content-disposition")).not.toMatch(/[A-Za-z]:\/^\//);
     expect(res.headers.get("content-type")).toBe("application/zip");
     expect(res.headers.get("x-package-sha256")).toBe(PKG_SHA);
     expect(res.body).toBeInstanceOf(Uint8Array);
-    expect(Array.from(res.body)).toEqual(Array.from(PKG_BYTES));
+    expect(Array.from(res.body ?? new Uint8Array())).toEqual(Array.from(PKG_BYTES));
   });
 
   it("missing delivery fails closed (bridge returns not-found)", async () => {
     bridgeGetDelivery.mockResolvedValue({ ok: false, error_code: "DELIVERY_NOT_FOUND", detail: null, record: null, package_sha256: null, package_path: null, backup_receipt: null });
-    const res: any = await GET(makeReq(DELIVERY_ID));
+    const res = await callGet(DELIVERY_ID);
     expect(res.status).toBe(404);
   });
 
   it("non-ready delivery fails closed (bridge returns not-ready)", async () => {
     bridgeGetDelivery.mockResolvedValue({ ok: true, error_code: null, detail: null, record: { state: "DELIVERY_APPROVED", package_sha256: "" }, package_sha256: null, package_path: null, backup_receipt: null });
-    const res: any = await GET(makeReq(DELIVERY_ID));
+    const res = await callGet(DELIVERY_ID);
     expect(res.status).toBe(409);
   });
 
   it("bridge failure maps to browser-safe error (no raw path/stderr)", async () => {
     bridgeGetDelivery.mockResolvedValue({ ok: false, error_code: "BRIDGE_SPAWN_FAILED", detail: "no response from delivery authority", record: null, package_sha256: null, package_path: null, backup_receipt: null });
-    const res: any = await GET(makeReq(DELIVERY_ID));
-    const body = JSON.parse(new TextDecoder().decode(res.body));
+    const res = await callGet(DELIVERY_ID);
+    const body = JSON.parse(new TextDecoder().decode(res.body ?? new Uint8Array())) as { ok: boolean; detail?: string };
     expect(body.ok).toBe(false);
     expect(String(body.detail ?? "")).not.toMatch(/[A-Za-z]:\\/); // no absolute path leak
   });
