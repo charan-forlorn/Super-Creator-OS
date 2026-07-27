@@ -26,8 +26,9 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Delegate to the authoritative Python readiness projection. If the authority
-  // returns no record, report NOT_READY with a browser-safe reason.
+  // Delegate to the authoritative Python readiness projection. The bridge
+  // returns readiness_state / checks / blocking_reasons / *_sha256 plus record.
+  // If the authority reports no record, report NOT_READY with a browser-safe reason.
   const res = await getReadiness(deliveryId);
   const body = res as unknown as Record<string, unknown>;
   if (!res.ok || !body.record) {
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
   }
 
   const projection = body as {
-    state: string;
+    readiness_state: string;
     delivery_id: string;
     checks?: Array<{ name: string; passed: boolean; reason_code: string; detail: string }>;
     blocking_reasons?: string[];
@@ -59,10 +60,10 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(
     {
       ok: true,
-      state: projection.state,
+      // Single source of truth: the Python authority's state, never derived client-side.
+      state: projection.readiness_state,
       delivery_id: projection.delivery_id,
-      // Browser-safe: omit raw detail for failed checks only when it could
-      // leak paths; the authority already redacts (no absolute paths/secrets).
+      // Browser-safe: the authority already redacts (no absolute paths/secrets).
       checks: projection.checks ?? [],
       blocking_reasons: projection.blocking_reasons ?? [],
       package_sha256: projection.package_sha256 || null,

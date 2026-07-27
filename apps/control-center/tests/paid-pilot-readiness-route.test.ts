@@ -91,8 +91,9 @@ describe("paid-pilot readiness route", () => {
 
   it("faithfully returns the authoritative BLOCKED projection", async () => {
     bridgeGetReadiness.mockResolvedValue({
-      ok: true, record: { state: "DELIVERY_PACKAGE_CORRUPT" },
-      state: "BLOCKED", delivery_id: DELIVERY_ID,
+      ok: true, error_code: null, detail: null,
+      record: { state: "DELIVERY_PACKAGE_CORRUPT" },
+      readiness_state: "BLOCKED", delivery_id: DELIVERY_ID,
       checks: [{ name: "delivery_record", passed: false, reason_code: "DELIVERY_BLOCKED", detail: "state=DELIVERY_PACKAGE_CORRUPT" }],
       blocking_reasons: ["DELIVERY_BLOCKED"],
       package_sha256: null, backup_sha256: null, audit_sha256: null,
@@ -104,8 +105,9 @@ describe("paid-pilot readiness route", () => {
 
   it("faithfully returns the authoritative READY_FOR_CONTROLLED_PILOT projection", async () => {
     bridgeGetReadiness.mockResolvedValue({
-      ok: true, record: { state: "DELIVERY_READY_FOR_MANUAL_HANDOFF" },
-      state: "READY_FOR_CONTROLLED_PILOT", delivery_id: DELIVERY_ID,
+      ok: true, error_code: null, detail: null,
+      record: { state: "DELIVERY_READY_FOR_MANUAL_HANDOFF" },
+      readiness_state: "READY_FOR_CONTROLLED_PILOT", delivery_id: DELIVERY_ID,
       checks: [
         { name: "store_integrity", passed: true, reason_code: "STORE_OK", detail: "ok" },
         { name: "delivery_record", passed: true, reason_code: "DELIVERY_RECORD_OK", detail: "ok" },
@@ -129,8 +131,9 @@ describe("paid-pilot readiness route", () => {
 
   it("never leaks absolute paths, secrets, or raw stderr", async () => {
     bridgeGetReadiness.mockResolvedValue({
-      ok: true, record: { state: "DELIVERY_READY_FOR_MANUAL_HANDOFF" },
-      state: "READY_FOR_CONTROLLED_PILOT", delivery_id: DELIVERY_ID,
+      ok: true, error_code: null, detail: null,
+      record: { state: "DELIVERY_READY_FOR_MANUAL_HANDOFF" },
+      readiness_state: "READY_FOR_CONTROLLED_PILOT", delivery_id: DELIVERY_ID,
       checks: [{ name: "store_integrity", passed: true, reason_code: "STORE_OK", detail: "ok" }],
       blocking_reasons: [],
       package_sha256: null, backup_sha256: null, audit_sha256: null,

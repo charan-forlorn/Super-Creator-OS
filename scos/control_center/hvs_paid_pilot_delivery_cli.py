@@ -22,8 +22,13 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 from .hvs_paid_pilot_delivery_models import (  # noqa: E402
     APPROVED_FOR_DELIVERY,
@@ -42,6 +47,30 @@ from .hvs_paid_pilot_delivery_service import (  # noqa: E402
     submit_rights_checklist,
 )
 from .hvs_paid_pilot_delivery_store import PaidPilotDeliveryStore  # noqa: E402
+from . import hvs_paid_pilot_audit as _audit  # noqa: E402
+
+
+def _audit_log_path(store_path: str | None) -> Path:
+    base = Path(store_path) if store_path else PaidPilotDeliveryStore()._store_path
+    return base.parent / "paid-pilot-audit-v1.jsonl"
+
+
+def _append_audit(
+    *, store_path: str | None, delivery_id: str, actor: str,
+    transition: str, previous_state: str, new_state: str,
+    result: str, correlation_key: str, recorded_at: str, detail: str = "",
+) -> None:
+    try:
+        _audit.append_audit_event(
+            audit_log_path=_audit_log_path(store_path),
+            event_type=transition,
+            delivery_id=delivery_id, actor=actor, transition=transition,
+            previous_state=previous_state, new_state=new_state, result=result,
+            correlation_key=correlation_key, recorded_at=recorded_at, detail=detail,
+        )
+    except Exception:
+        # Audit must never break the authoritative transition.
+        pass
 
 
 def _fail(code: str, detail: str | None = None) -> dict[str, Any]:
@@ -107,6 +136,13 @@ def main() -> int:
                 attestation=str(args.get("attestation", "")),
             )
             rec = store.get(checklist.delivery_id)
+            _append_audit(
+                store_path=str(args.get("store_path")),
+                delivery_id=checklist.delivery_id, actor=operator_id,
+                transition="RIGHTS_REVIEWED", previous_state="",
+                new_state=checklist.status, result="OK",
+                correlation_key=checklist.revision, recorded_at=reviewed_at,
+            )
             return _print(_ok(
                 revision=checklist.revision,
                 delivery_id=checklist.delivery_id,
@@ -126,7 +162,11 @@ def main() -> int:
             artifact_sha256=str(args.get("artifact_sha256", "")),
             recorded_at=str(args.get("recorded_at", "")),
         )
-        return _emit(res)
+        return _emit_with_audit(
+            res, store_path=str(args.get("store_path")), transition="QA_APPLIED",
+            actor="local-solo-operator", recorded_at=str(args.get("recorded_at", "")),
+            correlation_key=str(args.get("qa_report_id", "")),
+        )
 
     if op == "approve":
         res = approve_delivery(
@@ -146,7 +186,12 @@ def main() -> int:
             rights_status=str(args.get("rights_status", "")),
             recorded_at=str(args.get("recorded_at", "")),
         )
-        return _emit(res)
+        return _emit_with_audit(
+            res, store_path=str(args.get("store_path")), transition="DELIVERY_APPROVED",
+            actor=str(args.get("operator_id", "local-solo-operator")),
+            recorded_at=str(args.get("recorded_at", "")),
+            correlation_key=str(args.get("source_render_attempt_id", "")),
+        )
 
     if op == "create-package":
         res = create_package(
@@ -164,11 +209,20 @@ def main() -> int:
             rights_status=str(args.get("rights_status", "")),
             retention_class=str(args.get("retention_class", "MANUAL_PURGE_REQUIRED")),
         )
-        return _emit(res)
+        return _emit_with_audit(
+            res, store_path=str(args.get("store_path")), transition="PACKAGE_CREATED",
+            actor=str(args.get("operator_id", "local-solo-operator")),
+            recorded_at=str(args.get("recorded_at", "")),
+            correlation_key=str(args.get("attempt_id", "")),
+        )
 
     if op == "mark-handoff-ready":
         res = mark_ready_for_handoff(store=store, delivery_id=str(args.get("delivery_id", "")))
-        return _emit(res)
+        return _emit_with_audit(
+            res, store_path=str(args.get("store_path")), transition="HANDOFF_READY",
+            actor="local-solo-operator", recorded_at=_now_iso(),
+            correlation_key=str(args.get("delivery_id", "")),
+        )
 
     if op == "get":
         rec = store.get(str(args.get("delivery_id", "")))
@@ -186,7 +240,60 @@ def main() -> int:
         if not delivery_id:
             return _print(_fail("MISSING_DELIVERY_ID"))
         projection = compute_readiness(store=store, delivery_id=delivery_id)
-        return _print(_ok(**projection.to_dict()))
+        rec = store.get(delivery_id)
+        out = projection.to_dict()
+        # Bridge envelope carries the projection under browser-safe keys and
+        # always includes the record (so the route can distinguish
+        # "no record" from "record exists but not ready").
+        out["readiness_state"] = out.pop("state")
+        out["record"] = rec.to_dict() if rec is not None else None
+        return _print(_ok(**out))
+
+    if op == "restore":
+        # Authoritative restore drill: restore the delivery package into a
+        # FRESH isolated root and, on success, append a RESTORE_VERIFIED audit
+        # event so readiness can certify the drill. Server-resolved roots only.
+        from .hvs_paid_pilot_restore import restore_to_fresh_root
+        from .hvs_paid_pilot_delivery_service import (
+            DEFAULT_BACKUP_ROOT_RELATIVE,
+            DEFAULT_PACKAGE_ROOT_RELATIVE,
+        )
+
+        delivery_id = str(args.get("delivery_id", ""))
+        restore_root = str(args.get("restore_root", "")) or None
+        expected_package_sha256 = str(args.get("expected_package_sha256", "")) or None
+        if not delivery_id or not restore_root:
+            return _print(_fail("MISSING_RESTORE_ARGS", "delivery_id and restore_root required"))
+        if not expected_package_sha256:
+            return _print(_fail("MISSING_RESTORE_ARGS", "expected_package_sha256 required"))
+        repo_root = Path(__file__).resolve().parents[2]
+        pkg_root = Path(str(args.get("package_root", "")) or (repo_root / DEFAULT_PACKAGE_ROOT_RELATIVE))
+        bkp_root = Path(str(args.get("backup_root", "")) or (repo_root / DEFAULT_BACKUP_ROOT_RELATIVE))
+        rr = restore_to_fresh_root(
+            delivery_id=delivery_id,
+            package_root=pkg_root,
+            backup_root=bkp_root,
+            restore_root=Path(restore_root),
+            expected_package_sha256=expected_package_sha256,
+        )
+        if rr.ok:
+            _audit.append_audit_event(
+                audit_log_path=_audit_log_path(str(args.get("store_path"))),
+                event_type="RESTORE_VERIFIED",
+                delivery_id=delivery_id, actor="local-solo-operator",
+                transition="RESTORE_DRILL", previous_state="", new_state="RESTORE_VERIFIED",
+                result="OK", correlation_key=delivery_id,
+                recorded_at=_now_iso(),
+                detail=f"restored_root={restore_root}",
+            )
+        return _print(_ok(
+            ok=rr.ok, delivery_id=delivery_id,
+            error_code=None if rr.ok else rr.error_code,
+            restored_root=rr.restored_root,
+            inventory=list(rr.inventory),
+            package_sha256=rr.package_sha256,
+            backup_sha256=rr.backup_sha256,
+        ))
 
     if op == "list":
         return _print(_ok(records=[r.to_dict() for r in store.list_all()]))
@@ -203,6 +310,18 @@ def _emit(res):
             backup_receipt=res.backup_receipt.to_dict() if res.backup_receipt else None,
         ))
     return _print(_fail(res.error_code or "DELIVERY_FAILED", res.error_detail))
+
+
+def _emit_with_audit(res, *, store_path, transition, actor, recorded_at, correlation_key=""):
+    """Emit the service result and append a durable audit event on success."""
+    if res.ok and res.record is not None:
+        _append_audit(
+            store_path=store_path, delivery_id=res.record.delivery_id, actor=actor,
+            transition=transition, previous_state="", new_state=res.record.state,
+            result="OK", correlation_key=correlation_key or res.record.delivery_id,
+            recorded_at=recorded_at,
+        )
+    return _emit(res)
 
 
 def _print(payload: dict[str, Any]) -> int:

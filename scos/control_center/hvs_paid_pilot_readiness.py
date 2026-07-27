@@ -239,18 +239,18 @@ def _check_backup_integrity(record, backup_root: Path) -> ReadinessCheck:
         return ReadinessCheck("backup_integrity", False, "BACKUP_VERIFY_FAILED", "backup verification failed")
 
 
-def _check_restore_drill_status(record) -> ReadinessCheck:
+def _check_restore_drill_status(store, record) -> ReadinessCheck:
     """Verify a restore drill has been completed (via audit log marker)."""
     if record is None:
         return ReadinessCheck("restore_drill", False, "NO_RECORD", "no delivery record")
     # The restore drill status is recorded in the audit log. We check for
     # a RESTORE_VERIFIED event for this delivery.
     try:
-        from scos.control_center.hvs_paid_pilot_audit import read_delivery_events
-        audit_path = _default_audit_path()
-        events = read_delivery_events(audit_log_path=audit_path)
+        from scos.control_center.hvs_paid_pilot_audit import read_audit_events
+        audit_path = store._store_path.parent / "paid-pilot-audit-v1.jsonl"
+        events = read_audit_events(audit_log_path=audit_path)
         for ev in events:
-            if ev.event_type == "RESTORE_VERIFIED" and ev.package_id == record.delivery_id:
+            if ev.event_type == "RESTORE_VERIFIED" and ev.delivery_id == record.delivery_id:
                 return ReadinessCheck("restore_drill", True, "RESTORE_VERIFIED", "restore drill completed")
         return ReadinessCheck("restore_drill", False, "RESTORE_NOT_VERIFIED", "no verified restore drill")
     except Exception:
@@ -258,15 +258,20 @@ def _check_restore_drill_status(record) -> ReadinessCheck:
 
 
 def _check_audit_integrity(store: PaidPilotDeliveryStore) -> ReadinessCheck:
-    """Verify the audit log is readable and append-only."""
+    """Verify the audit log is readable and append-only (real audit API)."""
     try:
-        from scos.control_center.hvs_paid_pilot_audit import compute_line_hash, read_delivery_events
-        audit_path = _default_audit_path()
-        events = read_delivery_events(audit_log_path=audit_path)
-        _hash = compute_line_hash(audit_path)
+        from scos.control_center.hvs_paid_pilot_audit import (
+            read_audit_events,
+            verify_audit_integrity,
+        )
+        audit_path = store._store_path.parent / "paid-pilot-audit-v1.jsonl"
+        ok, msg = verify_audit_integrity(audit_log_path=audit_path)
+        if not ok:
+            return ReadinessCheck("audit_integrity", False, "AUDIT_UNREADABLE", msg)
+        events = read_audit_events(audit_log_path=audit_path)
         return ReadinessCheck("audit_integrity", True, "AUDIT_OK", f"audit log readable, {len(events)} events")
-    except Exception:
-        return ReadinessCheck("audit_integrity", False, "AUDIT_UNREADABLE", "audit log unreadable")
+    except Exception as exc:
+        return ReadinessCheck("audit_integrity", False, "AUDIT_UNREADABLE", f"audit log unreadable: {exc}")
 
 
 def _check_security_truth_canonical() -> ReadinessCheck:
@@ -332,7 +337,7 @@ def compute_readiness(
     approval_check = _check_operator_approval(record)
     package_check = _check_package_integrity(record, pkg_root)
     backup_check = _check_backup_integrity(record, bkp_root)
-    restore_check = _check_restore_drill_status(record)
+    restore_check = _check_restore_drill_status(store, record)
     audit_check = _check_audit_integrity(store)
     gates_check = _check_security_truth_canonical()
 
@@ -381,13 +386,22 @@ def compute_readiness(
         computed_at=now,
         package_sha256=record.package_sha256 if record else "",
         backup_sha256=record.backup_receipt.backup_sha256 if record and record.backup_receipt else "",
-        audit_sha256=_compute_audit_hash(),
+        audit_sha256=_compute_audit_hash(store),
     )
 
 
-def _compute_audit_hash() -> str:
+def _default_audit_path() -> Path:
+    # Audit log lives beside the delivery store (sibling file).
+    return Path(__file__).resolve().parents[2] / "memory" / "runtime" / "control-center" / "paid-pilot-audit-v1.jsonl"
+
+
+def _compute_audit_hash(store: PaidPilotDeliveryStore | None = None) -> str:
     try:
-        from scos.control_center.hvs_paid_pilot_audit import compute_line_hash
-        return compute_line_hash(_default_audit_path())
+        from scos.control_center.hvs_paid_pilot_audit import compute_audit_hash
+        if store is not None:
+            audit_path = store._store_path.parent / "paid-pilot-audit-v1.jsonl"
+        else:
+            audit_path = _default_audit_path()
+        return compute_audit_hash(audit_log_path=audit_path)
     except Exception:
         return ""

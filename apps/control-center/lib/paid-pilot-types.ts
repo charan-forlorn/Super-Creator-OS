@@ -88,6 +88,13 @@ export interface BackupReceiptView {
   protection_class: string;
 }
 
+export interface ReadinessCheckView {
+  name: string;
+  passed: boolean;
+  reason_code: string;
+  detail: string;
+}
+
 export interface DeliveryResponse {
   ok: boolean;
   error_code: string | null;
@@ -96,6 +103,14 @@ export interface DeliveryResponse {
   package_sha256: string | null;
   package_path: string | null;
   backup_receipt: BackupReceiptView | null;
+  // Read-only readiness projection fields (set only by the authoritative
+  // Python 'readiness' op; the browser must never derive these itself).
+  // Optional: other delivery ops do not populate them.
+  readiness_state?: string | null;
+  checks?: ReadinessCheckView[] | null;
+  blocking_reasons?: string[] | null;
+  backup_sha256?: string | null;
+  audit_sha256?: string | null;
 }
 
 export interface DeliveryProjectionView {

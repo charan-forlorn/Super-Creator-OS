@@ -23,6 +23,7 @@ import type {
   BackupReceiptView,
   DeliveryRecordView,
   DeliveryResponse,
+  ReadinessCheckView,
 } from "./paid-pilot-types";
 
 const BRIDGE_MODULE = "scos.control_center.hvs_paid_pilot_delivery_cli";
@@ -144,6 +145,12 @@ export function invokeBridge(payload: Record<string, unknown>): Promise<Delivery
         if (record && typeof record === "object") {
           delete (record as unknown as Record<string, unknown>).package_path;
         }
+        // Read-only readiness projection fields (authoritative Python 'readiness' op).
+        const readiness_state = (parsed.readiness_state as string | null) ?? null;
+        const checks = (parsed.checks as ReadinessCheckView[] | null) ?? null;
+        const blocking_reasons = (parsed.blocking_reasons as string[] | null) ?? null;
+        const backup_sha256 = (parsed.backup_sha256 as string | null) ?? null;
+        const audit_sha256 = (parsed.audit_sha256 as string | null) ?? null;
         resolve({
           ok: Boolean(parsed.ok),
           error_code: (parsed.error_code as string | null) ?? null,
@@ -152,6 +159,11 @@ export function invokeBridge(payload: Record<string, unknown>): Promise<Delivery
           package_sha256: (parsed.package_sha256 as string | null) ?? null,
           package_path: null,
           backup_receipt: (parsed.backup_receipt as BackupReceiptView | null) ?? null,
+          readiness_state,
+          checks,
+          blocking_reasons,
+          backup_sha256,
+          audit_sha256,
         });
       } catch {
         resolve({
@@ -287,6 +299,25 @@ export async function getDelivery(deliveryId: string): Promise<DeliveryResponse>
 
 export async function getReadiness(deliveryId: string): Promise<DeliveryResponse> {
   return invokeBridge(buildDeliveryPayload({ operation: "readiness", delivery_id: deliveryId }));
+}
+
+export async function restoreDelivery(opts: {
+  deliveryId: string;
+  restoreRoot: string;
+  packageRoot?: string;
+  backupRoot?: string;
+  expectedPackageSha256?: string;
+}): Promise<DeliveryResponse> {
+  return invokeBridge(
+    buildDeliveryPayload({
+      operation: "restore",
+      delivery_id: opts.deliveryId,
+      restore_root: opts.restoreRoot,
+      package_root: opts.packageRoot ?? "",
+      backup_root: opts.backupRoot ?? "",
+      expected_package_sha256: opts.expectedPackageSha256 ?? "",
+    }),
+  );
 }
 
 export async function listDeliveries(): Promise<DeliveryResponse> {
