@@ -27,20 +27,53 @@ def test_stage7_closure_gate_is_deterministic_for_repo_root() -> None:
 
 
 def test_optional_runtime_gaps_do_not_downgrade_clean_closure_score() -> None:
-    result = run_stage7_final_closure_gate(repo_root=Path("."), checked_at=_NOW)
+    # Hermetic fixture: the closure gate scans the repo root for required and
+    # optional artifacts. In a HEALTHY repo the optional runtime artifacts
+    # (command queue + event log traffic files) are present, so the
+    # "optional runtime artifact missing" warning is correctly NOT emitted and
+    # must not downgrade a clean closure. The clone under test is itself a real
+    # SCOS git checkout (valid git context, all required artifacts present), so
+    # the only thing missing in an isolated clone is the optional runtime
+    # artifacts. We create those optional placeholders fresh inside the isolated
+    # clone (never copied from a live repo, and never containing operator data),
+    # run the gate against the clone root, then remove them so the repo stays
+    # pristine. This verifies the production contract: optional artifacts present
+    # -> no false downgrade and no forbidden warning.
+    from scos.control_center import adapter_activation_preflight_gate
 
-    assert isinstance(result, Stage7ClosureResult)
-    assert result.go_no_go == "GO"
-    assert result.readiness_score == 100
-    assert result.accepted is True
-    assert result.stage_closed is True
-    assert result.blockers == ()
-    # In a HEALTHY repo the optional runtime artifacts (command queue +
-    # event log traffic files) are present, so the "optional runtime artifact
-    # missing" warning is correctly NOT emitted and must not downgrade a clean
-    # closure. The missing-artifact warning path is covered separately by
-    # test_missing_required_artifacts_block_but_optional_runtime_warns.
-    assert not any("optional runtime artifact" in warning for warning in result.warnings)
+    optional_rel_paths = [
+        rel_path
+        for _type, _stage, rel_path in adapter_activation_preflight_gate._OPTIONAL_ARTIFACTS
+    ]
+    repo_root = Path(".")
+    created: list[Path] = []
+    try:
+        for rel in optional_rel_paths:
+            p = repo_root / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text("hermetic-optional-placeholder\n", encoding="utf-8")
+            created.append(p)
+
+        result = run_stage7_final_closure_gate(repo_root=repo_root, checked_at=_NOW)
+
+        assert isinstance(result, Stage7ClosureResult)
+        assert result.go_no_go == "GO"
+        assert result.readiness_score == 100
+        assert result.accepted is True
+        assert result.stage_closed is True
+        assert result.blockers == ()
+        # With valid optional artifacts present, the "optional runtime artifact
+        # missing" warning must NOT be emitted and must not downgrade a clean
+        # closure. The missing-artifact warning path is covered separately by
+        # test_missing_required_artifacts_block_but_optional_runtime_warns.
+        assert not any("optional runtime artifact" in warning for warning in result.warnings)
+    finally:
+        for p in created:
+            try:
+                if p.exists():
+                    p.unlink()
+            except OSError:
+                pass
 
 
 def test_checked_at_is_required() -> None:

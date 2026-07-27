@@ -712,6 +712,23 @@ class HermesVideoStudioAdapter(BaseAgentAdapter):
                 request_id=request_id,
             )
 
+        # Read-only probe boundary: only the Stage 1 read-only operation is
+        # permitted. Any other operation (including mutating verbs such as
+        # render-hyperframes) is rejected before any subprocess is constructed
+        # or executed. This is the contract the unsupported-operation test
+        # enforces; the config-level allowlist also permits mutating verbs for
+        # the mutating path, so the read-only probe must enforce its own
+        # narrower allowlist here.
+        if self._config.operation not in STAGE1_READONLY_OPERATIONS:
+            return self._failure(
+                "invalid_configuration",
+                f"read-only probe supports only {STAGE1_READONLY_OPERATIONS}; "
+                f"got operation {self._config.operation!r}",
+                "run_readonly_probe",
+                request_id=request_id,
+                created_at=created_at,
+            )
+
         problems = self._config.validate()
         if problems:
             return self._failure(
