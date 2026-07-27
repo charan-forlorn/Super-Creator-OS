@@ -285,6 +285,10 @@ export async function getDelivery(deliveryId: string): Promise<DeliveryResponse>
   return invokeBridge(buildDeliveryPayload({ operation: "get", delivery_id: deliveryId }));
 }
 
+export async function getReadiness(deliveryId: string): Promise<DeliveryResponse> {
+  return invokeBridge(buildDeliveryPayload({ operation: "readiness", delivery_id: deliveryId }));
+}
+
 export async function listDeliveries(): Promise<DeliveryResponse> {
   return invokeBridge(buildDeliveryPayload({ operation: "list" }));
 }

@@ -413,6 +413,11 @@ def test_no_forbidden_runtime_source_markers_and_no_frontend_route_files() -> No
         # browser-supplied); only an authoritative ready-state package is served.
         # No external egress, no filesystem browsing, no absolute/repo path leak.
         Path("apps/control-center/app/api/paid-pilot/delivery/download/route.ts"),
+        # Cohort 10I — reviewed same-origin paid-pilot readiness projection.
+        # GET-only read-only bridge deriving readiness from the Python
+        # authority; no mutation, no subprocess, no external egress, no
+        # browser storage, no render.
+        Path("apps/control-center/app/api/paid-pilot/readiness/route.ts"),
     }
     route_files = [
         p

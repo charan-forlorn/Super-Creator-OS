@@ -77,8 +77,14 @@ _FORBIDDEN_STORAGE_TOKENS = ("localStorage", "sessionStorage", "navigator.clipbo
 # mutation method (POST/PUT/PATCH/DELETE) — the only allowed production surface
 # is the two reviewed same-origin read-only bridges.
 _REVIEWED_ROUTES = {
-    "apps/control-center/app/api/control-center-snapshot/route.ts",
-    "apps/control-center/app/api/operator-dry-run/route.ts",
+"apps/control-center/app/api/control-center-snapshot/route.ts",
+"apps/control-center/app/api/operator-dry-run/route.ts",
+# Cohort 10I authoritative paid-pilot readiness projection transport.
+# Reviewed safe: GET-only read-only bridge deriving readiness from the
+# Python authority; no mutation, no subprocess, no external egress, no
+# browser storage, no render. Declares runtime = "nodejs" +
+# dynamic = "force-dynamic".
+"apps/control-center/app/api/paid-pilot/readiness/route.ts",
     # Cohort 10C authoritative project-preparation transport. Reviewed safe:
     # GET read-only bridge + POST create/approve/preview mutations that
     # persist to a dedicated local store (memory/runtime/control-center/)

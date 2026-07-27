@@ -321,10 +321,16 @@ _FRONTEND_BRIDGE_TIMEOUT_FILES = frozenset({
 # is target-aware (see _FRONTEND_REVIEWED_FETCH_TARGETS below) so an absolute
 # or dynamic fetch inside an allowed file is still a finding.
 _FRONTEND_READ_ONLY_TRANSPORT_ALLOWLIST = {
-    "apps/control-center/app/api/control-center-snapshot/route.ts",
-    "apps/control-center/lib/control-center-snapshot.ts",
-    "apps/control-center/app/api/operator-dry-run/route.ts",
-    "apps/control-center/components/operator-dry-run-panel.tsx",
+"apps/control-center/app/api/control-center-snapshot/route.ts",
+"apps/control-center/lib/control-center-snapshot.ts",
+"apps/control-center/app/api/operator-dry-run/route.ts",
+"apps/control-center/components/operator-dry-run-panel.tsx",
+# Cohort 10I authoritative paid-pilot readiness projection transport.
+# Reviewed safe: GET-only, same-origin, read-only route deriving readiness
+# from the Python authority (no mutation, no subprocess, no external egress,
+# no browser storage, no render). Declares runtime = "nodejs" +
+# dynamic = "force-dynamic" (no static caching of a read-only bridge).
+"apps/control-center/app/api/paid-pilot/readiness/route.ts",
     # Cohort 10C authoritative project-preparation transport. Reviewed
     # safe: GET read-only bridge + POST create/approve/preview that
     # persist to a dedicated local store (memory/runtime/control-center/)

@@ -176,6 +176,18 @@ def main() -> int:
             return _print(_fail("DELIVERY_NOT_FOUND"))
         return _print(_ok(record=rec.to_dict()))
 
+    if op == "readiness":
+        # Authoritative readiness projection (Cohort 10I). The browser must
+        # never derive readiness itself; it consumes this server-computed
+        # projection so the Python authority remains the single source of truth.
+        from .hvs_paid_pilot_readiness import compute_readiness
+
+        delivery_id = str(args.get("delivery_id", ""))
+        if not delivery_id:
+            return _print(_fail("MISSING_DELIVERY_ID"))
+        projection = compute_readiness(store=store, delivery_id=delivery_id)
+        return _print(_ok(**projection.to_dict()))
+
     if op == "list":
         return _print(_ok(records=[r.to_dict() for r in store.list_all()]))
 
