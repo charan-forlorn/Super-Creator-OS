@@ -314,10 +314,29 @@ def _store(store_path: "str | None") -> MaterializationStore:
     return MaterializationStore()
 
 
+def _require_project_identity(args: dict[str, Any]) -> "tuple[str | None, int | None, str | None]":
+    """Validate the required project identity fields (fail-closed).
+
+    Returns ``(project_id, project_revision, error_code)``. On a missing /
+    malformed required field, ``project_id``/``project_revision`` are ``None``
+    and ``error_code`` is a precise, non-secret code (``REQUEST_MALFORMED``).
+    This prevents an opaque ``KeyError`` being masked as ``BRIDGE_ERROR`` at the
+    boundary: a malformed request gets a structured, diagnosable verdict.
+    """
+    project_id = str(args.get("project_id") or "")
+    if not project_id:
+        return (None, None, "REQUEST_MALFORMED")
+    raw_revision = args.get("project_revision")
+    if not isinstance(raw_revision, int) or isinstance(raw_revision, bool) or raw_revision < 0:
+        return (None, None, "REQUEST_MALFORMED")
+    return (project_id, int(raw_revision), None)
+
+
 def cmd_authorize(args: dict[str, Any]) -> dict[str, Any]:
+    project_id, project_revision, err = _require_project_identity(args)
+    if err is not None:
+        return {"ok": False, "error_code": err, "detail": "project_id and a non-negative integer project_revision are required"}
     store = _store(args.get("store_path"))
-    project_id = str(args["project_id"])
-    project_revision = int(args["project_revision"])
     confirmed = bool(args.get("confirmed"))
     authorization_id = str(args.get("authorization_id") or "auth-default")
     nonce = str(args.get("nonce") or "n0")
@@ -375,9 +394,10 @@ def cmd_authorize(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def cmd_execute(args: dict[str, Any]) -> dict[str, Any]:
+    project_id, project_revision, err = _require_project_identity(args)
+    if err is not None:
+        return {"ok": False, "error_code": err, "detail": "project_id and a non-negative integer project_revision are required"}
     store = _store(args.get("store_path"))
-    project_id = str(args["project_id"])
-    project_revision = int(args["project_revision"])
     authorization_id = str(args.get("authorization_id") or "")
     capability_id = str(args.get("capability_id") or "")
     attempt_id = str(args.get("attempt_id") or "")
@@ -434,8 +454,10 @@ def cmd_reconcile(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def cmd_projection(args: dict[str, Any]) -> dict[str, Any]:
+    project_id = str(args.get("project_id") or "")
+    if not project_id:
+        return {"ok": False, "error_code": "REQUEST_MALFORMED", "detail": "project_id is required"}
     store = _store(args.get("store_path"))
-    project_id = str(args["project_id"])
     result = store.read()
     if result["status"] != "AVAILABLE_WITH_DATA":
         return {

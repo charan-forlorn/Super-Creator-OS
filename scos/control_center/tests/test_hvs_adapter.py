@@ -255,7 +255,11 @@ def test_missing_python_executable_returns_failure(tmp_path) -> None:
 
 # --- 11. Unsupported operation rejected before subprocess ------------------
 def test_unsupported_operation_rejected_before_subprocess(tmp_path) -> None:
-    cfg = _valid_config(tmp_path, operation="render-hyperframes")
+    # `render-hyperframes` is now a controlled state-mutating operation
+    # (Cohort 10E), so it is no longer "unsupported". The pre-subprocess
+    # rejection contract is preserved by using a genuinely unknown verb that
+    # appears in no supported/read-only/mutating/CLI operation registry.
+    cfg = _valid_config(tmp_path, operation="explode-project")
     captured: dict[str, Any] = {}
     adapter = HermesVideoStudioAdapter(
         cfg, subprocess_run=_FakeRun(captured=captured)

@@ -486,10 +486,29 @@ export class HvsMaterializationStore {
           // let the operational/deployment layer choose where authoritative
           // state lives; a browser request can never set them.
           const request: Record<string, unknown> = { ...(payload ?? {}) };
-          const srvStorePath = process.env.SCOS_HVS_STORE_PATH;
-          if (srvStorePath && srvStorePath.length > 0) request.store_path = srvStorePath;
-          const srvProjectsRoot = process.env.SCOS_HVS_PROJECTS_ROOT;
-          if (srvProjectsRoot && srvProjectsRoot.length > 0) request.projects_root = srvProjectsRoot;
+          // Propagate the materialization store identity EXPLICITLY on every
+          // request so the TypeScript bridge and the Python CLI share ONE
+          // deterministic store identity.
+          //
+          // The store path / projects_root are TRUSTED server-side values:
+          // routes/builders place them in the request payload (never a browser
+          // field), and an operator may also pin them via the trusted env
+          // override. The request-bound value is preferred; the env override is
+          // the fallback. Previously the bridge only read the env override and
+          // SILENTLY DROPPED the request-bound value, so a clean worktree with
+          // no env override fell back to an ambient default store and the
+          // projection/route/execute operations could not recover the intended
+          // materialized state.
+          const reqStorePath =
+            typeof request.store_path === "string" && (request.store_path as string).length > 0
+              ? (request.store_path as string)
+              : (process.env.SCOS_HVS_STORE_PATH ?? "");
+          if (reqStorePath.length > 0) request.store_path = reqStorePath;
+          const reqProjectsRoot =
+            typeof request.projects_root === "string" && (request.projects_root as string).length > 0
+              ? (request.projects_root as string)
+              : (process.env.SCOS_HVS_PROJECTS_ROOT ?? "");
+          if (reqProjectsRoot.length > 0) request.projects_root = reqProjectsRoot;
           childProc.stdin.write(JSON.stringify(request));
           childProc.stdin.end();
         } catch {

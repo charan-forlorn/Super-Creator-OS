@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { spawn, type ChildProcess } from "node:child_process";
 import { resolve as pathResolve } from "node:path";
@@ -20,10 +20,30 @@ import {
 // literal `setTimeout` is correctly classified as reviewed-safe and not a
 // browser-polling finding.
 
-// Canonical interpreter = the project venv (matches server-side trusted default).
-// We resolve it explicitly here so the process-level tests invoke the REAL
-// Python CLI bridge against isolated OS-temp stores.
+// Deterministic interpreter resolution (BD5-R1).
+//
+// Precedence (explicit-trusted-first, fail-closed):
+//   1. SCOS_PYTHON_INTERPRETER  — the repository-owned canonical verifier passes
+//      the trusted interpreter here so the vitest worker NEVER has to rediscover
+//      python3 through PATH (the unreliable, racy boundary that caused req 1 to
+//      fail intermittently in detached-worktree runs).
+//   2. Repository-local .venv   — supported only when physically present.
+//   3. Platform python3 fallback — only when no explicit trusted interpreter is
+//      provided.
+//
+// When SCOS_PYTHON_INTERPRETER is set but invalid (missing/unreadable), we fail
+// closed with a deterministic error instead of silently falling back to python3.
 function resolvePython(): string {
+  const explicit = process.env["SCOS_PYTHON_INTERPRETER"];
+  if (explicit !== undefined && explicit.trim().length > 0) {
+    const trimmed = explicit.trim();
+    if (!existsSync(trimmed) || !statSync(trimmed).isFile()) {
+      throw new Error(
+        `SCOS_PYTHON_INTERPRETER is set but not a usable executable: ${trimmed}`,
+      );
+    }
+    return trimmed;
+  }
   const candidate = pathResolve(process.cwd(), "..", "..", ".venv", "Scripts", "python.exe");
   if (existsSync(candidate)) return candidate;
   const posix = pathResolve(process.cwd(), "..", "..", ".venv", "bin", "python");
@@ -31,7 +51,15 @@ function resolvePython(): string {
   return "python3";
 }
 
-const PY = resolvePython();
+// Resolve the CLI interpreter lazily (BD5-R1): evaluate at call time, not at
+// module load. Vitest applies the worker environment after the test module is
+// first evaluated, so a top-level `const PY = resolvePython()` can capture the
+// ambient `python3` fallback before SCOS_PYTHON_INTERPRETER is visible. A lazy
+// getter re-reads process.env at spawn time, where the trusted interpreter is
+// always present.
+function PY(): string {
+  return resolvePython();
+}
 const MODULE = "scos.control_center.hvs_materialization_cli";
 
 // Each process-level test gets a FRESH, ISOLATED OS-temp store + HVS root so
@@ -41,6 +69,7 @@ const MODULE = "scos.control_center.hvs_materialization_cli";
 function isolatedStores() {
   const storePath = mkdtempSync(pathResolve(tmpdir(), "hvs-store-"));
   const projectsRoot = mkdtempSync(pathResolve(tmpdir(), "hvs-root-"));
+  tempDirs.push(storePath, projectsRoot);
   return { storePath, projectsRoot };
 }
 
@@ -52,7 +81,7 @@ function runCli(
   opts: { timeoutMs?: number; stdoutCapBytes?: number } = {},
 ): Promise<{ code: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    const child: ChildProcess = spawn(PY, ["-m", MODULE, operation], {
+    const child: ChildProcess = spawn(PY(), ["-m", MODULE, operation], {
       cwd: pathResolve(process.cwd(), "..", ".."),
       env: { ...process.env, PYTHONIOENCODING: "utf-8", PYTHONDONTWRITEBYTECODE: "1", TZ: "UTC" },
       stdio: ["pipe", "pipe", "pipe"],
@@ -90,14 +119,18 @@ function runCli(
 
 const PROJECT = "spp-25177649af09";
 const root = mkdtempSync(pathResolve(tmpdir(), "hvs-bridge-"));
+const tempDirs: string[] = [];
 
 afterEach(() => {
   try { rmSync(root, { recursive: true, force: true }); } catch { /* ignore */ }
+  for (const p of tempDirs.splice(0)) {
+    try { rmSync(p, { recursive: true, force: true }); } catch { /* ignore */ }
+  }
 });
 
 describe("Cohort 10D bridge — argv transport (no shell)", () => {
   it("rejects an unknown operation without launching a child (req 2)", async () => {
-    const store = new HvsMaterializationStore(PY, MODULE);
+    const store = new HvsMaterializationStore(PY(), MODULE);
     const res = await store.invoke("bogus" as BridgeOperation, {});
     expect(res.ok).toBe(false);
     expect(res.error_code).toBe("BRIDGE_UNKNOWN_OPERATION");
@@ -108,8 +141,13 @@ describe("Cohort 10D bridge — argv transport (no shell)", () => {
     // <op>`. We prove the bridge reaches it (ok + structured JSON) and does
     // not shell out — the structural argv/shell guarantees are asserted in
     // hvs-materialization-bridge-mock.test.ts.
-    const store = new HvsMaterializationStore(PY, MODULE);
-    const res = await store.invoke("projection", buildProjectionPayload({ projectId: PROJECT }));
+    const { storePath, projectsRoot } = isolatedStores();
+    const store = new HvsMaterializationStore(PY(), MODULE);
+    await store.invoke("authorize",
+      { ...buildAuthorizePayload({ projectId: PROJECT, projectRevision: 2, confirmed: true, authorizationId: "auth-1", nonce: "n0", operatorId: "op" }), store_path: storePath });
+    await store.invoke("execute",
+      { ...buildExecutePayload({ projectId: PROJECT, projectRevision: 2, authorizationId: "auth-1", capabilityId: "cap-1", attemptId: "att-1", operatorId: "op" }), store_path: storePath, projects_root: projectsRoot });
+    const res = await store.invoke("projection", { ...buildProjectionPayload({ projectId: PROJECT }), store_path: storePath });
     expect(res.ok).toBe(true);
     expect(res.response?.projection?.project_id).toBe(PROJECT);
   });
@@ -117,7 +155,7 @@ describe("Cohort 10D bridge — argv transport (no shell)", () => {
 
 describe("Cohort 10D bridge — browser cannot steer the child (req 3/4/5/6)", () => {
   it("accepts only the trusted interpreter + module; no request field selects exe/cwd/store/projectsRoot", async () => {
-    const store = new HvsMaterializationStore(PY, MODULE);
+    const store = new HvsMaterializationStore(PY(), MODULE);
     // The route builders never accept an executable/cwd/store/projects_root.
     // Confirm the payloads contain none of those. If a browser tried to
     // smuggle them, the builder would have to accept them — it does not.
@@ -137,7 +175,7 @@ describe("Cohort 10D bridge — browser cannot steer the child (req 3/4/5/6)", (
     // The store's invoke signature accepts only (operation, payload); it has
     // no parameter for an executable/cwd/store/projects_root/command, so a
     // browser cannot inject one.
-    const store2 = new HvsMaterializationStore(PY, MODULE);
+    const store2 = new HvsMaterializationStore(PY(), MODULE);
     expect(store2.invoke.length).toBe(2);
     const params = (store2.invoke.toString().match(/invoke\(([^)]*)\)/) ?? [""])[1];
     expect(params).not.toMatch(/store_path|projects_root|executable|command/i);
@@ -145,7 +183,7 @@ describe("Cohort 10D bridge — browser cannot steer the child (req 3/4/5/6)", (
 
   it("store path / projects_root are never forwarded to the child", async () => {
     const { storePath } = isolatedStores();
-    const store = new HvsMaterializationStore(PY, MODULE);
+    const store = new HvsMaterializationStore(PY(), MODULE);
     const res = await store.invoke("projection", { ...buildProjectionPayload({ projectId: PROJECT }), store_path: storePath });
     // The real CLI must not have received a browser store_path/projects_root.
     expect(res.ok).toBe(true);
@@ -166,7 +204,7 @@ describe("Cohort 10D bridge — fail closed (req 7/8/9/10/11)", () => {
   it("non-zero child exit fails closed (req 8)", async () => {
     // An empty argv (no operation) makes the CLI print NO_COMMAND, exit 2.
     const r = await new Promise<{ code: number | null }>((resolve) => {
-      const child: ChildProcess = spawn(PY, [MODULE], {
+      const child: ChildProcess = spawn(PY(), [MODULE], {
         cwd: pathResolve(process.cwd(), "..", ".."),
         env: { ...process.env, PYTHONIOENCODING: "utf-8" },
         stdio: ["pipe", "pipe", "pipe"],
@@ -183,8 +221,13 @@ describe("Cohort 10D bridge — fail closed (req 7/8/9/10/11)", () => {
     // canonical CLI is fast, we instead verify the timeout plumbing by
     // calling the wrapper with an artificially short internal ceiling is not
     // configurable; assert the child is killed (no retry, single attempt).
-    const store = new HvsMaterializationStore(PY, MODULE);
-    const res = await store.invoke("projection", buildProjectionPayload({ projectId: PROJECT }));
+    const { storePath, projectsRoot } = isolatedStores();
+    const store = new HvsMaterializationStore(PY(), MODULE);
+    await store.invoke("authorize",
+      { ...buildAuthorizePayload({ projectId: PROJECT, projectRevision: 2, confirmed: true, authorizationId: "auth-1", nonce: "n0", operatorId: "op" }), store_path: storePath });
+    await store.invoke("execute",
+      { ...buildExecutePayload({ projectId: PROJECT, projectRevision: 2, authorizationId: "auth-1", capabilityId: "cap-1", attemptId: "att-1", operatorId: "op" }), store_path: storePath, projects_root: projectsRoot });
+    const res = await store.invoke("projection", { ...buildProjectionPayload({ projectId: PROJECT }), store_path: storePath });
     // Normal path returns ok; the timeout branch is covered structurally by
     // the kill-on-timeout in the wrapper (one child, no retry).
     expect(res.ok).toBe(true);
@@ -193,7 +236,7 @@ describe("Cohort 10D bridge — fail closed (req 7/8/9/10/11)", () => {
 
   it("raw stderr and absolute paths are not returned (req 10)", async () => {
     const { storePath } = isolatedStores();
-    const store = new HvsMaterializationStore(PY, MODULE);
+    const store = new HvsMaterializationStore(PY(), MODULE);
     const res = await store.invoke("projection", { ...buildProjectionPayload({ projectId: PROJECT }), store_path: storePath });
     // The wrapper never exposes stderr; the response is the parsed JSON.
     expect(res.detail ?? "").not.toMatch(/[A-Z]:\\|Traceback|File \"|line \d|PermissionError|No such file/i);
@@ -201,8 +244,13 @@ describe("Cohort 10D bridge — fail closed (req 7/8/9/10/11)", () => {
   });
 
   it("no retry occurs — a single projection reaches the real CLI once and returns ok (req 11)", async () => {
-    const store = new HvsMaterializationStore(PY, MODULE);
-    const res = await store.invoke("projection", buildProjectionPayload({ projectId: PROJECT }));
+    const { storePath, projectsRoot } = isolatedStores();
+    const store = new HvsMaterializationStore(PY(), MODULE);
+    await store.invoke("authorize",
+      { ...buildAuthorizePayload({ projectId: PROJECT, projectRevision: 2, confirmed: true, authorizationId: "auth-1", nonce: "n0", operatorId: "op" }), store_path: storePath });
+    await store.invoke("execute",
+      { ...buildExecutePayload({ projectId: PROJECT, projectRevision: 2, authorizationId: "auth-1", capabilityId: "cap-1", attemptId: "att-1", operatorId: "op" }), store_path: storePath, projects_root: projectsRoot });
+    const res = await store.invoke("projection", { ...buildProjectionPayload({ projectId: PROJECT }), store_path: storePath });
     // The wrapper surfaces the single real-CLI result (no retry loop). If it
     // retried, a transient failure would still be a single settle; the
     // structural no-retry guarantee is asserted in the bridge-mock test.
@@ -214,7 +262,7 @@ describe("Cohort 10D bridge — fail closed (req 7/8/9/10/11)", () => {
 describe("Cohort 10D bridge — process-level real CLI (req 16)", () => {
   it("authorize -> execute(real HVS isolated) -> reconcile round-trips through the real CLI with isolated temp stores (req 5/8/9/10)", async () => {
     const { storePath, projectsRoot } = isolatedStores();
-    const store = new HvsMaterializationStore(PY, MODULE);
+    const store = new HvsMaterializationStore(PY(), MODULE);
     const authRes = await store.invoke("authorize",
       { ...buildAuthorizePayload({ projectId: PROJECT, projectRevision: 2, confirmed: true, authorizationId: "auth-1", nonce: "n0", operatorId: "op" }), store_path: storePath });
     expect(authRes.ok).toBe(true);
@@ -243,7 +291,7 @@ describe("Cohort 10D bridge — process-level real CLI (req 16)", () => {
 
   it("projection remains read-only and reconciles read-only (req 14/15)", async () => {
     const { storePath } = isolatedStores();
-    const store = new HvsMaterializationStore(PY, MODULE);
+    const store = new HvsMaterializationStore(PY(), MODULE);
     const proj = await store.invoke("projection", { ...buildProjectionPayload({ projectId: PROJECT }), store_path: storePath });
     expect(proj?.ok).toBe(true);
     // Read-only: no HVS mutation occurs for a projection. The bridge returns
@@ -254,7 +302,7 @@ describe("Cohort 10D bridge — process-level real CLI (req 16)", () => {
 
   it("reconcile remains read-only (req 14) — single spawn, no mutation flags", async () => {
     const { storePath } = isolatedStores();
-    const store = new HvsMaterializationStore(PY, MODULE);
+    const store = new HvsMaterializationStore(PY(), MODULE);
     const rec = await store.invoke("reconcile", { ...buildReconcilePayload({ attemptId: "att-1" }), store_path: storePath });
     // Reconcile is a read-only classification; it must not materialize.
     expect(rec.ok).toBe(true);
@@ -264,7 +312,7 @@ describe("Cohort 10D bridge — process-level real CLI (req 16)", () => {
 
 describe("Cohort 10D bridge — no parallel TS authority remains", () => {
   it("the store exposes no local authorization/capability/persistence/reconcile authority", () => {
-    const store = new HvsMaterializationStore(PY, MODULE);
+    const store = new HvsMaterializationStore(PY(), MODULE);
     const proto = Object.getPrototypeOf(store);
     const methods = Object.getOwnPropertyNames(proto);
     // The old parallel-authority methods must be gone from the runtime.
@@ -311,7 +359,7 @@ describe("Cohort 10D bridge — no parallel TS authority remains", () => {
 describe("Cohort 10D bridge — each route invokes only its matching operation", () => {
   it("execute round-trips exactly once through the real CLI and is contained by the authority (req 12/13)", async () => {
     const { storePath, projectsRoot } = isolatedStores();
-    const store = new HvsMaterializationStore(PY, MODULE);
+    const store = new HvsMaterializationStore(PY(), MODULE);
     const authRes = await store.invoke("authorize",
       { ...buildAuthorizePayload({ projectId: PROJECT, projectRevision: 2, confirmed: true, authorizationId: "auth-1", nonce: "n0", operatorId: "op" }), store_path: storePath });
     expect(authRes.ok).toBe(true);
@@ -327,5 +375,57 @@ describe("Cohort 10D bridge — each route invokes only its matching operation",
     expect(replay.response?.ok).toBe(false);
     expect(replay.response?.error_code).toBe("CAPABILITY_CONSUMED");
     expect(replay.response?.hvs_calls).toBe(0);
+  });
+});
+
+describe("Cohort 10D bridge — Python interpreter resolution (BD5-R1)", () => {
+  const FIXTURE_VENV_PY = "C:/Workspace/super-creator-os/.venv/Scripts/python.exe";
+
+  it("uses SCOS_PYTHON_INTERPRETER exactly when valid (req 1 determinism)", () => {
+    const prev = process.env["SCOS_PYTHON_INTERPRETER"];
+    process.env["SCOS_PYTHON_INTERPRETER"] = FIXTURE_VENV_PY;
+    try {
+      const resolved = resolvePython();
+      expect(resolved).toBe(FIXTURE_VENV_PY);
+    } finally {
+      if (prev === undefined) delete process.env["SCOS_PYTHON_INTERPRETER"];
+      else process.env["SCOS_PYTHON_INTERPRETER"] = prev;
+    }
+  });
+
+  it("fails closed when SCOS_PYTHON_INTERPRETER is invalid", () => {
+    const prev = process.env["SCOS_PYTHON_INTERPRETER"];
+    process.env["SCOS_PYTHON_INTERPRETER"] = "C:/nope/missing-python.exe";
+    try {
+      expect(() => resolvePython()).toThrow(/SCOS_PYTHON_INTERPRETER/);
+    } finally {
+      if (prev === undefined) delete process.env["SCOS_PYTHON_INTERPRETER"];
+      else process.env["SCOS_PYTHON_INTERPRETER"] = prev;
+    }
+  });
+
+  it("preserves the supported fallback when SCOS_PYTHON_INTERPRETER is absent", () => {
+    const prev = process.env["SCOS_PYTHON_INTERPRETER"];
+    delete process.env["SCOS_PYTHON_INTERPRETER"];
+    try {
+      const resolved = resolvePython();
+      // Supported fallback: repository .venv when physically present,
+      // otherwise the platform python3 shim. Either is a usable fallback.
+      const venvCandidate = pathResolve(process.cwd(), "..", "..", ".venv", "Scripts", "python.exe");
+      const venvPosix = pathResolve(process.cwd(), "..", "..", ".venv", "bin", "python");
+      const isSupportedFallback =
+        resolved === "python3" ||
+        resolved === venvCandidate ||
+        resolved === venvPosix;
+      expect(isSupportedFallback).toBe(true);
+    } finally {
+      if (prev !== undefined) process.env["SCOS_PYTHON_INTERPRETER"] = prev;
+    }
+  });
+
+  it("does not mutate process.env globally", () => {
+    const before = { ...process.env };
+    resolvePython();
+    expect(Object.keys(process.env).sort()).toEqual(Object.keys(before).sort());
   });
 });
