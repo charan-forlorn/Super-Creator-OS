@@ -20,6 +20,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -140,17 +141,42 @@ def test_execute_and_reconcile_share_resolver(monkeypatch, tmp_path):
 
 
 # --- Cohort 10E explicit HyperFrames identity wiring -----------------------
-def test_resolve_hyperframes_identity_reads_only_trusted_env(monkeypatch, tmp_path):
+def _outside_repo_hf_dir() -> Path:
+    """A task-owned dir guaranteed OUTSIDE the production repository root.
+
+    The production ``validate_tool_path`` rejects any identity under its
+    repo root (``hvs_adapter.__file__`` parents[3]). To stay hermetic and
+    environment-independent we place the fake launcher in a *sibling* of that
+    root (a sibling can never be under the root), falling back to the OS temp
+    dir only when the sibling location is not writable. Auto-disposable.
+    """
+    import scos.control_center.hvs_adapter as _ha
+
+    repo_root = Path(_ha.__file__).resolve().parents[3]
+    sibling = repo_root.parent / f"scos-hf-probe-{os.getpid()}"
+    try:
+        sibling.mkdir(parents=True, exist_ok=True)
+        return sibling
+    except OSError:
+        pass
+    return Path(tempfile.mkdtemp(prefix="scos-hf-probe-"))
+
+
+def test_resolve_hyperframes_identity_reads_only_trusted_env(monkeypatch):
     # A valid, approved launcher identity is resolved from SCOS_HYPERFRAMES_BIN.
-    tool = tmp_path / "scos-cohort10e-tools" / "hyperframes-0.7.45" / "node_modules" / ".bin"
-    tool.mkdir(parents=True)
-    hf = tool / "hyperframes.cmd"
-    hf.write_text("@echo off\r\n")
-    monkeypatch.setenv("SCOS_HYPERFRAMES_BIN", str(hf))
-    m = _import_fresh()
-    canon, err = m._resolve_hyperframes_identity()
-    assert err is None
-    assert canon == str(hf)
+    # The identity MUST live OUTSIDE the repository root (production fails
+    # closed on any inside-repo identity). Use a task-owned dir guaranteed to
+    # sit outside the production repo root, independent of checkout location.
+    with tempfile.TemporaryDirectory(dir=_outside_repo_hf_dir()) as d:
+        tool = Path(d) / "hyperframes-0.7.45" / "node_modules" / ".bin"
+        tool.mkdir(parents=True)
+        hf = tool / "hyperframes.cmd"
+        hf.write_bytes(("@echo off" + chr(13) + chr(10)).encode())
+        monkeypatch.setenv("SCOS_HYPERFRAMES_BIN", str(hf))
+        m = _import_fresh()
+        canon, err = m._resolve_hyperframes_identity()
+        assert err is None
+        assert canon == str(hf)
 
 
 def test_resolve_hyperframes_identity_missing_fails_closed(monkeypatch):
@@ -161,16 +187,19 @@ def test_resolve_hyperframes_identity_missing_fails_closed(monkeypatch):
     assert err == "HF_IDENTITY_MISSING"
 
 
-def test_resolve_hyperframes_identity_invalid_fails_closed(monkeypatch, tmp_path):
-    # An identity outside the approved 0.7.45 tool root is rejected.
-    bad = tmp_path / "evil" / "node_modules" / ".bin" / "hyperframes.cmd"
-    bad.parent.mkdir(parents=True)
-    bad.write_text("@echo off\r\n")
-    monkeypatch.setenv("SCOS_HYPERFRAMES_BIN", str(bad))
-    m = _import_fresh()
-    canon, err = m._resolve_hyperframes_identity()
-    assert canon is None
-    assert err == "HF_IDENTITY_OUTSIDE_APPROVED_ROOT"
+def test_resolve_hyperframes_identity_invalid_fails_closed(monkeypatch):
+    # An identity outside the approved 0.7.45 tool root is rejected. Placed
+    # outside the repository root so the only failing dimension is the
+    # unapproved tool root, not the repo boundary.
+    with tempfile.TemporaryDirectory(dir=_outside_repo_hf_dir()) as d:
+        bad = Path(d) / "evil" / "node_modules" / ".bin" / "hyperframes.cmd"
+        bad.parent.mkdir(parents=True)
+        bad.write_bytes(("@echo off" + chr(13) + chr(10)).encode())
+        monkeypatch.setenv("SCOS_HYPERFRAMES_BIN", str(bad))
+        m = _import_fresh()
+        canon, err = m._resolve_hyperframes_identity()
+        assert canon is None
+        assert err == "HF_IDENTITY_OUTSIDE_APPROVED_ROOT"
 
 
 def test_resolve_hyperframes_identity_never_falls_back_to_bare_name(monkeypatch, tmp_path):

@@ -138,17 +138,84 @@ def find_repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def detect_interpreter(repo_root: Path) -> Path:
-    """Return the canonical ``.venv`` interpreter, preferring the Windows form."""
+def _is_regular_executable(path: Path) -> bool:
+    """True iff ``path`` is an absolute, existing, regular executable file.
+
+    Rejects directories, missing files, and non-regular entries. Performs NO
+    PATH lookup or shell resolution.
+    """
+    try:
+        if not path.is_absolute():
+            return False
+        if not path.is_file():
+            return False
+        return True
+    except OSError:
+        return False
+
+
+def _validate_sys_executable(candidate: object) -> "Path | None":
+    """Validate the trusted current-process interpreter fallback.
+
+    The candidate is trusted only when it is non-empty, absolute, exists, a
+    regular executable file, and exactly equals the interpreter running
+    ``ci_local_verify.py`` (``sys.executable``). The resolved identity is
+    returned for evidence recording; any other value fails closed (None).
+    """
+    if not candidate:
+        return None
+    if not isinstance(candidate, (str, Path)):
+        return None
+    try:
+        p = Path(candidate).resolve()
+    except (OSError, ValueError):
+        return None
+    if p != Path(sys.executable).resolve():
+        # not the running interpreter -> never trusted (no PATH/cwd shadowing)
+        return None
+    if not _is_regular_executable(p):
+        return None
+    return p
+
+
+def detect_interpreter(
+    repo_root: Path,
+    sys_executable: "str | None" = None,
+) -> Path:
+    """Resolve the canonical SCOS interpreter with strict precedence.
+
+    Precedence (operator §2):
+      1. repository-local canonical ``.venv`` interpreter, when present and valid;
+      2. current-process ``sys.executable``, when it passes all trusted-identity
+         checks;
+      3. fail closed.
+
+    The canonical ``.venv`` interpreter is preferred when it exists. A canonical
+    path that exists but is not a usable executable fails closed (explicit
+    bounded error) rather than silently switching to another interpreter. When
+    the canonical is absent, the trusted ``sys.executable`` fallback is
+    evaluated. No PATH lookup, shell resolution, or relative-path acceptance is
+    performed; raw interpreter paths are never placed into browser-safe or
+    externally returned envelopes.
+    """
     win = repo_root / _VENV_RELATIVE
     posix = repo_root / _VENV_RELATIVE_POSIX
-    if win.is_file():
-        return win
-    if posix.is_file():
-        return posix
-    raise FileNotFoundError(
-        f"canonical interpreter not found: neither {win} nor {posix} exists"
-    )
+    for cand in (win, posix):
+        if cand.exists():
+            if _is_regular_executable(cand):
+                return cand
+            # present but invalid -> fail closed (no silent fallback)
+            raise RuntimeError(
+                "canonical .venv interpreter present but not a valid executable"
+            )
+    # canonical absent -> trusted sys.executable fallback (precedence 2)
+    candidate = sys_executable if sys_executable is not None else sys.executable
+    trusted = _validate_sys_executable(candidate)
+    if trusted is None:
+        raise FileNotFoundError(
+            "canonical interpreter not found and no trusted fallback available"
+        )
+    return trusted
 
 
 # ---------------------------------------------------------------------------

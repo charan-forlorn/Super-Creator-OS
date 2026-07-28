@@ -322,7 +322,27 @@ def _scan_forbidden_behavior(root: Path) -> tuple[str, ...]:
 
 
 def _read_latest_commit(root: Path) -> str | None:
+    """Resolve the current commit SHA for ``root``.
+
+    Works identically in branch checkouts, detached-HEAD checkouts, and
+    linked worktrees. In a linked worktree ``.git`` is a *file* pointer
+    (``gitdir: <path>``) rather than a directory; we resolve the real git dir
+    from that pointer and then read ``HEAD`` exactly like a normal checkout.
+    Never spawns a process and never invents a commit; malformed/empty SHAs
+    are rejected. Fails closed (None) when the directory is not a repository
+    or the commit identity cannot be determined.
+    """
     git_dir = root / ".git"
+    # Linked worktree / detached checkout: .git is a *file* pointer to the
+    # real git dir (e.g. <repo>/.git/worktrees/<name>). Resolve it so the
+    # existing HEAD/ref/packed-refs logic below applies unchanged.
+    if git_dir.is_file():
+        pointer = _read_text(git_dir)
+        if pointer and pointer.strip().startswith("gitdir:"):
+            target = (git_dir.parent / pointer.strip()[len("gitdir:"):].strip())
+            resolved = target.resolve() if target.is_absolute() else (git_dir.parent / target).resolve()
+            if resolved.is_dir():
+                git_dir = resolved
     head = _read_text(git_dir / "HEAD")
     if head is None:
         return None
@@ -331,7 +351,7 @@ def _read_latest_commit(root: Path) -> str | None:
         ref_path = git_dir / head[5:].strip()
         ref_text = _read_text(ref_path)
         if ref_text:
-            return ref_text.strip()
+            return _normalize_commit_sha(ref_text.strip())
         packed = _read_text(git_dir / "packed-refs") or ""
         ref_name = head[5:].strip()
         for line in packed.splitlines():
@@ -339,9 +359,20 @@ def _read_latest_commit(root: Path) -> str | None:
                 continue
             parts = line.split()
             if len(parts) == 2 and parts[1] == ref_name:
-                return parts[0]
+                return _normalize_commit_sha(parts[0])
         return None
-    return head or None
+    return _normalize_commit_sha(head or None)
+
+
+# 40-hex commit identity (Git SHA-1). Used to reject malformed/empty output.
+_COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
+
+def _normalize_commit_sha(value: str | None) -> str | None:
+    """Return ``value`` only if it is a valid 40-hex commit SHA; else None."""
+    if not value:
+        return None
+    return value if _COMMIT_SHA_RE.match(value) else None
 
 
 def _stage_check(stage: str, artifacts: tuple[Stage7ClosureArtifact, ...]) -> Stage7ClosureCheck:

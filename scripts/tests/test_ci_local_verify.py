@@ -207,15 +207,18 @@ def test_gates_are_ordered_argv_lists():
 
 def test_canonical_venv_interpreter_is_used():
     interp = civ.detect_interpreter(REPO_ROOT)
-    # The canonical interpreter must be the .venv interpreter, not global python.
-    assert str(interp).endswith(str(civ._VENV_RELATIVE)) or "Scripts/python.exe" in str(interp)
-    assert "python.exe" in str(interp)
     gates = civ.build_gates(REPO_ROOT, interp, REPO_ROOT / "tmp-never")
+    # Every Python-driven gate must begin with the selected interpreter.
     for g in gates:
-        # Only Python-driven gates must use the venv interpreter. The Cohort 9D
-        # frontend gates (cc_*) run node/npm/npx and are intentionally exempt.
         if g.gate_id in _PYTHON_GATE_IDS:
             assert g.argv[0] == str(interp)
+    # Precedence: when the repository-local .venv is present it MUST be
+    # preferred; when absent, the trusted sys.executable fallback is selected.
+    venv = REPO_ROOT / civ._VENV_RELATIVE
+    if venv.is_file():
+        assert str(interp).endswith(str(civ._VENV_RELATIVE))
+    else:
+        assert Path(interp).resolve() == Path(sys.executable).resolve()
 
 
 def test_shell_true_never_used_and_cwd_correct(monkeypatch):
@@ -535,6 +538,129 @@ def test_cohort9d_frontend_gates_present_in_ci_and_local_parity():
     assert "control_center_truth_gate.py" in " ".join(local["cc_browser_acceptance"].argv)
 
     # Order parity is already enforced by test_ci_verification_gate_order_matches_local.
+
+
+# ---------------------------------------------------------------------------
+# C1 interpreter-contract (operator §4): precedence, fallback, fail-closed
+# ---------------------------------------------------------------------------
+
+def _make_fake_python(tmp_path, rel=("venv", "Scripts", "python.exe")):
+    """Create a fake regular executable file under tmp_path and return its path."""
+    p = tmp_path / Path(*rel)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_bytes(b"#!python\n")
+    return p
+
+
+def _run_detect(repo_root, sys_exe):
+    """Call detect_interpreter with a controlled sys_executable fallback."""
+    return civ.detect_interpreter(repo_root, sys_executable=sys_exe)
+
+
+def test_valid_repository_local_venv_is_preferred(tmp_path, monkeypatch):
+    # A fake repo with a valid .venv interpreter; sys.executable set elsewhere.
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    venv_py = _make_fake_python(repo, (".venv", "Scripts", "python.exe"))
+    other = _make_fake_python(tmp_path, ("other", "python.exe"))
+    monkeypatch.setattr(civ.sys, "executable", str(other))
+    got = _run_detect(repo, str(other))
+    # repo-local venv must win over the process interpreter
+    assert Path(got).resolve() == venv_py.resolve()
+
+
+def test_missing_repository_local_venv_uses_sys_executable(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()  # no .venv
+    other = _make_fake_python(tmp_path, ("other", "python.exe"))
+    monkeypatch.setattr(civ.sys, "executable", str(other))
+    got = _run_detect(repo, str(other))
+    assert Path(got).resolve() == other.resolve()
+
+
+def test_relative_sys_executable_rejected(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.setattr(civ.sys, "executable", "relative/python.exe")
+    with pytest.raises((FileNotFoundError, RuntimeError)):
+        _run_detect(repo, "relative/python.exe")
+
+
+def test_empty_sys_executable_rejected(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.setattr(civ.sys, "executable", "")
+    with pytest.raises(FileNotFoundError):
+        _run_detect(repo, "")
+
+
+def test_nonexistent_sys_executable_rejected(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    bad = str(tmp_path / "does_not_exist.exe")
+    monkeypatch.setattr(civ.sys, "executable", bad)
+    with pytest.raises(FileNotFoundError):
+        _run_detect(repo, bad)
+
+
+def test_directory_sys_executable_rejected(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.setattr(civ.sys, "executable", str(tmp_path))
+    with pytest.raises(FileNotFoundError):
+        _run_detect(repo, str(tmp_path))
+
+
+def test_present_but_invalid_repo_venv_fails_closed(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    # .venv/Scripts/python.exe exists but is a DIRECTORY -> present but invalid
+    venv_dir = tmp_path / "repo" / ".venv" / "Scripts" / "python.exe"
+    venv_dir.parent.mkdir(parents=True, exist_ok=True)
+    venv_dir.mkdir(parents=True, exist_ok=True)
+    other = _make_fake_python(tmp_path, ("other", "python.exe"))
+    monkeypatch.setattr(civ.sys, "executable", str(other))
+    # present-but-invalid must fail closed, NOT silently fall back to sys.executable
+    with pytest.raises(RuntimeError):
+        _run_detect(repo, str(other))
+
+
+def test_path_only_python_never_selected(tmp_path, monkeypatch):
+    # shutil.which must never be used by detect_interpreter; if it were, this
+    # would raise and the test would fail (proving no PATH resolution occurs).
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    other = _make_fake_python(tmp_path, ("other", "python.exe"))
+    monkeypatch.setattr(civ.sys, "executable", str(other))
+    monkeypatch.setattr(civ.shutil, "which", lambda *a, **k: (_ for _ in ()).throw(AssertionError("PATH used")))
+    got = _run_detect(repo, str(other))
+    assert Path(got).resolve() == other.resolve()
+
+
+def test_cwd_executable_shadowing_rejected(tmp_path):
+    # A cwd-relative path that is NOT the running interpreter must be rejected.
+    # The fallback only trusts sys.executable (the real running interpreter),
+    # so a different path fails closed even if it happens to exist.
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    shadow = tmp_path / "cwd_shadow_python.exe"
+    shadow.write_bytes(b"#!python\n")
+    with pytest.raises(FileNotFoundError):
+        _run_detect(repo, str(shadow))
+
+
+def test_subprocess_argv_begins_with_selected_interpreter():
+    interp = civ.detect_interpreter(REPO_ROOT)
+    gates = civ.build_gates(REPO_ROOT, interp, REPO_ROOT / "tmp-never")
+    for g in gates:
+        if g.gate_id in _PYTHON_GATE_IDS:
+            assert g.argv[0] == str(interp)
+
+
+def test_selection_deterministic_across_repeated_calls():
+    a = civ.detect_interpreter(REPO_ROOT)
+    b = civ.detect_interpreter(REPO_ROOT)
+    assert Path(a).resolve() == Path(b).resolve()
 
 
 # ---------------------------------------------------------------------------

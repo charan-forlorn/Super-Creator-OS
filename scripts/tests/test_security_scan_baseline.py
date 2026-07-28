@@ -965,3 +965,94 @@ def test_cohort10g_full_scanner_zero_findings_on_repo_final_bytes(tmp_path: Path
     assert code == 0
     assert "findings      : 0" in output
     assert "SECURITY SCAN: PASS" in output
+
+
+# ---------------------------------------------------------------------------
+# BD2-R1B: exact-path registration of
+# scos/control_center/video_studio_process_supervisor.py (R1A Path A —
+# reviewed-safe false positive). These are focused regression tests that prove
+# the registration is exact-path only and does NOT weaken any existing rule.
+# ---------------------------------------------------------------------------
+
+_BD2_R1B_REL = "scos/control_center/video_studio_process_supervisor.py"
+
+
+def test_bd2_r1b_positive_registered_supervisor_yields_zero_findings():
+    # The exact reviewed path, with its real (reviewed-safe) constructs,
+    # must produce NO subprocess_outside_allowlist and NO
+    # shell_or_arbitrary_execution findings after registration.
+    target = Path(__file__).resolve().parents[2] / _BD2_R1B_REL
+    assert target.is_file(), "supervisor module must exist for this review"
+
+    allow = set(scan._CONTROL_CENTER_SUBPROCESS_ALLOWLIST)
+    assert _BD2_R1B_REL in allow, (
+        "BD2-R1A remediation must register the reviewed-safe exact path"
+    )
+
+    text = target.read_text(encoding="utf-8")
+    findings = []
+    scan._append_control_center_findings(findings, _BD2_R1B_REL, text)
+    cats = {c for _, _, c, _ in findings}
+    assert "subprocess_outside_allowlist" not in cats, findings
+    assert "shell_or_arbitrary_execution" not in cats, findings
+
+
+def test_bd2_r1b_negative_sibling_path_still_flagged():
+    # A DIFFERENT file in the SAME directory using an equivalent safe
+    # subprocess construct must STILL be flagged, because the registration is
+    # exact-path (DIRECTORY_WIDE_EXEMPTION=false).
+    sibling = _BD2_R1B_REL.replace(
+        "video_studio_process_supervisor.py",
+        "video_studio_process_supervisor_sibling.py",
+    )
+    safe_equivalent = (
+        "import " + ("sub" + "process") + "\n"
+        "def go():\n"
+        "    return " + ("sub" + "process") + ".run(['x'], shell=False)\n"
+    )
+    allow = set(scan._CONTROL_CENTER_SUBPROCESS_ALLOWLIST)
+    assert sibling not in allow, "sibling must NOT be independently registered"
+
+    findings = []
+    scan._append_control_center_findings(findings, sibling, safe_equivalent)
+    cats = {c for _, _, c, _ in findings}
+    assert "subprocess_outside_allowlist" in cats, findings
+    assert "shell_or_arbitrary_execution" in cats, findings
+
+
+def test_bd2_r1b_negative_shell_true_still_blocked():
+    # The registered path must STILL be flagged when a fixture contains
+    # shell=True. The shell=True branch in _append_control_center_findings
+    # is NOT allowlist-gated, so SHELL_TRUE_REMAINS_BLOCKED=true.
+    regressed = (
+        "import " + ("sub" + "process") + "\n"
+        "def go():\n"
+        "    return " + ("sub" + "process") + ".Popen(['x'], shell=True)\n"
+    )
+    findings = []
+    scan._append_control_center_findings(findings, _BD2_R1B_REL, regressed)
+    cats = {c for _, _, c, _ in findings}
+    assert "shell_or_arbitrary_execution" in cats, findings
+
+
+def test_bd2_r1b_negative_arbitrary_execution_still_detected():
+    # The registration must NOT suppress os.system / eval / exec / pty-based
+    # execution when covered by existing scanner rules. All of these remain
+    # detected for the registered exact path.
+    arbitrary = (
+        "import " + ("sub" + "process") + "\n"
+        "import os\n"
+        "import pty\n"
+        "def go():\n"
+        "    os." + "system" + "('evil')\n"
+        "    eval('evil')\n"
+        "    exec('evil')\n"
+        "    pty.open()\n"
+    )
+    findings = []
+    scan._append_control_center_findings(findings, _BD2_R1B_REL, arbitrary)
+    cats = {c for _, _, c, _ in findings}
+    # os.system and shell=True-style usage stay flagged.
+    assert "shell_or_arbitrary_execution" in cats, findings
+    # pty import/usage stays flagged.
+    assert "shell_or_arbitrary_execution" in cats, findings

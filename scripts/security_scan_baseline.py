@@ -248,6 +248,22 @@ _CONTROL_CENTER_SUBPROCESS_ALLOWLIST = {
     # interpolation, no network inference from exit code, no browser/request-
     # selectable executable. Added alongside the Cohort 10G implementation.
     "scos/control_center/hvs_golden_render_service.py",
+    # Stage video-studio integration (BD2-R1A Path A, reviewed-safe false
+    # positive): video_studio_process_supervisor.py drives the certified
+    # Invoke-VideoStudioBridge.ps1 ONLY via subprocess.Popen(list,
+    # shell=False, fixed executable, fixed cwd, bounded timeout, no
+    # caller-controlled fragments); it kills ONLY its owned child on timeout.
+    # Identical safe pattern already registered for hvs_adapter.py /
+    # hvs_render_dispatch.py / hvs_production_asset_service.py /
+    # hvs_render_completion_service.py / hvs_golden_render_service.py, and
+    # proven safe by test_fixed_binding_uses_argument_list_shell_false_and_
+    # trusted_cwd + test_timeout_kills_only_owned_child_and_records_cleanup
+    # (8 tests in scos/control_center/tests/test_video_studio_process_
+    # supervisor.py). Registered EXACT-PATH only; no directory-wide exemption,
+    # no blanket rule disablement. The shell=True / os.system / pty branch in
+    # _append_control_center_findings is NOT allowlist-gated, so regressions
+    # to those constructs remain flagged for this exact path.
+    "scos/control_center/video_studio_process_supervisor.py",
     "scripts/security_scan_baseline.py",
 }
 _FRONTEND_FORBIDDEN_TOKENS = (

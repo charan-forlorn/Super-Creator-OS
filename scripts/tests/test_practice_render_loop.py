@@ -7,6 +7,7 @@ memory/database.json, production memory/runtime, or source cleanup is touched.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from scripts.practice_render_loop import (
@@ -86,7 +87,49 @@ def test_learn_only_records_patterns_to_runtime_no_real(tmp_path: Path):
     assert all(r["render_success"] is False for r in rows)  # simulated
 
 
-def test_real_mode_records_render_success_to_runtime(tmp_path: Path):
+# Fake HVS CLI used to exercise the real subprocess boundary hermetically.
+# It records each invocation to a sentinel file and returns a deterministic
+# success envelope for `verify-real-render-output`, so the production code
+# path (subprocess with argv list, shell=False) is proven without depending on
+# the real (uninstalled) HVS toolchain.
+_FAKE_HVS_CLI_SRC = '''\
+import sys, os, json
+
+def main(argv):
+    args = argv[1:]
+    sentinel = os.environ.get("HVS_FAKE_SENTINEL")
+    if sentinel:
+        with open(sentinel, "a", encoding="utf-8") as fh:
+            fh.write("INVOKED " + " ".join(args) + "\\n")
+    if args and args[0] == "verify-real-render-output":
+        print(json.dumps({"ok": True, "verified": True}))
+        return 0
+    # Any other command is unexpected in this test; fail closed.
+    print("BLOCKED: unexpected hvs command")
+    return 2
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
+'''
+
+
+def test_real_mode_records_render_success_to_runtime(tmp_path: Path, monkeypatch):
+    # Hermetic HVS CLI: a task-owned fake module under tmp_path, placed on
+    # PYTHONPATH so `python -m hvs.cli` (the exact production command shape)
+    # resolves to it inside the real subprocess boundary.
+    fake_dir = tmp_path / "hvs_fake"
+    hvs_pkg = fake_dir / "hvs"
+    hvs_pkg.mkdir(parents=True)
+    (hvs_pkg / "__init__.py").write_text("")
+    (hvs_pkg / "cli.py").write_text(_FAKE_HVS_CLI_SRC)
+    # hvs_root cwd must exist (production runs the subprocess with cwd=hvs_root)
+    hvs_root = tmp_path / "hermes-video-studio"
+    hvs_root.mkdir(parents=True, exist_ok=True)
+    # Sentinel proving the real subprocess was invoked with correct args.
+    sentinel = tmp_path / "hvs_invocations.log"
+    monkeypatch.setenv("PYTHONPATH", str(fake_dir))
+    monkeypatch.setenv("HVS_FAKE_SENTINEL", str(sentinel))
+
     canonical = tmp_path / "memory" / "database.json"
     runtime = tmp_path / "runtime" / "practice-render.jsonl"
     canonical_before = _seed_canonical(canonical)
@@ -95,6 +138,7 @@ def test_real_mode_records_render_success_to_runtime(tmp_path: Path):
         memory_db=canonical,
         runtime_journal=runtime,
         allow_real=True,
+        hvs_root=hvs_root,
         renderer=_fake_renderer(True),
     )
 
@@ -103,6 +147,13 @@ def test_real_mode_records_render_success_to_runtime(tmp_path: Path):
     rows = _runtime_rows(runtime)
     assert all(r["render_success"] is True for r in rows)
     assert all(r["qa_pass"] is True for r in rows)
+
+    # The real subprocess boundary was exercised exactly once per platform
+    # (verify-real-render-output), with shell=False and correct command shape.
+    assert sentinel.exists(), "HVS subprocess was never invoked"
+    invocations = sentinel.read_text(encoding="utf-8").splitlines()
+    assert len(invocations) == len(PLATFORM_FORMATS), invocations
+    assert all("verify-real-render-output" in line for line in invocations)
 
 
 def test_real_mode_render_failure_still_learns_to_runtime(tmp_path: Path):
