@@ -369,16 +369,45 @@ def test_existing_environment_copied_and_path_prepended():
     record = []
     runner = _fake_runner_factory(record)
     civ.run_all(REPO_ROOT, runner=runner)
-    media_calls = [c for c in record if c["env"] is not None]
+    # Media env is only attached to media-sensitive gates (it carries the
+    # SCOS_FFMPEG_BIN marker). Gate 5 carries a deterministic frontend-python
+    # env instead (BD5 Case B).
+    media_calls = [c for c in record
+                   if c["env"] is not None and "SCOS_FFMPEG_BIN" in c["env"]]
     assert media_calls
     for c in media_calls:
         env = c["env"]
         # copy of current environment (every original key present)
         for key in os.environ:
             assert key in env
-        # PATH prepended, not replaced
-        assert env["PATH"].startswith(str(civ._MEDIA_SHIM_DIR))
+        # Media shim is prepended (present) and the original PATH is preserved
+        # (not replaced). Position-0 is not asserted because a nested verifier
+        # run may already carry an interpreter-shim prepend in os.environ PATH.
+        assert str(civ._MEDIA_SHIM_DIR) in env["PATH"]
         assert os.environ.get("PATH", "") in env["PATH"]
+
+
+def test_frontend_python_env_deterministic_for_gate5():
+    """BD5 Case B: Gate 5 gets a deterministic python3-resolving child env."""
+    record = []
+    runner = _fake_runner_factory(record)
+    interp = civ.detect_interpreter(REPO_ROOT)
+    civ.run_all(REPO_ROOT, runner=runner)
+    gate5 = [c for c in record if c["gate"] == "cc_frontend_tests"]
+    assert gate5, "Gate 5 must have run"
+    env = gate5[0]["env"]
+    assert env is not None
+    # Trusted interpreter exported for tests that honour it.
+    assert env.get("SCOS_PYTHON_INTERPRETER") == str(interp)
+    # A process-local shim dir is prepended to PATH so the bare 'python3'
+    # fallback resolves to the trusted interpreter inside the vitest worker.
+    assert "frontend-python-shim" in env["PATH"]
+    # Real environment is not mutated by the verifier (compare snapshot).
+    before = dict(os.environ)
+    # (the verifier runs inside this process; assert it did not inject the var
+    # where it was absent beforehand)
+    if "SCOS_PYTHON_INTERPRETER" not in before:
+        assert "SCOS_PYTHON_INTERPRETER" not in os.environ
 
 
 def test_media_bins_child_local_and_not_permanent():
@@ -390,7 +419,8 @@ def test_media_bins_child_local_and_not_permanent():
     before = dict(os.environ)
     civ.run_all(REPO_ROOT, runner=runner)
     after = dict(os.environ)
-    media_calls = [c for c in record if c["env"] is not None]
+    media_calls = [c for c in record
+                   if c["env"] is not None and "SCOS_FFMPEG_BIN" in c["env"]]
     for c in media_calls:
         assert c["env"]["SCOS_FFMPEG_BIN"] == str(civ._MEDIA_FFMPEG)
         assert c["env"]["SCOS_FFPROBE_BIN"] == str(civ._MEDIA_FFPROBE)

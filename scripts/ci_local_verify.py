@@ -122,6 +122,7 @@ class Gate:
     gate_id: str
     argv: List[str]
     extra_env: Optional[dict] = None
+    child_env: Optional[dict] = None
     media_sensitive: bool = False
     is_pytest: bool = False
     marker: Optional[str] = None
@@ -270,6 +271,72 @@ def build_media_env(base_env: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Deterministic frontend Python environment (BD5, Case B)
+# ---------------------------------------------------------------------------
+
+def build_frontend_python_env(
+    run_root: Path,
+    interpreter: Path,
+) -> dict:
+    """Return a deterministic child env for Python-resolving frontend gates.
+
+    The Control Center frontend tests resolve their Python interpreter
+    themselves (e.g. ``resolvePython()`` falls back to the bare ``python3``
+    command when no repository-local ``.venv`` is present). In a detached
+    certification worktree there is no local ``.venv``, so that fallback
+    depends on ambient ``PATH`` reaching a ``python3`` executable — which is
+    nondeterministic inside the vitest worker process and intermittently fails
+    CI-parity (BD3/BD4/BD5: the single ``req 1`` argv-transport failure).
+
+    This helper makes the resolution deterministic without modifying any
+    product, route, or test source: it materialises a PROCESS-LOCAL shim
+    directory inside the verifier-owned ``run_root`` containing a ``python3``
+    executable that points at the SAME trusted interpreter the verifier
+    already resolved (``detect_interpreter()``), prepends that directory to
+    ``PATH``, and also exports ``SCOS_PYTHON_INTERPRETER`` for tests that
+    honour it. The shim lives under ``run_root`` and is cleaned with it, so no
+    permanent machine change occurs.
+
+    Contract: explicit trusted interpreter -> validated executable existence
+    -> deterministic child environment -> fail closed when unavailable.
+    """
+    shim_dir = Path(run_root) / "frontend-python-shim"
+    shim_dir.mkdir(parents=True, exist_ok=True)
+
+    src = Path(interpreter)
+    if not src.is_file():
+        # Fail closed: a missing trusted interpreter must not silently fall
+        # back to an arbitrary Python installation.
+        raise FileNotFoundError(
+            f"cannot build frontend python shim: trusted interpreter "
+            f"missing: {src}"
+        )
+
+    dst_exe = shim_dir / "python3.exe"
+    dst_cmd = shim_dir / "python3.cmd"
+    try:
+        if not dst_exe.exists() or dst_exe.stat().st_size != src.stat().st_size:
+            shutil.copyfile(src, dst_exe)
+    except OSError as exc:
+        raise RuntimeError(
+            f"cannot materialise deterministic python3 shim: {exc}"
+        ) from exc
+    # .cmd fallback for spawn callers that resolve via PATHEXT only.
+    dst_cmd.write_text(
+        '@"%s" %%*\n' % str(src), encoding="utf-8"
+    )
+
+    env = dict(os.environ)
+    existing_path = env.get("PATH", "")
+    env["PATH"] = (
+        str(shim_dir)
+        + (os.pathsep + existing_path if existing_path else "")
+    )
+    env["SCOS_PYTHON_INTERPRETER"] = str(src)
+    return env
+
+
+# ---------------------------------------------------------------------------
 # Gate construction
 # ---------------------------------------------------------------------------
 
@@ -340,11 +407,16 @@ def build_gates(
     ))
 
     # 5. Control Center frontend tests (frontend, Cohort 9D).
+    # Deterministic Python env (BD5 Case B): expose the trusted interpreter to
+    # Python-resolving frontend tests so the bare ``python3`` fallback resolves
+    # reliably inside the vitest worker regardless of ambient PATH.
+    frontend_env = build_frontend_python_env(run_root, interpreter)
     gates.append(Gate(
         order=5,
         gate_id="cc_frontend_tests",
         argv=[_NPX_BIN, "vitest", "run", "--no-file-parallelism"],
         extra_env={"CHANGE_DIR": str(repo_root / _CONTROL_CENTER_DIR)},
+        child_env=frontend_env,
     ))
 
     # 6. Control Center production build (frontend, Cohort 9D).
@@ -450,6 +522,14 @@ def run_gate(
     env = None
     if gate.media_sensitive:
         env = build_media_env(dict(os.environ))
+    if gate.child_env:
+        # Merge gate-specific child env (e.g. deterministic frontend Python).
+        # Start from a clean os.environ copy when no media env was built, and
+        # prefer the gate's values (including its PATH prepend).
+        base = dict(os.environ) if env is None else dict(env)
+        for k, v in gate.child_env.items():
+            base[k] = v
+        env = base
     rc = runner(gate.argv, cwd=str(cwd), env=env)
     return rc
 
