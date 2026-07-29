@@ -20,6 +20,7 @@ _COMMERCIAL = _HERE.parent
 _ROOT = _HERE.parents[2]
 
 sys.path.insert(0, str(_COMMERCIAL))
+sys.path.insert(0, str(_HERE))
 
 from first_customer_conversion_handoff import (  # noqa: E402
     create_first_customer_conversion_handoff,
@@ -43,6 +44,8 @@ from prospect_models import (  # noqa: E402
     ProspectProfile,
     ProspectResponseStatus,
 )
+
+from _existing_suites_guard import run_existing_suites  # noqa: E402
 
 _PASS, _FAIL = 0, 0
 _NOW = "2026-07-04T07:00:00Z"
@@ -363,9 +366,7 @@ def test_existing_suites():
         _HERE / "test_first_outreach_launch_kit.py",
         _ROOT / "scos" / "knowledge" / "tests" / "test_knowledge_service.py",
     ]
-    for suite in suites:
-        proc = subprocess.run([sys.executable, str(suite)], capture_output=True, text=True)
-        check(f"suite passes: {suite.name}", proc.returncode == 0)
+    run_existing_suites(suites, timeout_seconds=120)
 
 
 def test_package_import_safe():

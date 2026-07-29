@@ -13,6 +13,7 @@ _COMMERCIAL = _HERE.parent
 _ROOT = _HERE.parents[2]
 
 sys.path.insert(0, str(_COMMERCIAL))
+sys.path.insert(0, str(_HERE))
 
 from first_prospect_mini_audit_handoff import create_first_prospect_mini_audit_handoff  # noqa: E402
 from mini_audit_handoff_models import (  # noqa: E402
@@ -27,6 +28,8 @@ from prospect_models import (  # noqa: E402
     ProspectProfile,
     ProspectResponseStatus,
 )
+
+from _existing_suites_guard import run_existing_suites  # noqa: E402
 
 _PASS, _FAIL = 0, 0
 _NOW = "2026-07-03T07:00:00Z"
@@ -290,9 +293,7 @@ def test_existing_suites():
         _HERE / "test_report_builder.py",
         _ROOT / "scos" / "knowledge" / "tests" / "test_knowledge_service.py",
     ]
-    for suite in suites:
-        proc = subprocess.run([sys.executable, str(suite)], capture_output=True, text=True)
-        check(f"{suite.name} exits 0", proc.returncode == 0)
+    run_existing_suites(suites, timeout_seconds=120)
 
 
 def main():
