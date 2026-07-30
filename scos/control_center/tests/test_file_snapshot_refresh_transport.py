@@ -418,6 +418,10 @@ def test_no_forbidden_runtime_source_markers_and_no_frontend_route_files() -> No
         # authority; no mutation, no subprocess, no external egress, no
         # browser storage, no render.
         Path("apps/control-center/app/api/paid-pilot/readiness/route.ts"),
+        # Cohort 10J — reviewed same-origin guided paid-pilot intake transport.
+        # POST-only route with strict operation allow-list, no generic proxy,
+        # no browser-selected executable/cwd/root, and browser-safe error envelope.
+        Path("apps/control-center/app/api/paid-pilot/intake/route.ts"),
     }
     route_files = [
         p

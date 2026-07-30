@@ -1056,3 +1056,111 @@ def test_bd2_r1b_negative_arbitrary_execution_still_detected():
     assert "shell_or_arbitrary_execution" in cats, findings
     # pty import/usage stays flagged.
     assert "shell_or_arbitrary_execution" in cats, findings
+
+
+# ---------------------------------------------------------------------------
+# Cohort 10J Amendment A1 — guided paid-pilot intake exact reviewed boundary.
+# ---------------------------------------------------------------------------
+
+def test_cohort10j_reviewed_guided_intake_surface_produces_zero_findings(tmp_path: Path):
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / "apps" / "control-center" / "app" / "api" / "paid-pilot" / "intake" / "route.ts",
+        'export const dynamic="force-dynamic"; export const runtime="nodejs";\n'
+        'const OPS=new Set(["draft","validate","create","get"]);\n'
+        'export async function POST(request){ return Response.json({ok:true}); }\n',
+    )
+    _write(
+        root / "apps" / "control-center" / "lib" / "paid-pilot-intake-client.ts",
+        "export function post(body) {\n"
+        "  return " + ("fet" + "ch") + "(\"/api/paid-pilot/intake\", { method: \"POST\", body: JSON.stringify(body) });\n"
+        "}\n",
+    )
+    _write(
+        root / "apps" / "control-center" / "lib" / "paid-pilot-intake-bridge.ts",
+        "import * as childProcess from \"node:child_process\";\n"
+        "export function invoke() {\n"
+        "  const child = childProcess.spawn(\"python\", [\"-m\", \"scos.control_center.hvs_guided_pilot_intake_cli\", \"draft\"], { shell: false });\n"
+        "  return set" + "Timeout(() => { child.kill(\"SIGKILL\"); }, 60000);\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 0
+    assert "findings      : 0" in output
+
+
+def test_cohort10j_negative_unregistered_intake_like_route_still_flagged(tmp_path: Path):
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(root / "apps" / "control-center" / "app" / "api" / "paid-pilot" / "intake2" / "route.ts", "export {}\n")
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_api_route" in output
+
+
+def test_cohort10j_negative_intake_client_unsafe_fetch_targets_still_flagged(tmp_path: Path):
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / "apps" / "control-center" / "lib" / "paid-pilot-intake-client.ts",
+        "const target = \"/api/paid-pilot/intake\";\n"
+        "export function bad(url) {\n"
+        "  " + ("fet" + "ch") + "(target);\n"
+        "  " + ("fet" + "ch") + "(\"https://example.invalid/intake\");\n"
+        "  " + ("fet" + "ch") + "(url);\n"
+        "  " + ("fet" + "ch") + "(\"/api/paid-pilot/intake-other\");\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert output.count("frontend_transport") >= 4
+
+
+def test_cohort10j_negative_intake_bridge_unsafe_execution_and_timers_still_flagged(tmp_path: Path):
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / "apps" / "control-center" / "lib" / "paid-pilot-intake-bridge.ts",
+        "import * as childProcess from \"node:child_process\";\n"
+        "export function bad(command, mod) {\n"
+        "  childProcess.spawn(command, \"-m \" + mod, { shell: true });\n"
+        "  set" + "Interval(() => bad(command, mod), 1000);\n"
+        "  set" + "Timeout(() => bad(command, mod), 1000);\n"
+        "}\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_polling" in output
+
+
+def test_cohort10j_negative_browser_storage_authority_still_flagged(tmp_path: Path):
+    root = tmp_path / "repo"
+    _write(root / "scos" / "commercial" / "safe.py", "VALUE = 1\n")
+    _write(root / "scripts" / "safe.py", "VALUE = 1\n")
+    _write(root / "scos" / "control_center" / "safe.py", "VALUE = 1\n")
+    _write(
+        root / "apps" / "control-center" / "components" / "paid-pilot-intake-wizard.tsx",
+        "export function Bad() { window.local" + "Storage.setItem(\"draft\", \"x\"); window.session" + "Storage.setItem(\"draft\", \"x\"); }\n",
+    )
+
+    code, output = _run_scan(root)
+
+    assert code == 1
+    assert "frontend_storage" in output

@@ -1,0 +1,102 @@
+import { describe, expect, it, vi } from "vitest";
+import type { NextRequest } from "next/server";
+
+vi.mock("@/lib/paid-pilot-intake-bridge", () => ({
+  invokeIntake: vi.fn(async (op: string, payload: Record<string, unknown>) => {
+    if (payload.idempotency_key === "conflict-draft-1") {
+      return {
+        ok: false,
+        error_code: "CONFLICTING_REPLAY_REJECTED",
+        detail: "idempotency key conflicts with existing creation",
+        draft: null,
+      };
+    }
+    return {
+      ok: true,
+      error_code: null,
+      detail: null,
+      replay: op === "create" && payload.idempotency_key === "create-draft-1",
+      pilot_safe_id: op === "create" ? "pilot-1" : undefined,
+      project_safe_id: op === "create" ? "project-1" : undefined,
+      admission_packet_sha256: op === "create" ? "b".repeat(64) : undefined,
+      draft: {
+        draft_id: payload.draft_id ?? "draft-1",
+        status: op === "create" ? "CREATED" : "READY_TO_CREATE",
+        safe_project_title: "Synthetic",
+        selected_template: "Vertical Product Promo",
+        target_platform: "TikTok",
+        output_profile: "vertical_9_16",
+        duration: "30s",
+        deadline: "2026-08-15",
+        commercial_reference: "synthetic",
+        asset_references: [],
+        consent_state: "CONSENT_CONFIRMED",
+        consent_evidence_reference: "redacted.txt",
+        consent_evidence_sha256: "a".repeat(64),
+        explicit_consent_confirmed: true,
+        rights_answers: {},
+        privacy_answers: {},
+        derived_classification: "STANDARD_COMMERCIAL",
+        retention_policy: "30 days",
+        external_action_restrictions: { upload: "NOT_AUTHORIZED" },
+        validation_findings: [],
+        generated: {},
+        created_at: "t",
+        updated_at: "t",
+        revision: 1,
+        pilot_safe_id: "pilot-1",
+        project_safe_id: "project-1",
+        admission_packet_sha256: "b".repeat(64),
+      },
+    };
+  }),
+}));
+
+const { POST } = await import("@/app/api/paid-pilot/intake/route");
+
+describe("paid-pilot guided intake route", () => {
+  it("delegates to Python authority and redacts route errors", async () => {
+    const req = new Request("http://local/api/paid-pilot/intake", {
+      method: "POST",
+      body: JSON.stringify({ operation: "draft", safe_project_title: "Synthetic" }),
+    });
+    const res = await POST(req as unknown as NextRequest);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(JSON.stringify(body)).not.toMatch(/C:\\|stderr|Traceback|SCOS_PYTHON_INTERPRETER/);
+  });
+
+  it("rejects unknown operations", async () => {
+    const req = new Request("http://local/api/paid-pilot/intake", {
+      method: "POST",
+      body: JSON.stringify({ operation: "send-customer-message" }),
+    });
+    const res = await POST(req as unknown as NextRequest);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error_code).toBe("UNKNOWN_OPERATION");
+  });
+
+  it("exact replay remains idempotent and conflicting replay remains rejected", async () => {
+    const exact = new Request("http://local/api/paid-pilot/intake", {
+      method: "POST",
+      body: JSON.stringify({ operation: "create", draft_id: "draft-1", idempotency_key: "create-draft-1" }),
+    });
+    const exactRes = await POST(exact as unknown as NextRequest);
+    expect(exactRes.status).toBe(200);
+    const exactBody = await exactRes.json();
+    expect(exactBody.replay).toBe(true);
+    expect(exactBody.pilot_safe_id).toBe("pilot-1");
+    expect(exactBody.project_safe_id).toBe("project-1");
+
+    const conflict = new Request("http://local/api/paid-pilot/intake", {
+      method: "POST",
+      body: JSON.stringify({ operation: "create", draft_id: "draft-1", idempotency_key: "conflict-draft-1" }),
+    });
+    const conflictRes = await POST(conflict as unknown as NextRequest);
+    expect(conflictRes.status).toBe(409);
+    const conflictBody = await conflictRes.json();
+    expect(conflictBody.error_code).toBe("CONFLICTING_REPLAY_REJECTED");
+  });
+});

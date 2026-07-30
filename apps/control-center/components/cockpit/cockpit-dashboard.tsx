@@ -9,6 +9,7 @@ import { GoldenRenderPanel } from "@/components/golden-render-panel";
 import { SoloOperatorWorkflowPanel } from "@/components/solo-operator-workflow-panel";
 import { SoloProjectPreparationPanel } from "@/components/solo-project-preparation-panel";
 import { PaidPilotDeliveryPanel } from "@/components/paid-pilot-delivery-panel";
+import { PaidPilotIntakeWizard } from "@/components/paid-pilot-intake-wizard";
 import {
   DEMO_LABEL,
   useControlCenterData,
@@ -245,6 +246,10 @@ function CockpitSurface() {
 
         <section className="cockpit-panel">
           <SoloProjectPreparationPanel />
+        </section>
+
+        <section className="cockpit-panel">
+          <PaidPilotIntakeWizard />
         </section>
 
         <section className="cockpit-panel">

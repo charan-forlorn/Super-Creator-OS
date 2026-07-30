@@ -310,6 +310,11 @@ _FRONTEND_BRIDGE_TIMEOUT_FILES = frozenset({
     # refresh/poll). Exact per-call-site exemption, same pattern as the
     # materialization/render/golden bridges above.
     "apps/control-center/lib/paid-pilot-delivery-bridge.ts",
+    # Cohort 10J guided paid-pilot intake bridge: server-only module imported
+    # ONLY by the intake API route. Its setTimeout is a one-shot bounded
+    # child-kill for the owned Python CLI process; argv array, no shell, fixed
+    # module name, server-controlled cwd/interpreter, bounded stdout, no retry.
+    "apps/control-center/lib/paid-pilot-intake-bridge.ts",
 })
 
 # Cohort 9A reviewed-safe read-only transport allow-list.
@@ -410,6 +415,14 @@ _FRONTEND_READ_ONLY_TRANSPORT_ALLOWLIST = {
     # same-origin POST/GET to the exact reviewed target below; no node
     # builtins, no fs, no storage, no polling loop, no auto-retry.
     "apps/control-center/lib/paid-pilot-delivery-client.ts",
+    # Cohort 10J — reviewed same-origin guided paid-pilot intake boundary.
+    # POST-only route with strict operation allow-list, no generic proxy,
+    # no browser-selected executable/cwd/root, and browser-safe error envelope.
+    "apps/control-center/app/api/paid-pilot/intake/route.ts",
+    # Cohort 10J — reviewed pure-fetch client. It targets only the exact
+    # same-origin intake route below; no dynamic host, no absolute URL,
+    # no storage authority, no polling, no auto-retry.
+    "apps/control-center/lib/paid-pilot-intake-client.ts",
 }
 
 # Exact reviewed same-origin fetch target(s) permitted for each allow-listed
@@ -454,6 +467,9 @@ _FRONTEND_REVIEWED_FETCH_TARGETS = {
     # POST mutations and the GET projection/list calls).
     "apps/control-center/lib/paid-pilot-delivery-client.ts": (
         "/api/paid-pilot/delivery",
+    ),
+    "apps/control-center/lib/paid-pilot-intake-client.ts": (
+        "/api/paid-pilot/intake",
     ),
 }
 

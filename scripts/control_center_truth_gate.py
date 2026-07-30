@@ -134,6 +134,10 @@ _REVIEWED_ROUTES = {
     # "nodejs" + dynamic = "force-dynamic" (no static caching).
     "apps/control-center/app/api/paid-pilot/delivery/route.ts",
     "apps/control-center/app/api/paid-pilot/delivery/download/route.ts",
+    # Cohort 10J reviewed guided paid-pilot intake transport. Browser route is
+    # non-authoritative; Python service/CLI remain the writer. Declares
+    # runtime=nodejs + dynamic=force-dynamic; no generic proxy or external egress.
+    "apps/control-center/app/api/paid-pilot/intake/route.ts",
 }
 
 
@@ -231,6 +235,46 @@ def _check_no_new_mutation_route(findings: list[tuple]) -> None:
         findings.append((rel, 0, "unreviewed_api_route_introduced", rel))
 
 
+
+def _check_guided_pilot_intake_authority(findings: list[tuple]) -> None:
+    """Cohort 10J guided intake must preserve Python authority and browser projection."""
+    required = {
+        "scos/control_center/hvs_guided_pilot_intake.py": (
+            "os.replace", "admission-packet.json", "external_action_restrictions", "CREATION_OUTCOME_UNKNOWN",
+        ),
+        "scos/control_center/hvs_guided_pilot_intake_cli.py": (
+            "json.loads", "op=", "sample-asset", "GuidedIntakeStore",
+        ),
+        "apps/control-center/lib/paid-pilot-intake-bridge.ts": (
+            "childProcess.spawn", "hvs_guided_pilot_intake_cli", "setTimeout", "child.kill", "MAX=1_048_576",
+        ),
+        "apps/control-center/lib/paid-pilot-intake-client.ts": (
+            'fetch("/api/paid-pilot/intake"', "REQUEST_FAILED",
+        ),
+        "apps/control-center/app/api/paid-pilot/intake/route.ts": (
+            "const OPS", "invokeIntake", "cache-control",
+        ),
+    }
+    forbidden = {
+        "apps/control-center/lib/paid-pilot-intake-bridge.ts": ("shell:true", "setInterval", "stderr", "Traceback"),
+        "apps/control-center/lib/paid-pilot-intake-client.ts": ("localStorage", "sessionStorage", "http://", "https://"),
+        "apps/control-center/app/api/paid-pilot/intake/route.ts": ("localStorage", "sessionStorage", "stderr", "Traceback"),
+    }
+    for rel, markers in required.items():
+        path = _ROOT / rel
+        if not path.is_file():
+            findings.append((rel, 0, "guided_intake_authority_file_missing", rel))
+            continue
+        text = path.read_text(encoding="utf-8")
+        compact = text.replace(" ", "")
+        for marker in markers:
+            haystack = compact if marker in ("shell:true", "MAX=1_048_576") else text
+            if marker not in haystack:
+                findings.append((rel, 0, "guided_intake_authority_marker_missing", marker))
+        for marker in forbidden.get(rel, ()):
+            if marker in compact or marker in text:
+                findings.append((rel, 0, "guided_intake_forbidden_marker_present", marker))
+
 def _check_dry_run_preview_only(findings: list[tuple]) -> None:
     """operator-dry-run.ts must keep the preview-only truth markers."""
     path = _FRONTEND_DIR / "lib" / "operator-dry-run.ts"
@@ -275,6 +319,7 @@ def main() -> int:
     _check_route_tree_mock_isolation(findings)
     _check_no_storage_fabrication(findings)
     _check_no_new_mutation_route(findings)
+    _check_guided_pilot_intake_authority(findings)
     _check_dry_run_preview_only(findings)
     _check_snapshot_unavailable_semantics(findings)
 
