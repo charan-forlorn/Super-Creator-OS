@@ -11,6 +11,42 @@ LOCKED_EXTERNAL_RESTRICTIONS={'customer_notification':'NOT_AUTHORIZED','external
 RETENTION_DEFAULT='Retain customer assets for 30 days after operator handoff, then require review before deletion or extended retention.'
 PRESETS={'Vertical Product Promo':('TikTok / Reels / Shorts','vertical_9_16','30s'),'Square Product Promo':('Instagram / Facebook','square_1_1','30s'),'Landscape Product Promo':('YouTube / Website','landscape_16_9','45s'),'Service Awareness Video':('Local manual handoff','landscape_16_9','60s'),'Manual Local Delivery':('Manual local delivery','operator_selected','operator_selected'),'Custom':('Custom','custom','custom')}
 ALLOWED_SUFFIX={'.png','.jpg','.jpeg','.webp','.mp4','.mov','.wav','.mp3','.txt','.pdf'}; PROHIBITED={'health_data','financial_data','government_identifiers','child_information'}
+# --- Cohort 10K plain-language Brief Studio (authoritative, deterministic) ---
+# The browser is a collector only. Every readiness state, recommended default and
+# resolved output profile below is computed here, inside the sole authoritative
+# writer, and published read-only under draft.generated['brief'].
+BRIEF_SCHEMA_VERSION='scos-hvs.guided-brief-studio.v1/1.0.0'
+UNSURE='ยังไม่แน่ใจ'
+RIGHTS_KEYS=('asset_owner','identifiable_person','voice_used','music_used','font_policy')
+PRIVACY_KEYS=('health_data','financial_data','government_identifiers','child_information')
+BRIEF_SECTION_IDS=('goal','audience','message','style','channel','assets','schedule','rights')
+# Required plain-language answers per section. 'schedule' is satisfied by the
+# draft-level deadline; 'assets' and 'rights' are satisfied by the existing
+# fail-closed asset / rights / privacy authority, never by a free-text answer.
+BRIEF_REQUIRED={'goal':('goal',),'audience':('audience',),'message':('main_point',),'style':(),'channel':('channel',),'assets':(),'schedule':(),'rights':()}
+BRIEF_TEXT={
+ 'goal':('เป้าหมายของงาน','ระบบต้องรู้ว่าคุณอยากได้งานแบบไหน จึงจะเตรียมโครงงานให้ถูกต้อง','เลือกเป้าหมายจากตัวเลือก หรือพิมพ์อธิบายด้วยคำพูดของคุณเอง'),
+ 'audience':('กลุ่มผู้ชม','ถ้าไม่รู้ว่าใครจะดู เนื้อหาจะจับใจคนดูไม่ได้','บอกสั้น ๆ ว่าคนดูคือใคร'),
+ 'message':('ข้อความหลัก','ข้อความหลักคือสิ่งที่คนดูต้องจำให้ได้','เขียนประโยคเดียวที่อยากให้คนดูจำ'),
+ 'style':('สไตล์และอารมณ์','สไตล์ช่วยให้งานดูเป็นแบรนด์เดียวกัน','เลือกสไตล์ที่ใกล้เคียงที่สุด ถ้ายังไม่แน่ใจ ระบบจะแนะนำให้'),
+ 'channel':('ช่องทางและรูปแบบ','ช่องทางกำหนดสัดส่วนภาพและความยาวที่เหมาะสม','เลือกช่องทางที่จะนำไปใช้'),
+ 'assets':('ไฟล์และวัตถุดิบ','ถ้าไฟล์ยังไม่พร้อม งานจะเริ่มไม่ได้','เพิ่มไฟล์ที่ผู้ดูแลอนุมัติแล้ว แล้วกดตรวจสอบไฟล์อีกครั้ง'),
+ 'schedule':('กำหนดเวลาและเงื่อนไข','กำหนดเวลาช่วยให้วางลำดับงานได้','เลือกวันที่ต้องการให้งานเสร็จ'),
+ 'rights':('สิทธิ์ ความยินยอม และความเป็นส่วนตัว','คำตอบเรื่องสิทธิ์และความเป็นส่วนตัวต้องชัดเจน เพื่อไม่ให้เกิดปัญหาทางกฎหมายภายหลัง','ตอบให้ชัดเจนทุกข้อ ถ้ายังไม่แน่ใจ ให้ตรวจสอบกับเจ้าของงานก่อน'),
+}
+# Creative (non-safety) recommended defaults. These are RECOMMENDATIONS: they are
+# always labelled as such in the projection and never silently applied to a
+# rights, consent or privacy answer.
+BRIEF_CREATIVE_DEFAULTS={'style_tone':'เรียบง่ายและน่าเชื่อถือ','channel':'TikTok / Reels / Shorts'}
+BRIEF_CHANNEL_MAP={
+ 'TikTok / Reels / Shorts':('Vertical Product Promo','TikTok / Reels / Shorts','vertical_9_16','30s'),
+ 'Facebook / Instagram feed':('Square Product Promo','Instagram / Facebook','square_1_1','30s'),
+ 'YouTube':('Landscape Product Promo','YouTube / Website','landscape_16_9','45s'),
+ 'เว็บไซต์':('Landscape Product Promo','YouTube / Website','landscape_16_9','45s'),
+ 'นำเสนอในร้าน':('Service Awareness Video','Local manual handoff','landscape_16_9','60s'),
+}
+BRIEF_ANSWER_KEYS=('goal','goal_detail','audience','audience_problem','audience_feeling','audience_next_step','main_point','offer','call_to_action','required_wording','avoid_wording','style_tone','style_colors','style_font_feel','style_reference','style_avoid','channel','asset_notes','deadline','campaign_date','max_duration','revision_note','special_instruction')
+
 def now(): return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
 def sha(b): return hashlib.sha256(b if isinstance(b,bytes) else str(b).encode()).hexdigest()
 def slug(s):
@@ -58,7 +94,7 @@ class AssetReference:
     def to_dict(self): return dict(self.__dict__)
 @dataclass(frozen=True)
 class GuidedIntakeDraft:
-    schema_version:str=SCHEMA_VERSION; draft_id:str=''; status:str=DRAFT; safe_project_title:str=''; selected_template:str='Vertical Product Promo'; target_platform:str='TikTok / Reels / Shorts'; output_profile:str='vertical_9_16'; duration:str='30s'; deadline:str=''; commercial_reference:str=''; asset_references:tuple=(); consent_state:str='CONSENT_NOT_CONFIRMED'; consent_evidence_reference:str=''; consent_evidence_sha256:str=''; explicit_consent_confirmed:bool=False; rights_answers:dict=field(default_factory=dict); privacy_answers:dict=field(default_factory=dict); derived_classification:str='UNCLASSIFIED'; retention_policy:str=RETENTION_DEFAULT; external_action_restrictions:dict=field(default_factory=lambda:dict(LOCKED_EXTERNAL_RESTRICTIONS)); validation_findings:tuple=(); generated:dict=field(default_factory=dict); created_at:str=''; updated_at:str=''; revision:int=1; creation_idempotency_key:str=''; pilot_safe_id:str=''; project_safe_id:str=''; admission_packet_sha256:str=''
+    schema_version:str=SCHEMA_VERSION; draft_id:str=''; status:str=DRAFT; safe_project_title:str=''; selected_template:str='Vertical Product Promo'; target_platform:str='TikTok / Reels / Shorts'; output_profile:str='vertical_9_16'; duration:str='30s'; deadline:str=''; commercial_reference:str=''; asset_references:tuple=(); consent_state:str='CONSENT_NOT_CONFIRMED'; consent_evidence_reference:str=''; consent_evidence_sha256:str=''; explicit_consent_confirmed:bool=False; rights_answers:dict=field(default_factory=dict); privacy_answers:dict=field(default_factory=dict); derived_classification:str='UNCLASSIFIED'; retention_policy:str=RETENTION_DEFAULT; external_action_restrictions:dict=field(default_factory=lambda:dict(LOCKED_EXTERNAL_RESTRICTIONS)); validation_findings:tuple=(); generated:dict=field(default_factory=dict); created_at:str=''; updated_at:str=''; revision:int=1; creation_idempotency_key:str=''; pilot_safe_id:str=''; project_safe_id:str=''; admission_packet_sha256:str=''; brief_mode:bool=False; brief_answers:dict=field(default_factory=dict)
     def to_dict(self):
         d=dict(self.__dict__); d['asset_references']=[a.to_dict() for a in self.asset_references]; d['validation_findings']=[f.to_dict() for f in self.validation_findings]; return d
     @classmethod
@@ -87,6 +123,71 @@ def add_asset_from_path(d, *, approved_input_root, file_path):
     status='Unsupported file' if p.suffix.lower() not in ALLOWED_SUFFIX else ('File appears damaged' if p.stat().st_size<=0 else 'Ready')
     b=p.read_bytes(); a=AssetReference('asset-'+sha(str(p.relative_to(root)).encode()+b)[:16],p.name,sha(b),p.stat().st_size,status,True,p.name)
     return with_updates(d, asset_references=tuple([*d.asset_references,a]))
+def brief_recommendations(ba):
+    """Deterministic, clearly-labelled creative recommendations.
+
+    Only non-safety creative fields may receive a recommended default. Rights,
+    consent and privacy answers are never defaulted here: they stay fail-closed.
+    """
+    out={}
+    for k,v in BRIEF_CREATIVE_DEFAULTS.items():
+        cur=str(ba.get(k,'')).strip()
+        if not cur or cur==UNSURE: out[k]={'field':k,'value':v,'label':'คำแนะนำของระบบ (ยังเปลี่ยนได้)','reason':'คุณยังไม่แน่ใจ ระบบจึงเลือกค่าที่ปลอดภัยที่สุดให้ก่อน และคุณเปลี่ยนได้ตลอด'}
+    return out
+def brief_effective(ba):
+    """Answers after applying labelled creative recommendations."""
+    eff=dict(ba)
+    for k,rec in brief_recommendations(ba).items(): eff[k]=rec['value']
+    return eff
+def brief_channel_resolution(ba):
+    tpl,plat,prof,dur=BRIEF_CHANNEL_MAP[BRIEF_CREATIVE_DEFAULTS['channel']]
+    ch=str(brief_effective(ba).get('channel','')).strip()
+    if ch in BRIEF_CHANNEL_MAP: tpl,plat,prof,dur=BRIEF_CHANNEL_MAP[ch]
+    return {'selected_template':tpl,'target_platform':plat,'output_profile':prof,'duration':dur}
+def apply_brief_section(d, *, section_id, answers):
+    """Authoritative write of one plain-language brief section.
+
+    The browser sends plain answers only. Every derived technical field
+    (template, platform, output profile, duration, project title, deadline) is
+    resolved here, never in the browser.
+    """
+    sid=str(section_id).strip()
+    if sid not in BRIEF_SECTION_IDS: raise ValueError('UNKNOWN_BRIEF_SECTION')
+    incoming={k:('' if v is None else str(v)) for k,v in dict(answers or {}).items() if k in BRIEF_ANSWER_KEYS}
+    ba={**dict(d.brief_answers), **incoming}
+    upd={'brief_mode':True,'brief_answers':ba}
+    title=(ba.get('goal_detail') or ba.get('goal') or '').strip()
+    if title: upd['safe_project_title']=title[:80]
+    if str(ba.get('deadline','')).strip(): upd['deadline']=str(ba['deadline']).strip()
+    upd.update(brief_channel_resolution(ba))
+    if not str(d.commercial_reference or '').strip(): upd['commercial_reference']='brief-studio'
+    return with_updates(d, **upd)
+def brief_projection(d, findings):
+    """Browser-safe projection of authoritative state. No paths, no schema names."""
+    ba=dict(d.brief_answers); eff=brief_effective(ba); recs=brief_recommendations(ba)
+    fields={f.field for f in findings}
+    rights_blocked=bool(fields & set(RIGHTS_KEYS) or {'consent_evidence','explicit_consent'} & fields)
+    privacy_blocked=bool(fields & set(PRIVACY_KEYS) or 'derived_classification' in fields)
+    assets_blocked=bool({'assets','asset_inventory'} & fields)
+    sections=[]
+    for sid in BRIEF_SECTION_IDS:
+        heading,why,how=BRIEF_TEXT[sid]
+        missing=[k for k in BRIEF_REQUIRED[sid] if not str(eff.get(k,'')).strip() or str(eff.get(k,'')).strip()==UNSURE]
+        state='READY'; blocking=False; detail=''
+        if sid=='rights' and (rights_blocked or privacy_blocked):
+            state='BLOCKED_FOR_PRIVACY' if privacy_blocked and not rights_blocked else 'BLOCKED_FOR_RIGHTS'; blocking=True
+            detail='ยังมีคำตอบเรื่องสิทธิ์หรือความเป็นส่วนตัวที่ไม่ชัดเจน ระบบจะไม่สร้างโปรเจกต์จนกว่าจะตอบให้ชัดเจน'
+        elif sid=='assets' and assets_blocked:
+            state='BLOCKED_FOR_ASSETS'; blocking=True; detail='ไฟล์ที่จำเป็นยังไม่พร้อม'
+        elif sid=='schedule' and not str(d.deadline or '').strip():
+            state='NEEDS_INFORMATION'; blocking=True; detail='ยังไม่ได้เลือกวันที่ต้องการให้งานเสร็จ'
+        elif missing:
+            state='NEEDS_INFORMATION'; blocking=True; detail='ยังตอบไม่ครบในส่วนนี้'
+        sections.append({'id':sid,'heading':heading,'state':state,'blocking':blocking,'why_it_matters':why,'how_to_resolve':how,'detail':detail,'recommended':[recs[k] for k in recs if k in BRIEF_REQUIRED.get(sid,()) or (sid=='style' and k=='style_tone') or (sid=='channel' and k=='channel')]})
+    ready=sum(1 for s in sections if s['state']=='READY')
+    assets={'available':sum(1 for a in d.asset_references if a.status=='Ready'),'needs_review':sum(1 for a in d.asset_references if a.status not in ('Ready','Unsupported file')),'unsupported':sum(1 for a in d.asset_references if a.status=='Unsupported file'),'names':[a.safe_name for a in d.asset_references],'missing':0 if d.asset_references else 1}
+    overall='CREATED' if d.status==CREATED else ('READY' if d.status==READY_TO_CREATE else next((s['state'] for s in sections if s['blocking'] and s['state'].startswith('BLOCKED')),'NEEDS_INFORMATION'))
+    return {'schema_version':BRIEF_SCHEMA_VERSION,'sections':sections,'ready_count':ready,'total_count':len(sections),'readiness_label':'พร้อมแล้ว %d จาก %d ส่วน'%(ready,len(sections)),'overall':overall,'answers':eff,'raw_answers':ba,'recommendations':list(recs.values()),'assets':assets,'resolved_output':brief_channel_resolution(ba),'will_not_do':['ระบบจะไม่ส่งข้อความหาลูกค้าให้อัตโนมัติ','ระบบจะไม่เผยแพร่หรืออัปโหลดงานให้อัตโนมัติ','ระบบจะไม่ส่งข้อมูลออกนอกเครื่องนี้','ระบบจะไม่เรนเดอร์วิดีโอจริงจนกว่าผู้ดูแลจะสั่ง']}
 def validate_draft(d):
     fs=[]
     if not d.safe_project_title.strip(): fs.append(find('safe_project_title','Safe project title is missing.','Enter a short non-sensitive project title.'))
@@ -108,7 +209,9 @@ def validate_draft(d):
     status=READY_TO_CREATE if not fs else (BLOCKED if any(f.field=='derived_classification' for f in fs) else NEEDS_INPUT)
     pid=pilot_id(d) if d.safe_project_title else ''; prid=project_id(d) if d.safe_project_title else ''; gen=dict(d.generated)
     if pid: gen.update({'pilot_safe_id':pid,'project_safe_id':prid,'roots':roots(pid)})
-    return GuidedIntakeDraft.from_dict({**d.to_dict(),'status':status,'derived_classification':dc,'validation_findings':[f.to_dict() for f in fs],'generated':gen,'pilot_safe_id':pid,'project_safe_id':prid})
+    nd=GuidedIntakeDraft.from_dict({**d.to_dict(),'status':status,'derived_classification':dc,'validation_findings':[f.to_dict() for f in fs],'generated':gen,'pilot_safe_id':pid,'project_safe_id':prid})
+    if nd.brief_mode: gen=dict(gen); gen['brief']=brief_projection(nd,fs); nd=GuidedIntakeDraft.from_dict({**nd.to_dict(),'generated':gen})
+    return nd
 class GuidedIntakeStore:
     def __init__(self,store_path): self.path=Path(store_path)
     def read(self):
@@ -141,5 +244,7 @@ def create_pilot(store, *, draft_id, idempotency_key, runtime_base='C:/Workspace
     (ev/'SHA256SUMS').write_text('\n'.join(sums)+'\n',encoding='utf-8')
     with (ev/'audit.jsonl').open('a',encoding='utf-8',newline='\n') as fh: fh.write(json.dumps({'schema_version':SCHEMA_VERSION,'event_type':'PILOT_CREATED','draft_id':draft_id,'pilot_safe_id':d.pilot_safe_id,'packet_sha256':psha,'external_actions':LOCKED_EXTERNAL_RESTRICTIONS},ensure_ascii=False,separators=(',',':'))+'\n')
     pend.unlink()
-    final=GuidedIntakeDraft.from_dict({**d.to_dict(),'status':CREATED,'creation_idempotency_key':idempotency_key,'admission_packet_sha256':psha,'generated':{**d.generated,'roots':rs,'evidence_files':['admission-packet.json','admission-packet.redacted.json','SHA256SUMS','audit.jsonl']}}); store.put(final)
+    final=GuidedIntakeDraft.from_dict({**d.to_dict(),'status':CREATED,'creation_idempotency_key':idempotency_key,'admission_packet_sha256':psha,'generated':{**d.generated,'roots':rs,'evidence_files':['admission-packet.json','admission-packet.redacted.json','SHA256SUMS','audit.jsonl']}})
+    if final.brief_mode: final=GuidedIntakeDraft.from_dict({**final.to_dict(),'generated':{**final.generated,'brief':brief_projection(final,())}})
+    store.put(final)
     return {'ok':True,'replay':False,'draft':final.to_dict(),'pilot_safe_id':final.pilot_safe_id,'project_safe_id':final.project_safe_id,'admission_packet_sha256':psha,'next_safe_action':'Review technical evidence; no render/delivery is authorized.'}

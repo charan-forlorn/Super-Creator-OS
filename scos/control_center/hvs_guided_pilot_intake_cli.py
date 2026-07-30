@@ -2,7 +2,7 @@
 from __future__ import annotations
 import json, sys
 from pathlib import Path
-from scos.control_center.hvs_guided_pilot_intake import GuidedIntakeStore, add_asset_from_path, attach_consent_evidence, create_draft, create_pilot, validate_draft, with_updates
+from scos.control_center.hvs_guided_pilot_intake import GuidedIntakeStore, add_asset_from_path, apply_brief_section, attach_consent_evidence, create_draft, create_pilot, validate_draft, with_updates
 def emit(d): print(json.dumps(d,ensure_ascii=False,sort_keys=True)); return 0
 def store(a): return GuidedIntakeStore(a.get('store_path') or str(Path(a.get('evidence_base') or 'C:/Workspace/scos-paid-pilot-evidence')/'_guided-intake-store-v1.json'))
 def main(argv=None):
@@ -32,6 +32,12 @@ def main(argv=None):
             asset=input_root/'synthetic-product.txt'
             asset.write_text('SCOS synthetic guided-intake asset fixture\n',encoding='utf-8')
             d=add_asset_from_path(d,approved_input_root=input_root,file_path=asset); st.put(d); return emit({'ok':True,'draft':d.to_dict()})
+        if op=='brief-section':
+            # Cohort 10K: plain-language brief section write. The browser sends
+            # ordinary answers only; the authority resolves every derived field.
+            d=st.get(str(a.get('draft_id','')))
+            if not d: return emit({'ok':False,'error_code':'DRAFT_NOT_FOUND','detail':'draft not found'})
+            d=apply_brief_section(d,section_id=str(a.get('section_id','')),answers=dict(a.get('answers') or {})); st.put(d); return emit({'ok':True,'draft':d.to_dict()})
         if op=='validate':
             d=st.get(str(a.get('draft_id','')))
             if not d: return emit({'ok':False,'error_code':'DRAFT_NOT_FOUND','detail':'draft not found'})

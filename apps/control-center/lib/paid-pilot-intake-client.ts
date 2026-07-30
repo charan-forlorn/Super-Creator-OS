@@ -11,3 +11,8 @@ export const getIntakeDraft=(draftId:string)=>post("get",{draft_id:draftId});
 export const createPilotFromDraft=(draftId:string,idempotencyKey:string)=>post("create",{draft_id:draftId,idempotency_key:idempotencyKey});
 
 export const refreshAssetInventory=(draftId:string)=>post("sample-asset",{draft_id:draftId});
+
+// Cohort 10K — plain-language Brief Studio. Reuses this reviewed same-origin
+// transport; the browser never becomes an authoritative writer.
+export const saveBriefSection=(draftId:string, sectionId:string, answers:Record<string,string>)=>post("brief-section",{draft_id:draftId,section_id:sectionId,answers});
+export const updateIntakeDraft=(draftId:string, updates:Record<string,unknown>)=>post("update",{draft_id:draftId,updates});

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useLocale } from "@/lib/i18n";
 import { OrbitMascot } from "@/components/cockpit/orbit-mascot";
 import { CockpitShell } from "@/components/cockpit/cockpit-shell";
@@ -246,6 +247,15 @@ function CockpitSurface() {
 
         <section className="cockpit-panel">
           <SoloProjectPreparationPanel />
+        </section>
+
+        <section className="cockpit-panel brief-entry-panel">
+          <p className="action-kicker">สร้างบรีฟงานใหม่</p>
+          <h2 className="brief-entry-panel__title">เล่าให้เราฟังว่าคุณต้องการสร้างอะไร</h2>
+          <p className="brief-entry-panel__lead">ตอบคำถามง่าย ๆ เป็นภาษาปกติ ไม่ต้องใช้คำสั่ง ไม่ต้องกรอกข้อมูลทางเทคนิค</p>
+          <Link className="brief-entry-panel__cta" href="/brief-studio">
+            เริ่มทำบรีฟใหม่
+          </Link>
         </section>
 
         <section className="cockpit-panel">
