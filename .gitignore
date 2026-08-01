@@ -88,3 +88,5 @@ apps/control-center/public/
 # Local runtime store / integrity markers (per-run, not source).
 apps/control-center/memory/
 memory/runtime/
+/tmp-never/frontend-python-shim/
+/apps/control-center/tests/rt-bridge-fixture/
