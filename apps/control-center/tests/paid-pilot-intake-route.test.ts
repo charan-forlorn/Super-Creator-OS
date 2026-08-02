@@ -1,13 +1,28 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeAll, afterAll } from "vitest";
 import type { NextRequest } from "next/server";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 
-// Canonical repository interpreter used for the real-spawn regression test.
-// Computed relative to the project root so the test file contains no
-// machine-specific absolute path (keeps the security scanner clean).
-// cwd = <worktree>/apps/control-center -> ../../../super-creator-os/.venv/...
-const SUPER_VENV = path.resolve(process.cwd(), "..", "..", "..", "super-creator-os", ".venv", "Scripts", "python.exe");
+function resolveInterpreterForTest(): string {
+  const explicit = process.env.SCOS_PYTHON_INTERPRETER;
+  if (explicit && fs.existsSync(explicit)) return explicit;
+  let candidate = process.cwd();
+  for (let i = 0; i < 5; i++) {
+    for (const rel of [["Scripts", "python.exe"], ["bin", "python"]]) {
+      const p = path.resolve(candidate, ".venv", ...(rel as [string, string]));
+      if (fs.existsSync(p)) return p;
+    }
+    candidate = path.dirname(candidate);
+  }
+  // Last resort: a python3 shim on PATH (materialised by the canonical verifier).
+  for (const entry of (process.env.PATH ?? "").split(path.delimiter)) {
+    if (!entry) continue;
+    const p = path.join(entry, process.platform === "win32" ? "python3.exe" : "python3");
+    if (fs.existsSync(p)) return p;
+  }
+  return "";
+}
 
 function mockInvoke() {
   return vi.fn(async (op: string, payload: Record<string, unknown>) => {
@@ -61,18 +76,22 @@ function mockInvoke() {
 }
 
 describe("paid-pilot guided intake route", () => {
-  it("delegates to Python authority and redacts route errors", async () => {
+  it("delegates to Python authority and redacts route errors, sends no filesystem path", async () => {
     vi.doMock("@/lib/paid-pilot-intake-bridge", () => ({ invokeIntake: mockInvoke() }));
     const { POST } = await import("@/app/api/paid-pilot/intake/route");
+    const raw = JSON.stringify({ operation: "draft", safe_project_title: "Synthetic", store_path: "C:/Workspace/scos-paid-pilot-evidence/x.json", runtime_base: "C:/Workspace/scos-paid-pilot/y", evidence_base: "C:/Workspace/scos-paid-pilot/z" });
     const req = new Request("http://local/api/paid-pilot/intake", {
       method: "POST",
-      body: JSON.stringify({ operation: "draft", safe_project_title: "Synthetic" }),
+      body: raw,
     });
     const res = await POST(req as unknown as NextRequest);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
-    expect(JSON.stringify(body)).not.toMatch(/C:\\|stderr|Traceback|SCOS_PYTHON_INTERPRETER/);
+    // The stripped path fields must never reach the response or be echoed.
+    expect(raw).toContain("store_path");
+    expect(JSON.stringify(body)).not.toMatch(/C:\\\\|C:\/|scos-paid-pilot|store_path|runtime_base|evidence_base|SCOS_PILOT_/);
+    expect(JSON.stringify(body)).not.toMatch(/stderr|Traceback|SCOS_PYTHON_INTERPRETER/);
   });
 
   it("rejects unknown operations", async () => {
@@ -130,7 +149,52 @@ describe("paid-pilot guided intake route", () => {
 });
 
 describe("guided intake bridge real spawn", () => {
-  const tmp = path.join(__dirname, "rt-bridge-fixture");
+  // R2.1: task-owned roots come from the server process environment only.
+  // A fresh OS-temp directory owns all state — never a repo-local path and
+  // never the operator/CI shared root.
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "scos-pp-route-"));
+
+  const MANAGED_KEYS = [
+    "SCOS_PYTHON_INTERPRETER",
+    "SCOS_PILOT_INTAKE_STORE", "SCOS_PILOT_PACKET_ADMISSION_STORE", "SCOS_PILOT_AUDIT_STORE",
+    "SCOS_PILOT_AUTHORIZATION_STORE", "SCOS_PILOT_MATERIALIZATION_STATE", "SCOS_PILOT_HVS_PROJECTS_ROOT",
+    "SCOS_PILOT_RENDER_READINESS_STATE", "SCOS_PILOT_OUTPUT_ROOT", "SCOS_PILOT_APPROVED_INPUT_ROOT",
+    "SCOS_PILOT_INTAKE_RUNTIME_BASE", "SCOS_PILOT_INTAKE_EVIDENCE_BASE",
+  ] as const;
+
+  function setRoots() {
+    for (const key of MANAGED_KEYS) ORIGINAL_ENV[key] = process.env[key];
+    process.env.SCOS_PILOT_INTAKE_STORE = path.join(tmp, "intake-store.json");
+    process.env.SCOS_PILOT_PACKET_ADMISSION_STORE = path.join(tmp, "adm.json");
+    process.env.SCOS_PILOT_AUDIT_STORE = path.join(tmp, "audit.jsonl");
+    process.env.SCOS_PILOT_AUTHORIZATION_STORE = path.join(tmp, "auth.json");
+    process.env.SCOS_PILOT_MATERIALIZATION_STATE = path.join(tmp, "mat.json");
+    process.env.SCOS_PILOT_HVS_PROJECTS_ROOT = path.join(tmp, "hvs-projects");
+    process.env.SCOS_PILOT_RENDER_READINESS_STATE = path.join(tmp, "rr.json");
+    process.env.SCOS_PILOT_OUTPUT_ROOT = path.join(tmp, "output");
+    process.env.SCOS_PILOT_APPROVED_INPUT_ROOT = path.join(tmp, "approved-input");
+    process.env.SCOS_PILOT_INTAKE_RUNTIME_BASE = path.join(tmp, "runtime");
+    process.env.SCOS_PILOT_INTAKE_EVIDENCE_BASE = path.join(tmp, "evidence");
+  }
+
+  const ORIGINAL_ENV: Record<string, string | undefined> = {};
+
+  function restoreRoots() {
+    for (const key of MANAGED_KEYS) {
+      const original = ORIGINAL_ENV[key];
+      if (original === undefined) delete process.env[key];
+      else process.env[key] = original;
+    }
+  }
+
+  beforeAll(() => {
+    setRoots();
+  });
+
+  afterAll(() => {
+    restoreRoots();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
 
   it("fails closed when the configured interpreter is missing", async () => {
     vi.doUnmock("@/lib/paid-pilot-intake-bridge");
@@ -152,7 +216,7 @@ describe("guided intake bridge real spawn", () => {
     vi.doUnmock("@/lib/paid-pilot-intake-bridge");
     vi.resetModules();
     const prev = process.env.SCOS_PYTHON_INTERPRETER;
-    process.env.SCOS_PYTHON_INTERPRETER = SUPER_VENV;
+    process.env.SCOS_PYTHON_INTERPRETER = resolveInterpreterForTest();
     try {
       const mod = await import("@/lib/paid-pilot-intake-bridge");
       const res = await mod.invokeIntake("draft", {
@@ -162,8 +226,6 @@ describe("guided intake bridge real spawn", () => {
         commercial_reference: "bridge-test",
         rights_answers: { asset_owner: "Owned", identifiable_person: "No", voice_used: "Not used", music_used: "Not used", font_policy: "Licensed" },
         privacy_answers: { health_data: "No", financial_data: "No", government_identifiers: "No", child_information: "No" },
-        evidence_base: tmp,
-        runtime_base: tmp,
       });
       expect(res.ok).toBe(true);
       expect(res.draft?.draft_id).toBeTruthy();

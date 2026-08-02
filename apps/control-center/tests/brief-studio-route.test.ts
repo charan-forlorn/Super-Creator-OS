@@ -70,7 +70,14 @@ let RUNTIME_ROOT = "";
 let STORE_PATH = "";
 
 const ORIGINAL_ENV: Record<string, string | undefined> = {};
-const MANAGED_KEYS = ["SCOS_REPO_ROOT", "SCOS_PYTHON_INTERPRETER", "PYTHONPATH"] as const;
+const MANAGED_KEYS = [
+  "SCOS_REPO_ROOT", "SCOS_PYTHON_INTERPRETER", "PYTHONPATH",
+  // R2.1 task-owned roots (server-controlled; never from request body).
+  "SCOS_PILOT_INTAKE_STORE", "SCOS_PILOT_PACKET_ADMISSION_STORE", "SCOS_PILOT_AUDIT_STORE",
+  "SCOS_PILOT_AUTHORIZATION_STORE", "SCOS_PILOT_MATERIALIZATION_STATE", "SCOS_PILOT_HVS_PROJECTS_ROOT",
+  "SCOS_PILOT_RENDER_READINESS_STATE", "SCOS_PILOT_OUTPUT_ROOT", "SCOS_PILOT_APPROVED_INPUT_ROOT",
+  "SCOS_PILOT_INTAKE_RUNTIME_BASE", "SCOS_PILOT_INTAKE_EVIDENCE_BASE",
+] as const;
 
 function makeReq(body: unknown): NextRequest {
   return new NextRequest("http://localhost/api/paid-pilot/intake", {
@@ -94,6 +101,19 @@ beforeAll(() => {
   process.env.SCOS_REPO_ROOT = REPO_ROOT;
   process.env.SCOS_PYTHON_INTERPRETER = interpreter;
   process.env.PYTHONPATH = REPO_ROOT;
+  // R2.1: task-owned roots are resolved server-side from environment. The route
+  // strips any path field from the request body; the CLI resolves these roots.
+  process.env.SCOS_PILOT_INTAKE_STORE = STORE_PATH;
+  process.env.SCOS_PILOT_PACKET_ADMISSION_STORE = join(RUNTIME_ROOT, "adm.json");
+  process.env.SCOS_PILOT_AUDIT_STORE = join(RUNTIME_ROOT, "audit.jsonl");
+  process.env.SCOS_PILOT_AUTHORIZATION_STORE = join(RUNTIME_ROOT, "auth.json");
+  process.env.SCOS_PILOT_MATERIALIZATION_STATE = join(RUNTIME_ROOT, "mat.json");
+  process.env.SCOS_PILOT_HVS_PROJECTS_ROOT = join(RUNTIME_ROOT, "hvs-projects");
+  process.env.SCOS_PILOT_RENDER_READINESS_STATE = join(RUNTIME_ROOT, "rr.json");
+  process.env.SCOS_PILOT_OUTPUT_ROOT = join(RUNTIME_ROOT, "output");
+  process.env.SCOS_PILOT_APPROVED_INPUT_ROOT = join(RUNTIME_ROOT, "approved-input");
+  process.env.SCOS_PILOT_INTAKE_RUNTIME_BASE = join(RUNTIME_ROOT, "runtime");
+  process.env.SCOS_PILOT_INTAKE_EVIDENCE_BASE = join(RUNTIME_ROOT, "evidence");
 });
 
 afterAll(() => {
@@ -132,7 +152,7 @@ describe("POST /api/paid-pilot/intake — brief-section", () => {
   });
 
   it("runs a real child process for a valid brief-section write and returns the authoritative projection", async () => {
-    const create = await POST(makeReq({ operation: "draft", store_path: STORE_PATH, evidence_base: RUNTIME_ROOT, runtime_base: RUNTIME_ROOT, safe_project_title: "Synthetic Brief", deadline: "2026-08-15", rights_answers: { asset_owner: "Owned", identifiable_person: "No", voice_used: "Not used", music_used: "Not used", font_policy: "Licensed" }, privacy_answers: { health_data: "No", financial_data: "No", government_identifiers: "No", child_information: "No" } }));
+    const create = await POST(makeReq({ operation: "draft", safe_project_title: "Synthetic Brief", deadline: "2026-08-15", rights_answers: { asset_owner: "Owned", identifiable_person: "No", voice_used: "Not used", music_used: "Not used", font_policy: "Licensed" }, privacy_answers: { health_data: "No", financial_data: "No", government_identifiers: "No", child_information: "No" } }));
     expect(create.status).toBe(200);
     const cj = await create.json();
     const did = cj.draft.draft_id;
@@ -140,7 +160,7 @@ describe("POST /api/paid-pilot/intake — brief-section", () => {
     // The store was written by the real child process, outside the repository.
     expect(existsSync(STORE_PATH)).toBe(true);
 
-    const res = await POST(makeReq({ operation: "brief-section", draft_id: did, section_id: "goal", answers: { goal: "วิดีโอให้ความรู้" }, store_path: STORE_PATH, evidence_base: RUNTIME_ROOT, runtime_base: RUNTIME_ROOT }));
+    const res = await POST(makeReq({ operation: "brief-section", draft_id: did, section_id: "goal", answers: { goal: "วิดีโอให้ความรู้" } }));
     expect(res.status).toBe(200);
     const j = await res.json();
     expect(j.ok).toBe(true);
@@ -152,7 +172,7 @@ describe("POST /api/paid-pilot/intake — brief-section", () => {
     const saved = process.env.SCOS_PYTHON_INTERPRETER;
     process.env.SCOS_PYTHON_INTERPRETER = join(RUNTIME_ROOT, "does-not-exist-python.exe");
     try {
-      const res = await POST(makeReq({ operation: "brief-section", draft_id: "x", section_id: "goal", answers: {}, store_path: STORE_PATH }));
+      const res = await POST(makeReq({ operation: "brief-section", draft_id: "x", section_id: "goal", answers: {} }));
       // A genuine bridge failure must stay a 409 — never a false 200 success.
       expect(res.status).toBe(409);
       const j = await res.json();
@@ -166,7 +186,7 @@ describe("POST /api/paid-pilot/intake — brief-section", () => {
   });
 
   it("keeps a genuine authority rejection at 409 without leaking internals", async () => {
-    const res = await POST(makeReq({ operation: "brief-section", draft_id: "missing-draft-id", section_id: "goal", answers: { goal: "x" }, store_path: STORE_PATH }));
+    const res = await POST(makeReq({ operation: "brief-section", draft_id: "missing-draft-id", section_id: "goal", answers: { goal: "x" } }));
     expect(res.status).toBe(409);
     const j = await res.json();
     expect(j.ok).toBe(false);
@@ -179,5 +199,39 @@ describe("POST /api/paid-pilot/intake — brief-section", () => {
     expect(res.status).toBe(413);
     const j = await res.json();
     expect(j.error_code).toBe("REQUEST_TOO_LARGE");
+  });
+
+  it("sends no filesystem path field in the request body", async () => {
+    const body = {
+      operation: "draft",
+      safe_project_title: "Synthetic Brief",
+      rights_answers: { asset_owner: "Owned", identifiable_person: "No", voice_used: "Not used", music_used: "Not used", font_policy: "Licensed" },
+      privacy_answers: { health_data: "No", financial_data: "No", government_identifiers: "No", child_information: "No" },
+    };
+    const forbidden = ["store_path", "runtime_base", "evidence_base", "approved_input_root", "admission_store", "identity_store", "materialization_store", "readiness_store", "projects_root", "output_root", "contracts_root", "file_path", "directory_path"];
+    for (const key of forbidden) expect((body as Record<string, unknown>)[key]).toBeUndefined();
+    const req = makeReq(body);
+    const raw = await req.text();
+    for (const key of forbidden) expect(raw).not.toContain(key);
+  });
+
+  it("ignores client-supplied filesystem path fields and returns a path-free response", async () => {
+    // A client attempting to inject a shared-operator store path via the
+    // request body must have it stripped; roots resolve server-side only.
+    const res = await POST(makeReq({
+      operation: "draft",
+      store_path: "C:/Workspace/scos-paid-pilot-evidence/_guided-intake-store-v1.json",
+      safe_project_title: "Synthetic Brief",
+      rights_answers: { asset_owner: "Owned", identifiable_person: "No", voice_used: "Not used", music_used: "Not used", font_policy: "Licensed" },
+      privacy_answers: { health_data: "No", financial_data: "No", government_identifiers: "No", child_information: "No" },
+    }));
+    expect(res.status).toBe(200);
+    const j = await res.json();
+    const serialized = JSON.stringify(j);
+    expect(serialized).not.toMatch(/C:\\\\|C:\/|scos-paid-pilot|SCOS_PILOT_/);
+    expect(serialized).not.toMatch(/Traceback|stderr|stack/i);
+    // The injected shared-operator path string must not be echoed back.
+    expect(serialized).not.toContain("scos-paid-pilot-evidence");
+    expect(j.draft.draft_id).toBeTruthy();
   });
 });

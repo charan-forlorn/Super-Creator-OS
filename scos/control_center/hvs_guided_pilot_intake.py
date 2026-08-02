@@ -69,7 +69,14 @@ def inside_git(p:Path):
 def draft_id(title,ref=''): return 'draft-'+sha('|'.join(['draft',title.strip(),ref.strip()]))[:16]
 def pilot_id(d): return 'pilot-'+slug(d.safe_project_title)+'-'+sha('|'.join([d.draft_id,d.safe_project_title,d.deadline,d.commercial_reference]))[:12]
 def project_id(d): return 'project-'+sha('|'.join([d.draft_id,d.safe_project_title,d.selected_template,d.output_profile]))[:16]
-def roots(pid, runtime_base='C:/Workspace/scos-paid-pilot', evidence_base='C:/Workspace/scos-paid-pilot-evidence'):
+def roots(pid, runtime_base, evidence_base):
+    # R2.1C: runtime_base/evidence_base are REQUIRED. The historical hard-coded
+    # defaults ('C:/Workspace/scos-paid-pilot[-evidence]') were a reachable
+    # shared-root fallback: any caller that omitted them silently resolved onto
+    # the shared operator roots. There is now exactly one root authority
+    # (hvs_pilot_roots.resolve_task_owned_roots) and no in-service default.
+    if not str(runtime_base or '').strip() or not str(evidence_base or '').strip():
+        raise ValueError('TASK_OWNED_ROOTS_REQUIRED')
     if not re.match(r'^[a-z0-9][a-z0-9_-]{1,95}$',pid): raise ValueError('UNSAFE_PILOT_ID')
     rb=Path(runtime_base).resolve(); eb=Path(evidence_base).resolve()
     out={'runtime_root':rb/pid/'runtime','input_root':rb/pid/'input','hvs_projects_root':rb/pid/'hvs-projects','output_root':rb/pid/'output','downloads_root':rb/pid/'downloads','backup_root':rb/pid/'backup','restore_root':rb/pid/'restore','evidence_root':eb/pid}
@@ -81,8 +88,51 @@ def roots(pid, runtime_base='C:/Workspace/scos-paid-pilot', evidence_base='C:/Wo
         for b in vals[i+1:]:
             if relto(a,b) or relto(b,a): raise ValueError('OVERLAPPING_ROOTS_REJECTED')
     return {k:str(v) for k,v in out.items()}
-def generated_roots(pilot_safe_id, runtime_base='C:/Workspace/scos-paid-pilot', evidence_base='C:/Workspace/scos-paid-pilot-evidence'):
+def generated_roots(pilot_safe_id, runtime_base, evidence_base):
     return roots(pilot_safe_id, runtime_base, evidence_base)
+
+# --- R2.1C browser-boundary redaction (service-owned, single authority) ------
+# The authoritative service - not the CLI and not the route - decides what may
+# cross the browser boundary. Filesystem roots are trusted SERVER-side execution
+# state: they remain in the stored draft and in the on-disk admission packet so
+# server-side processing and R2.2 semantics are unchanged, but they are never
+# projected to the browser.
+BROWSER_REDACTED_GENERATED_KEYS = ('roots',)
+_ABS_PATH_RE = re.compile(r'^(?:[A-Za-z]:[\\/]|\\\\|/[^/\s])')
+REDACTED_SERVER_PATH = 'REDACTED_SERVER_PATH'
+
+def _is_abs_path_str(v):
+    return isinstance(v, str) and bool(_ABS_PATH_RE.match(v))
+
+def _redact_paths(obj):
+    """Defense in depth: replace any absolute path anywhere in a browser payload."""
+    if isinstance(obj, dict): return {k: _redact_paths(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)): return [_redact_paths(v) for v in obj]
+    return REDACTED_SERVER_PATH if _is_abs_path_str(obj) else obj
+
+def browser_safe_generated(gen):
+    """Strip server root identity from the 'generated' projection.
+
+    Root identity is replaced by a bounded, non-path status so the browser can
+    still tell that isolated task-owned storage was provisioned.
+    """
+    src = dict(gen or {})
+    out = {k: v for k, v in src.items() if k not in BROWSER_REDACTED_GENERATED_KEYS}
+    if src.get('roots'):
+        out['runtime_isolation'] = {'status': 'SERVER_MANAGED', 'root_count': len(src['roots'])}
+    return _redact_paths(out)
+
+def browser_safe_draft(d):
+    """Browser-facing projection of an authoritative draft. Never contains paths."""
+    data = d.to_dict() if hasattr(d, 'to_dict') else dict(d or {})
+    data['generated'] = browser_safe_generated(data.get('generated'))
+    return _redact_paths(data)
+
+def browser_safe_response(res):
+    """Browser-facing projection of a service response envelope."""
+    out = dict(res or {})
+    if isinstance(out.get('draft'), dict): out['draft'] = browser_safe_draft(out['draft'])
+    return _redact_paths(out)
 
 @dataclass(frozen=True)
 class Finding:
@@ -207,8 +257,14 @@ def validate_draft(d):
     if dc=='PROHIBITED': fs.append(find('derived_classification','Derived classification is PROHIBITED.','Remove prohibited material or stop this intake.','SCOS does not admit prohibited paid-pilot data.','No admission packet, render, or delivery will be created.'))
     if any(a.status!='Ready' for a in d.asset_references): fs.append(find('asset_inventory','One or more assets are not ready.','Remove unsupported or damaged assets.'))
     status=READY_TO_CREATE if not fs else (BLOCKED if any(f.field=='derived_classification' for f in fs) else NEEDS_INPUT)
-    pid=pilot_id(d) if d.safe_project_title else ''; prid=project_id(d) if d.safe_project_title else ''; gen=dict(d.generated)
-    if pid: gen.update({'pilot_safe_id':pid,'project_safe_id':prid,'roots':roots(pid)})
+    pid=pilot_id(d) if d.safe_project_title else ''; prid=project_id(d) if d.safe_project_title else ''
+    gen=dict(d.generated)
+    # R2.1C: roots are NEVER derived here. validate_draft is reachable from the
+    # browser-facing draft/asset/consent/validate operations; calling the root
+    # authority with defaults previously leaked the shared operator roots into
+    # the response. Roots are set exactly once, by create_pilot, from the
+    # server-owned task-root contract, and are only preserved here if present.
+    if pid: gen.update({'pilot_safe_id':pid,'project_safe_id':prid})
     nd=GuidedIntakeDraft.from_dict({**d.to_dict(),'status':status,'derived_classification':dc,'validation_findings':[f.to_dict() for f in fs],'generated':gen,'pilot_safe_id':pid,'project_safe_id':prid})
     if nd.brief_mode: gen=dict(gen); gen['brief']=brief_projection(nd,fs); nd=GuidedIntakeDraft.from_dict({**nd.to_dict(),'generated':gen})
     return nd
@@ -224,7 +280,8 @@ class GuidedIntakeStore:
     def get(self,did):
         d=self.read().get('drafts',{}).get(did); return GuidedIntakeDraft.from_dict(d) if d else None
 def packet(d): return {'schema_version':SCHEMA_VERSION,'pilot_safe_id':d.pilot_safe_id,'project_safe_id':d.project_safe_id,'project':{'title':d.safe_project_title,'template':d.selected_template,'target_platform':d.target_platform,'output_profile':d.output_profile,'duration':d.duration,'deadline':d.deadline,'commercial_reference':d.commercial_reference},'assets':[a.to_dict() for a in d.asset_references],'consent':{'state':d.consent_state,'evidence_reference':d.consent_evidence_reference,'evidence_sha256':d.consent_evidence_sha256,'explicit_confirmed':d.explicit_consent_confirmed},'rights_answers':d.rights_answers,'privacy_answers':d.privacy_answers,'derived_classification':d.derived_classification,'retention_policy':d.retention_policy,'external_action_restrictions':d.external_action_restrictions,'runtime_isolation_plan':d.generated.get('roots',{}),'automation_allowed':False}
-def create_pilot(store, *, draft_id, idempotency_key, runtime_base='C:/Workspace/scos-paid-pilot', evidence_base='C:/Workspace/scos-paid-pilot-evidence', recorded_at=None):
+def create_pilot(store, *, draft_id, idempotency_key, runtime_base, evidence_base, recorded_at=None):
+    # R2.1C: runtime_base/evidence_base are REQUIRED (no shared-root default).
     d=store.get(draft_id)
     if not d: return {'ok':False,'error_code':'DRAFT_NOT_FOUND','detail':'draft not found'}
     d=validate_draft(d)
