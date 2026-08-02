@@ -422,6 +422,20 @@ def test_no_forbidden_runtime_source_markers_and_no_frontend_route_files() -> No
         # POST-only route with strict operation allow-list, no generic proxy,
         # no browser-selected executable/cwd/root, and browser-safe error envelope.
         Path("apps/control-center/app/api/paid-pilot/intake/route.ts"),
+        # R2.1 — reviewed same-origin packet-admission authority transport.
+        # POST-only boundary; browser submits ONLY {operation, expected_sha256}
+        # (no filesystem path); packet path + task-owned roots resolved server-
+        # side. Produces a browser-safe projection. No external egress, no render.
+        Path("apps/control-center/app/api/paid-pilot/admission/route.ts"),
+        # R2.1 — reviewed same-origin pre-render readiness authority transport.
+        # POST-only read-only boundary; browser submits only external_project_ref;
+        # server resolves canonical id + task-owned roots. No render authorization
+        # / renderer invocation.
+        Path("apps/control-center/app/api/paid-pilot/render-readiness/route.ts"),
+        # R2.2 — reviewed same-origin canonical project creation transport.
+        # POST-only; browser submits ONLY {operation, idempotency_key}; all
+        # roots + packet path resolved server-side. No render / external egress.
+        Path("apps/control-center/app/api/paid-pilot/create/route.ts"),
     }
     route_files = [
         p

@@ -3,6 +3,9 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { PaidPilotIntakeWizard } from "@/components/paid-pilot-intake-wizard";
 import * as client from "@/lib/paid-pilot-intake-client";
+import * as admissionClient from "@/lib/paid-pilot-admission-client";
+import * as createClient from "@/lib/paid-pilot-create-client";
+import * as readinessClient from "@/lib/paid-pilot-render-readiness-client";
 import type { GuidedIntakeDraft, IntakeStatus } from "@/lib/paid-pilot-intake-types";
 
 type DraftExtra = Partial<GuidedIntakeDraft>;
@@ -85,80 +88,101 @@ describe("PaidPilotIntakeWizard", () => {
     expect(screen.getByRole("button", { name: /Quick Setup/i }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("button", { name: /Advanced Setup/i }).getAttribute("aria-expanded")).toBe("false");
     expect(document.body.textContent).not.toMatch(/YAML|JSON schema|SHA-256.*input/i);
-    expect(screen.getByText(/Customer notification/i)).toBeTruthy();
-    expect(screen.getAllByText(/NOT AUTHORIZED|Not authorized/i).length).toBeGreaterThan(0);
+    // External-action restrictions are locked (not authorized) and surfaced truthfully.
+    expect(screen.getByTestId("external-action-restrictions").textContent).toMatch(/not authorized/i);
   });
 
-  it("blocks create while missing consent, then creates after authoritative READY_TO_CREATE", async () => {
+  it("disables Create until authoritative PACKET_ADMISSION = PASS (not READY_TO_CREATE alone), then creates canonical spp-* project", async () => {
     vi.spyOn(client, "getIntakeDraft").mockResolvedValue({ ok: false, error_code: "DRAFT_NOT_FOUND", detail: null, draft: null });
     vi.spyOn(client, "createIntakeDraft").mockResolvedValue({ ok: true, error_code: null, detail: null, draft: draft() });
-    vi.spyOn(client, "refreshAssetInventory").mockResolvedValue({
-      ok: true,
-      error_code: null,
-      detail: null,
-      draft: draft("NEEDS_INPUT", {
-        asset_references: [
-          {
-            asset_id: "a",
-            safe_name: "x.png",
-            sha256: "a".repeat(64),
-            size_bytes: 2,
-            status: "Ready",
-            rights_required: true,
-            safe_reference: "x.png",
-          },
+    vi.spyOn(admissionClient, "admitRealPacket").mockResolvedValue({
+      ok: true, error_code: null, detail: null, gates: [], assets: [],
+      projection: {
+        packet_sha256: "c4784164…", pilot_id: "PILOT-2026-001", customer_ref: "CUST-A1",
+        project_ref: "PILOT-2026-001-PROJ-01", asset_count: 3,
+        assets: [
+          { safe_name: "product-front.jpg" }, { safe_name: "customer-logo.png" }, { safe_name: "promo-music-31s.mp3" },
         ],
-      }),
+        external_action_restrictions: { publishing: "NOT_AUTHORIZED" }, font_policy: "OPEN_SOURCE_APPROVED",
+      },
     });
-    vi.spyOn(client, "attachConsentEvidence").mockResolvedValue({
-      ok: true,
-      error_code: null,
-      detail: null,
-      draft: draft("READY_TO_CREATE", {
-        validation_findings: [],
-        asset_references: [
-          {
-            asset_id: "a",
-            safe_name: "x.png",
-            sha256: "a".repeat(64),
-            size_bytes: 2,
-            status: "Ready",
-            rights_required: true,
-            safe_reference: "x.png",
-          },
-        ],
-        consent_state: "CONSENT_CONFIRMED",
-        explicit_consent_confirmed: true,
-        consent_evidence_sha256: "b".repeat(64),
-      }),
-    });
-    vi.spyOn(client, "createPilotFromDraft").mockResolvedValue({
-      ok: true,
-      error_code: null,
-      detail: null,
-      pilot_safe_id: "pilot-1",
-      project_safe_id: "project-1",
-      admission_packet_sha256: "c".repeat(64),
-      draft: draft("CREATED", { validation_findings: [], admission_packet_sha256: "c".repeat(64) }),
-    });
+    const createMock = vi.spyOn(createClient, "createCanonicalProject");
+    createMock
+      .mockResolvedValueOnce({ ok: true, error_code: null, detail: null, canonical_internal_project_id: "spp-3f9a1c2d4e5b", pilot_safe_id: null, project_safe_id: null, external_project_ref: null, admission_packet_sha256: null, replay: false, materialization: { dimensions: "1080x1920" }, next_safe_action: null })
+      .mockResolvedValueOnce({ ok: true, error_code: null, detail: null, canonical_internal_project_id: "spp-3f9a1c2d4e5b", pilot_safe_id: null, project_safe_id: null, external_project_ref: null, admission_packet_sha256: null, replay: true, materialization: { dimensions: "1080x1920" }, next_safe_action: null });
 
     render(<PaidPilotIntakeWizard />);
     await click(/Create guided draft/i);
-    await waitFor(() => expect(screen.getByText(/Consent evidence is missing/i)).toBeTruthy());
-    expect(screen.getByRole("button", { name: /Create Pilot/i })).toBeDisabled();
+    // Before admission, Create is disabled even though the draft exists.
+    expect(screen.getByTestId("create-pilot")).toBeDisabled();
 
-    await click(/Refresh asset inventory/i);
-    await click(/Generate consent message/i);
-    await act(async () => {
-      fireEvent.click(screen.getByRole("checkbox", { name: /Confirm explicit consent/i }));
+    // READY_TO_CREATE alone must NOT enable Create: attach consent to reach
+    // READY_TO_CREATE, then assert Create remains disabled without admission.
+    vi.spyOn(client, "attachConsentEvidence").mockResolvedValue({
+      ok: true, error_code: null, detail: null,
+      draft: draft("READY_TO_CREATE", { validation_findings: [], consent_state: "CONSENT_CONFIRMED", explicit_consent_confirmed: true }),
     });
-    await click(/Attach redacted consent evidence/i);
-    await waitFor(() => expect(screen.getByRole("button", { name: /Create Pilot/i })).not.toBeDisabled());
+    await click(/Generate consent message/i);
+    await act(async () => { fireEvent.click(screen.getByRole("checkbox", { name: /Confirm explicit consent/i })); });
+    await click(/Attach consent evidence/i);
+    await waitFor(() => expect(screen.getByText(/Create disabled until PACKET_ADMISSION/i)).toBeTruthy());
+    expect(screen.getByTestId("create-pilot")).toBeDisabled();
+    expect(createMock).not.toHaveBeenCalled();
 
+    // Successful authoritative admission enables Create.
+    await click(/Admit authorization packet/i);
+    await waitFor(() => expect(screen.getByTestId("admission-projection").textContent).toMatch(/PILOT-2026-001-PROJ-01/));
+    expect(screen.getByTestId("create-pilot")).not.toBeDisabled();
+
+    // Create action calls the canonical-create client with a browser-safe payload.
     await click(/Create Pilot/i);
-    await waitFor(() => expect(screen.getByRole("heading", { name: /Pilot created/i })).toBeTruthy());
-    expect(screen.getByText(/Admission packet sealed/i)).toBeTruthy();
-    expect(screen.getAllByText(/Technical evidence/i).length).toBeGreaterThan(0);
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+    const [key] = createMock.mock.calls[0];
+    expect(typeof key).toBe("string");
+    expect(key).not.toMatch(/[\\/]|C:\\\\|packet_path|hvs_projects_root/);
+    const first = await createMock.mock.results[0].value;
+    expect(first.canonical_internal_project_id).toMatch(/^spp-[a-f0-9]{12}$/);
+    expect(screen.getByText(/Canonical project created: spp-3f9a1c2d4e5b/)).toBeTruthy();
+
+    // Exact replay creates no duplicate (no render action anywhere).
+    await click(/Create Pilot/i);
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(2));
+    const second = await createMock.mock.results[1].value;
+    expect(second.replay).toBe(true);
+    expect(JSON.stringify(createMock.mock.calls)).not.toMatch(/packet_path|hvs_projects_root|C:\\\\\\\\/);
+  });
+
+  it("passes the admitted external project_ref to readiness, never the spp-* id (§7.1/§7.2)", async () => {
+    vi.spyOn(client, "getIntakeDraft").mockResolvedValue({ ok: false, error_code: "DRAFT_NOT_FOUND", detail: null, draft: null });
+    vi.spyOn(client, "createIntakeDraft").mockResolvedValue({ ok: true, error_code: null, detail: null, draft: draft() });
+    vi.spyOn(admissionClient, "admitRealPacket").mockResolvedValue({
+      ok: true, error_code: null, detail: null, gates: [], assets: [],
+      projection: {
+        packet_sha256: "c4784164…", pilot_id: "PILOT-2026-001", customer_ref: "CUST-A1",
+        project_ref: "PILOT-2026-001-PROJ-01", asset_count: 3,
+        assets: [{ safe_name: "product-front.jpg" }, { safe_name: "customer-logo.png" }, { safe_name: "promo-music-31s.mp3" }],
+        external_action_restrictions: { publishing: "NOT_AUTHORIZED" }, font_policy: "OPEN_SOURCE_APPROVED",
+      },
+    });
+    vi.spyOn(createClient, "createCanonicalProject").mockResolvedValue({
+      ok: true, error_code: null, detail: null, canonical_internal_project_id: "spp-3f9a1c2d4e5b",
+      pilot_safe_id: null, project_safe_id: null, external_project_ref: null, admission_packet_sha256: null,
+      replay: false, materialization: { dimensions: "1080x1920" }, next_safe_action: null,
+    });
+    const readinessMock = vi.spyOn(readinessClient, "evaluateRenderReadiness");
+    readinessMock.mockResolvedValue({ ok: true, state: "READY_FOR_RENDER", error_code: null, detail: null, checks: [], projection: { schema_version: "scos-hvs.pilot-render-readiness.v1/1.0.0", canonical_internal_project_id: "spp-3f9a1c2d4e5b", external_project_ref: "PILOT-2026-001-PROJ-01", output_profile: "vertical_9_16", dimensions: "1080x1920", duration_seconds: 30, audio_duration_seconds: 30.974943, font_family: "Noto Sans Thai", asset_safe_names: ["product-front.jpg", "customer-logo.png", "promo-music-31s.mp3"], render_action: "DISABLED_PRE_AUTHORIZATION" } });
+
+    render(<PaidPilotIntakeWizard />);
+    await click(/Create guided draft/i);
+    await click(/Admit authorization packet/i);
+    await waitFor(() => expect(screen.getByTestId("admission-projection")).toBeTruthy());
+    await click(/Create Pilot/i);
+    await waitFor(() => expect(screen.getByTestId("created-canonical")).toBeTruthy());
+    await click(/Check render readiness/i);
+    await waitFor(() => expect(readinessMock).toHaveBeenCalledTimes(1));
+    // Must pass the external project_ref, NOT the spp-* canonical id.
+    expect(readinessMock.mock.calls[0][0]).toBe("PILOT-2026-001-PROJ-01");
+    expect(readinessMock.mock.calls[0][0]).not.toMatch(/^spp-/);
   });
 
   it("does not use browser storage and hydrates CREATED state from an authoritative URL draft id", async () => {
@@ -176,7 +200,8 @@ describe("PaidPilotIntakeWizard", () => {
 
     render(<PaidPilotIntakeWizard />);
 
-    await waitFor(() => expect(screen.getByRole("heading", { name: /Pilot created/i })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("heading", { name: /Start New Pilot/i })).toBeTruthy());
+    expect(screen.getByText(/CREATED/)).toBeTruthy();
     expect(client.getIntakeDraft).toHaveBeenCalledWith("draft-1");
     expect(storageRead).not.toHaveBeenCalled();
     expect(storageWrite).not.toHaveBeenCalled();

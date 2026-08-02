@@ -138,6 +138,26 @@ _REVIEWED_ROUTES = {
     # non-authoritative; Python service/CLI remain the writer. Declares
     # runtime=nodejs + dynamic=force-dynamic; no generic proxy or external egress.
     "apps/control-center/app/api/paid-pilot/intake/route.ts",
+    # R2.1 packet-admission authority transport. Reviewed safe: POST-only
+    # boundary that accepts ONLY {operation, expected_sha256} from the browser
+    # (no filesystem path); the packet path + every task-owned root are resolved
+    # server-side from trusted environment. Produces a browser-safe projection
+    # (no absolute paths, no raw evidence, no PII). No mutation of evidence,
+    # no render, no external egress. Declares dynamic=force-dynamic.
+    "apps/control-center/app/api/paid-pilot/admission/route.ts",
+    # R2.1 pre-render readiness authority transport. Reviewed safe: POST-only
+    # read-only boundary; the browser submits only external_project_ref, the
+    # server resolves canonical id + task-owned roots from environment. No
+    # render authorization, no renderer invocation, no external egress.
+    # Declares dynamic=force-dynamic.
+    "apps/control-center/app/api/paid-pilot/render-readiness/route.ts",
+    # R2.2 canonical project creation transport. Reviewed safe: POST-only; the
+    # browser submits only {operation, idempotency_key}; all roots + packet path
+    # resolved server-side from trusted environment. Single writer for the
+    # canonical spp-* project (admission record -> identity -> HVS dir ->
+    # materialization). No render authorization, no renderer invocation, no
+    # external egress. Declares dynamic=force-dynamic.
+    "apps/control-center/app/api/paid-pilot/create/route.ts",
 }
 
 
@@ -275,6 +295,81 @@ def _check_guided_pilot_intake_authority(findings: list[tuple]) -> None:
             if marker in compact or marker in text:
                 findings.append((rel, 0, "guided_intake_forbidden_marker_present", marker))
 
+def _check_r2_pilot_admission_authority(findings: list[tuple]) -> None:
+    """R2.1 packet-admission + render-readiness boundaries must preserve the
+    server-controlled, browser-safe, no-render contract."""
+    required = {
+        "apps/control-center/app/api/paid-pilot/admission/route.ts": (
+            "expected_sha256", "invokeAdmission", "force-dynamic",
+        ),
+        "apps/control-center/lib/paid-pilot-admission-bridge.ts": (
+            "childProcess.spawn", "hvs_pilot_cli", "setTimeout",
+            "child.kill", "invokeAdmission",
+        ),
+        "apps/control-center/app/api/paid-pilot/render-readiness/route.ts": (
+            "external_project_ref", "invokeRenderReadiness", "force-dynamic",
+        ),
+        "apps/control-center/lib/paid-pilot-render-readiness-bridge.ts": (
+            "childProcess.spawn", "hvs_pilot_cli", "setTimeout",
+            "child.kill", "invokeRenderReadiness",
+        ),
+        "apps/control-center/app/api/paid-pilot/create/route.ts": (
+            "idempotency_key", "invokeCreateCanonical", "force-dynamic",
+        ),
+        "apps/control-center/lib/paid-pilot-create-bridge.ts": (
+            "childProcess.spawn", "hvs_pilot_cli", "setTimeout",
+            "child.kill", "invokeCreateCanonical",
+        ),
+        "scos/control_center/hvs_pilot_canonical_create.py": (
+            "def create_canonical_project", "derive_canonical_id", "build_materialization_state",
+        ),
+        "scos/control_center/hvs_pilot_packet_admission.py": (
+            "def admit_packet", "expected_sha256", "PACKET_VALID", "EXTERNAL_ACTION_RESTRICTIONS",
+        ),
+        "scos/control_center/hvs_pilot_render_readiness.py": (
+            "def evaluate_render_readiness", "READY_FOR_RENDER", "NOT_READY", "no render",
+        ),
+    }
+    forbidden = {
+        "apps/control-center/app/api/paid-pilot/admission/route.ts": (
+            "localStorage", "sessionStorage", "stderr", "Traceback",
+        ),
+        "apps/control-center/app/api/paid-pilot/render-readiness/route.ts": (
+            "localStorage", "sessionStorage", "stderr", "Traceback",
+        ),
+        "apps/control-center/lib/paid-pilot-admission-bridge.ts": (
+            "shell:true", "setInterval", "packet_path",
+        ),
+        "apps/control-center/lib/paid-pilot-render-readiness-bridge.ts": (
+            "shell:true", "setInterval",
+        ),
+        "apps/control-center/app/api/paid-pilot/create/route.ts": (
+            "localStorage", "sessionStorage", "stderr", "Traceback",
+        ),
+        "apps/control-center/lib/paid-pilot-create-bridge.ts": (
+            "shell:true", "setInterval", "packet_path",
+        ),
+    }
+    for rel, markers in required.items():
+        path = _ROOT / rel
+        if not path.is_file():
+            findings.append((rel, 0, "r2_pilot_authority_file_missing", rel))
+            continue
+        text = path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                findings.append((rel, 0, "r2_pilot_authority_marker_missing", marker))
+    for rel, markers in forbidden.items():
+        path = _ROOT / rel
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        compact = text.replace(" ", "")
+        for marker in markers:
+            if marker in compact or marker in text:
+                findings.append((rel, 0, "r2_pilot_forbidden_marker_present", marker))
+
+
 def _check_dry_run_preview_only(findings: list[tuple]) -> None:
     """operator-dry-run.ts must keep the preview-only truth markers."""
     path = _FRONTEND_DIR / "lib" / "operator-dry-run.ts"
@@ -320,6 +415,7 @@ def main() -> int:
     _check_no_storage_fabrication(findings)
     _check_no_new_mutation_route(findings)
     _check_guided_pilot_intake_authority(findings)
+    _check_r2_pilot_admission_authority(findings)
     _check_dry_run_preview_only(findings)
     _check_snapshot_unavailable_semantics(findings)
 

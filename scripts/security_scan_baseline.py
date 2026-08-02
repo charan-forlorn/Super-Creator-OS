@@ -315,6 +315,14 @@ _FRONTEND_BRIDGE_TIMEOUT_FILES = frozenset({
     # child-kill for the owned Python CLI process; argv array, no shell, fixed
     # module name, server-controlled cwd/interpreter, bounded stdout, no retry.
     "apps/control-center/lib/paid-pilot-intake-bridge.ts",
+    # R2.1 packet-admission + render-readiness bridges: one-shot bounded
+    # child-kill setTimeout (kills ONLY the owned Python CLI child for
+    # hvs_pilot_cli); argv array, no shell, fixed module name, server-
+    # controlled cwd/interpreter, bounded stdout, no retry. Per-call-site
+    # exemption, same pattern as the Cohort 10J intake bridge above.
+    "apps/control-center/lib/paid-pilot-admission-bridge.ts",
+    "apps/control-center/lib/paid-pilot-render-readiness-bridge.ts",
+    "apps/control-center/lib/paid-pilot-create-bridge.ts",
 })
 
 # Cohort 9A reviewed-safe read-only transport allow-list.
@@ -423,6 +431,28 @@ _FRONTEND_READ_ONLY_TRANSPORT_ALLOWLIST = {
     # same-origin intake route below; no dynamic host, no absolute URL,
     # no storage authority, no polling, no auto-retry.
     "apps/control-center/lib/paid-pilot-intake-client.ts",
+    # R2.1 packet-admission authority transport (server-only bridge + route +
+    # pure-fetch client). Reviewed safe: POST-only boundary; browser submits
+    # ONLY {operation, expected_sha256}; packet path + task-owned roots
+    # resolved server-side. Browser-safe projection only.
+    "apps/control-center/app/api/paid-pilot/admission/route.ts",
+    "apps/control-center/lib/paid-pilot-admission-client.ts",
+    "apps/control-center/lib/paid-pilot-admission-bridge.ts",
+    # R2.1 pre-render readiness authority transport (server-only bridge +
+    # route + pure-fetch client). Reviewed safe: POST-only read-only boundary;
+    # browser submits only external_project_ref; server resolves canonical id
+    # + task-owned roots. No render authorization / renderer invocation.
+    "apps/control-center/app/api/paid-pilot/render-readiness/route.ts",
+    "apps/control-center/lib/paid-pilot-render-readiness-client.ts",
+    "apps/control-center/lib/paid-pilot-render-readiness-bridge.ts",
+    # R2.2 canonical project creation transport (server-only bridge + route +
+    # pure-fetch client). Reviewed safe: POST-only; browser submits ONLY
+    # {operation, idempotency_key}; all roots + packet path resolved
+    # server-side. Single writer for canonical spp-* project. No render
+    # authorization / renderer invocation / external egress.
+    "apps/control-center/app/api/paid-pilot/create/route.ts",
+    "apps/control-center/lib/paid-pilot-create-client.ts",
+    "apps/control-center/lib/paid-pilot-create-bridge.ts",
 }
 
 # Exact reviewed same-origin fetch target(s) permitted for each allow-listed
@@ -470,6 +500,17 @@ _FRONTEND_REVIEWED_FETCH_TARGETS = {
     ),
     "apps/control-center/lib/paid-pilot-intake-client.ts": (
         "/api/paid-pilot/intake",
+    ),
+    # R2.1 pure-fetch clients: each targets exactly one reviewed same-origin
+    # route; no dynamic host, no absolute URL, no storage authority.
+    "apps/control-center/lib/paid-pilot-admission-client.ts": (
+        "/api/paid-pilot/admission",
+    ),
+    "apps/control-center/lib/paid-pilot-render-readiness-client.ts": (
+        "/api/paid-pilot/render-readiness",
+    ),
+    "apps/control-center/lib/paid-pilot-create-client.ts": (
+        "/api/paid-pilot/create",
     ),
 }
 

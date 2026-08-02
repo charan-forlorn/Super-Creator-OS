@@ -10,6 +10,15 @@ export const validateIntakeDraft=(draftId:string)=>post("validate",{draft_id:dra
 export const getIntakeDraft=(draftId:string)=>post("get",{draft_id:draftId});
 export const createPilotFromDraft=(draftId:string,idempotencyKey:string)=>post("create",{draft_id:draftId,idempotency_key:idempotencyKey});
 
+// Real packet-approved asset admission. asset_file is a safe basename resolved
+// server-side under SCOS_PILOT_APPROVED_INPUT_ROOT (never a browser path, B3/B4).
+export const admitRealAsset=(draftId:string, assetFile:string)=>post("asset",{draft_id:draftId,asset_file:assetFile});
+
+// Synthetic fixture is TEST-ONLY and rejected in real-packet mode (B3/B4).
+export const refreshAssetInventoryTestOnly=(draftId:string)=>post("sample-asset",{draft_id:draftId,mode:"test"});
+
+// Compatibility alias retained for the committed Brief Studio consumer
+// (brief-studio.tsx) which calls the same-origin test-mode asset refresh.
 export const refreshAssetInventory=(draftId:string)=>post("sample-asset",{draft_id:draftId});
 
 // Cohort 10K — plain-language Brief Studio. Reuses this reviewed same-origin
