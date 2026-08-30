@@ -90,3 +90,13 @@ apps/control-center/memory/
 memory/runtime/
 /tmp-never/frontend-python-shim/
 /apps/control-center/tests/rt-bridge-fixture/
+
+# WebView2 Fixed Version Runtime (official Microsoft binaries, bundled locally to bypass corrupted system Evergreen registration)
+apps/desktop/src-tauri/Microsoft.WebView2.FixedVersionRuntime.*/
+
+# Build outputs (never commit)
+apps/desktop/dist/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/target/release/
+apps/desktop/src-tauri/target/debug/
+apps/desktop/*.tsbuildinfo

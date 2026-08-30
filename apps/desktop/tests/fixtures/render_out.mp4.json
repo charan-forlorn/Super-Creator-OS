@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "id": "p-e2e",
+  "name": "E2E",
+  "createdAt": "2026-08-30T19:39:17.268Z",
+  "updatedAt": "2026-08-30T19:39:17.268Z",
+  "assets": [
+    {
+      "id": "a1",
+      "name": "sample.mp4",
+      "sourcePath": "C:\\Workspace\\super-creator-os\\apps\\desktop\\tests\\fixtures\\sample.mp4",
+      "kind": "video",
+      "durationSec": 10,
+      "width": 640,
+      "height": 360,
+      "fps": 30,
+      "hasAudio": true,
+      "createdAt": "2026-08-30T19:39:17.268Z"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "tv",
+      "kind": "video",
+      "clips": [
+        {
+          "id": "c1",
+          "assetId": "a1",
+          "inPoint": 1,
+          "duration": 4,
+          "start": 0,
+          "trackId": "tv",
+          "transform": {
+            "scale": 1,
+            "x": 0,
+            "y": 0,
+            "opacity": 1
+          }
+        }
+      ],
+      "captions": []
+    },
+    {
+      "id": "ta",
+      "kind": "audio",
+      "clips": [
+        {
+          "id": "c2",
+          "assetId": "a1",
+          "inPoint": 1,
+          "duration": 4,
+          "start": 0,
+          "trackId": "ta",
+          "transform": {
+            "scale": 1,
+            "x": 0,
+            "y": 0,
+            "opacity": 1
+          }
+        }
+      ],
+      "captions": []
+    }
+  ],
+  "durationSec": 4,
+  "aspectRatio": "1920x1080"
+}

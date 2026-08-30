@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": ".",
+    "paths": {
+      "@haios/project-model": ["../../packages/project-model/src/index.ts"],
+      "@haios/command-system": ["../../packages/command-system/src/index.ts"],
+      "@haios/timeline": ["../../packages/timeline/src/index.ts"],
+      "@haios/ai-core": ["../../packages/ai-core/src/index.ts"],
+      "@haios/ai-providers": ["../../packages/ai-providers/src/index.ts"],
+      "@haios/media-engine": ["../../packages/media-engine/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

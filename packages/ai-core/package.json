@@ -1,0 +1,23 @@
+{
+  "name": "@haios/ai-core",
+  "version": "1.0.0",
+  "description": "HAIOS AI Video Studio — AI edit plan schema, semantic validation, and command compilation",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@haios/project-model": "workspace:*",
+    "@haios/command-system": "workspace:*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

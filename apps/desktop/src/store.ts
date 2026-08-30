@@ -1,0 +1,315 @@
+import { create } from "zustand";
+import {
+  type Project,
+  type Clip,
+  type Caption,
+  type ExportResolution,
+  createEmptyProject,
+  parseProject,
+} from "@haios/project-model";
+import {
+  type CommandRegistry,
+  CommandBus,
+  createStudioRegistry,
+  CommandBusValidationError,
+  CommandError,
+  ADD_CLIP,
+  DELETE_CLIP,
+  MOVE_CLIP,
+  TRIM_CLIP,
+  SPLIT_CLIP,
+  ADD_CAPTION,
+  CHANGE_ASPECT,
+  PLACE_PROBED_MEDIA,
+} from "@haios/command-system";
+import {
+  type AiEditPlan,
+  planToCommands,
+  AiPlanValidationError,
+  AiSemanticError,
+} from "@haios/ai-core";
+import { type AIProvider, OfflineProvider, ProviderUnavailableError } from "@haios/ai-providers";
+import type { MediaProbe } from "./bridge";
+
+let clipCounter = 0;
+let captionCounter = 0;
+function uid(prefix: string): string {
+  clipCounter += 1;
+  return `${prefix}-${Date.now().toString(36)}-${clipCounter}`;
+}
+
+export interface StudioState {
+  project: Project;
+  bus: CommandBus;
+  registry: CommandRegistry;
+  selectedClipId: string | null;
+  playheadSec: number;
+  zoom: number;
+  scrollSec: number;
+  snapInterval: number;
+  provider: AIProvider;
+  thumbnails: Record<string, string>;
+  /** Deterministically-cached preview proxy paths keyed by asset id (ROOT_CAUSE_3). */
+  previewProxies: Record<string, string>;
+  lastError: string | null;
+  dirty: boolean;
+
+  newProject: () => void;
+  loadProject: (raw: unknown) => void;
+  markSaved: () => void;
+
+  /** Atomic import + timeline placement (ROOT_CAUSE_1 fix). Returns the created clip id. */
+  importProbedMedia: (probe: MediaProbe) => string | null;
+  setThumbnail: (assetId: string, url: string) => void;
+  setPreviewProxy: (assetId: string, proxyPath: string) => void;
+
+  selectClip: (id: string | null) => void;
+  setPlayhead: (sec: number) => void;
+  setZoom: (z: number) => void;
+  setScroll: (s: number) => void;
+
+  addClip: (assetId: string, trackId: string, inPoint: number, duration: number, start: number) => void;
+  deleteSelected: () => void;
+  moveSelected: (newStart: number) => void;
+  trimSelected: (newInPoint?: number, newSourceEnd?: number) => void;
+  splitSelected: (t: number) => void;
+  duplicateSelected: () => void;
+  addCaption: (trackId: string, text: string, start: number, duration: number) => void;
+  changeAspect: (ratio: ExportResolution) => void;
+
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+
+  runAiInstruction: (instruction: string) => Promise<AiEditPlan | { error: string }>;
+}
+
+function makeBus(): { bus: CommandBus; registry: CommandRegistry } {
+  const registry = createStudioRegistry();
+  const bus = new CommandBus(registry, createEmptyProject("Untitled", uid("proj")));
+  return { bus, registry };
+}
+
+export const useStudio = create<StudioState>((set, get) => {
+  const initial = makeBus();
+  return {
+    project: initial.bus.project,
+    bus: initial.bus,
+    registry: initial.registry,
+    selectedClipId: null,
+    playheadSec: 0,
+    zoom: 1,
+    scrollSec: 0,
+    snapInterval: 1,
+    provider: new OfflineProvider(),
+    thumbnails: {},
+    previewProxies: {},
+    lastError: null,
+    dirty: false,
+
+    newProject: () => {
+      const { bus, registry } = makeBus();
+      set({ project: bus.project, bus, registry, selectedClipId: null, playheadSec: 0, previewProxies: {}, dirty: false, lastError: null });
+    },
+
+    loadProject: (raw) => {
+      const p = parseProject(raw); // fail-closed on bad schema version
+      const registry = createStudioRegistry();
+      const bus = new CommandBus(registry, p);
+      set({ project: p, bus, registry, selectedClipId: null, playheadSec: 0, previewProxies: {}, dirty: false, lastError: null });
+    },
+
+    markSaved: () => set({ dirty: false }),
+
+    // ROOT_CAUSE_1 FIX — atomic import + placement.
+    // A single CommandBus operation (PLACE_PROBED_MEDIA) adds the asset, ensures
+    // the correct track exists, places the clip, and updates duration. The result
+    // returns the created clipId so we can select it immediately from CURRENT
+    // state. This removes the former race where the UI captured a stale
+    // `project` snapshot before the asset (and its track) existed.
+    importProbedMedia: (probe) => {
+      if (probe.probeStatus !== "ok") {
+        set({ lastError: `probe failed: ${probe.error ?? probe.probeStatus}` });
+        return null;
+      }
+      try {
+        const res = get().bus.execute<{ clipId?: string }>(PLACE_PROBED_MEDIA, {
+          probe: {
+            id: probe.id,
+            name: probe.name,
+            sourcePath: probe.sourcePath,
+            kind: probe.kind,
+            durationSec: probe.durationSec,
+            width: probe.width,
+            height: probe.height,
+            fps: probe.fps,
+            hasAudio: probe.hasAudio,
+            videoCodec: probe.videoCodec,
+            audioCodec: probe.audioCodec,
+            probeStatus: probe.probeStatus,
+          },
+          place: true,
+        });
+        set({ project: get().bus.project, dirty: true, selectedClipId: res.clipId ?? null });
+        return res.clipId ?? null;
+      } catch (e) {
+        set({ lastError: (e as Error).message });
+        return null;
+      }
+    },
+
+    setThumbnail: (assetId, url) =>
+      set((s) => ({ thumbnails: { ...s.thumbnails, [assetId]: url } })),
+
+    // Record a generated H.264/AAC preview proxy for an asset (ROOT_CAUSE_3).
+    // Original source path is never overwritten.
+    setPreviewProxy: (assetId, proxyPath) =>
+      set((s) => ({ previewProxies: { ...s.previewProxies, [assetId]: proxyPath } })),
+
+    selectClip: (id) => set({ selectedClipId: id }),
+    setPlayhead: (sec) => set({ playheadSec: Math.max(0, sec) }),
+    setZoom: (z) => set({ zoom: Math.max(0.1, Math.min(10, z)) }),
+    setScroll: (s) => set({ scrollSec: Math.max(0, s) }),
+
+    addClip: (assetId, trackId, inPoint, duration, start) => {
+      const id = uid("clip");
+      const clip: Clip = { id, assetId, inPoint, duration, start, trackId, transform: { scale: 1, x: 0, y: 0, opacity: 1 } };
+      get().bus.execute(ADD_CLIP, { clip });
+      set({ project: get().bus.project, dirty: true, selectedClipId: id });
+    },
+
+    deleteSelected: () => {
+      const id = get().selectedClipId;
+      if (!id) return;
+      try {
+        get().bus.execute(DELETE_CLIP, { clipId: id });
+        set({ project: get().bus.project, selectedClipId: null, dirty: true });
+      } catch (e) {
+        set({ lastError: (e as Error).message });
+      }
+    },
+
+    moveSelected: (newStart) => {
+      const id = get().selectedClipId;
+      if (!id) return;
+      try {
+        get().bus.execute(MOVE_CLIP, { clipId: id, newStart });
+        set({ project: get().bus.project, dirty: true });
+      } catch (e) {
+        set({ lastError: (e as Error).message });
+      }
+    },
+
+    trimSelected: (newInPoint, newSourceEnd) => {
+      const id = get().selectedClipId;
+      if (!id) return;
+      try {
+        get().bus.execute(TRIM_CLIP, { clipId: id, newInPoint, newSourceEnd });
+        set({ project: get().bus.project, dirty: true });
+      } catch (e) {
+        set({ lastError: (e as Error).message });
+      }
+    },
+
+    splitSelected: (t) => {
+      const id = get().selectedClipId;
+      if (!id) return;
+      try {
+        get().bus.execute(SPLIT_CLIP, { clipId: id, t });
+        set({ project: get().bus.project, dirty: true });
+      } catch (e) {
+        set({ lastError: (e as Error).message });
+      }
+    },
+
+    duplicateSelected: () => {
+      const id = get().selectedClipId;
+      if (!id) return;
+      const clip = get().project.tracks.flatMap((t) => t.clips).find((c) => c.id === id);
+      if (!clip) return;
+      const newId = uid("clip");
+      const copy: Clip = { ...clip, id: newId, start: clip.start + clip.duration, transform: { scale: 1, x: 0, y: 0, opacity: 1 } };
+      try {
+        get().bus.execute(ADD_CLIP, { clip: copy });
+        set({ project: get().bus.project, selectedClipId: newId, dirty: true });
+      } catch (e) {
+        set({ lastError: (e as Error).message });
+      }
+    },
+
+    addCaption: (trackId, text, start, duration) => {
+      captionCounter += 1;
+      const caption: Caption = { id: `cap-${captionCounter}`, text, start, duration, trackId, style: { x: 0.5, y: 0.85, fontSizePx: 48, color: "#FFFFFF", backgroundColor: "#000000", backgroundOpacity: 0.6 } };
+      try {
+        get().bus.execute(ADD_CAPTION, { caption });
+        set({ project: get().bus.project, dirty: true });
+      } catch (e) {
+        set({ lastError: (e as Error).message });
+      }
+    },
+
+    changeAspect: (ratio) => {
+      try {
+        get().bus.execute(CHANGE_ASPECT, { ratio });
+        set({ project: get().bus.project, dirty: true });
+      } catch (e) {
+        set({ lastError: (e as Error).message });
+      }
+    },
+
+    undo: () => {
+      if (get().bus.canUndo) {
+        get().bus.undo();
+        const id = get().selectedClipId;
+        const stillThere = id && get().project.tracks.some((t) => t.clips.some((c) => c.id === id));
+        set({ project: get().bus.project, dirty: true, selectedClipId: stillThere ? id : null });
+      }
+    },
+
+    redo: () => {
+      if (get().bus.canRedo) {
+        get().bus.redo();
+        set({ project: get().bus.project, dirty: true });
+      }
+    },
+
+    canUndo: () => get().bus.canUndo,
+    canRedo: () => get().bus.canRedo,
+
+    runAiInstruction: async (instruction) => {
+      const { provider, project, selectedClipId, registry } = get();
+      let response;
+      try {
+        response = await provider.generate({
+          instruction,
+          context: { clipIds: selectedClipId ? [selectedClipId] : [], selectedClipId: selectedClipId ?? undefined },
+        });
+      } catch (e) {
+        if (e instanceof ProviderUnavailableError) return { error: "AI provider unavailable" };
+        return { error: (e as Error).message };
+      }
+      const plan = response.plan;
+      let commands;
+      try {
+        commands = planToCommands(plan, project, registry);
+      } catch (e) {
+        if (e instanceof AiPlanValidationError) return { error: `plan invalid: ${e.message}` };
+        if (e instanceof AiSemanticError) return { error: `plan rejected: ${e.message}` };
+        if (e instanceof CommandError) return { error: `compile refused: ${e.message}` };
+        if (e instanceof CommandBusValidationError) return { error: `command invalid: ${e.message}` };
+        return { error: (e as Error).message };
+      }
+      for (const c of commands) {
+        try {
+          get().bus.execute(c.commandType, c.payload);
+        } catch (e) {
+          set({ lastError: (e as Error).message });
+          return { error: `execution failed: ${(e as Error).message}` };
+        }
+      }
+      set({ project: get().bus.project, dirty: true });
+      return plan;
+    },
+  };
+});
