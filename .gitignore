@@ -96,6 +96,10 @@ apps/desktop/src-tauri/Microsoft.WebView2.FixedVersionRuntime.*/
 
 # Build outputs (never commit)
 apps/desktop/dist/
+apps/desktop/dist-e2e/
+apps/desktop/e2e/bin/
+apps/desktop/e2e/artifacts/
+apps/desktop/e2e/fixtures/*.mp4
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/target/release/
 apps/desktop/src-tauri/target/debug/

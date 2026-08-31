@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node", "@wdio/globals/types", "@wdio/mocha-framework"],
+    "noEmit": true
+  },
+  "include": ["e2e/**/*.ts", "wdio.conf.ts"]
+}

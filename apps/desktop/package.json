@@ -9,7 +9,10 @@
     "typecheck": "tsc -b --noEmit",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test": "vitest run"
+    "test": "vitest run",
+    "webview2:bootstrap": "node scripts/webview2-bootstrap.mjs",
+    "webview2:verify": "node scripts/webview2-verify.mjs",
+    "webview2:verify:test": "node scripts/webview2-bootstrap.test.mjs"
   },
   "dependencies": {
     "@haios/ai-core": "workspace:*",
@@ -27,9 +30,16 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.1.1",
+    "@types/node": "24.10.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
+    "@wdio/cli": "9.31.5",
+    "@wdio/globals": "9.31.3",
+    "@wdio/local-runner": "9.31.5",
+    "@wdio/mocha-framework": "9.31.5",
+    "@wdio/spec-reporter": "9.31.2",
+    "@wdio/types": "9.31.2",
     "typescript": "^5.6.3",
     "vite": "^5.4.10"
   }

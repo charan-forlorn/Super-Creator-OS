@@ -1,0 +1,10 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "frontendDist": "../dist-e2e",
+    "beforeBuildCommand": "pnpm exec vite build --mode e2e -c vite.e2e.config.ts"
+  },
+  "bundle": {
+    "active": false
+  }
+}

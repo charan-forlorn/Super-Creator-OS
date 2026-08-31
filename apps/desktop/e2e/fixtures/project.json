@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "id": "e2e-fixture-project",
+  "name": "R2.1 E2E Fixture",
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "updatedAt": "2026-01-01T00:00:00.000Z",
+  "assets": [
+    {
+      "id": "asset-fixture",
+      "name": "sample.mp4",
+      "sourcePath": "E2E_FIXTURE_SAMPLE_MP4",
+      "kind": "video",
+      "durationSec": 12,
+      "width": 320,
+      "height": 240,
+      "fps": 25,
+      "hasAudio": true,
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "track-video-1",
+      "kind": "video",
+      "clips": [
+        {
+          "id": "c0",
+          "assetId": "asset-fixture",
+          "inPoint": 0,
+          "duration": 2,
+          "start": 0,
+          "trackId": "track-video-1",
+          "transform": { "scale": 1, "x": 0, "y": 0, "opacity": 1 }
+        },
+        {
+          "id": "c1",
+          "assetId": "asset-fixture",
+          "inPoint": 0,
+          "duration": 8,
+          "start": 1,
+          "trackId": "track-video-1",
+          "transform": { "scale": 1, "x": 0, "y": 0, "opacity": 1 }
+        },
+        {
+          "id": "c2",
+          "assetId": "asset-fixture",
+          "inPoint": 0,
+          "duration": 2,
+          "start": 10,
+          "trackId": "track-video-1",
+          "transform": { "scale": 1, "x": 0, "y": 0, "opacity": 1 }
+        }
+      ],
+      "captions": []
+    }
+  ],
+  "durationSec": 12,
+  "aspectRatio": "1920x1080"
+}

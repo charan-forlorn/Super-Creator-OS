@@ -43,6 +43,9 @@ export interface StudioState {
   bus: CommandBus;
   registry: CommandRegistry;
   selectedClipId: string | null;
+  /** R2.1 — multi-selection. `selectedClipId` mirrors the primary selection for
+   *  single-clip consumers (Inspector, AICommandBar) so they need no changes. */
+  selectedClipIds: string[];
   playheadSec: number;
   zoom: number;
   scrollSec: number;
@@ -64,6 +67,10 @@ export interface StudioState {
   setPreviewProxy: (assetId: string, proxyPath: string) => void;
 
   selectClip: (id: string | null) => void;
+  /** R2.1 — toggle/extend selection (multi-select). */
+  toggleClipSelection: (id: string) => void;
+  selectAllClips: () => void;
+  clearClipSelection: () => void;
   setPlayhead: (sec: number) => void;
   setZoom: (z: number) => void;
   setScroll: (s: number) => void;
@@ -71,8 +78,10 @@ export interface StudioState {
   addClip: (assetId: string, trackId: string, inPoint: number, duration: number, start: number) => void;
   deleteSelected: () => void;
   moveSelected: (newStart: number) => void;
+  /** R2.1 — commit a group move (all selected clips shifted by delta seconds) as ONE undoable unit. */
+  commitGroupMove: (deltaSec: number) => void;
   trimSelected: (newInPoint?: number, newSourceEnd?: number) => void;
-  splitSelected: (t: number) => void;
+  splitSelected: (t?: number) => void;
   duplicateSelected: () => void;
   addCaption: (trackId: string, text: string, start: number, duration: number) => void;
   changeAspect: (ratio: ExportResolution) => void;
@@ -98,6 +107,7 @@ export const useStudio = create<StudioState>((set, get) => {
     bus: initial.bus,
     registry: initial.registry,
     selectedClipId: null,
+    selectedClipIds: [],
     playheadSec: 0,
     zoom: 1,
     scrollSec: 0,
@@ -167,7 +177,22 @@ export const useStudio = create<StudioState>((set, get) => {
     setPreviewProxy: (assetId, proxyPath) =>
       set((s) => ({ previewProxies: { ...s.previewProxies, [assetId]: proxyPath } })),
 
-    selectClip: (id) => set({ selectedClipId: id }),
+    selectClip: (id) => set({ selectedClipId: id, selectedClipIds: id ? [id] : [] }),
+    toggleClipSelection: (id) =>
+      set((s) => {
+        const has = s.selectedClipIds.includes(id);
+        const next = has
+          ? s.selectedClipIds.filter((x) => x !== id)
+          : [...s.selectedClipIds, id];
+        return { selectedClipIds: next, selectedClipId: next.length ? next[next.length - 1] : null };
+      }),
+    selectAllClips: () =>
+      set((s) => ({
+        selectedClipIds: s.project.tracks.flatMap((t) => t.clips.map((c) => c.id)),
+        selectedClipId:
+          s.project.tracks.flatMap((t) => t.clips.map((c) => c.id)).slice(-1)[0] ?? null,
+      })),
+    clearClipSelection: () => set({ selectedClipIds: [], selectedClipId: null }),
     setPlayhead: (sec) => set({ playheadSec: Math.max(0, sec) }),
     setZoom: (z) => set({ zoom: Math.max(0.1, Math.min(10, z)) }),
     setScroll: (s) => set({ scrollSec: Math.max(0, s) }),
@@ -180,11 +205,12 @@ export const useStudio = create<StudioState>((set, get) => {
     },
 
     deleteSelected: () => {
-      const id = get().selectedClipId;
-      if (!id) return;
+      const ids = get().selectedClipIds;
+      if (ids.length === 0) return;
       try {
-        get().bus.execute(DELETE_CLIP, { clipId: id });
-        set({ project: get().bus.project, selectedClipId: null, dirty: true });
+        // One undoable unit: deleting N selected clips collapses to a single undo.
+        get().bus.batch(ids.map((id) => ({ commandType: DELETE_CLIP, payload: { clipId: id } })));
+        set({ project: get().bus.project, selectedClipIds: [], selectedClipId: null, dirty: true });
       } catch (e) {
         set({ lastError: (e as Error).message });
       }
@@ -195,6 +221,30 @@ export const useStudio = create<StudioState>((set, get) => {
       if (!id) return;
       try {
         get().bus.execute(MOVE_CLIP, { clipId: id, newStart });
+        set({ project: get().bus.project, dirty: true });
+      } catch (e) {
+        set({ lastError: (e as Error).message });
+      }
+    },
+
+    // R2.1 — shift every selected clip by `deltaSec` as ONE atomic, undoable group.
+    // Preserves relative spacing by clamping the WHOLE group's minimum start to 0
+    // (not each clip independently), so a drag near the left edge keeps ordering.
+    // Fail-closed: if any clip is missing, the whole gesture is rejected.
+    commitGroupMove: (deltaSec) => {
+      const ids = get().selectedClipIds;
+      if (ids.length === 0) return;
+      const clips = get().project.tracks.flatMap((t) => t.clips);
+      const found = ids
+        .map((id) => clips.find((x) => x.id === id))
+        .filter((c): c is NonNullable<typeof c> => c !== undefined);
+      if (found.length === 0) return;
+      const rawStarts = found.map((c) => c.start + deltaSec);
+      const minRaw = Math.min(...rawStarts);
+      const shift = minRaw < 0 ? -minRaw : 0; // lift the whole group so min >= 0
+      const moves = found.map((c) => ({ clipId: c.id, newStart: c.start + deltaSec + shift }));
+      try {
+        get().bus.batch(moves.map((m) => ({ commandType: MOVE_CLIP, payload: m })));
         set({ project: get().bus.project, dirty: true });
       } catch (e) {
         set({ lastError: (e as Error).message });
@@ -213,10 +263,23 @@ export const useStudio = create<StudioState>((set, get) => {
     },
 
     splitSelected: (t) => {
-      const id = get().selectedClipId;
-      if (!id) return;
+      const ids = get().selectedClipIds;
+      if (ids.length === 0) return;
+      const clips = get().project.tracks.flatMap((tr) => tr.clips);
+      // Split each selected clip at its LOCAL playhead offset (t is relative to
+      // the clip start), clamped into (0, duration). All splits collapse into one undo.
+      const splits = ids
+        .map((id) => {
+          const clip = clips.find((c) => c.id === id);
+          if (!clip) return null;
+          const local = t === undefined ? get().playheadSec - clip.start : t;
+          if (!(local > 0 && local < clip.duration)) return null;
+          return { clipId: id, t: local };
+        })
+        .filter((s): s is { clipId: string; t: number } => s !== null);
+      if (splits.length === 0) return;
       try {
-        get().bus.execute(SPLIT_CLIP, { clipId: id, t });
+        get().bus.batch(splits.map((s) => ({ commandType: SPLIT_CLIP, payload: s })));
         set({ project: get().bus.project, dirty: true });
       } catch (e) {
         set({ lastError: (e as Error).message });
@@ -224,15 +287,30 @@ export const useStudio = create<StudioState>((set, get) => {
     },
 
     duplicateSelected: () => {
-      const id = get().selectedClipId;
-      if (!id) return;
-      const clip = get().project.tracks.flatMap((t) => t.clips).find((c) => c.id === id);
-      if (!clip) return;
-      const newId = uid("clip");
-      const copy: Clip = { ...clip, id: newId, start: clip.start + clip.duration, transform: { scale: 1, x: 0, y: 0, opacity: 1 } };
+      const ids = get().selectedClipIds;
+      if (ids.length === 0) return;
+      const clips = get().project.tracks.flatMap((tr) => tr.clips);
+      const copies: Clip[] = [];
+      for (const id of ids) {
+        const clip = clips.find((c) => c.id === id);
+        if (!clip) continue;
+        copies.push({
+          ...clip,
+          id: uid("clip"),
+          start: clip.start + clip.duration,
+          transform: { scale: 1, x: 0, y: 0, opacity: 1 },
+        });
+      }
+      if (copies.length === 0) return;
       try {
-        get().bus.execute(ADD_CLIP, { clip: copy });
-        set({ project: get().bus.project, selectedClipId: newId, dirty: true });
+        // Duplicate the whole selection as a single undoable group.
+        get().bus.batch(copies.map((c) => ({ commandType: ADD_CLIP, payload: { clip: c } })));
+        set({
+          project: get().bus.project,
+          selectedClipIds: copies.map((c) => c.id),
+          selectedClipId: copies.length ? copies[copies.length - 1].id : null,
+          dirty: true,
+        });
       } catch (e) {
         set({ lastError: (e as Error).message });
       }

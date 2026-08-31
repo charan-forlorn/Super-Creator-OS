@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_comment": "R2.0 reproducible Fixed WebView2 runtime pin. Authoritative version/architecture/official source for the Microsoft WebView2 Fixed Version Runtime used by the Tauri 'fixedRuntime' bundle mode (apps/desktop/src-tauri/tauri.conf.json). The runtime binary is intentionally NOT committed (gitignored). This file is the single source of truth for acquisition + integrity verification.",
+  "product": "Microsoft.WebView2.FixedVersionRuntime",
+  "version": "151.0.4129.107",
+  "arch": "x64",
+  "extractedDirName": "Microsoft.WebView2.FixedVersionRuntime.151.0.4129.107.x64",
+  "officialSource": "https://msedgedl.blob.core.windows.net/webview/151.0.4129.107/Microsoft.WebView2.FixedVersionRuntime.151.0.4129.107.x64.cab",
+  "cabFileName": "Microsoft.WebView2.FixedVersionRuntime.151.0.4129.107.x64.cab",
+  "integrityTarget": "msedgewebview2.exe",
+  "expectedExtractedSha256": "fe7922326f2a1d3188454ba5502861253223d5da10d9da0b858f9b10f3e01468",
+  "expectedExtractedSha256ComputedBy": "certutil + Node crypto (independent cross-check on the R1 sealed runtime image)",
+  "expectedExtractedSha256Date": "2026-08-31",
+  "sourceCabSha256": null,
+  "sourceCabSha256Available": false,
+  "_note_sourceCabSha256": "Microsoft does not publish a checksum for the Fixed Version CAB at the official download endpoint. Integrity is therefore enforced on the authoritative extracted artifact (the actual WebView2 host binary that Tauri loads), measured from the R1-proven runtime. The pinned expected hash is fail-closed: any drift in the host binary fails verification and blocks the build bootstrap.",
+  "additionalExpectedArtifacts": [
+    "151.0.4129.107.manifest",
+    "EBWebView",
+    "msedge.dll"
+  ],
+  "extraction": {
+    "windowsTool": "expand.exe",
+    "windowsCommand": "expand.exe -F:* <cab> <extractedDir>",
+    "posixFallbackTool": "cabextract",
+    "posixCommand": "cabextract -d <extractedDir> <cab>"
+  },
+  "usage": {
+    "bootstrap": "node scripts/webview2-bootstrap.mjs",
+    "verifyOnly": "node scripts/webview2-verify.mjs",
+    "packageScript": "pnpm webview2:verify"
+  }
+}

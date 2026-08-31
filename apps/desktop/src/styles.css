@@ -104,7 +104,9 @@ body { background: var(--bg); color: var(--fg); }
 .timeline-toolbar input[type=range] { width: 120px; }
 .timeline-scroll { overflow-x: auto; overflow-y: hidden; flex: 1; }
 .timeline-inner { position: relative; min-height: 100%; }
-.timeline-ruler { position: relative; height: 22px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
+.timeline-ruler { display: flex; height: 22px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
+.ruler-label { width: 64px; flex: 0 0 64px; border-right: 1px solid var(--border); }
+.ruler-lane { position: relative; flex: 1; }
 .ruler-tick { position: absolute; top: 2px; font-size: 10px; color: var(--muted); border-left: 1px solid var(--border); padding-left: 3px; }
 .playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); z-index: 5; pointer-events: none; }
 .track { display: flex; align-items: stretch; height: 46px; border-bottom: 1px solid var(--border); }
@@ -114,6 +116,9 @@ body { background: var(--bg); color: var(--fg); }
 .track-lane { position: relative; flex: 1; }
 .clip { position: absolute; top: 5px; height: 36px; background: linear-gradient(180deg, #2f6fb0, #274f78); border: 1px solid #4f9dff; border-radius: 5px; display: flex; align-items: center; cursor: grab; overflow: hidden; }
 .clip.selected { outline: 2px solid var(--accent-2); }
+/* Primary (last-clicked) selection stands out from the rest of a multi-selection. */
+.clip.primary { outline: 2px solid var(--accent); box-shadow: 0 0 0 1px var(--accent); background: linear-gradient(180deg, #3f86d6, #2c5e93); }
+.sel-count { color: var(--muted); font-size: 12px; margin-left: 6px; }
 .clip-label { font-size: 10px; color: #dcebff; padding: 0 6px; pointer-events: none; white-space: nowrap; overflow: hidden; }
 .clip-trim { position: absolute; top: 0; bottom: 0; width: 7px; cursor: ew-resize; background: rgba(255,255,255,0.15); }
 .clip-trim.trim-l { left: 0; }
