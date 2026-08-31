@@ -59,7 +59,6 @@ fn ffmpeg_search_dirs() -> Vec<std::path::PathBuf> {
 // `which` is not a default crate; implement a minimal PATH lookup.
 mod which {
     use std::env;
-    use std::path::Path;
     use std::process::Command;
 
     pub fn which(name: &str) -> Result<std::path::PathBuf, ()> {
@@ -115,22 +114,6 @@ fn now_ms() -> u128 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0)
-}
-
-fn class_of_codec(codec: &str) -> &'static str {
-    let c = codec.to_lowercase();
-    if c.contains("h264") || c.contains("h265") || c.contains("hevc") || c.contains("vp9")
-        || c.contains("av1") || c.contains("mpeg") || c.contains("prores") || c == "mjpeg"
-        || c.contains("png") {
-        "video"
-    } else if c.contains("aac") || c.contains("mp3") || c.contains("opus") || c.contains("vorbis")
-        || c.contains("flac") || c.contains("pcm") || c.contains("ac3") {
-        "audio"
-    } else if c.contains("png") || c.contains("mjpeg") || c.contains("gif") || c.contains("webp") {
-        "image"
-    } else {
-        "unknown"
-    }
 }
 
 pub fn probe_media(path: &str) -> MediaProbe {
@@ -314,10 +297,12 @@ fn clip_audio_linear_gain(clip: &Value) -> f64 {
 
 fn video_clip_audio_filter(input_idx: usize, clip: &Value, duration: f64, has_audio: bool) -> String {
     let gain = clip_audio_linear_gain(clip);
+    let start = clip.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.0);
+    let delay_ms = (start * 1000.0).round() as u64;
     if has_audio {
-        format!("[{input_idx}:a]atrim=duration={duration:.3},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp,aresample=44100,volume={gain:.6}[{input_idx}va]")
+        format!("[{input_idx}:a]atrim=duration={duration:.3},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp,aresample=44100,volume={gain:.6},adelay={delay_ms}|{delay_ms}[{input_idx}va]")
     } else {
-        format!("anullsrc=r=44100:cl=mono:d={duration:.3},volume={gain:.6}[{input_idx}va]")
+        format!("anullsrc=r=44100:cl=mono:d={duration:.3},volume={gain:.6},adelay={delay_ms}|{delay_ms}[{input_idx}va]")
     }
 }
 
@@ -347,6 +332,21 @@ fn video_clip_filter(input_idx: usize, clip: &Value, duration: f64, w: i32, h: i
     )
 }
 
+
+fn video_timeline_filter(clips: &[Value], duration: f64, w: i32, h: i32) -> String {
+    let duration = duration.max(0.1);
+    let mut parts = vec![format!("color=c=black:s={w}x{h}:d={duration:.3}:r=30[vbase0]")];
+    for (i, clip) in clips.iter().enumerate() {
+        let start = clip.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.0);
+        let clip_duration = clip.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.001).max(0.001);
+        let end = start + clip_duration;
+        parts.push(format!("[{i}v]setpts=PTS+{start:.3}/TB[{i}vt]"));
+        let base_in = format!("vbase{i}");
+        let base_out = if i + 1 == clips.len() { "vout".to_string() } else { format!("vbase{}", i + 1) };
+        parts.push(format!("[{base_in}][{i}vt]overlay=x=0:y=0:eof_action=pass:repeatlast=0:shortest=0:enable='between(t,{start:.3},{end:.3})'[{base_out}]"));
+    }
+    parts.join(";")
+}
 
 fn safe_caption_color(value: Option<&str>, fallback: &str) -> String {
     match value {
@@ -481,10 +481,10 @@ pub fn run_render(
         let has_audio = asset.and_then(|a| a.get("hasAudio")).and_then(|v| v.as_bool()).unwrap_or(false);
         video_audio_parts.push(video_clip_audio_filter(i, clip, duration, has_audio));
     }
-    let vlist: Vec<String> = (0..video_clips.len()).map(|i| format!("[{i}v]")).collect();
+    let timeline_duration = project.get("durationSec").and_then(|v| v.as_f64()).unwrap_or_else(|| video_clips.iter().map(|c| c.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0) + c.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0)).fold(0.0, f64::max)).max(0.1);
     let mut filter = concat_parts.join(";");
     filter.push(';');
-    filter.push_str(&format!("{}concat=n={}:v=1:a=0[vout]", vlist.join(""), vlist.len()));
+    filter.push_str(&video_timeline_filter(&video_clips, timeline_duration, w, h));
 
     // Burn timeline captions using UTF-8 text files so caption text is never parsed
     // as filter syntax. This keeps Unicode text and untrusted punctuation inert.
@@ -513,7 +513,9 @@ pub fn run_render(
             let idx = first_audio_input + offset;
             inputs.extend(["-ss".into(), format!("{in_point:.3}"), "-t".into(), format!("{duration:.3}"), "-i".into(), source]);
             let gain = clip_audio_linear_gain(clip);
-            audio_filters.push(format!("[{idx}:a]atrim=duration={duration:.3},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp,aresample=44100,volume={gain:.6}[a{idx}]"));
+            let start = clip.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.0);
+            let delay_ms = (start * 1000.0).round() as u64;
+            audio_filters.push(format!("[{idx}:a]atrim=duration={duration:.3},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp,aresample=44100,volume={gain:.6},adelay={delay_ms}|{delay_ms}[a{idx}]"));
             audio_labels.push(format!("[a{idx}]"));
         }
         if audio_labels.is_empty() {
@@ -523,14 +525,14 @@ pub fn run_render(
             filter.push(';');
             filter.push_str(&audio_filters.join(";"));
             filter.push(';');
-            filter.push_str(&format!("{}concat=n={}:v=0:a=1[aout]", audio_labels.join(""), audio_labels.len()));
+            filter.push_str(&format!("{}amix=inputs={}:duration=longest:normalize=0,apad,atrim=duration={timeline_duration:.3}[aout]", audio_labels.join(""), audio_labels.len()));
         }
     } else {
         filter.push(';');
         filter.push_str(&video_audio_parts.join(";"));
         let labels: Vec<String> = (0..video_clips.len()).map(|i| format!("[{i}va]")).collect();
         filter.push(';');
-        filter.push_str(&format!("{}concat=n={}:v=0:a=1[aout]", labels.join(""), labels.len()));
+        filter.push_str(&format!("{}amix=inputs={}:duration=longest:normalize=0,apad,atrim=duration={timeline_duration:.3}[aout]", labels.join(""), labels.len()));
     }
 
     let mut cmd = ffcmd(&ffmpeg);
@@ -565,6 +567,12 @@ pub fn run_render(
             emit_state(app, job_id, "FAILED", 0.0, None, Some(format!("ffmpeg spawn error: {e}")));
         }
     }
+}
+
+fn canonical_container(format_name: &str) -> String {
+    let aliases: Vec<&str> = format_name.split(',').collect();
+    if aliases.iter().any(|x| *x == "mp4") { return "mp4".to_string(); }
+    aliases.first().copied().unwrap_or(format_name).to_string()
 }
 
 pub fn verify_render(output_path: &str, resolution: &str) -> RenderVerification {
@@ -629,7 +637,7 @@ pub fn verify_render(output_path: &str, resolution: &str) -> RenderVerification 
         }
     }
     if let Some(fmt) = parsed.get("format") {
-        ver.container = fmt.get("format_name").and_then(|v| v.as_str()).map(|s| s.split(',').next().unwrap_or(s).to_string());
+        ver.container = fmt.get("format_name").and_then(|v| v.as_str()).map(canonical_container);
         ver.duration_sec = fmt.get("duration").and_then(|v| v.as_str()).and_then(|s| s.parse().ok());
         ver.size_bytes = fmt.get("size").and_then(|v| v.as_str()).and_then(|s| s.parse().ok());
     }
@@ -641,14 +649,15 @@ pub fn verify_render(output_path: &str, resolution: &str) -> RenderVerification 
     let container_ok = ver.container.as_deref() == Some("mov,mp4,m4a,3gp,3g2,mj2")
         || ver.container.as_deref().map(|c| c.contains("mp4")).unwrap_or(false);
     let codec_ok = ver.video_codec.as_deref() == Some("h264");
+    let audio_ok = has_audio && ver.audio_codec.as_deref() == Some("aac");
     let res_ok = ver.width == Some(want_w) && ver.height == Some(want_h);
     let nonzero = ver.size_bytes.unwrap_or(0) > 0;
     let dur_ok = ver.duration_sec.unwrap_or(0.0) > 0.0;
-    ver.ok = has_video && container_ok && codec_ok && res_ok && nonzero && dur_ok;
+    ver.ok = has_video && container_ok && codec_ok && audio_ok && res_ok && nonzero && dur_ok;
     if !ver.ok {
         ver.error = Some(format!(
-            "verify failed: video={has_video} container={:?} vcodec={:?} res={:?}x{:?} size={:?} dur={:?} want={}x{}",
-            ver.container, ver.video_codec, ver.width, ver.height, ver.size_bytes, ver.duration_sec, want_w, want_h
+            "verify failed: video={has_video} audio={audio_ok} container={:?} vcodec={:?} acodec={:?} res={:?}x{:?} size={:?} dur={:?} want={}x{}",
+            ver.container, ver.video_codec, ver.audio_codec, ver.width, ver.height, ver.size_bytes, ver.duration_sec, want_w, want_h
         ));
     }
     ver
@@ -1111,6 +1120,54 @@ mod tests {
         assert!(filter.contains("colorchannelmixer=aa=0.600000"));
         assert!(filter.contains("overlay=x=-240.000:y=-540.000"));
         assert!(filter.ends_with("[2v]"));
+    }
+
+    #[test]
+    fn video_timeline_gap_executes_with_real_ffmpeg() {
+        let clip = json!({"start": 1.0, "duration": 1.0, "transform": {"scale": 1.0, "x": 0.0, "y": 0.0, "opacity": 1.0}});
+        let clips = vec![clip.clone()];
+        let graph = format!("{};{};[vout]fps=1[out]", video_clip_filter(0, &clip, 1.0, 320, 180), video_timeline_filter(&clips, 2.0, 320, 180));
+        let out = std::process::Command::new("ffmpeg").args(["-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=30:duration=1", "-filter_complex", &graph, "-map", "[out]", "-frames:v", "2", "-pix_fmt", "rgb24", "-f", "rawvideo", "-"]).output().expect("spawn timeline video proof");
+        assert!(out.status.success());
+        let frame = 320 * 180 * 3;
+        assert!(out.stdout.len() >= frame * 2);
+        assert!(out.stdout[..frame].iter().all(|b| *b < 10), "pre-start frame must be black");
+        assert!(out.stdout[frame..frame*2].iter().any(|b| *b > 30), "active frame must contain source pixels");
+    }
+
+    #[test]
+    fn audio_timeline_delay_executes_with_real_ffmpeg() {
+        let clip = json!({"start": 1.0, "audio": {"gainDb": 0.0, "muted": false}});
+        let graph = format!("{};[0va]apad,atrim=duration=2[aout]", video_clip_audio_filter(0, &clip, 1.0, true));
+        let out = std::process::Command::new("ffmpeg").args(["-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-filter_complex", &graph, "-map", "[aout]", "-ac", "1", "-ar", "44100", "-f", "s16le", "-"]).output().expect("spawn timeline audio proof");
+        assert!(out.status.success());
+        let first_sec = 44100 * 2;
+        assert!(out.stdout.len() >= first_sec * 2);
+        assert!(out.stdout[..first_sec].iter().all(|b| *b == 0), "pre-start audio must be silence");
+        assert!(out.stdout[first_sec..].iter().any(|b| *b != 0), "delayed audio must contain signal");
+    }
+
+    #[test]
+    fn canonical_container_normalizes_ffprobe_mp4_aliases() {
+        assert_eq!(canonical_container("mov,mp4,m4a,3gp,3g2,mj2"), "mp4");
+        assert_eq!(canonical_container("matroska,webm"), "matroska");
+    }
+
+    #[test]
+    fn video_timeline_filter_preserves_start_gap_and_duration() {
+        let clips = vec![json!({"start": 2.0, "duration": 1.0, "transform": {"scale": 1.0, "x": 0.0, "y": 0.0, "opacity": 1.0}})];
+        let f = video_timeline_filter(&clips, 3.0, 320, 180);
+        assert!(f.contains("color=c=black:s=320x180:d=3.000"));
+        assert!(f.contains("setpts=PTS+2.000/TB"));
+        assert!(f.contains("enable='between(t,2.000,3.000)'"));
+        assert!(f.ends_with("[vout]"));
+    }
+
+    #[test]
+    fn audio_filter_preserves_clip_start_with_delay() {
+        let clip = json!({"start": 1.5, "audio": {"gainDb": 0.0, "muted": false}});
+        let f = video_clip_audio_filter(0, &clip, 1.0, true);
+        assert!(f.contains("adelay=1500|1500"));
     }
 
     #[test]
