@@ -18,6 +18,7 @@ import {
   MOVE_CLIP,
   TRIM_CLIP,
   SET_CLIP_AUDIO,
+  SET_CLIP_EFFECTS,
   SET_CLIP_TRANSFORM,
   SPLIT_CLIP,
   ADD_CAPTION,
@@ -114,6 +115,7 @@ export interface StudioState {
   commitGroupMove: (deltaSec: number) => void;
   trimSelected: (newInPoint?: number, newSourceEnd?: number) => void;
   setSelectedAudio: (gainDb: number, muted: boolean) => boolean;
+  setSelectedEffects: (brightness: number, contrast: number, saturation: number) => boolean;
   setSelectedTransform: (scale: number, x: number, y: number, opacity: number) => boolean;
   splitSelected: (t?: number) => void;
   duplicateSelected: () => void;
@@ -294,7 +296,7 @@ export const useStudio = create<StudioState>((set, get) => {
 
     addClip: (assetId, trackId, inPoint, duration, start) => {
       const id = uid("clip");
-      const clip: Clip = { id, assetId, inPoint, duration, start, trackId, transform: { scale: 1, x: 0, y: 0, opacity: 1 }, audio: { gainDb: 0, muted: false } };
+      const clip: Clip = { id, assetId, inPoint, duration, start, trackId, transform: { scale: 1, x: 0, y: 0, opacity: 1 }, audio: { gainDb: 0, muted: false }, effects: { brightness: 0, contrast: 1, saturation: 1 } };
       get().bus.execute(ADD_CLIP, { clip });
       set({ project: get().bus.project, dirty: true, selectedClipId: id });
     },
@@ -351,6 +353,19 @@ export const useStudio = create<StudioState>((set, get) => {
       if (!id) return false;
       try {
         get().bus.execute(SET_CLIP_AUDIO, { clipId: id, gainDb, muted });
+        set({ project: get().bus.project, dirty: true, lastError: null });
+        return true;
+      } catch (e) {
+        set({ lastError: (e as Error).message });
+        return false;
+      }
+    },
+
+    setSelectedEffects: (brightness, contrast, saturation) => {
+      const id = get().selectedClipId;
+      if (!id) return false;
+      try {
+        get().bus.execute(SET_CLIP_EFFECTS, { clipId: id, brightness, contrast, saturation });
         set({ project: get().bus.project, dirty: true, lastError: null });
         return true;
       } catch (e) {

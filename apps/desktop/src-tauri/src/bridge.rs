@@ -315,6 +315,14 @@ fn clip_transform_values(clip: &Value) -> (f64, f64, f64, f64) {
     (scale, x, y, opacity)
 }
 
+fn clip_effect_values(clip: &Value) -> (f64, f64, f64) {
+    let effects = clip.get("effects");
+    let brightness = effects.and_then(|e| e.get("brightness")).and_then(|v| v.as_f64()).unwrap_or(0.0).clamp(-1.0, 1.0);
+    let contrast = effects.and_then(|e| e.get("contrast")).and_then(|v| v.as_f64()).unwrap_or(1.0).clamp(0.0, 2.0);
+    let saturation = effects.and_then(|e| e.get("saturation")).and_then(|v| v.as_f64()).unwrap_or(1.0).clamp(0.0, 3.0);
+    (brightness, contrast, saturation)
+}
+
 fn even_px(value: f64) -> i32 {
     let mut n = value.round().max(2.0) as i32;
     if n % 2 != 0 { n += 1; }
@@ -323,12 +331,13 @@ fn even_px(value: f64) -> i32 {
 
 fn video_clip_filter(input_idx: usize, clip: &Value, duration: f64, w: i32, h: i32) -> String {
     let (scale, x, y, opacity) = clip_transform_values(clip);
+    let (brightness, contrast, saturation) = clip_effect_values(clip);
     let scaled_w = even_px(w as f64 * scale);
     let scaled_h = even_px(h as f64 * scale);
     let left = (w - scaled_w) as f64 / 2.0 + x * w as f64 / 2.0;
     let top = (h - scaled_h) as f64 / 2.0 + y * h as f64 / 2.0;
     format!(
-        "color=c=black:s={w}x{h}:d={duration:.3}:r=30[{input_idx}bg];[{input_idx}:v]trim=duration={duration:.3},setpts=PTS-STARTPTS,scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1,scale={scaled_w}:{scaled_h},format=rgba,colorchannelmixer=aa={opacity:.6}[{input_idx}fg];[{input_idx}bg][{input_idx}fg]overlay=x={left:.3}:y={top:.3}:shortest=1[{input_idx}v]"
+        "color=c=black:s={w}x{h}:d={duration:.3}:r=30[{input_idx}bg];[{input_idx}:v]trim=duration={duration:.3},setpts=PTS-STARTPTS,scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1,eq=brightness={brightness:.6}:contrast={contrast:.6}:saturation={saturation:.6},scale={scaled_w}:{scaled_h},format=rgba,colorchannelmixer=aa={opacity:.6}[{input_idx}fg];[{input_idx}bg][{input_idx}fg]overlay=x={left:.3}:y={top:.3}:shortest=1[{input_idx}v]"
     )
 }
 
@@ -1120,6 +1129,27 @@ mod tests {
         assert!(filter.contains("colorchannelmixer=aa=0.600000"));
         assert!(filter.contains("overlay=x=-240.000:y=-540.000"));
         assert!(filter.ends_with("[2v]"));
+    }
+
+    #[test]
+    fn clip_effect_filter_contract() {
+        let clip = json!({"effects": {"brightness": 0.2, "contrast": 1.4, "saturation": 0.5}});
+        let filter = video_clip_filter(0, &clip, 1.0, 320, 180);
+        assert!(filter.contains("eq=brightness=0.200000:contrast=1.400000:saturation=0.500000"));
+    }
+
+    #[test]
+    fn clip_effect_saturation_executes_with_real_ffmpeg() {
+        let clip = json!({"effects": {"brightness": 0.0, "contrast": 1.0, "saturation": 0.0}});
+        let graph = video_clip_filter(0, &clip, 0.2, 64, 64);
+        let out = std::process::Command::new("ffmpeg")
+            .args(["-v", "error", "-f", "lavfi", "-i", "color=c=red:s=64x64:r=1:d=0.2", "-filter_complex", &graph, "-map", "[0v]", "-frames:v", "1", "-pix_fmt", "rgb24", "-f", "rawvideo", "-"])
+            .output().expect("spawn effects proof");
+        assert!(out.status.success());
+        let i = (32 * 64 + 32) * 3;
+        assert!(out.stdout.len() >= i + 3);
+        let (r, g, b) = (out.stdout[i] as i16, out.stdout[i+1] as i16, out.stdout[i+2] as i16);
+        assert!((r-g).abs() < 6 && (g-b).abs() < 6, "saturation=0 must produce grayscale center pixel: {r},{g},{b}");
     }
 
     #[test]

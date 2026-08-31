@@ -166,6 +166,26 @@ export const setClipAudioCommand: EditCommand<z.infer<typeof setClipAudioSchema>
   },
 };
 
+/* ---------------------------- clipEffects --------------------------- */
+export const SET_CLIP_EFFECTS = "clip.effects";
+export const setClipEffectsSchema = z.object({
+  clipId: z.string().min(1),
+  brightness: z.number().min(-1).max(1),
+  contrast: z.number().min(0).max(2),
+  saturation: z.number().min(0).max(3),
+});
+export const setClipEffectsCommand: EditCommand<z.infer<typeof setClipEffectsSchema>> = {
+  type: SET_CLIP_EFFECTS,
+  schema: setClipEffectsSchema,
+  execute(prev, { clipId, brightness, contrast, saturation }) {
+    const { clip, track } = findClip(prev, clipId);
+    const prior = clip.effects ?? { brightness: 0, contrast: 1, saturation: 1 };
+    const updated: Clip = { ...clip, effects: { brightness, contrast, saturation } };
+    const tracks = prev.tracks.map((t) => t.id === track.id ? { ...t, clips: t.clips.map((c) => c.id === clipId ? updated : c) } : t);
+    return { next: { ...prev, tracks, updatedAt: new Date().toISOString() }, inverse: { type: SET_CLIP_EFFECTS, execute: (p) => setClipEffectsCommand.execute(p, { clipId, ...prior }) } };
+  },
+};
+
 /* --------------------------- clipTransform -------------------------- */
 export const SET_CLIP_TRANSFORM = "clip.transform";
 export const setClipTransformSchema = z.object({
@@ -504,6 +524,7 @@ export const placeProbedMediaCommand: EditCommand<z.infer<typeof placeProbedMedi
         trackId: targetTrackId,
         transform: { scale: 1, x: 0, y: 0, opacity: 1 },
         audio: { gainDb: 0, muted: false },
+        effects: { brightness: 0, contrast: 1, saturation: 1 },
       };
       next = {
         ...next,

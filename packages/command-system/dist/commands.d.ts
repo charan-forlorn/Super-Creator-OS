@@ -43,6 +43,24 @@ export declare const setClipAudioSchema: z.ZodObject<{
     muted: boolean;
 }>;
 export declare const setClipAudioCommand: EditCommand<z.infer<typeof setClipAudioSchema>>;
+export declare const SET_CLIP_EFFECTS = "clip.effects";
+export declare const setClipEffectsSchema: z.ZodObject<{
+    clipId: z.ZodString;
+    brightness: z.ZodNumber;
+    contrast: z.ZodNumber;
+    saturation: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    clipId: string;
+    brightness: number;
+    contrast: number;
+    saturation: number;
+}, {
+    clipId: string;
+    brightness: number;
+    contrast: number;
+    saturation: number;
+}>;
+export declare const setClipEffectsCommand: EditCommand<z.infer<typeof setClipEffectsSchema>>;
 export declare const SET_CLIP_TRANSFORM = "clip.transform";
 export declare const setClipTransformSchema: z.ZodObject<{
     clipId: z.ZodString;
@@ -231,6 +249,19 @@ export declare const addTrackSchema: z.ZodObject<{
                 y?: number | undefined;
                 opacity?: number | undefined;
             }>>;
+            effects: z.ZodDefault<z.ZodObject<{
+                brightness: z.ZodDefault<z.ZodNumber>;
+                contrast: z.ZodDefault<z.ZodNumber>;
+                saturation: z.ZodDefault<z.ZodNumber>;
+            }, "strip", z.ZodTypeAny, {
+                brightness: number;
+                contrast: number;
+                saturation: number;
+            }, {
+                brightness?: number | undefined;
+                contrast?: number | undefined;
+                saturation?: number | undefined;
+            }>>;
             audio: z.ZodDefault<z.ZodObject<{
                 gainDb: z.ZodDefault<z.ZodNumber>;
                 muted: z.ZodDefault<z.ZodBoolean>;
@@ -258,6 +289,11 @@ export declare const addTrackSchema: z.ZodObject<{
                 y: number;
                 opacity: number;
             };
+            effects: {
+                brightness: number;
+                contrast: number;
+                saturation: number;
+            };
         }, {
             id: string;
             assetId: string;
@@ -274,6 +310,11 @@ export declare const addTrackSchema: z.ZodObject<{
                 x?: number | undefined;
                 y?: number | undefined;
                 opacity?: number | undefined;
+            } | undefined;
+            effects?: {
+                brightness?: number | undefined;
+                contrast?: number | undefined;
+                saturation?: number | undefined;
             } | undefined;
         }>, "many">>;
         captions: z.ZodDefault<z.ZodArray<z.ZodObject<{
@@ -353,6 +394,11 @@ export declare const addTrackSchema: z.ZodObject<{
                 y: number;
                 opacity: number;
             };
+            effects: {
+                brightness: number;
+                contrast: number;
+                saturation: number;
+            };
         }[];
         captions: {
             id: string;
@@ -388,6 +434,11 @@ export declare const addTrackSchema: z.ZodObject<{
                 x?: number | undefined;
                 y?: number | undefined;
                 opacity?: number | undefined;
+            } | undefined;
+            effects?: {
+                brightness?: number | undefined;
+                contrast?: number | undefined;
+                saturation?: number | undefined;
             } | undefined;
         }[] | undefined;
         captions?: {
@@ -427,6 +478,11 @@ export declare const addTrackSchema: z.ZodObject<{
                 y: number;
                 opacity: number;
             };
+            effects: {
+                brightness: number;
+                contrast: number;
+                saturation: number;
+            };
         }[];
         captions: {
             id: string;
@@ -464,6 +520,11 @@ export declare const addTrackSchema: z.ZodObject<{
                 x?: number | undefined;
                 y?: number | undefined;
                 opacity?: number | undefined;
+            } | undefined;
+            effects?: {
+                brightness?: number | undefined;
+                contrast?: number | undefined;
+                saturation?: number | undefined;
             } | undefined;
         }[] | undefined;
         captions?: {

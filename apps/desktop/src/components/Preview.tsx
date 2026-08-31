@@ -131,12 +131,14 @@ function aspectStyle(ratio: string): React.CSSProperties {
   return { aspectRatio: String(ar), maxHeight: "100%", maxWidth: "100%" };
 }
 
-function videoTransformStyle(clip?: { transform?: { x: number; y: number; scale: number; opacity: number } }): React.CSSProperties {
+function videoTransformStyle(clip?: { transform?: { x: number; y: number; scale: number; opacity: number }; effects?: { brightness: number; contrast: number; saturation: number } }): React.CSSProperties {
   const t = clip?.transform ?? { x: 0, y: 0, scale: 1, opacity: 1 };
+  const e = clip?.effects ?? { brightness: 0, contrast: 1, saturation: 1 };
   return {
     transform: `translate(${t.x * 50}%, ${t.y * 50}%) scale(${t.scale})`,
     transformOrigin: "center center",
     opacity: t.opacity,
+    filter: `brightness(${Math.max(0, 1 + e.brightness)}) contrast(${e.contrast}) saturate(${e.saturation})`,
   };
 }
 

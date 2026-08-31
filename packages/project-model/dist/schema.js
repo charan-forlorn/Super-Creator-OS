@@ -43,6 +43,14 @@ export const clipSchema = z.object({
         opacity: z.number().min(0).max(1).default(1),
     })
         .default({}),
+    /** Clip-local visual effects; neutral defaults preserve legacy appearance. */
+    effects: z
+        .object({
+        brightness: z.number().min(-1).max(1).default(0),
+        contrast: z.number().min(0).max(2).default(1),
+        saturation: z.number().min(0).max(3).default(1),
+    })
+        .default({}),
     /** Clip-local audio controls; defaults preserve source audio for legacy projects. */
     audio: z
         .object({

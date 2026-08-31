@@ -83,6 +83,20 @@ export declare const clipSchema: z.ZodObject<{
         y?: number | undefined;
         opacity?: number | undefined;
     }>>;
+    /** Clip-local visual effects; neutral defaults preserve legacy appearance. */
+    effects: z.ZodDefault<z.ZodObject<{
+        brightness: z.ZodDefault<z.ZodNumber>;
+        contrast: z.ZodDefault<z.ZodNumber>;
+        saturation: z.ZodDefault<z.ZodNumber>;
+    }, "strip", z.ZodTypeAny, {
+        brightness: number;
+        contrast: number;
+        saturation: number;
+    }, {
+        brightness?: number | undefined;
+        contrast?: number | undefined;
+        saturation?: number | undefined;
+    }>>;
     /** Clip-local audio controls; defaults preserve source audio for legacy projects. */
     audio: z.ZodDefault<z.ZodObject<{
         gainDb: z.ZodDefault<z.ZodNumber>;
@@ -111,6 +125,11 @@ export declare const clipSchema: z.ZodObject<{
         y: number;
         opacity: number;
     };
+    effects: {
+        brightness: number;
+        contrast: number;
+        saturation: number;
+    };
 }, {
     id: string;
     assetId: string;
@@ -127,6 +146,11 @@ export declare const clipSchema: z.ZodObject<{
         x?: number | undefined;
         y?: number | undefined;
         opacity?: number | undefined;
+    } | undefined;
+    effects?: {
+        brightness?: number | undefined;
+        contrast?: number | undefined;
+        saturation?: number | undefined;
     } | undefined;
 }>;
 export type Clip = z.infer<typeof clipSchema>;
@@ -220,6 +244,20 @@ export declare const trackSchema: z.ZodObject<{
             y?: number | undefined;
             opacity?: number | undefined;
         }>>;
+        /** Clip-local visual effects; neutral defaults preserve legacy appearance. */
+        effects: z.ZodDefault<z.ZodObject<{
+            brightness: z.ZodDefault<z.ZodNumber>;
+            contrast: z.ZodDefault<z.ZodNumber>;
+            saturation: z.ZodDefault<z.ZodNumber>;
+        }, "strip", z.ZodTypeAny, {
+            brightness: number;
+            contrast: number;
+            saturation: number;
+        }, {
+            brightness?: number | undefined;
+            contrast?: number | undefined;
+            saturation?: number | undefined;
+        }>>;
         /** Clip-local audio controls; defaults preserve source audio for legacy projects. */
         audio: z.ZodDefault<z.ZodObject<{
             gainDb: z.ZodDefault<z.ZodNumber>;
@@ -248,6 +286,11 @@ export declare const trackSchema: z.ZodObject<{
             y: number;
             opacity: number;
         };
+        effects: {
+            brightness: number;
+            contrast: number;
+            saturation: number;
+        };
     }, {
         id: string;
         assetId: string;
@@ -264,6 +307,11 @@ export declare const trackSchema: z.ZodObject<{
             x?: number | undefined;
             y?: number | undefined;
             opacity?: number | undefined;
+        } | undefined;
+        effects?: {
+            brightness?: number | undefined;
+            contrast?: number | undefined;
+            saturation?: number | undefined;
         } | undefined;
     }>, "many">;
     captions: z.ZodDefault<z.ZodArray<z.ZodObject<{
@@ -345,6 +393,11 @@ export declare const trackSchema: z.ZodObject<{
             y: number;
             opacity: number;
         };
+        effects: {
+            brightness: number;
+            contrast: number;
+            saturation: number;
+        };
     }[];
     captions: {
         id: string;
@@ -380,6 +433,11 @@ export declare const trackSchema: z.ZodObject<{
             x?: number | undefined;
             y?: number | undefined;
             opacity?: number | undefined;
+        } | undefined;
+        effects?: {
+            brightness?: number | undefined;
+            contrast?: number | undefined;
+            saturation?: number | undefined;
         } | undefined;
     }[];
     captions?: {
@@ -476,6 +534,20 @@ export declare const projectSchema: z.ZodObject<{
                 y?: number | undefined;
                 opacity?: number | undefined;
             }>>;
+            /** Clip-local visual effects; neutral defaults preserve legacy appearance. */
+            effects: z.ZodDefault<z.ZodObject<{
+                brightness: z.ZodDefault<z.ZodNumber>;
+                contrast: z.ZodDefault<z.ZodNumber>;
+                saturation: z.ZodDefault<z.ZodNumber>;
+            }, "strip", z.ZodTypeAny, {
+                brightness: number;
+                contrast: number;
+                saturation: number;
+            }, {
+                brightness?: number | undefined;
+                contrast?: number | undefined;
+                saturation?: number | undefined;
+            }>>;
             /** Clip-local audio controls; defaults preserve source audio for legacy projects. */
             audio: z.ZodDefault<z.ZodObject<{
                 gainDb: z.ZodDefault<z.ZodNumber>;
@@ -504,6 +576,11 @@ export declare const projectSchema: z.ZodObject<{
                 y: number;
                 opacity: number;
             };
+            effects: {
+                brightness: number;
+                contrast: number;
+                saturation: number;
+            };
         }, {
             id: string;
             assetId: string;
@@ -520,6 +597,11 @@ export declare const projectSchema: z.ZodObject<{
                 x?: number | undefined;
                 y?: number | undefined;
                 opacity?: number | undefined;
+            } | undefined;
+            effects?: {
+                brightness?: number | undefined;
+                contrast?: number | undefined;
+                saturation?: number | undefined;
             } | undefined;
         }>, "many">;
         captions: z.ZodDefault<z.ZodArray<z.ZodObject<{
@@ -601,6 +683,11 @@ export declare const projectSchema: z.ZodObject<{
                 y: number;
                 opacity: number;
             };
+            effects: {
+                brightness: number;
+                contrast: number;
+                saturation: number;
+            };
         }[];
         captions: {
             id: string;
@@ -636,6 +723,11 @@ export declare const projectSchema: z.ZodObject<{
                 x?: number | undefined;
                 y?: number | undefined;
                 opacity?: number | undefined;
+            } | undefined;
+            effects?: {
+                brightness?: number | undefined;
+                contrast?: number | undefined;
+                saturation?: number | undefined;
             } | undefined;
         }[];
         captions?: {
@@ -698,6 +790,11 @@ export declare const projectSchema: z.ZodObject<{
                 y: number;
                 opacity: number;
             };
+            effects: {
+                brightness: number;
+                contrast: number;
+                saturation: number;
+            };
         }[];
         captions: {
             id: string;
@@ -755,6 +852,11 @@ export declare const projectSchema: z.ZodObject<{
                 x?: number | undefined;
                 y?: number | undefined;
                 opacity?: number | undefined;
+            } | undefined;
+            effects?: {
+                brightness?: number | undefined;
+                contrast?: number | undefined;
+                saturation?: number | undefined;
             } | undefined;
         }[];
         captions?: {

@@ -1,9 +1,10 @@
 import { useStudio } from "../store";
 
 export function Inspector() {
-  const { project, selectedClipId, moveSelected, trimSelected, setSelectedAudio, setSelectedTransform, changeAspect } = useStudio();
+  const { project, selectedClipId, moveSelected, trimSelected, setSelectedAudio, setSelectedEffects, setSelectedTransform, changeAspect } = useStudio();
   const clip = project.tracks.flatMap((t) => t.clips).find((c) => c.id === selectedClipId);
   const transform = clip?.transform ?? { scale: 1, x: 0, y: 0, opacity: 1 };
+  const effects = clip?.effects ?? { brightness: 0, contrast: 1, saturation: 1 };
 
   return (
     <div className="panel inspector">
@@ -42,6 +43,13 @@ export function Inspector() {
             onChange={(value) => setSelectedTransform(transform.scale, transform.x, value, transform.opacity)} />
           <TransformField testId="transform-opacity" label="Opacity" value={transform.opacity} min={0} max={1} step={0.05}
             onChange={(value) => setSelectedTransform(transform.scale, transform.x, transform.y, value)} />
+          <div className="panel-subhead">Effects</div>
+          <TransformField testId="effects-brightness" label="Brightness" value={effects.brightness} min={-1} max={1} step={0.05}
+            onChange={(value) => setSelectedEffects(value, effects.contrast, effects.saturation)} />
+          <TransformField testId="effects-contrast" label="Contrast" value={effects.contrast} min={0} max={2} step={0.05}
+            onChange={(value) => setSelectedEffects(effects.brightness, value, effects.saturation)} />
+          <TransformField testId="effects-saturation" label="Saturation" value={effects.saturation} min={0} max={3} step={0.05}
+            onChange={(value) => setSelectedEffects(effects.brightness, effects.contrast, value)} />
           <div className="inspector-row">
             <label>Gain (dB)</label>
             <input
