@@ -125,3 +125,11 @@ body { background: var(--bg); color: var(--fg); }
 .clip-trim.trim-r { right: 0; }
 
 .error-toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--danger); color: #fff; padding: 8px 16px; border-radius: 8px; cursor: pointer; z-index: 20; font-size: 13px; }
+.media-meta { min-width: 0; flex: 1; }
+.media-item.missing { border-style: dashed; }
+.media-codecs { margin-top: 2px; }
+.analysis-status { margin-top: 3px; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.analysis-status.ready { color: var(--accent); }
+.analysis-status.missing, .analysis-status.failed { color: var(--danger, #e88); }
+.media-waveform { display: block; width: 100%; max-width: 180px; height: 32px; object-fit: contain; background: #000; border-radius: 4px; margin-top: 4px; }
+.relink-button { margin-top: 5px; font-size: 11px; }

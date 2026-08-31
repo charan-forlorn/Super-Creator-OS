@@ -32,6 +32,20 @@
       "videoCodec": "prores",
       "audioCodec": "pcm_s16le",
       "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "asset-missing",
+      "name": "missing-source.mp4",
+      "sourcePath": "E2E_FIXTURE_MISSING",
+      "kind": "video",
+      "durationSec": 3,
+      "width": 640,
+      "height": 360,
+      "fps": 30,
+      "hasAudio": true,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "createdAt": "2026-01-01T00:00:00.000Z"
     }
   ],
   "tracks": [

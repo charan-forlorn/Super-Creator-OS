@@ -66,6 +66,10 @@ export async function ensureThumbnail(sourcePath: string, timeSec: number): Prom
   return invoke<string>("ensure_thumbnail", { sourcePath, timeSec });
 }
 
+export async function ensureWaveform(sourcePath: string): Promise<string> {
+  return invoke<string>("ensure_waveform", { sourcePath });
+}
+
 export async function invalidateCache(kind: string, key: string): Promise<boolean> {
   return invoke<boolean>("invalidate_cache", { kind, key });
 }

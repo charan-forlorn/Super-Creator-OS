@@ -21,6 +21,7 @@ import {
   ADD_CAPTION,
   CHANGE_ASPECT,
   PLACE_PROBED_MEDIA,
+  RELINK_MEDIA,
 } from "@haios/command-system";
 import {
   type AiEditPlan,
@@ -30,6 +31,7 @@ import {
 } from "@haios/ai-core";
 import { type AIProvider, OfflineProvider, ProviderUnavailableError } from "@haios/ai-providers";
 import type { MediaProbe } from "./bridge";
+import type { MediaAnalysisResult } from "./mediaAnalysis";
 import { PureMediaCache } from "@haios/media-engine";
 
 /** R2.2 — deterministic, browser-safe cache lifecycle tracker (no fs IO). */
@@ -40,6 +42,16 @@ let captionCounter = 0;
 function uid(prefix: string): string {
   clipCounter += 1;
   return `${prefix}-${Date.now().toString(36)}-${clipCounter}`;
+}
+
+export interface AssetAnalysisState {
+  sourcePath: string;
+  status: "queued" | "analyzing" | MediaAnalysisResult["status"];
+  probe?: MediaProbe;
+  thumbnailPath?: string;
+  proxyPath?: string;
+  waveformPath?: string;
+  error?: string;
 }
 
 export interface StudioState {
@@ -60,6 +72,8 @@ export interface StudioState {
   previewProxies: Record<string, string>;
   /** Deterministic media cache lifecycle state (HIT/MISS/STALE) keyed by cache key. */
   cacheState: Record<string, "missing" | "fresh" | "stale">;
+  /** R2.3 — runtime-only derived analysis, never persisted into the project schema. */
+  mediaAnalysis: Record<string, AssetAnalysisState>;
   lastError: string | null;
   dirty: boolean;
 
@@ -77,6 +91,8 @@ export interface StudioState {
   recordThumbnailCache: (sourcePath: string, timeSec: number, revision: number) => void;
   /** R2.2 — invalidate cache entries for a source (proxy + thumbnails). */
   invalidateSourceCache: (sourcePath: string) => void;
+  setMediaAnalysis: (assetId: string, state: AssetAnalysisState) => void;
+  relinkMedia: (assetId: string, probe: MediaProbe) => boolean;
 
   selectClip: (id: string | null) => void;
   /** R2.1 — toggle/extend selection (multi-select). */
@@ -128,13 +144,14 @@ export const useStudio = create<StudioState>((set, get) => {
     thumbnails: {},
     previewProxies: {},
     cacheState: {},
+    mediaAnalysis: {},
     lastError: null,
     dirty: false,
 
     newProject: () => {
       const { bus, registry } = makeBus();
       mediaCache.clear();
-      set({ project: bus.project, bus, registry, selectedClipId: null, playheadSec: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, dirty: false, lastError: null });
+      set({ project: bus.project, bus, registry, selectedClipId: null, playheadSec: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty: false, lastError: null });
     },
 
     loadProject: (raw) => {
@@ -142,7 +159,7 @@ export const useStudio = create<StudioState>((set, get) => {
       const registry = createStudioRegistry();
       const bus = new CommandBus(registry, p);
       mediaCache.clear();
-      set({ project: p, bus, registry, selectedClipId: null, playheadSec: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, dirty: false, lastError: null });
+      set({ project: p, bus, registry, selectedClipId: null, playheadSec: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty: false, lastError: null });
     },
 
     markSaved: () => set({ dirty: false }),
@@ -208,6 +225,43 @@ export const useStudio = create<StudioState>((set, get) => {
     invalidateSourceCache: (sourcePath) => {
       const removed = mediaCache.invalidateSource(sourcePath);
       if (removed > 0) set({ cacheState: {} });
+    },
+
+    setMediaAnalysis: (assetId, state) =>
+      set((state0) => ({ mediaAnalysis: { ...state0.mediaAnalysis, [assetId]: state } })),
+
+    relinkMedia: (assetId, probe) => {
+      const prior = get().project.assets.find((asset) => asset.id === assetId);
+      if (!prior) {
+        set({ lastError: `ASSET_NOT_FOUND: ${assetId}` });
+        return false;
+      }
+      try {
+        get().bus.execute(RELINK_MEDIA, { assetId, probe });
+        mediaCache.invalidateSource(prior.sourcePath);
+        set((state0) => {
+          const thumbnails = { ...state0.thumbnails };
+          const previewProxies = { ...state0.previewProxies };
+          delete thumbnails[assetId];
+          delete previewProxies[assetId];
+          return {
+            project: get().bus.project,
+            thumbnails,
+            previewProxies,
+            cacheState: {},
+            mediaAnalysis: {
+              ...state0.mediaAnalysis,
+              [assetId]: { sourcePath: probe.sourcePath, status: "queued", probe },
+            },
+            dirty: true,
+            lastError: null,
+          };
+        });
+        return true;
+      } catch (error) {
+        set({ lastError: (error as Error).message });
+        return false;
+      }
     },
 
     selectClip: (id) => set({ selectedClipId: id, selectedClipIds: id ? [id] : [] }),
@@ -374,14 +428,16 @@ export const useStudio = create<StudioState>((set, get) => {
         get().bus.undo();
         const id = get().selectedClipId;
         const stillThere = id && get().project.tracks.some((t) => t.clips.some((c) => c.id === id));
-        set({ project: get().bus.project, dirty: true, selectedClipId: stillThere ? id : null });
+        mediaCache.clear();
+        set({ project: get().bus.project, dirty: true, selectedClipId: stillThere ? id : null, mediaAnalysis: {}, thumbnails: {}, previewProxies: {}, cacheState: {} });
       }
     },
 
     redo: () => {
       if (get().bus.canRedo) {
         get().bus.redo();
-        set({ project: get().bus.project, dirty: true });
+        mediaCache.clear();
+        set({ project: get().bus.project, dirty: true, mediaAnalysis: {}, thumbnails: {}, previewProxies: {}, cacheState: {} });
       }
     },
 

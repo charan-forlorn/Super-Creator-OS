@@ -699,6 +699,46 @@ fn ensure_preview_proxy_impl(
     generate_preview_proxy_impl(source_path, &out_path)
 }
 
+/// Deterministic waveform cache key. Versioned so future rendering changes can
+/// invalidate old derived artifacts without touching source media.
+fn waveform_cache_key(source_path: &str) -> String {
+    format!("wave_{}", stable_hash(&format!("{}|waveform-v1", source_path)))
+}
+
+/// Build (or HIT) a waveform PNG in the managed cache.
+pub fn ensure_waveform(app: &tauri::AppHandle, source_path: &str) -> Result<String, String> {
+    let dir = cache_dir_for(app, "waveform")?;
+    ensure_waveform_impl(dir, source_path)
+}
+
+fn ensure_waveform_impl(cache_dir: String, source_path: &str) -> Result<String, String> {
+    let key = waveform_cache_key(source_path);
+    let out_path = std::path::Path::new(&cache_dir)
+        .join(format!("{key}.png"))
+        .to_string_lossy()
+        .to_string();
+    if Path::new(&out_path).is_file() {
+        return Ok(out_path);
+    }
+    generate_waveform_impl(source_path, &out_path)
+}
+
+fn generate_waveform_impl(source_path: &str, out_path: &str) -> Result<String, String> {
+    let ffmpeg = which("ffmpeg");
+    let status = ffcmd(&ffmpeg)
+        .args([
+            "-y", "-i", source_path,
+            "-filter_complex", "aformat=channel_layouts=mono,showwavespic=s=320x64:colors=white",
+            "-frames:v", "1", out_path,
+        ])
+        .status();
+    match status {
+        Ok(s) if s.success() => Ok(out_path.to_string()),
+        Ok(s) => Err(format!("ffmpeg waveform failed exit {s}")),
+        Err(e) => Err(format!("ffmpeg spawn error: {e}")),
+    }
+}
+
 /// Generate a deterministic thumbnail at `time_sec` inside the managed cache.
 /// HIT returns the existing file; MISS/STALE generates it.
 pub fn ensure_thumbnail(
@@ -927,6 +967,33 @@ mod tests {
         assert_eq!(before_mod, after_meta.modified().unwrap(), "source mtime must not change");
 
         // Cleanup test-only artifacts (do not leak into production cache).
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn ensure_waveform_real_miss_hit_reuse() {
+        let tmp = std::env::temp_dir().join(format!(
+            "haios_wave_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let source = tmp.join("tone.wav");
+        let gen = std::process::Command::new("ffmpeg")
+            .args(["-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", source.to_str().unwrap()])
+            .status()
+            .expect("spawn ffmpeg tone fixture");
+        assert!(gen.success());
+        let cache = tmp.join("cache").to_string_lossy().to_string();
+        std::fs::create_dir_all(&cache).unwrap();
+        let out1 = ensure_waveform_impl(cache.clone(), source.to_str().unwrap()).expect("waveform miss");
+        assert!(std::path::Path::new(&out1).is_file());
+        let mtime1 = std::fs::metadata(&out1).unwrap().modified().unwrap();
+        let out2 = ensure_waveform_impl(cache, source.to_str().unwrap()).expect("waveform hit");
+        assert_eq!(out1, out2);
+        assert_eq!(mtime1, std::fs::metadata(&out2).unwrap().modified().unwrap());
         let _ = std::fs::remove_dir_all(&tmp);
     }
 

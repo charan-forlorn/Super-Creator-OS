@@ -30,6 +30,7 @@ const E2E_SAMPLE_ABS_PATH: string = __E2E_SAMPLE_ABS_PATH__ || "E2E_FIXTURE_SAMP
 // seed time so the app can exercise the REAL ensurePreviewProxy production
 // command (mirrors MediaPanel.importFile) during bootstrap — no new bridge.
 const E2E_PRORES_ABS_PATH = E2E_SAMPLE_ABS_PATH.replace(/sample\.mp4$/i, "sample_prores.mov");
+const E2E_MISSING_ABS_PATH = E2E_SAMPLE_ABS_PATH.replace(/sample\.mp4$/i, "definitely-missing.mp4");
 
 async function bootstrapE2E() {
   // Clone before replacing the test fixture sentinel so schema validation is
@@ -42,7 +43,9 @@ async function bootstrapE2E() {
       ? { ...asset, sourcePath: E2E_SAMPLE_ABS_PATH }
       : asset.sourcePath === "E2E_FIXTURE_PRORES_MOV"
         ? { ...asset, sourcePath: E2E_PRORES_ABS_PATH }
-        : asset,
+        : asset.sourcePath === "E2E_FIXTURE_MISSING"
+          ? { ...asset, sourcePath: E2E_MISSING_ABS_PATH }
+          : asset,
   );
 
   // Render the SAME production App IMMEDIATELY (do not block first paint on
@@ -52,6 +55,11 @@ async function bootstrapE2E() {
   if (!root) throw new Error("E2E: #root missing");
   ReactDOM.createRoot(root).render(React.createElement(App));
   useStudio.getState().loadProject(project);
+
+  const mark = (key: string, value: unknown) => {
+    try { document.documentElement.setAttribute(`data-e2e-${key}`, String(value)); } catch { /* test-only diagnostics */ }
+  };
+  mark("seed-start", Date.now());
 
   // Mirror the production import flow: for each seeded video asset, generate a
   // deterministic thumbnail AND (if the codec needs it) a cached H.264/AAC proxy
@@ -76,14 +84,17 @@ async function bootstrapE2E() {
           const sig = `${asset.videoCodec ?? "na"}+${asset.audioCodec ?? "na"}`;
           // MISS → real proxy encode (via the production Tauri command).
           const proxyOut = await ensurePreviewProxy(asset.sourcePath, asset.videoCodec ?? null, asset.audioCodec ?? null);
+          mark(`proxy-ok-${asset.id}`, proxyOut);
           useStudio.getState().recordProxyCache(asset.sourcePath, sig, 1);
           useStudio.getState().setPreviewProxy(asset.id, proxyOut);
           // HIT → SAME command path again with identical identity. The backend
           // must reuse the existing deterministic cache file (no re-encode). This
           // proves real cache HIT/REUSE inside the production app, not just MISS.
-          await ensurePreviewProxy(asset.sourcePath, asset.videoCodec ?? null, asset.audioCodec ?? null);
+          const proxyOut2 = await ensurePreviewProxy(asset.sourcePath, asset.videoCodec ?? null, asset.audioCodec ?? null);
+          mark(proxyOut === proxyOut2 ? `proxy-hit-ok-${asset.id}` : `proxy-hit-mismatch-${asset.id}`, "1");
         } catch (e) {
           console.error("E2E proxy seed failed", e);
+          mark(`proxy-error-${asset.id}`, String(e));
         }
       }
     }

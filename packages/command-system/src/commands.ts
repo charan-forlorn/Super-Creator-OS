@@ -436,6 +436,62 @@ export const placeProbedMediaCommand: EditCommand<z.infer<typeof placeProbedMedi
   },
 };
 
+/* ----------------------------- relinkMedia -------------------------- */
+export const RELINK_MEDIA = "media.relink";
+export const relinkMediaSchema = z.object({
+  assetId: z.string().min(1),
+  probe: z.object({
+    name: z.string().min(1),
+    sourcePath: z.string().min(1),
+    kind: z.enum(["video", "audio", "image", "unknown"]),
+    durationSec: z.number().positive(),
+    width: z.number().int().nonnegative().optional(),
+    height: z.number().int().nonnegative().optional(),
+    fps: z.number().positive().optional(),
+    hasAudio: z.boolean(),
+    videoCodec: z.string().nullable().optional(),
+    audioCodec: z.string().nullable().optional(),
+    probeStatus: z.string(),
+  }),
+});
+export const relinkMediaCommand: EditCommand<z.infer<typeof relinkMediaSchema>> = {
+  type: RELINK_MEDIA,
+  schema: relinkMediaSchema,
+  execute(prev, { assetId, probe }) {
+    if (probe.probeStatus !== "ok") throw new CommandError(`RELINK_PROBE_NOT_OK: ${probe.probeStatus}`);
+    const prior = findAsset(prev, assetId);
+    const nextKind = probe.kind === "audio" ? "audio" : probe.kind === "video" ? "video" : "image";
+    if (nextKind !== prior.kind) throw new CommandError(`RELINK_KIND_MISMATCH: ${prior.kind} -> ${nextKind}`);
+    const replacement: MediaAsset = {
+      ...prior,
+      name: probe.name,
+      sourcePath: probe.sourcePath,
+      durationSec: probe.durationSec,
+      width: probe.width || undefined,
+      height: probe.height || undefined,
+      fps: probe.fps || undefined,
+      hasAudio: probe.hasAudio,
+      checksum: undefined,
+    };
+    for (const track of prev.tracks) {
+      for (const clip of track.clips.filter((c) => c.assetId === assetId)) {
+        const bad = validateClipAgainstAsset(clip, replacement);
+        if (bad) throw new CommandError(`RELINK_INCOMPATIBLE_CLIP: ${clip.id}: ${bad}`);
+      }
+    }
+    const next: Project = { ...prev, assets: prev.assets.map((a) => a.id === assetId ? replacement : a), updatedAt: new Date().toISOString() };
+    const inverse: EditCommand<z.infer<typeof relinkMediaSchema>> = {
+      type: "media.relink.restore",
+      execute(p) {
+        return {
+          next: { ...p, assets: p.assets.map((a) => a.id === assetId ? prior : a), updatedAt: new Date().toISOString() },
+          inverse: relinkMediaCommand,
+        };
+      },
+    };
+    return { next, inverse };
+  },
+};
 /* ----------------------------- splitClip ---------------------------- */
 export const SPLIT_CLIP = "clip.split";
 export const splitClipSchema = z.object({ clipId: z.string().min(1), t: z.number().positive() });

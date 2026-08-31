@@ -15,6 +15,7 @@ import {
   addTrackCommand,
   removeTrackCommand,
   placeProbedMediaCommand,
+  relinkMediaCommand,
 } from "./commands.js";
 import type { EditCommand } from "./types.js";
 
@@ -40,6 +41,7 @@ export function createStudioRegistry(): CommandRegistry {
     addTrackCommand,
     removeTrackCommand,
     placeProbedMediaCommand,
+    relinkMediaCommand,
   ];
   for (const c of cmds) reg.register(c);
   return reg;

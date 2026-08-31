@@ -480,6 +480,78 @@ export declare const placeProbedMediaSchema: z.ZodObject<{
     place?: boolean | undefined;
 }>;
 export declare const placeProbedMediaCommand: EditCommand<z.infer<typeof placeProbedMediaSchema>>;
+export declare const RELINK_MEDIA = "media.relink";
+export declare const relinkMediaSchema: z.ZodObject<{
+    assetId: z.ZodString;
+    probe: z.ZodObject<{
+        name: z.ZodString;
+        sourcePath: z.ZodString;
+        kind: z.ZodEnum<["video", "audio", "image", "unknown"]>;
+        durationSec: z.ZodNumber;
+        width: z.ZodOptional<z.ZodNumber>;
+        height: z.ZodOptional<z.ZodNumber>;
+        fps: z.ZodOptional<z.ZodNumber>;
+        hasAudio: z.ZodBoolean;
+        videoCodec: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+        audioCodec: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+        probeStatus: z.ZodString;
+    }, "strip", z.ZodTypeAny, {
+        kind: "video" | "audio" | "image" | "unknown";
+        name: string;
+        sourcePath: string;
+        durationSec: number;
+        hasAudio: boolean;
+        probeStatus: string;
+        width?: number | undefined;
+        height?: number | undefined;
+        fps?: number | undefined;
+        videoCodec?: string | null | undefined;
+        audioCodec?: string | null | undefined;
+    }, {
+        kind: "video" | "audio" | "image" | "unknown";
+        name: string;
+        sourcePath: string;
+        durationSec: number;
+        hasAudio: boolean;
+        probeStatus: string;
+        width?: number | undefined;
+        height?: number | undefined;
+        fps?: number | undefined;
+        videoCodec?: string | null | undefined;
+        audioCodec?: string | null | undefined;
+    }>;
+}, "strip", z.ZodTypeAny, {
+    probe: {
+        kind: "video" | "audio" | "image" | "unknown";
+        name: string;
+        sourcePath: string;
+        durationSec: number;
+        hasAudio: boolean;
+        probeStatus: string;
+        width?: number | undefined;
+        height?: number | undefined;
+        fps?: number | undefined;
+        videoCodec?: string | null | undefined;
+        audioCodec?: string | null | undefined;
+    };
+    assetId: string;
+}, {
+    probe: {
+        kind: "video" | "audio" | "image" | "unknown";
+        name: string;
+        sourcePath: string;
+        durationSec: number;
+        hasAudio: boolean;
+        probeStatus: string;
+        width?: number | undefined;
+        height?: number | undefined;
+        fps?: number | undefined;
+        videoCodec?: string | null | undefined;
+        audioCodec?: string | null | undefined;
+    };
+    assetId: string;
+}>;
+export declare const relinkMediaCommand: EditCommand<z.infer<typeof relinkMediaSchema>>;
 export declare const SPLIT_CLIP = "clip.split";
 export declare const splitClipSchema: z.ZodObject<{
     clipId: z.ZodString;

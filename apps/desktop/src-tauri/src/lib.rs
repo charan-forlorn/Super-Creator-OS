@@ -105,6 +105,12 @@ fn ensure_thumbnail(source_path: String, time_sec: f64, app: tauri::AppHandle) -
     bridge::ensure_thumbnail(&app, &source_path, time_sec)
 }
 
+/// R2.3 — Build (or HIT) a deterministic waveform PNG inside the managed cache.
+#[tauri::command]
+fn ensure_waveform(source_path: String, app: tauri::AppHandle) -> Result<String, String> {
+    bridge::ensure_waveform(&app, &source_path)
+}
+
 /// R2.2 — Invalidate a cache entry by deterministic key + kind.
 #[tauri::command]
 fn invalidate_cache(kind: String, key: String, app: tauri::AppHandle) -> bool {
@@ -198,6 +204,7 @@ pub fn run() {
             hvs_capabilities,
             ensure_preview_proxy,
             ensure_thumbnail,
+            ensure_waveform,
             invalidate_cache,
             hvs_render,
             verify_render,
