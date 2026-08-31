@@ -97,6 +97,17 @@ export declare const clipSchema: z.ZodObject<{
         contrast?: number | undefined;
         saturation?: number | undefined;
     }>>;
+    /** Incoming clip transition; null preserves legacy hard-cut behavior. */
+    transitionIn: z.ZodDefault<z.ZodNullable<z.ZodObject<{
+        type: z.ZodLiteral<"crossfade">;
+        duration: z.ZodNumber;
+    }, "strip", z.ZodTypeAny, {
+        type: "crossfade";
+        duration: number;
+    }, {
+        type: "crossfade";
+        duration: number;
+    }>>>;
     /** Clip-local audio controls; defaults preserve source audio for legacy projects. */
     audio: z.ZodDefault<z.ZodObject<{
         gainDb: z.ZodDefault<z.ZodNumber>;
@@ -130,6 +141,10 @@ export declare const clipSchema: z.ZodObject<{
         contrast: number;
         saturation: number;
     };
+    transitionIn: {
+        type: "crossfade";
+        duration: number;
+    } | null;
 }, {
     id: string;
     assetId: string;
@@ -152,6 +167,10 @@ export declare const clipSchema: z.ZodObject<{
         contrast?: number | undefined;
         saturation?: number | undefined;
     } | undefined;
+    transitionIn?: {
+        type: "crossfade";
+        duration: number;
+    } | null | undefined;
 }>;
 export type Clip = z.infer<typeof clipSchema>;
 export declare const captionSchema: z.ZodObject<{
@@ -258,6 +277,17 @@ export declare const trackSchema: z.ZodObject<{
             contrast?: number | undefined;
             saturation?: number | undefined;
         }>>;
+        /** Incoming clip transition; null preserves legacy hard-cut behavior. */
+        transitionIn: z.ZodDefault<z.ZodNullable<z.ZodObject<{
+            type: z.ZodLiteral<"crossfade">;
+            duration: z.ZodNumber;
+        }, "strip", z.ZodTypeAny, {
+            type: "crossfade";
+            duration: number;
+        }, {
+            type: "crossfade";
+            duration: number;
+        }>>>;
         /** Clip-local audio controls; defaults preserve source audio for legacy projects. */
         audio: z.ZodDefault<z.ZodObject<{
             gainDb: z.ZodDefault<z.ZodNumber>;
@@ -291,6 +321,10 @@ export declare const trackSchema: z.ZodObject<{
             contrast: number;
             saturation: number;
         };
+        transitionIn: {
+            type: "crossfade";
+            duration: number;
+        } | null;
     }, {
         id: string;
         assetId: string;
@@ -313,6 +347,10 @@ export declare const trackSchema: z.ZodObject<{
             contrast?: number | undefined;
             saturation?: number | undefined;
         } | undefined;
+        transitionIn?: {
+            type: "crossfade";
+            duration: number;
+        } | null | undefined;
     }>, "many">;
     captions: z.ZodDefault<z.ZodArray<z.ZodObject<{
         id: z.ZodString;
@@ -398,6 +436,10 @@ export declare const trackSchema: z.ZodObject<{
             contrast: number;
             saturation: number;
         };
+        transitionIn: {
+            type: "crossfade";
+            duration: number;
+        } | null;
     }[];
     captions: {
         id: string;
@@ -439,6 +481,10 @@ export declare const trackSchema: z.ZodObject<{
             contrast?: number | undefined;
             saturation?: number | undefined;
         } | undefined;
+        transitionIn?: {
+            type: "crossfade";
+            duration: number;
+        } | null | undefined;
     }[];
     captions?: {
         id: string;
@@ -548,6 +594,17 @@ export declare const projectSchema: z.ZodObject<{
                 contrast?: number | undefined;
                 saturation?: number | undefined;
             }>>;
+            /** Incoming clip transition; null preserves legacy hard-cut behavior. */
+            transitionIn: z.ZodDefault<z.ZodNullable<z.ZodObject<{
+                type: z.ZodLiteral<"crossfade">;
+                duration: z.ZodNumber;
+            }, "strip", z.ZodTypeAny, {
+                type: "crossfade";
+                duration: number;
+            }, {
+                type: "crossfade";
+                duration: number;
+            }>>>;
             /** Clip-local audio controls; defaults preserve source audio for legacy projects. */
             audio: z.ZodDefault<z.ZodObject<{
                 gainDb: z.ZodDefault<z.ZodNumber>;
@@ -581,6 +638,10 @@ export declare const projectSchema: z.ZodObject<{
                 contrast: number;
                 saturation: number;
             };
+            transitionIn: {
+                type: "crossfade";
+                duration: number;
+            } | null;
         }, {
             id: string;
             assetId: string;
@@ -603,6 +664,10 @@ export declare const projectSchema: z.ZodObject<{
                 contrast?: number | undefined;
                 saturation?: number | undefined;
             } | undefined;
+            transitionIn?: {
+                type: "crossfade";
+                duration: number;
+            } | null | undefined;
         }>, "many">;
         captions: z.ZodDefault<z.ZodArray<z.ZodObject<{
             id: z.ZodString;
@@ -688,6 +753,10 @@ export declare const projectSchema: z.ZodObject<{
                 contrast: number;
                 saturation: number;
             };
+            transitionIn: {
+                type: "crossfade";
+                duration: number;
+            } | null;
         }[];
         captions: {
             id: string;
@@ -729,6 +798,10 @@ export declare const projectSchema: z.ZodObject<{
                 contrast?: number | undefined;
                 saturation?: number | undefined;
             } | undefined;
+            transitionIn?: {
+                type: "crossfade";
+                duration: number;
+            } | null | undefined;
         }[];
         captions?: {
             id: string;
@@ -795,6 +868,10 @@ export declare const projectSchema: z.ZodObject<{
                 contrast: number;
                 saturation: number;
             };
+            transitionIn: {
+                type: "crossfade";
+                duration: number;
+            } | null;
         }[];
         captions: {
             id: string;
@@ -858,6 +935,10 @@ export declare const projectSchema: z.ZodObject<{
                 contrast?: number | undefined;
                 saturation?: number | undefined;
             } | undefined;
+            transitionIn?: {
+                type: "crossfade";
+                duration: number;
+            } | null | undefined;
         }[];
         captions?: {
             id: string;

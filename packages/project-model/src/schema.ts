@@ -57,6 +57,14 @@ export const clipSchema = z.object({
       saturation: z.number().min(0).max(3).default(1),
     })
     .default({}),
+  /** Incoming clip transition; null preserves legacy hard-cut behavior. */
+  transitionIn: z
+    .object({
+      type: z.literal("crossfade"),
+      duration: z.number().min(0.1).max(2),
+    })
+    .nullable()
+    .default(null),
   /** Clip-local audio controls; defaults preserve source audio for legacy projects. */
   audio: z
     .object({

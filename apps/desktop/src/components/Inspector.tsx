@@ -1,10 +1,11 @@
 import { useStudio } from "../store";
 
 export function Inspector() {
-  const { project, selectedClipId, moveSelected, trimSelected, setSelectedAudio, setSelectedEffects, setSelectedTransform, changeAspect } = useStudio();
+  const { project, selectedClipId, moveSelected, trimSelected, setSelectedAudio, setSelectedEffects, setSelectedTransition, setSelectedTransform, changeAspect } = useStudio();
   const clip = project.tracks.flatMap((t) => t.clips).find((c) => c.id === selectedClipId);
   const transform = clip?.transform ?? { scale: 1, x: 0, y: 0, opacity: 1 };
   const effects = clip?.effects ?? { brightness: 0, contrast: 1, saturation: 1 };
+  const transition = clip?.transitionIn ?? null;
 
   return (
     <div className="panel inspector">
@@ -50,6 +51,14 @@ export function Inspector() {
             onChange={(value) => setSelectedEffects(effects.brightness, value, effects.saturation)} />
           <TransformField testId="effects-saturation" label="Saturation" value={effects.saturation} min={0} max={3} step={0.05}
             onChange={(value) => setSelectedEffects(effects.brightness, effects.contrast, value)} />
+          <div className="panel-subhead">Transition</div>
+          <div className="inspector-row">
+            <label>Crossfade</label>
+            <button data-testid="transition-crossfade" onClick={() => setSelectedTransition("crossfade", transition?.duration ?? 0.5)}>Apply</button>
+            <button data-testid="transition-none" onClick={() => setSelectedTransition("none")}>None</button>
+          </div>
+          <TransformField testId="transition-duration" label="Duration (s)" value={transition?.duration ?? 0.5} min={0.1} max={2} step={0.1}
+            onChange={(value) => setSelectedTransition("crossfade", value)} />
           <div className="inspector-row">
             <label>Gain (dB)</label>
             <input

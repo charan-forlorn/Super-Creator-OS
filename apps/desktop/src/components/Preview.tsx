@@ -6,49 +6,47 @@ import { PlaybackDiagnostics } from "../previewDiagnostics";
 export function Preview() {
   const { project, playheadSec, setPlayhead, previewProxies } = useStudio();
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const outgoingRef = useRef<HTMLVideoElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const diagRef = useRef<PlaybackDiagnostics>(new PlaybackDiagnostics());
 
-  // Resolve the clip under the playhead on the first video track.
-  const clip = project.tracks
-    .filter((t) => t.kind === "video")
-    .flatMap((t) => t.clips)
-    .find((c) => playheadSec >= c.start && playheadSec < c.start + c.duration);
+  const videoTrack = project.tracks.find((t) => t.kind === "video");
+  const orderedClips = [...(videoTrack?.clips ?? [])].sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+  const transitionIndex = orderedClips.findIndex((c) =>
+    c.transitionIn?.type === "crossfade" &&
+    playheadSec >= c.start && playheadSec < c.start + c.transitionIn.duration,
+  );
+  const transitionClip = transitionIndex >= 0 ? orderedClips[transitionIndex] : undefined;
+  const outgoingClip = transitionIndex > 0 ? orderedClips[transitionIndex - 1] : undefined;
+  const clip = transitionClip ?? orderedClips.find((c) => playheadSec >= c.start && playheadSec < c.start + c.duration);
+  const transitionProgress = transitionClip?.transitionIn
+    ? Math.max(0, Math.min(1, (playheadSec - transitionClip.start) / transitionClip.transitionIn.duration))
+    : 1;
 
   const asset = clip ? project.assets.find((a) => a.id === clip.assetId) : undefined;
-
-  // ROOT_CAUSE_2 FIX: never assign a raw Windows filesystem path to video.src.
-  // Route every media source through the centralized Tauri-safe resolver.
+  const outgoingAsset = outgoingClip ? project.assets.find((a) => a.id === outgoingClip.assetId) : undefined;
   const previewSrc = asset ? resolvePreviewSource({ sourcePath: asset.sourcePath, proxyPath: previewProxies[asset.id] }) : undefined;
+  const outgoingSrc = outgoingAsset ? resolvePreviewSource({ sourcePath: outgoingAsset.sourcePath, proxyPath: previewProxies[outgoingAsset.id] }) : undefined;
+  const transitionActive = Boolean(transitionClip && outgoingClip && outgoingSrc && previewSrc);
 
   useEffect(() => {
-    const v = videoRef.current;
-    if (!v || !clip) return;
-    const audio = clip.audio ?? { gainDb: 0, muted: false };
-    v.muted = audio.muted;
-    v.volume = Math.max(0, Math.min(1, Math.pow(10, audio.gainDb / 20)));
-  }, [clip?.id, clip?.audio?.gainDb, clip?.audio?.muted]);
+    applyClipAudio(videoRef.current, clip, transitionActive ? transitionProgress : 1);
+    applyClipAudio(outgoingRef.current, outgoingClip, transitionActive ? 1 - transitionProgress : 1);
+  }, [clip, outgoingClip, transitionActive, transitionProgress]);
 
   useEffect(() => {
-    const v = videoRef.current;
-    if (!v || !asset) return;
-    const local = playheadSec - (clip?.start ?? 0) + (clip?.inPoint ?? 0);
-    if (Math.abs(v.currentTime - local) > 0.2) {
-      try {
-        v.currentTime = Math.max(0, local);
-      } catch {
-        /* seeking before metadata ready */
-      }
-    }
-  }, [playheadSec, asset, clip]);
+    syncVideoTime(videoRef.current, clip, playheadSec);
+    syncVideoTime(outgoingRef.current, outgoingClip, playheadSec);
+  }, [playheadSec, clip, outgoingClip]);
 
   function togglePlay() {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.paused) {
-      v.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+    const primary = videoRef.current;
+    if (!primary) return;
+    const videos = [outgoingRef.current, primary].filter((v): v is HTMLVideoElement => Boolean(v));
+    if (primary.paused) {
+      Promise.all(videos.map((v) => v.play())).then(() => setPlaying(true)).catch(() => setPlaying(false));
     } else {
-      v.pause();
+      videos.forEach((v) => v.pause());
       setPlaying(false);
     }
   }
@@ -70,7 +68,36 @@ export function Preview() {
   return (
     <div className="preview">
       <div className="preview-stage" style={aspectStyle(project.aspectRatio)}>
-        {asset && previewSrc ? (
+        {transitionActive && outgoingSrc && previewSrc ? (
+          <>
+            <video
+              ref={outgoingRef}
+              data-testid="transition-outgoing-video"
+              src={outgoingSrc}
+              className="preview-video preview-video-layer"
+              style={videoTransformStyle(outgoingClip, 1)}
+              onError={onError}
+            />
+            <video
+              ref={videoRef}
+              data-testid="transition-incoming-video"
+              src={previewSrc}
+              className="preview-video preview-video-layer"
+              style={videoTransformStyle(transitionClip, transitionProgress)}
+              onLoadedMetadata={() => diagRef.current.record({ type: "loadedmetadata" })}
+              onCanPlay={() => diagRef.current.record({ type: "canplay" })}
+              onPlay={() => { diagRef.current.record({ type: "play" }); setPlaying(true); }}
+              onPause={() => { diagRef.current.record({ type: "pause" }); setPlaying(false); }}
+              onError={onError}
+              onTimeUpdate={(e) => {
+                if (!e.currentTarget.paused && transitionClip) {
+                  setPlayhead(transitionClip.start - transitionClip.inPoint + e.currentTarget.currentTime);
+                }
+              }}
+              onEnded={() => setPlaying(false)}
+            />
+          </>
+        ) : asset && previewSrc ? (
           <video
             ref={videoRef}
             src={previewSrc}
@@ -82,11 +109,8 @@ export function Preview() {
             onPause={() => { diagRef.current.record({ type: "pause" }); setPlaying(false); }}
             onError={onError}
             onTimeUpdate={(e) => {
-              const t = e.currentTarget.currentTime;
-              if (!e.currentTarget.paused) {
-                // keep playhead synced while playing
-                const next = (clip?.start ?? 0) - (clip?.inPoint ?? 0) + t;
-                setPlayhead(next);
+              if (!e.currentTarget.paused && clip) {
+                setPlayhead(clip.start - clip.inPoint + e.currentTarget.currentTime);
               }
             }}
             onEnded={() => setPlaying(false)}
@@ -124,6 +148,27 @@ export function Preview() {
   );
 }
 
+type PreviewAudioClip = {
+  start: number;
+  inPoint: number;
+  audio?: { gainDb: number; muted: boolean };
+};
+
+function applyClipAudio(video: HTMLVideoElement | null, clip: PreviewAudioClip | undefined, layerGain: number) {
+  if (!video || !clip) return;
+  const audio = clip.audio ?? { gainDb: 0, muted: false };
+  video.muted = audio.muted;
+  const base = Math.pow(10, audio.gainDb / 20);
+  video.volume = Math.max(0, Math.min(1, base * layerGain));
+}
+
+function syncVideoTime(video: HTMLVideoElement | null, clip: PreviewAudioClip | undefined, playheadSec: number) {
+  if (!video || !clip) return;
+  const local = playheadSec - clip.start + clip.inPoint;
+  if (Math.abs(video.currentTime - local) <= 0.2) return;
+  try { video.currentTime = Math.max(0, local); } catch { /* metadata not ready */ }
+}
+
 function aspectStyle(ratio: string): React.CSSProperties {
   const [w, h] = ratio.split("x").map(Number);
   const ar = w / h;
@@ -131,13 +176,13 @@ function aspectStyle(ratio: string): React.CSSProperties {
   return { aspectRatio: String(ar), maxHeight: "100%", maxWidth: "100%" };
 }
 
-function videoTransformStyle(clip?: { transform?: { x: number; y: number; scale: number; opacity: number }; effects?: { brightness: number; contrast: number; saturation: number } }): React.CSSProperties {
+function videoTransformStyle(clip?: { transform?: { x: number; y: number; scale: number; opacity: number }; effects?: { brightness: number; contrast: number; saturation: number } }, layerOpacity = 1): React.CSSProperties {
   const t = clip?.transform ?? { x: 0, y: 0, scale: 1, opacity: 1 };
   const e = clip?.effects ?? { brightness: 0, contrast: 1, saturation: 1 };
   return {
     transform: `translate(${t.x * 50}%, ${t.y * 50}%) scale(${t.scale})`,
     transformOrigin: "center center",
-    opacity: t.opacity,
+    opacity: t.opacity * layerOpacity,
     filter: `brightness(${Math.max(0, 1 + e.brightness)}) contrast(${e.contrast}) saturate(${e.saturation})`,
   };
 }

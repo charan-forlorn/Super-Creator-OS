@@ -295,15 +295,34 @@ fn clip_audio_linear_gain(clip: &Value) -> f64 {
     10_f64.powf(gain_db / 20.0)
 }
 
-fn video_clip_audio_filter(input_idx: usize, clip: &Value, duration: f64, has_audio: bool) -> String {
+fn transition_in_duration(clip: &Value) -> Option<f64> {
+    let t = clip.get("transitionIn")?;
+    if t.get("type").and_then(|v| v.as_str()) != Some("crossfade") { return None; }
+    t.get("duration").and_then(|v| v.as_f64()).map(|d| d.clamp(0.1, 2.0))
+}
+
+fn video_clip_audio_filter_with_transition(input_idx: usize, clip: &Value, duration: f64, has_audio: bool, fade_out: Option<f64>) -> String {
     let gain = clip_audio_linear_gain(clip);
     let start = clip.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.0);
     let delay_ms = (start * 1000.0).round() as u64;
-    if has_audio {
-        format!("[{input_idx}:a]atrim=duration={duration:.3},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp,aresample=44100,volume={gain:.6},adelay={delay_ms}|{delay_ms}[{input_idx}va]")
-    } else {
-        format!("anullsrc=r=44100:cl=mono:d={duration:.3},volume={gain:.6},adelay={delay_ms}|{delay_ms}[{input_idx}va]")
+    let mut fades = String::new();
+    if let Some(d) = transition_in_duration(clip) {
+        fades.push_str(&format!(",afade=t=in:st=0:d={:.3}", d.min(duration)));
     }
+    if let Some(d) = fade_out {
+        let d = d.min(duration);
+        fades.push_str(&format!(",afade=t=out:st={:.3}:d={:.3}", (duration - d).max(0.0), d));
+    }
+    if has_audio {
+        format!("[{input_idx}:a]atrim=duration={duration:.3},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp,aresample=44100,volume={gain:.6}{fades},adelay={delay_ms}|{delay_ms}[{input_idx}va]")
+    } else {
+        format!("anullsrc=r=44100:cl=mono:d={duration:.3},volume={gain:.6}{fades},adelay={delay_ms}|{delay_ms}[{input_idx}va]")
+    }
+}
+
+#[cfg(test)]
+fn video_clip_audio_filter(input_idx: usize, clip: &Value, duration: f64, has_audio: bool) -> String {
+    video_clip_audio_filter_with_transition(input_idx, clip, duration, has_audio, None)
 }
 
 fn clip_transform_values(clip: &Value) -> (f64, f64, f64, f64) {
@@ -349,7 +368,12 @@ fn video_timeline_filter(clips: &[Value], duration: f64, w: i32, h: i32) -> Stri
         let start = clip.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.0);
         let clip_duration = clip.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.001).max(0.001);
         let end = start + clip_duration;
-        parts.push(format!("[{i}v]setpts=PTS+{start:.3}/TB[{i}vt]"));
+        if let Some(d) = transition_in_duration(clip) {
+            let d = d.min(clip_duration);
+            parts.push(format!("[{i}v]format=rgba,fade=t=in:st=0:d={d:.3}:alpha=1,setpts=PTS+{start:.3}/TB[{i}vt]"));
+        } else {
+            parts.push(format!("[{i}v]setpts=PTS+{start:.3}/TB[{i}vt]"));
+        }
         let base_in = format!("vbase{i}");
         let base_out = if i + 1 == clips.len() { "vout".to_string() } else { format!("vbase{}", i + 1) };
         parts.push(format!("[{base_in}][{i}vt]overlay=x=0:y=0:eof_action=pass:repeatlast=0:shortest=0:enable='between(t,{start:.3},{end:.3})'[{base_out}]"));
@@ -467,6 +491,12 @@ pub fn run_render(
         emit_state(app, job_id, "FAILED", 0.0, None, Some("no video clips to render".to_string()));
         return;
     }
+    video_clips.sort_by(|a, b| {
+        let sa = a.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let sb = b.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        sa.partial_cmp(&sb).unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.get("id").and_then(|v| v.as_str()).unwrap_or("").cmp(b.get("id").and_then(|v| v.as_str()).unwrap_or("")))
+    });
 
     // Concatenate video clips with exact source trims and scale to the target.
     // Each video input is bounded with -t so export duration matches the model.
@@ -488,7 +518,8 @@ pub fn run_render(
         inputs.extend(["-ss".into(), format!("{in_point:.3}"), "-t".into(), format!("{duration:.3}"), "-i".into(), source]);
         concat_parts.push(video_clip_filter(i, clip, duration, w, h));
         let has_audio = asset.and_then(|a| a.get("hasAudio")).and_then(|v| v.as_bool()).unwrap_or(false);
-        video_audio_parts.push(video_clip_audio_filter(i, clip, duration, has_audio));
+        let fade_out = video_clips.get(i + 1).and_then(transition_in_duration);
+        video_audio_parts.push(video_clip_audio_filter_with_transition(i, clip, duration, has_audio, fade_out));
     }
     let timeline_duration = project.get("durationSec").and_then(|v| v.as_f64()).unwrap_or_else(|| video_clips.iter().map(|c| c.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0) + c.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0)).fold(0.0, f64::max)).max(0.1);
     let mut filter = concat_parts.join(";");
@@ -1175,6 +1206,65 @@ mod tests {
         assert!(out.stdout.len() >= first_sec * 2);
         assert!(out.stdout[..first_sec].iter().all(|b| *b == 0), "pre-start audio must be silence");
         assert!(out.stdout[first_sec..].iter().any(|b| *b != 0), "delayed audio must contain signal");
+    }
+
+    #[test]
+    fn crossfade_filter_contract_uses_incoming_alpha_and_audio_pair() {
+        let c0 = json!({"start": 0.0, "duration": 2.0, "audio": {"gainDb": 0.0, "muted": false}});
+        let c1 = json!({"start": 1.5, "duration": 2.0, "transitionIn": {"type": "crossfade", "duration": 0.5}, "audio": {"gainDb": 0.0, "muted": false}});
+        let vf = video_timeline_filter(&vec![c0.clone(), c1.clone()], 3.5, 320, 180);
+        assert!(vf.contains("[1v]format=rgba,fade=t=in:st=0:d=0.500:alpha=1"));
+        let a0 = video_clip_audio_filter_with_transition(0, &c0, 2.0, true, Some(0.5));
+        let a1 = video_clip_audio_filter_with_transition(1, &c1, 2.0, true, None);
+        assert!(a0.contains("afade=t=out:st=1.500:d=0.500"));
+        assert!(a1.contains("afade=t=in:st=0:d=0.500"));
+    }
+
+    #[test]
+    fn crossfade_video_executes_with_real_ffmpeg() {
+        let c0 = json!({"start": 0.0, "duration": 2.0});
+        let c1 = json!({"start": 1.5, "duration": 2.0, "transitionIn": {"type": "crossfade", "duration": 0.5}});
+        let clips = vec![c0.clone(), c1.clone()];
+        let graph = format!("{};{};{};[vout]trim=start=1.74:end=1.77,setpts=PTS-STARTPTS[out]",
+            video_clip_filter(0, &c0, 2.0, 64, 64),
+            video_clip_filter(1, &c1, 2.0, 64, 64),
+            video_timeline_filter(&clips, 3.5, 64, 64));
+        let out = std::process::Command::new("ffmpeg").args([
+            "-v", "error", "-f", "lavfi", "-i", "color=c=red:s=64x64:r=30:d=2",
+            "-f", "lavfi", "-i", "color=c=blue:s=64x64:r=30:d=2",
+            "-filter_complex", &graph, "-map", "[out]", "-frames:v", "1",
+            "-pix_fmt", "rgb24", "-f", "rawvideo", "-",
+        ]).output().expect("spawn crossfade video proof");
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        let i = (32 * 64 + 32) * 3;
+        assert!(out.stdout.len() >= i + 3);
+        let (r, g, b) = (out.stdout[i], out.stdout[i + 1], out.stdout[i + 2]);
+        assert!(r > 45 && b > 45 && g < 60, "mid-crossfade must contain both sources: {r},{g},{b}");
+    }
+
+    #[test]
+    fn crossfade_audio_executes_with_real_ffmpeg() {
+        let c0 = json!({"start": 0.0, "audio": {"gainDb": 0.0, "muted": false}});
+        let c1 = json!({"start": 1.5, "transitionIn": {"type": "crossfade", "duration": 0.5}, "audio": {"gainDb": 0.0, "muted": false}});
+        let graph = format!("{};{};[0va][1va]amix=inputs=2:duration=longest:normalize=0[aout]",
+            video_clip_audio_filter_with_transition(0, &c0, 2.0, true, Some(0.5)),
+            video_clip_audio_filter_with_transition(1, &c1, 2.0, false, None));
+        let out = std::process::Command::new("ffmpeg").args([
+            "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+            "-filter_complex", &graph, "-map", "[aout]", "-ac", "1", "-ar", "44100",
+            "-f", "s16le", "-",
+        ]).output().expect("spawn crossfade audio proof");
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        let window_peak = |start_sec: f64, span_sec: f64| -> i16 {
+            let start = (start_sec * 44100.0) as usize * 2;
+            let end = (((start_sec + span_sec) * 44100.0) as usize * 2).min(out.stdout.len());
+            out.stdout[start..end].chunks_exact(2)
+                .map(|b| i16::from_le_bytes([b[0], b[1]]).abs())
+                .max().unwrap_or(0)
+        };
+        let early = window_peak(1.52, 0.08);
+        let late = window_peak(1.90, 0.08);
+        assert!(early > late * 3, "outgoing audio must fade down across overlap: early={early} late={late}");
     }
 
     #[test]

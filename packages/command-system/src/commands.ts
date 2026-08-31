@@ -186,6 +186,50 @@ export const setClipEffectsCommand: EditCommand<z.infer<typeof setClipEffectsSch
   },
 };
 
+/* -------------------------- clipTransition ------------------------- */
+export const SET_CLIP_TRANSITION = "clip.transition";
+export const setClipTransitionSchema = z.object({
+  clipId: z.string().min(1),
+  mode: z.enum(["none", "crossfade"]),
+  duration: z.number().min(0.1).max(2).optional(),
+});
+
+type TransitionSnapshot = { start: number; transitionIn: Clip["transitionIn"] };
+function restoreClipTransition(prev: Project, clipId: string, target: TransitionSnapshot): { next: Project; inverse: EditCommand } {
+  const { clip, track } = findClip(prev, clipId);
+  const current: TransitionSnapshot = { start: clip.start, transitionIn: clip.transitionIn ?? null };
+  const updated: Clip = { ...clip, start: target.start, transitionIn: target.transitionIn };
+  const tracks = prev.tracks.map((t) => t.id === track.id ? { ...t, clips: t.clips.map((c) => c.id === clipId ? updated : c) } : t);
+  const next: Project = { ...prev, tracks, durationSec: recomputeDuration({ ...prev, tracks }), updatedAt: new Date().toISOString() };
+  return { next, inverse: { type: SET_CLIP_TRANSITION, execute: (p: Project) => restoreClipTransition(p, clipId, current) } as EditCommand };
+}
+
+export const setClipTransitionCommand: EditCommand<z.infer<typeof setClipTransitionSchema>> = {
+  type: SET_CLIP_TRANSITION,
+  schema: setClipTransitionSchema,
+  execute(prev, { clipId, mode, duration }) {
+    const { clip, track } = findClip(prev, clipId);
+    if (track.kind !== "video") throw new CommandError("TRANSITION_REQUIRES_VIDEO_TRACK");
+    const ordered = [...track.clips].sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+    const index = ordered.findIndex((c) => c.id === clipId);
+    const previous = index > 0 ? ordered[index - 1] : undefined;
+    if (mode === "crossfade") {
+      if (!previous) throw new CommandError("TRANSITION_REQUIRES_PREVIOUS_CLIP");
+      const d = duration ?? 0.5;
+      const maxDuration = Math.min(previous.duration, clip.duration, 2);
+      if (d > maxDuration + 1e-9) throw new CommandError(`TRANSITION_TOO_LONG: ${d} > ${maxDuration}`);
+      return restoreClipTransition(prev, clipId, {
+        start: previous.start + previous.duration - d,
+        transitionIn: { type: "crossfade", duration: d },
+      });
+    }
+    return restoreClipTransition(prev, clipId, {
+      start: clip.transitionIn && previous ? previous.start + previous.duration : clip.start,
+      transitionIn: null,
+    });
+  },
+};
+
 /* --------------------------- clipTransform -------------------------- */
 export const SET_CLIP_TRANSFORM = "clip.transform";
 export const setClipTransformSchema = z.object({
@@ -525,6 +569,7 @@ export const placeProbedMediaCommand: EditCommand<z.infer<typeof placeProbedMedi
         transform: { scale: 1, x: 0, y: 0, opacity: 1 },
         audio: { gainDb: 0, muted: false },
         effects: { brightness: 0, contrast: 1, saturation: 1 },
+        transitionIn: null,
       };
       next = {
         ...next,

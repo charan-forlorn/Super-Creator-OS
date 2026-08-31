@@ -61,6 +61,21 @@ export declare const setClipEffectsSchema: z.ZodObject<{
     saturation: number;
 }>;
 export declare const setClipEffectsCommand: EditCommand<z.infer<typeof setClipEffectsSchema>>;
+export declare const SET_CLIP_TRANSITION = "clip.transition";
+export declare const setClipTransitionSchema: z.ZodObject<{
+    clipId: z.ZodString;
+    mode: z.ZodEnum<["none", "crossfade"]>;
+    duration: z.ZodOptional<z.ZodNumber>;
+}, "strip", z.ZodTypeAny, {
+    clipId: string;
+    mode: "crossfade" | "none";
+    duration?: number | undefined;
+}, {
+    clipId: string;
+    mode: "crossfade" | "none";
+    duration?: number | undefined;
+}>;
+export declare const setClipTransitionCommand: EditCommand<z.infer<typeof setClipTransitionSchema>>;
 export declare const SET_CLIP_TRANSFORM = "clip.transform";
 export declare const setClipTransformSchema: z.ZodObject<{
     clipId: z.ZodString;
@@ -106,12 +121,12 @@ export declare const placeCaptionSchema: z.ZodObject<{
     duration: z.ZodDefault<z.ZodNumber>;
 }, "strip", z.ZodTypeAny, {
     text: string;
-    start: number;
     duration: number;
+    start: number;
 }, {
     text: string;
-    start?: number | undefined;
     duration?: number | undefined;
+    start?: number | undefined;
 }>;
 export declare const placeCaptionCommand: EditCommand<z.infer<typeof placeCaptionSchema>>;
 export declare const ADD_CAPTION = "caption.add";
@@ -262,6 +277,16 @@ export declare const addTrackSchema: z.ZodObject<{
                 contrast?: number | undefined;
                 saturation?: number | undefined;
             }>>;
+            transitionIn: z.ZodDefault<z.ZodNullable<z.ZodObject<{
+                type: z.ZodLiteral<"crossfade">;
+                duration: z.ZodNumber;
+            }, "strip", z.ZodTypeAny, {
+                type: "crossfade";
+                duration: number;
+            }, {
+                type: "crossfade";
+                duration: number;
+            }>>>;
             audio: z.ZodDefault<z.ZodObject<{
                 gainDb: z.ZodDefault<z.ZodNumber>;
                 muted: z.ZodDefault<z.ZodBoolean>;
@@ -294,6 +319,10 @@ export declare const addTrackSchema: z.ZodObject<{
                 contrast: number;
                 saturation: number;
             };
+            transitionIn: {
+                type: "crossfade";
+                duration: number;
+            } | null;
         }, {
             id: string;
             assetId: string;
@@ -316,6 +345,10 @@ export declare const addTrackSchema: z.ZodObject<{
                 contrast?: number | undefined;
                 saturation?: number | undefined;
             } | undefined;
+            transitionIn?: {
+                type: "crossfade";
+                duration: number;
+            } | null | undefined;
         }>, "many">>;
         captions: z.ZodDefault<z.ZodArray<z.ZodObject<{
             id: z.ZodString;
@@ -399,6 +432,10 @@ export declare const addTrackSchema: z.ZodObject<{
                 contrast: number;
                 saturation: number;
             };
+            transitionIn: {
+                type: "crossfade";
+                duration: number;
+            } | null;
         }[];
         captions: {
             id: string;
@@ -440,6 +477,10 @@ export declare const addTrackSchema: z.ZodObject<{
                 contrast?: number | undefined;
                 saturation?: number | undefined;
             } | undefined;
+            transitionIn?: {
+                type: "crossfade";
+                duration: number;
+            } | null | undefined;
         }[] | undefined;
         captions?: {
             id: string;
@@ -483,6 +524,10 @@ export declare const addTrackSchema: z.ZodObject<{
                 contrast: number;
                 saturation: number;
             };
+            transitionIn: {
+                type: "crossfade";
+                duration: number;
+            } | null;
         }[];
         captions: {
             id: string;
@@ -526,6 +571,10 @@ export declare const addTrackSchema: z.ZodObject<{
                 contrast?: number | undefined;
                 saturation?: number | undefined;
             } | undefined;
+            transitionIn?: {
+                type: "crossfade";
+                duration: number;
+            } | null | undefined;
         }[] | undefined;
         captions?: {
             id: string;
