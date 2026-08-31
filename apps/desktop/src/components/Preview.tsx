@@ -75,6 +75,7 @@ export function Preview() {
             ref={videoRef}
             src={previewSrc}
             className="preview-video"
+            style={videoTransformStyle(clip)}
             onLoadedMetadata={() => diagRef.current.record({ type: "loadedmetadata" })}
             onCanPlay={() => diagRef.current.record({ type: "canplay" })}
             onPlay={() => { diagRef.current.record({ type: "play" }); setPlaying(true); }}
@@ -94,7 +95,7 @@ export function Preview() {
           <div className="preview-placeholder">Import media and select a clip to preview</div>
         )}
         {clip && (
-          <div className="preview-overlay" style={overlayStyle(clip)}>
+          <div className="preview-overlay">
             {project.tracks
               .filter((t) => t.kind === "text")
               .flatMap((t) => t.captions)
@@ -130,14 +131,12 @@ function aspectStyle(ratio: string): React.CSSProperties {
   return { aspectRatio: String(ar), maxHeight: "100%", maxWidth: "100%" };
 }
 
-function overlayStyle(clip: { transform?: { x: number; y: number; scale: number; opacity: number } }): React.CSSProperties {
-  const t = clip.transform ?? { x: 0, y: 0, scale: 1, opacity: 1 };
+function videoTransformStyle(clip?: { transform?: { x: number; y: number; scale: number; opacity: number } }): React.CSSProperties {
+  const t = clip?.transform ?? { x: 0, y: 0, scale: 1, opacity: 1 };
   return {
-    transform: `translate(${t.x * 100}%, ${t.y * 100}%) scale(${t.scale})`,
+    transform: `translate(${t.x * 50}%, ${t.y * 50}%) scale(${t.scale})`,
+    transformOrigin: "center center",
     opacity: t.opacity,
-    position: "absolute",
-    inset: 0,
-    pointerEvents: "none",
   };
 }
 

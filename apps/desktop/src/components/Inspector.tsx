@@ -1,8 +1,9 @@
 import { useStudio } from "../store";
 
 export function Inspector() {
-  const { project, selectedClipId, moveSelected, trimSelected, setSelectedAudio, changeAspect } = useStudio();
+  const { project, selectedClipId, moveSelected, trimSelected, setSelectedAudio, setSelectedTransform, changeAspect } = useStudio();
   const clip = project.tracks.flatMap((t) => t.clips).find((c) => c.id === selectedClipId);
+  const transform = clip?.transform ?? { scale: 1, x: 0, y: 0, opacity: 1 };
 
   return (
     <div className="panel inspector">
@@ -32,10 +33,15 @@ export function Inspector() {
               onBlur={(e) => trimSelected(Number(e.target.value))}
             />
           </div>
-          <div className="inspector-row">
-            <label>Scale</label>
-            <span>{clip.transform?.scale ?? 1}</span>
-          </div>
+          <div className="panel-subhead">Transform</div>
+          <TransformField testId="transform-scale" label="Scale" value={transform.scale} min={0.1} max={4} step={0.05}
+            onChange={(value) => setSelectedTransform(value, transform.x, transform.y, transform.opacity)} />
+          <TransformField testId="transform-x" label="Position X" value={transform.x} min={-1} max={1} step={0.05}
+            onChange={(value) => setSelectedTransform(transform.scale, value, transform.y, transform.opacity)} />
+          <TransformField testId="transform-y" label="Position Y" value={transform.y} min={-1} max={1} step={0.05}
+            onChange={(value) => setSelectedTransform(transform.scale, transform.x, value, transform.opacity)} />
+          <TransformField testId="transform-opacity" label="Opacity" value={transform.opacity} min={0} max={1} step={0.05}
+            onChange={(value) => setSelectedTransform(transform.scale, transform.x, transform.y, value)} />
           <div className="inspector-row">
             <label>Gain (dB)</label>
             <input
@@ -69,6 +75,18 @@ export function Inspector() {
         <Field label="Schema v" value={String(project.schemaVersion)} />
         <Field label="Duration" value={`${project.durationSec.toFixed(2)}s`} />
       </div>
+    </div>
+  );
+}
+
+function TransformField({ testId, label, value, min, max, step, onChange }: {
+  testId: string; label: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void;
+}) {
+  return (
+    <div className="inspector-row">
+      <label>{label}</label>
+      <input data-testid={testId} type="number" min={min} max={max} step={step} value={value}
+        onChange={(e) => onChange(Number(e.target.value))} />
     </div>
   );
 }

@@ -143,6 +143,32 @@ export const setClipAudioCommand = {
         };
     },
 };
+/* --------------------------- clipTransform -------------------------- */
+export const SET_CLIP_TRANSFORM = "clip.transform";
+export const setClipTransformSchema = z.object({
+    clipId: z.string().min(1),
+    scale: z.number().min(0.1).max(4),
+    x: z.number().min(-1).max(1),
+    y: z.number().min(-1).max(1),
+    opacity: z.number().min(0).max(1),
+});
+export const setClipTransformCommand = {
+    type: SET_CLIP_TRANSFORM,
+    schema: setClipTransformSchema,
+    execute(prev, { clipId, scale, x, y, opacity }) {
+        const { clip, track } = findClip(prev, clipId);
+        const prior = clip.transform ?? { scale: 1, x: 0, y: 0, opacity: 1 };
+        const updated = { ...clip, transform: { scale, x, y, opacity } };
+        const tracks = prev.tracks.map((t) => t.id === track.id ? { ...t, clips: t.clips.map((c) => c.id === clipId ? updated : c) } : t);
+        return {
+            next: { ...prev, tracks, updatedAt: new Date().toISOString() },
+            inverse: {
+                type: SET_CLIP_TRANSFORM,
+                execute: (p) => setClipTransformCommand.execute(p, { clipId, ...prior }),
+            },
+        };
+    },
+};
 /* ----------------------------- trimClip ----------------------------- */
 export const TRIM_CLIP = "clip.trim";
 export const trimClipSchema = z.object({

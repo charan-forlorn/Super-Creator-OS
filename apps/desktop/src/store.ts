@@ -18,6 +18,7 @@ import {
   MOVE_CLIP,
   TRIM_CLIP,
   SET_CLIP_AUDIO,
+  SET_CLIP_TRANSFORM,
   SPLIT_CLIP,
   ADD_CAPTION,
   PLACE_CAPTION,
@@ -113,6 +114,7 @@ export interface StudioState {
   commitGroupMove: (deltaSec: number) => void;
   trimSelected: (newInPoint?: number, newSourceEnd?: number) => void;
   setSelectedAudio: (gainDb: number, muted: boolean) => boolean;
+  setSelectedTransform: (scale: number, x: number, y: number, opacity: number) => boolean;
   splitSelected: (t?: number) => void;
   duplicateSelected: () => void;
   addCaption: (trackId: string, text: string, start: number, duration: number) => void;
@@ -349,6 +351,19 @@ export const useStudio = create<StudioState>((set, get) => {
       if (!id) return false;
       try {
         get().bus.execute(SET_CLIP_AUDIO, { clipId: id, gainDb, muted });
+        set({ project: get().bus.project, dirty: true, lastError: null });
+        return true;
+      } catch (e) {
+        set({ lastError: (e as Error).message });
+        return false;
+      }
+    },
+
+    setSelectedTransform: (scale, x, y, opacity) => {
+      const id = get().selectedClipId;
+      if (!id) return false;
+      try {
+        get().bus.execute(SET_CLIP_TRANSFORM, { clipId: id, scale, x, y, opacity });
         set({ project: get().bus.project, dirty: true, lastError: null });
         return true;
       } catch (e) {

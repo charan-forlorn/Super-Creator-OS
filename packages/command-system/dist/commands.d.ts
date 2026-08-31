@@ -43,6 +43,27 @@ export declare const setClipAudioSchema: z.ZodObject<{
     muted: boolean;
 }>;
 export declare const setClipAudioCommand: EditCommand<z.infer<typeof setClipAudioSchema>>;
+export declare const SET_CLIP_TRANSFORM = "clip.transform";
+export declare const setClipTransformSchema: z.ZodObject<{
+    clipId: z.ZodString;
+    scale: z.ZodNumber;
+    x: z.ZodNumber;
+    y: z.ZodNumber;
+    opacity: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    clipId: string;
+    scale: number;
+    x: number;
+    y: number;
+    opacity: number;
+}, {
+    clipId: string;
+    scale: number;
+    x: number;
+    y: number;
+    opacity: number;
+}>;
+export declare const setClipTransformCommand: EditCommand<z.infer<typeof setClipTransformSchema>>;
 export declare const TRIM_CLIP = "clip.trim";
 export declare const trimClipSchema: z.ZodObject<{
     clipId: z.ZodString;

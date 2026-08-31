@@ -321,6 +321,32 @@ fn video_clip_audio_filter(input_idx: usize, clip: &Value, duration: f64, has_au
     }
 }
 
+fn clip_transform_values(clip: &Value) -> (f64, f64, f64, f64) {
+    let transform = clip.get("transform");
+    let scale = transform.and_then(|t| t.get("scale")).and_then(|v| v.as_f64()).unwrap_or(1.0).clamp(0.1, 4.0);
+    let x = transform.and_then(|t| t.get("x")).and_then(|v| v.as_f64()).unwrap_or(0.0).clamp(-1.0, 1.0);
+    let y = transform.and_then(|t| t.get("y")).and_then(|v| v.as_f64()).unwrap_or(0.0).clamp(-1.0, 1.0);
+    let opacity = transform.and_then(|t| t.get("opacity")).and_then(|v| v.as_f64()).unwrap_or(1.0).clamp(0.0, 1.0);
+    (scale, x, y, opacity)
+}
+
+fn even_px(value: f64) -> i32 {
+    let mut n = value.round().max(2.0) as i32;
+    if n % 2 != 0 { n += 1; }
+    n
+}
+
+fn video_clip_filter(input_idx: usize, clip: &Value, duration: f64, w: i32, h: i32) -> String {
+    let (scale, x, y, opacity) = clip_transform_values(clip);
+    let scaled_w = even_px(w as f64 * scale);
+    let scaled_h = even_px(h as f64 * scale);
+    let left = (w - scaled_w) as f64 / 2.0 + x * w as f64 / 2.0;
+    let top = (h - scaled_h) as f64 / 2.0 + y * h as f64 / 2.0;
+    format!(
+        "color=c=black:s={w}x{h}:d={duration:.3}:r=30[{input_idx}bg];[{input_idx}:v]trim=duration={duration:.3},setpts=PTS-STARTPTS,scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1,scale={scaled_w}:{scaled_h},format=rgba,colorchannelmixer=aa={opacity:.6}[{input_idx}fg];[{input_idx}bg][{input_idx}fg]overlay=x={left:.3}:y={top:.3}:shortest=1[{input_idx}v]"
+    )
+}
+
 pub fn run_render(
     job_id: &str,
     project_json: &str,
@@ -390,9 +416,7 @@ pub fn run_render(
         let in_point = clip.get("inPoint").and_then(|v| v.as_f64()).unwrap_or(0.0);
         let duration = clip.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.001);
         inputs.extend(["-ss".into(), format!("{in_point:.3}"), "-t".into(), format!("{duration:.3}"), "-i".into(), source]);
-        concat_parts.push(format!(
-            "[{i}:v]trim=duration={duration:.3},setpts=PTS-STARTPTS,scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1[{i}v]"
-        ));
+        concat_parts.push(video_clip_filter(i, clip, duration, w, h));
         let has_audio = asset.and_then(|a| a.get("hasAudio")).and_then(|v| v.as_bool()).unwrap_or(false);
         video_audio_parts.push(video_clip_audio_filter(i, clip, duration, has_audio));
     }
@@ -1006,6 +1030,27 @@ mod tests {
         assert_eq!(out1, out2);
         assert_eq!(mtime1, std::fs::metadata(&out2).unwrap().modified().unwrap());
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn clip_transform_filter_contract() {
+        let clip = json!({"transform": {"scale": 1.5, "x": 0.25, "y": -0.5, "opacity": 0.6}});
+        let filter = video_clip_filter(2, &clip, 2.5, 1920, 1080);
+        assert!(filter.contains("scale=2880:1620"));
+        assert!(filter.contains("colorchannelmixer=aa=0.600000"));
+        assert!(filter.contains("overlay=x=-240.000:y=-540.000"));
+        assert!(filter.ends_with("[2v]"));
+    }
+
+    #[test]
+    fn clip_transform_filter_executes_with_real_ffmpeg() {
+        let clip = json!({"transform": {"scale": 0.75, "x": 0.2, "y": -0.2, "opacity": 0.5}});
+        let filter = video_clip_filter(0, &clip, 0.5, 320, 240);
+        let status = std::process::Command::new("ffmpeg")
+            .args(["-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x240:rate=30:duration=0.5",
+                "-filter_complex", &filter, "-map", "[0v]", "-frames:v", "1", "-f", "null", "-"])
+            .status().expect("spawn ffmpeg transform proof");
+        assert!(status.success(), "transform filter graph must execute");
     }
 
     #[test]
