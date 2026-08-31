@@ -12,7 +12,8 @@ R2_1=PASS
 REAL_GUI_RUNTIME=PASS
 R2_2=PASS (S1 R2.2 PREVIEW + MEDIA FOUNDATION — 7/7 real-GUI gates + full proxy miss/hit/reuse chain)
 R2_3=PASS (S2 MEDIA WORKSPACE - real GUI + full regression verified)
-R2_4..R2_7=UNSPECIFIED_IN_REPO (authoritative prior scope not recoverable; reconstruct from capability-gap evidence)
+R2_4=PASS (RECONSTRUCTED scope: Text & Caption Workspace; original prior R2.4 spec not recoverable)
+R2_5..R2_7=UNSPECIFIED_IN_REPO (reconstruct only from capability-gap evidence)
 CRITICAL_DEFECTS=0
 
 ## S1 R2.2 — VERIFIED REAL-GUI EVIDENCE (full harness run, tauri-driver :4444)
@@ -113,8 +114,26 @@ CRITICAL_DEFECTS=0
 - E2E: deterministic missing-media fixture + real WebDriver R2.3 gate runner
 - Production project schema unchanged; derived analysis remains runtime-only
 
+
+## R2.4 RECONSTRUCTED TEXT & CAPTION WORKSPACE
+SCOPE_AUTHORITY=RECONSTRUCTED_FROM_REPO_CAPABILITY_GAPS
+ORIGINAL_R2_4_SPEC_RECOVERED=FALSE
+CAPTION_PLACE_COMMAND=PASS (deterministic text track + caption id + atomic undo/redo)
+AI_ADD_CAPTION_ROUTE=PASS (canonical caption.place seam; former payload mismatch closed)
+CAPTION_STORE=PASS (add/delete through CommandBus only)
+CAPTION_WORKSPACE_UI=PASS (composer + duration + list + delete)
+CAPTION_PREVIEW_OVERLAY=PASS
+R2_4_REAL_GUI=PASS (add -> overlay -> delete -> undo restore)
+COMMAND_SYSTEM_TESTS=33/33 PASS
+AI_CORE_TESTS=9/9 PASS
+DESKTOP_TESTS=32/32 PASS
+DESKTOP_TYPECHECK=PASS
+R2_3_GUI_REGRESSION=PASS
+R2_2_GUI_REGRESSION=PASS
+CRITICAL_DEFECTS=0
+
 ## NEXT EXACT ACTION
-Seal the scoped R2.3 commit containing this checkpoint and verified implementation.
-Then perform a production-editor capability-gap audit to reconstruct R2.4-R2.7 because no authoritative prior R2.4-R2.7 scope is recoverable from repo or saved checkpoint.
-Do not infer that reconstructed milestones are the original spec; label them explicitly as reconstructed.
+Reconstruct and implement R2.5 from the next highest production-editor capability gap.
+Current highest gap: Audio Workspace / clip-level audio control.
+Do not infer reconstructed milestones are the original spec.
 BLOCKERS=none

@@ -184,6 +184,50 @@ export const trimClipCommand: EditCommand<z.infer<typeof trimClipSchema>> = {
   },
 };
 
+/* ----------------------------- placeCaption ------------------------- */
+export const PLACE_CAPTION = "caption.place";
+export const placeCaptionSchema = z.object({
+  text: z.string().min(1),
+  start: z.number().nonnegative().default(0),
+  duration: z.number().positive().default(3),
+});
+export const placeCaptionCommand: EditCommand<z.infer<typeof placeCaptionSchema>> = {
+  type: PLACE_CAPTION,
+  schema: placeCaptionSchema,
+  execute(prev, { text, start, duration }) {
+    const existing = prev.tracks.find((t) => t.kind === "text");
+    const trackId = existing?.id ?? "text-captions";
+    const used = new Set(prev.tracks.flatMap((t) => t.captions.map((c) => c.id)));
+    let n = 1;
+    while (used.has(`cap-${n}`)) n += 1;
+    const caption = {
+      id: `cap-${n}`, text, start, duration, trackId,
+      style: { x: 0.5, y: 0.85, fontSizePx: 48, color: "#FFFFFF", backgroundColor: "#000000", backgroundOpacity: 0.6 },
+    };
+    const tracks = existing
+      ? prev.tracks.map((t) => t.id === trackId ? { ...t, captions: [...t.captions, caption] } : t)
+      : [...prev.tracks, { id: trackId, kind: "text" as const, clips: [], captions: [caption] }];
+    const next: Project = {
+      ...prev, tracks,
+      durationSec: Math.max(prev.durationSec, start + duration),
+      updatedAt: new Date().toISOString(),
+    };
+    const inverse: EditCommand<z.infer<typeof placeCaptionSchema>> = {
+      type: "caption.unplace",
+      execute(p) {
+        const track = p.tracks.find((t) => t.id === trackId);
+        if (!track) throw new CommandError(`CAPTION_TRACK_NOT_FOUND: ${trackId}`);
+        const remaining = track.captions.filter((c) => c.id !== caption.id);
+        const nextTracks = !existing && remaining.length === 0
+          ? p.tracks.filter((t) => t.id !== trackId)
+          : p.tracks.map((t) => t.id === trackId ? { ...t, captions: remaining } : t);
+        return { next: { ...p, tracks: nextTracks, updatedAt: new Date().toISOString() }, inverse: placeCaptionCommand };
+      },
+    };
+    return { next, inverse, result: { captionId: caption.id, trackId } };
+  },
+};
+
 /* ----------------------------- captionAdd --------------------------- */
 export const ADD_CAPTION = "caption.add";
 export const addCaptionSchema = z.object({

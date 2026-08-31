@@ -16,7 +16,7 @@ const TOOL_TO_COMMAND: Record<(typeof AI_TOOL_NAMES)[number], string> = {
   move_clip: "clip.move",
   trim_clip: "clip.trim",
   delete_clip: "clip.delete",
-  add_caption: "caption.add",
+  add_caption: "caption.place",
   change_aspect_ratio: "project.changeAspect",
 };
 

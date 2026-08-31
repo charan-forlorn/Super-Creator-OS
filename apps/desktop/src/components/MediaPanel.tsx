@@ -9,6 +9,7 @@ import {
   type MediaProbe,
 } from "../bridge";
 import { previewNeedsProxy } from "@haios/media-engine";
+import { CaptionPanel } from "./CaptionPanel";
 import { previewUrlForPath } from "../mediaUrl";
 import { analyzeMediaSource, mediaAnalysisQueue } from "../mediaAnalysis";
 
@@ -137,7 +138,7 @@ export function MediaPanel() {
         })}
       </div>
       <div className="rail-section">Text</div>
-      <div className="rail-section">Captions</div>
+      <CaptionPanel />
       <div className="rail-section">Audio</div>
       <div className="rail-section">Effects</div>
       <div className="rail-section">Transitions</div>

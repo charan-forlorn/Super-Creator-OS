@@ -133,3 +133,13 @@ body { background: var(--bg); color: var(--fg); }
 .analysis-status.missing, .analysis-status.failed { color: var(--danger, #e88); }
 .media-waveform { display: block; width: 100%; max-width: 180px; height: 32px; object-fit: contain; background: #000; border-radius: 4px; margin-top: 4px; }
 .relink-button { margin-top: 5px; font-size: 11px; }
+
+.caption-workspace { border-top: 1px solid var(--border); padding: 8px 4px; display: grid; gap: 8px; }
+.rail-section-title { color: var(--muted); font-size: 13px; font-weight: 600; }
+.caption-workspace textarea { width: 100%; min-height: 58px; resize: vertical; box-sizing: border-box; }
+.caption-controls { display: flex; gap: 8px; align-items: end; }
+.caption-controls label { display: grid; gap: 3px; color: var(--muted); font-size: 11px; flex: 1; }
+.caption-controls input { width: 100%; box-sizing: border-box; }
+.caption-list { display: grid; gap: 6px; max-height: 160px; overflow: auto; }
+.caption-row { display: flex; justify-content: space-between; gap: 8px; align-items: center; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 6px; }
+.caption-row-text { font-size: 12px; overflow-wrap: anywhere; }

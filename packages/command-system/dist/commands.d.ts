@@ -45,6 +45,21 @@ export declare const trimClipSchema: z.ZodObject<{
     newSourceEnd?: number | undefined;
 }>;
 export declare const trimClipCommand: EditCommand<z.infer<typeof trimClipSchema>>;
+export declare const PLACE_CAPTION = "caption.place";
+export declare const placeCaptionSchema: z.ZodObject<{
+    text: z.ZodString;
+    start: z.ZodDefault<z.ZodNumber>;
+    duration: z.ZodDefault<z.ZodNumber>;
+}, "strip", z.ZodTypeAny, {
+    text: string;
+    start: number;
+    duration: number;
+}, {
+    text: string;
+    start?: number | undefined;
+    duration?: number | undefined;
+}>;
+export declare const placeCaptionCommand: EditCommand<z.infer<typeof placeCaptionSchema>>;
 export declare const ADD_CAPTION = "caption.add";
 export declare const addCaptionSchema: z.ZodObject<{
     caption: z.ZodObject<{

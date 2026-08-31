@@ -19,6 +19,8 @@ import {
   TRIM_CLIP,
   SPLIT_CLIP,
   ADD_CAPTION,
+  PLACE_CAPTION,
+  REMOVE_CAPTION,
   CHANGE_ASPECT,
   PLACE_PROBED_MEDIA,
   RELINK_MEDIA,
@@ -112,6 +114,8 @@ export interface StudioState {
   splitSelected: (t?: number) => void;
   duplicateSelected: () => void;
   addCaption: (trackId: string, text: string, start: number, duration: number) => void;
+  placeCaption: (text: string, start: number, duration: number) => boolean;
+  removeCaption: (captionId: string, trackId: string) => boolean;
   changeAspect: (ratio: ExportResolution) => void;
 
   undo: () => void;
@@ -400,6 +404,28 @@ export const useStudio = create<StudioState>((set, get) => {
         });
       } catch (e) {
         set({ lastError: (e as Error).message });
+      }
+    },
+
+    placeCaption: (text, start, duration) => {
+      try {
+        get().bus.execute(PLACE_CAPTION, { text, start, duration });
+        set({ project: get().bus.project, dirty: true, lastError: null });
+        return true;
+      } catch (e) {
+        set({ lastError: (e as Error).message });
+        return false;
+      }
+    },
+
+    removeCaption: (captionId, trackId) => {
+      try {
+        get().bus.execute(REMOVE_CAPTION, { captionId, trackId });
+        set({ project: get().bus.project, dirty: true, lastError: null });
+        return true;
+      } catch (e) {
+        set({ lastError: (e as Error).message });
+        return false;
       }
     },
 
