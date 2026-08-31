@@ -136,3 +136,6 @@ export function previewNeedsProxy(input) {
         return true;
     return false;
 }
+/* ----------------------------- R2.2 cache ----------------------------- */
+export { stableHash, normalizeCodec, proxyCacheKey, thumbnailCacheKey, cacheFileName, cachePath, } from "./cacheKey.js";
+export { PureMediaCache, describeProxy, describeThumbnail, } from "./cache.js";

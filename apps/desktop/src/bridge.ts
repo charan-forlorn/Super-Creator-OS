@@ -58,6 +58,18 @@ export async function generateThumbnail(sourcePath: string, outPath: string, tim
   return invoke<string>("generate_thumbnail", { sourcePath, outPath, timeSec });
 }
 
+export async function ensurePreviewProxy(sourcePath: string, videoCodec: string | null, audioCodec: string | null): Promise<string> {
+  return invoke<string>("ensure_preview_proxy", { sourcePath, videoCodec, audioCodec });
+}
+
+export async function ensureThumbnail(sourcePath: string, timeSec: number): Promise<string> {
+  return invoke<string>("ensure_thumbnail", { sourcePath, timeSec });
+}
+
+export async function invalidateCache(kind: string, key: string): Promise<boolean> {
+  return invoke<boolean>("invalidate_cache", { kind, key });
+}
+
 export async function generatePreviewProxy(sourcePath: string, outPath: string): Promise<string> {
   return invoke<string>("generate_preview_proxy", { sourcePath, outPath });
 }

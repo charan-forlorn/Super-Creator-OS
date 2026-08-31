@@ -38,7 +38,7 @@ export declare const mediaProbeSchema: z.ZodObject<{
     videoCodec: string | null;
     audioCodec: string | null;
     audioSampleRate: number | null;
-    probeStatus: "ok" | "missing" | "unavailable" | "corrupt" | "failed";
+    probeStatus: "missing" | "ok" | "unavailable" | "corrupt" | "failed";
     error: string | null;
 }, {
     id: string;
@@ -53,7 +53,7 @@ export declare const mediaProbeSchema: z.ZodObject<{
     videoCodec: string | null;
     audioCodec: string | null;
     audioSampleRate: number | null;
-    probeStatus: "ok" | "missing" | "unavailable" | "corrupt" | "failed";
+    probeStatus: "missing" | "ok" | "unavailable" | "corrupt" | "failed";
     error: string | null;
 }>;
 export type MediaProbe = z.infer<typeof mediaProbeSchema>;
@@ -162,3 +162,5 @@ export interface PreviewCompatInput {
     audioCodec?: string | null;
 }
 export declare function previewNeedsProxy(input: PreviewCompatInput): boolean;
+export { stableHash, normalizeCodec, proxyCacheKey, thumbnailCacheKey, cacheFileName, cachePath, type CacheKind, } from "./cacheKey.js";
+export { PureMediaCache, describeProxy, describeThumbnail, type CacheState, type CacheEntry, type CacheRecord, } from "./cache.js";

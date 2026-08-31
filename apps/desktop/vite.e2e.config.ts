@@ -1,7 +1,15 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { renameSync } from "node:fs";
+import { renameSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
+
+// Inject the real absolute path of the E2E sample at build time by replacing a
+// sentinel token in the E2E entry. Vite `define` proved unreliable for bare
+// identifiers here, so we use an explicit transform. The seed then sets the
+// project asset's sourcePath to a genuine filesystem path so the app's Tauri
+// asset-protocol resolver (convertFileSrc) can serve it for real playback
+// inside the bundled webview.
+const E2E_SAMPLE_ABS = resolve(__dirname, "e2e/fixtures/sample.mp4");
 
 /**
  * TEST-ONLY build config for the GUI E2E harness.
@@ -15,17 +23,28 @@ export default defineConfig({
   plugins: [
     react(),
     {
+      name: "haios-e2e-inject-sample-path",
+      enforce: "pre",
+      transform(code, id) {
+        if (id.endsWith("e2e-entry.tsx")) {
+          return code.replace(/__E2E_SAMPLE_ABS_PATH__/g, JSON.stringify(E2E_SAMPLE_ABS));
+        }
+        return null;
+      },
+    },
+    {
       name: "haios-e2e-tauri-index",
       closeBundle() {
-        renameSync(resolve("dist-e2e/index.e2e.html"), resolve("dist-e2e/index.html"));
+        // Vite emits the E2E entry as `index.e2e.html` (mirrors the source file
+        // name); Tauri always loads `index.html`, so rename it.
+        const out = resolve("dist-e2e/index.e2e.html");
+        const target = resolve("dist-e2e/index.html");
+        if (existsSync(out)) renameSync(out, target);
       },
     },
   ],
   clearScreen: false,
   root: ".",
-  // The H.264/AAC file is a deterministic E2E-only asset, not a production
-  // media path. Explicit inclusion lets Vite emit a stable hashed URL.
-  assetsInclude: ["**/*.mp4"],
   build: {
     outDir: "dist-e2e",
     emptyOutDir: true,

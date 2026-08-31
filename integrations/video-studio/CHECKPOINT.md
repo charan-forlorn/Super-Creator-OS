@@ -3,81 +3,77 @@
 PROGRAM=HAIOS AI Video Studio → R2 Production Editor Expansion
 R1_BASELINE=34e4e2ee795922448411a79a7d268fd9f8bc5828
 R1_TAG=haios-ai-video-studio-r1.0.0
-CURRENT_HEAD=34e4e2e
+CURRENT_HEAD=56c79e3 (R2.1 sealed) — S1 R2.2 commit PENDING (scoped, not yet pushed)
 
 ## MILESTONE STATUS
 R2_0=PASS
 R2_1=PASS
 REAL_GUI_RUNTIME=PASS
-FULL_GUI_HARNESS=14/14 PASS
+R2_2=PASS (S1 R2.2 PREVIEW + MEDIA FOUNDATION — 7/7 real-GUI gates + full proxy miss/hit/reuse chain)
+R2_3..R2_7=NOT_STARTED
 CRITICAL_DEFECTS=0
-R2_2=NOT_STARTED
 
-## R2.0 — REPRODUCIBLE WEBVIEW2
-- Fixed WebView2 Runtime pinned: 151.0.4129.107 x64.
-- Runtime acquisition/verification scripts live under apps/desktop/scripts/.
-- Runtime binary remains gitignored; no large runtime payload committed.
-- Integrity verification uses pinned SHA-256 for msedgewebview2.exe.
-- Bootstrap/verify documentation is under apps/desktop/docs/.
+## S1 R2.2 — VERIFIED REAL-GUI EVIDENCE (full harness run, tauri-driver :4444)
+FULL_S1_GUI=7/7 PASS
+  GUI_CLIPS_VISIBLE=PASS
+  PREVIEW_PLAYBACK=PASS
+  PLAYHEAD_SYNC=PASS
+  VIDEO_SEEK=PASS
+  CLIP_BOUNDARY_PLAYBACK=PASS
+  THUMBNAIL_CACHE=PASS
+  PROXY_CACHE=PASS
+PROXY CHAIN (real production command, miss→create→ffprobe→hit/reuse):
+  PROXY_DECISION_H264_AAC=PASS        (previewNeedsProxy({h264,aac})===false)
+  PROXY_REQUIRED_FIXTURE=sample_prores.mov
+  PROXY_CORRECTLY_SKIPPED=PASS        (H.264/AAC takes direct playback, no proxy file)
+  PROXY_CACHE_MISS=PASS
+  PROXY_CREATED=PASS
+  PROXY_FFPROBE=PASS                  (proxy verified H.264/AAC/mp4 via ffprobe)
+  ORIGINAL_SOURCE_IMMUTABLE=PASS      (size+mtime unchanged after cache ops)
+  PROXY_CACHE_HIT=PASS
+  PROXY_CACHE_REUSE=PASS
+MEDIA_ERROR_HANDLING=PASS
+REAL_GUI_RUNTIME=PASS
 
-## R2.1 — PRODUCTION TIMELINE UX
-- CommandBus.batch(): atomic grouped commands with one-step undo/redo.
-- Multi-selection, group move, group delete, group duplicate, multi-split.
-- Keyboard: Ctrl+A, Ctrl+D, Esc, arrows, Delete, S.
-- Group move preserves relative spacing and clamps the group as a unit.
-- Timeline ruler origin corrected to share track t=0 origin.
+## ROOT CAUSES FIXED (this session)
+RESIZE_1 (PROXY_CACHE fail): proxy dir never created because the seed's
+  `await ensureThumbnail` hung the detached loop. Root cause = ffmpeg/ffprobe
+  spawned by the Rust media commands used default INHERITED stdio; in the bundled
+  GUI-subsystem app (no console) those stdio handles are invalid → ffmpeg blocks.
+  FIX: `ffcmd()` in src-tauri/src/bridge.rs sets Stdio::null() for stdin+stderr
+  (stdout piped for ffprobe JSON); all 5 production ffmpeg/ffprobe spawn sites use it.
+RESIZE_2 (ffmpeg not found under WebDriver launch): tauri-driver spawns the app
+  with a minimal PATH, so `which("ffmpeg")` failed. FIX: `which()` now also probes
+  well-known Windows install dirs (scoop shims, C:\ffmpeg\bin, etc.) before giving
+  up. Harness additionally injects scoop shims dir onto PATH via tauri:options.env.
 
-## REAL GUI EVIDENCE
-GUI_CLIPS_VISIBLE=PASS
-GUI_MULTI_SELECT=PASS
-GUI_GROUP_DRAG=PASS
-GUI_GROUP_SPACING_PRESERVED=PASS
-GUI_GROUP_UNDO=PASS
-GUI_GROUP_REDO=PASS
-GUI_SELECT_ALL=PASS
-GUI_KEYBOARD_NUDGE=PASS
-GUI_GROUP_DELETE=PASS
-GUI_GROUP_DELETE_UNDO=PASS
-GUI_GROUP_DUPLICATE=PASS
-GUI_MULTI_SPLIT=PASS
-GUI_CLEAR_SELECTION=PASS
-
-GUI_MULTI_SPLIT_EVIDENCE=clip-c0→clip-c0+clip-c0__r; clip-c1→clip-c1+clip-c1__r; playhead=4.0s
-GUI_CLEAR_SELECTION_EVIDENCE=selectedClips=0; primaryClips=0
-
-## FINAL REGRESSION
-COMMAND_SYSTEM_REGRESSION=28/28 PASS
-DESKTOP_REGRESSION=25/25 PASS
+## STACK (as committed)
+S0 CURRENTNESS=PASS
+S1 R2.2 PREVIEW + MEDIA FOUNDATION:
+  - packages/media-engine/src/cacheKey.ts: deterministic proxy/thumbnail cache keys
+  - packages/media-engine/src/cache.ts: PureMediaCache lifecycle (no fs IO, browser-safe)
+  - packages/media-engine/tests/cache.test.ts + preview-proxy.test.ts: PASS
+  - apps/desktop/src-tauri/src/bridge.rs: ensure_preview_proxy / ensure_thumbnail /
+    invalidate_cache (managed cache dir under LOCALAPPDATA/haios-video-studio);
+    ffcmd() stdio fix; which() discovery fallback; ensure_preview_proxy_impl seam;
+    #[cfg(test)] ensure_preview_proxy_real_miss_hit_reuse test
+  - apps/desktop/src-tauri/src/lib.rs: 3 Tauri commands registered (no new test bridge)
+  - store: cacheState + recordProxyCache/recordThumbnailCache/invalidateSourceCache
+  - MediaPanel: cache-aware ensure_* commands
+  - e2e/run-r2.2-preview.mjs: real-GUI S1 gate runner (PERMANENT test infra)
+  - e2e/fixtures/project.json: H.264 (asset-fixture) + ProRes/PCM (asset-prores) w/ codecs
+  - tests/fixtures/gen_prores.mjs: ProRes/PCM generator (gitignored *.mov)
+  - src/e2e-entry.tsx: render-first e2e seed → detached thumbnail+proxy via REAL commands
+RUST TESTS=4 PASS (3 cache contract + 1 real miss/hit/reuse)
+PACKAGE TESTS=PASS (desktop 25/25 incl E2E-01 19/19; media-engine incl Phase A)
 TYPECHECK=PASS
-BUILD=PASS
-NORMAL_PRODUCTION_E2E_HOOK_REFERENCES=0
+CARGO_BUILD_RELEASE=PASS
+NORMAL_PRODUCTION_E2E_HOOK_REFERENCES=0 (no new production proof bridge added)
 
-## GUI HARNESS
-- Actual Tauri/WebView2 session driven by WebDriverIO/tauri-driver.
-- E2E entry and deterministic seeded project are test-only.
-- Stable data-testid/data-* selectors may remain inert in production.
-- No fixture seeding/bootstrap/proof runtime hooks exist in normal production bundle.
-
-## SCOPE / SAFETY
-MISSION_SCOPE_RECONCILED=TRUE
-UNRELATED_STATE_PRESERVED=TRUE
-UNRELATED_DIRTY_STATE=SCOS/control-center/memory/CLAUDE.md/.hermes preserved
-
-## COMMIT PLAN
-Commit only intended R2.0 + R2.1 artifacts.
-Suggested message:
-feat(video-studio): complete R2 reproducibility and timeline UX
-
-After commit record:
-R2_0_R2_1_COMMIT=<sha>
-
-## NEXT MILESTONE
-NEXT_MILESTONE=R2.2
-NEXT_GOAL=HAIOS_AI_VIDEO_STUDIO_R2_2_PREVIEW_MEDIA_FOUNDATION
-
-R2.2 target:
-- deterministic proxy-cache ownership and cleanup
-- preview/seek/playhead-sync hardening
-- media error handling and real GUI runtime evidence
-
-Do not begin R2.2 until the scoped R2.0+R2.1 commit is created and verified.
+## NEXT EXACT ACTION
+STOP before S2. Create the SCOPED S1 R2.2 commit (video-studio only):
+  feat(video-studio): complete R2.2 preview + media foundation (proxy cache miss/hit/reuse)
+Then hand off to S2.
+NEXT_STACK=R2.3 MEDIA WORKSPACE (MEDIA_BIN, THUMBNAILS, METADATA, WAVEFORM,
+  MISSING_MEDIA_DETECTION, MEDIA_RELINK, BACKGROUND_ANALYSIS_NON_BLOCKING, REAL_GUI_RUNTIME).
+BLOCKERS=none

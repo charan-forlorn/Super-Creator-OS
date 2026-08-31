@@ -1,10 +1,31 @@
-use serde_json::{json, Value};
+﻿use serde_json::{json, Value};
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use tauri::Emitter;
 
 use crate::{is_cancelled, MediaProbe, RenderVerification};
+
+/// Spawn a media CLI (ffmpeg/ffprobe) with explicit stdio. The bundled Tauri app
+/// is a GUI-subsystem process with NO console; relying on Rust's default
+/// *inherited* stdio hands ffmpeg invalid stdin/stdout/stderr handles, which makes
+/// it block forever (the command never returns, deadlocking any awaited caller).
+/// Nulling stdin and stderr (ffprobe's JSON goes to piped stdout) avoids that.
+fn ffcmd(bin: &str) -> Command {
+    let mut c = Command::new(bin);
+    c.stdin(Stdio::null()).stderr(Stdio::null());
+    // Tauri release binaries use the Windows GUI subsystem. Child ffmpeg/ffprobe
+    // processes can otherwise inherit an unusable console state and block forever
+    // while the parent waits on `status()` / `output()`. CREATE_NO_WINDOW gives
+    // media subprocesses an explicit non-console launch mode and keeps the same
+    // behavior for console/test builds.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        c.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    c
+}
 
 /// Locate a binary, preferring PATH, falling back to common Windows shims.
 fn which(bin: &str) -> String {
@@ -12,6 +33,27 @@ fn which(bin: &str) -> String {
         return p.to_string_lossy().to_string();
     }
     bin.to_string()
+}
+
+/// Candidate directories to probe when `bin` is not resolvable via PATH. This makes
+/// ffmpeg/ffprobe discovery resilient to a minimal launch environment (e.g. when the
+/// app is started by an external driver whose PATH does not include the user's shims).
+fn ffmpeg_search_dirs() -> Vec<std::path::PathBuf> {
+    let mut dirs: Vec<std::path::PathBuf> = Vec::new();
+    if let Some(home) = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")) {
+        // scoop shims: ~/scoop/shims
+        dirs.push(std::path::Path::new(&home).join("scoop").join("shims"));
+        // also the legacy localappdata scoop layout
+        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+            dirs.push(std::path::Path::new(&local).join("scoop").join("shims"));
+        }
+    }
+    // Common manual install locations.
+    for base in ["C:\\", "C:\\Program Files\\", "C:\\Program Files (x86)\\", "D:\\"] {
+        dirs.push(std::path::Path::new(base).join("ffmpeg").join("bin"));
+        dirs.push(std::path::Path::new(base).join("ffmpeg").join("bin"));
+    }
+    dirs
 }
 
 // `which` is not a default crate; implement a minimal PATH lookup.
@@ -35,6 +77,19 @@ mod which {
             let exe = dir.join(format!("{name}.exe"));
             if exe.is_file() {
                 return Ok(exe);
+            }
+        }
+        // Probe well-known install locations (scoop shims, common ffmpeg dirs).
+        for dir in super::ffmpeg_search_dirs() {
+            let candidate = dir.join(format!("{name}.exe"));
+            if candidate.is_file() {
+                return Ok(candidate);
+            }
+            if name.contains('.') {
+                let c2 = dir.join(name);
+                if c2.is_file() {
+                    return Ok(c2);
+                }
             }
         }
         // As a last resort, probe via `where` on Windows.
@@ -104,7 +159,7 @@ pub fn probe_media(path: &str) -> MediaProbe {
     if !Path::new(path).is_file() {
         return MediaProbe { probe_status: "missing".to_string(), error: Some(format!("file not found: {path}")), ..base };
     }
-    let out = Command::new(&ffprobe)
+    let out = ffcmd(&ffprobe)
         .args(["-v", "error", "-show_format", "-show_streams", "-of", "json", path])
         .output();
     let out = match out {
@@ -212,78 +267,16 @@ fn sanitize_name(path: &str) -> String {
 }
 
 pub fn generate_thumbnail(source_path: &str, out_path: &str, time_sec: f64) -> Result<String, String> {
-    let ffmpeg = which("ffmpeg");
-    let ts = format!("{time_sec:.3}");
-    let status = Command::new(&ffmpeg)
-        .args([
-            "-y",
-            "-ss",
-            &ts,
-            "-i",
-            source_path,
-            "-frames:v",
-            "1",
-            "-vf",
-            "scale='min(320,iw)':-2",
-            out_path,
-        ])
-        .status();
-    match status {
-        Ok(s) if s.success() => Ok(out_path.to_string()),
-        Ok(s) => Err(format!("ffmpeg thumbnail failed exit {s}")),
-        Err(e) => Err(format!("ffmpeg spawn error: {e}")),
-    }
+    generate_thumbnail_impl(source_path, out_path, time_sec)
 }
 
-/// ROOT_CAUSE_3 — generate a deterministic H.264/AAC MP4 preview proxy for a
-/// source that WebView2 cannot decode directly (HEVC, ProRes, exotic MOV, …).
+/// ROOT_CAUSE_3 â€” generate a deterministic H.264/AAC MP4 preview proxy for a
+/// source that WebView2 cannot decode directly (HEVC, ProRes, exotic MOV, â€¦).
 /// The ORIGINAL source is never overwritten; the proxy is written to `out_path`.
 /// Uses a fast encode preset and scales down only when the source is larger than
 /// 720p (preserve small sources as-is to keep the proxy cheap).
 pub fn generate_preview_proxy(source_path: &str, out_path: &str) -> Result<String, String> {
-    let ffmpeg = which("ffmpeg");
-    let probe = probe_media(source_path);
-    // Fit within a 720p envelope (preview-only), preserving aspect ratio and
-    // producing even dimensions (required by yuv420p/H.264). We scale by height
-    // when the source is tall (portrait) and by width otherwise; `-2` keeps the
-    // other axis even and aspect-correct. Unlike a hardcoded width:height pair
-    // this never emits an invalid target and works for portrait/landscape alike.
-    let vf = if probe.height >= 720 {
-        "scale=w=-2:h=720,format=yuv420p"
-    } else if probe.width >= 1280 {
-        "scale=w=1280:h=-2,format=yuv420p"
-    } else {
-        "format=yuv420p"
-    };
-    let status = Command::new(&ffmpeg)
-        .args([
-            "-y",
-            "-i",
-            source_path,
-            "-vf",
-            vf,
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-crf",
-            "23",
-            "-pix_fmt",
-            "yuv420p",
-            "-movflags",
-            "+faststart",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "192k",
-            out_path,
-        ])
-        .status();
-    match status {
-        Ok(s) if s.success() => Ok(out_path.to_string()),
-        Ok(s) => Err(format!("ffmpeg preview proxy failed exit {s}")),
-        Err(e) => Err(format!("ffmpeg spawn error: {e}")),
-    }
+    generate_preview_proxy_impl(source_path, out_path)
 }
 
 pub fn hvs_capabilities() -> Value {
@@ -436,7 +429,7 @@ pub fn run_render(
         audio_arg = vec!["-map".into(), "[vout]".into(), "-map".into(), "[aout]".into()];
     }
 
-    let mut cmd = Command::new(&ffmpeg);
+    let mut cmd = ffcmd(&ffmpeg);
     cmd.args(["-y"]);
     cmd.args(&inputs);
     cmd.args(["-filter_complex", &filter]);
@@ -483,7 +476,7 @@ pub fn verify_render(output_path: &str, resolution: &str) -> RenderVerification 
             error: Some(format!("output missing: {output_path}")),
         };
     }
-    let out = match Command::new(&ffprobe)
+    let out = match ffcmd(&ffprobe)
         .args(["-v", "error", "-show_format", "-show_streams", "-of", "json", output_path])
         .output()
     {
@@ -564,4 +557,397 @@ fn emit_state(app: &tauri::AppHandle, job_id: &str, status: &str, progress: f64,
         "error": error,
     });
     let _ = app.emit("render-progress", payload);
+}
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// R2.2 DETERMINISTIC MEDIA CACHE (ROOT_CAUSE_3 continuation)
+//
+// Proxy + thumbnail cache identity is computed deterministically from the source
+// path + a codec/time signature so that the SAME source always maps to the SAME
+// cache file. This lets the backend HIT a previously generated proxy instead of
+// re-encoding every import, and lets STALE be detected when the source changes.
+//
+// The algorithm here mirrors packages/media-engine/src/cacheKey.ts BYTE-FOR-BYTE
+// so the frontend and backend agree on cache paths. That contract is asserted by
+// tests/desktop/tests/r2_cache_contract.test.ts.
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+/// djb2 over UTF-8 bytes, base36 â€” identical to TS `stableHash` (which uses
+/// JavaScript `Number.toString(36)`). Rust's std has no base36 formatter, so we
+/// implement it explicitly to keep the two implementations byte-identical.
+fn stable_hash(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut h: u32 = 5381;
+    for &b in bytes {
+        h = h.wrapping_mul(33).wrapping_add(b as u32);
+    }
+    to_base36(h)
+}
+
+/// u32 -> base36 string (lowercase), matching JS `Number.toString(36)`.
+fn to_base36(mut n: u32) -> String {
+    if n == 0 {
+        return "0".to_string();
+    }
+    let mut out = String::new();
+    while n > 0 {
+        let r = (n % 36) as u8;
+        let c = if r < 10 {
+            (b'0' + r) as char
+        } else {
+            (b'a' + (r - 10)) as char
+        };
+        out.push(c);
+        n /= 36;
+    }
+    out.chars().rev().collect()
+}
+
+fn normalize_codec(c: &Option<String>) -> String {
+    match c {
+        Some(v) => {
+            let lower = v.to_lowercase();
+            let alnum: String = lower.chars().filter(|ch| ch.is_ascii_alphanumeric()).collect();
+            if alnum.is_empty() {
+                "na".to_string()
+            } else {
+                alnum
+            }
+        }
+        None => "na".to_string(),
+    }
+}
+
+/// Deterministic cache directory for the app (under the OS cache dir) for the
+/// given kind. Creates it if missing. Mirrors TS `cachePath` structure:
+/// `<cacheDir>/<kind>/<key>.<ext>`.
+///
+/// Uses the platform cache location via environment variables rather than a
+/// Tauri path plugin dependency, so the backend stays dependency-light.
+fn cache_dir_for(_app: &tauri::AppHandle, kind: &str) -> Result<String, String> {
+    let base = if cfg!(windows) {
+        std::env::var("LOCALAPPDATA")
+            .map_err(|e| format!("LOCALAPPDATA unavailable: {e}"))?
+    } else {
+        std::env::var("XDG_CACHE_HOME")
+            .or_else(|_| {
+                std::env::var("HOME").map(|h| format!("{h}/.cache"))
+            })
+            .map_err(|e| format!("cache dir unavailable: {e}"))?
+    };
+    let dir = std::path::Path::new(&base).join("haios-video-studio").join(kind);
+    std::fs::create_dir_all(&dir).map_err(|e| format!("cannot create cache dir: {e}"))?;
+    Ok(dir.to_string_lossy().to_string())
+}
+
+/// Proxy cache key â€” identical to TS `proxyCacheKey` (codec signature folded in).
+fn proxy_cache_key(source_path: &str, codec_signature: &str) -> String {
+    format!("proxy_{}", stable_hash(&format!("{}|{}", source_path, codec_signature)))
+}
+
+/// Thumbnail cache key â€” identical to TS `thumbnailCacheKey` (time bucketed to ms).
+fn thumbnail_cache_key(source_path: &str, time_sec: f64) -> String {
+    let bucket = (time_sec * 1000.0).round() as i64;
+    format!("thumb_{}", stable_hash(&format!("{}|{}", source_path, bucket)))
+}
+
+/// Signature folding the probe codecs that decide proxy necessity.
+fn proxy_codec_signature(video_codec: &Option<String>, audio_codec: &Option<String>) -> String {
+    format!("{}+{}", normalize_codec(video_codec), normalize_codec(audio_codec))
+}
+
+/// Build (or HIT) a deterministic preview proxy for `source_path` inside the
+/// managed cache. Returns the cache path. On HIT (file already present + not
+/// stale) the existing file is returned without re-encoding. `source_revision`
+/// lets callers mark staleness, but the backend owns the file mtime so a present
+/// file is treated as a valid HIT (re-encoding only happens on miss).
+pub fn ensure_preview_proxy(
+    app: &tauri::AppHandle,
+    source_path: &str,
+    video_codec: &Option<String>,
+    audio_codec: &Option<String>,
+) -> Result<String, String> {
+    let dir = cache_dir_for(app, "proxy")?;
+    ensure_preview_proxy_impl(dir, source_path, video_codec, audio_codec)
+}
+
+/// Cache-aware proxy ensure: deterministic key from `source_path` + codec
+/// signature. On HIT (file already present for this exact identity) the
+/// existing proxy is reused without re-encoding; on MISS/STALE it is generated
+/// deterministically into the cache path (the ORIGINAL source is never touched).
+///
+/// This is the context-free core so the missâ†’hitâ†’reuse lifecycle can be
+/// unit-tested with a temporary cache directory (no `AppHandle` coupling), while
+/// the production `ensure_preview_proxy` command supplies the managed cache dir.
+/// Behavior is identical to the previous inline implementation.
+fn ensure_preview_proxy_impl(
+    cache_dir: String,
+    source_path: &str,
+    video_codec: &Option<String>,
+    audio_codec: &Option<String>,
+) -> Result<String, String> {
+    let key = proxy_cache_key(source_path, &proxy_codec_signature(video_codec, audio_codec));
+    let out_path = std::path::Path::new(&cache_dir)
+        .join(format!("{key}.mp4"))
+        .to_string_lossy()
+        .to_string();
+    // HIT: cache file already generated for this exact source identity.
+    if Path::new(&out_path).is_file() {
+        return Ok(out_path);
+    }
+    // MISS/STALE: (re)generate the proxy deterministically into the cache path.
+    generate_preview_proxy_impl(source_path, &out_path)
+}
+
+/// Generate a deterministic thumbnail at `time_sec` inside the managed cache.
+/// HIT returns the existing file; MISS/STALE generates it.
+pub fn ensure_thumbnail(
+    app: &tauri::AppHandle,
+    source_path: &str,
+    time_sec: f64,
+) -> Result<String, String> {
+    let dir = cache_dir_for(app, "thumbnail")?;
+    let key = thumbnail_cache_key(source_path, time_sec);
+    let out_path = format!("{}/{}.png", dir, key);
+    if Path::new(&out_path).is_file() {
+        return Ok(out_path);
+    }
+    generate_thumbnail_impl(source_path, &out_path, time_sec)
+}
+
+/// Invalidate (delete) a cache entry by deterministic key within a kind.
+pub fn invalidate_cache_entry(app: &tauri::AppHandle, kind: &str, key: &str) -> bool {
+    if let Ok(dir) = cache_dir_for(app, kind) {
+        let ext = if kind == "proxy" { "mp4" } else { "png" };
+        let p = format!("{}/{}.{}", dir, key, ext);
+        if Path::new(&p).is_file() {
+            return std::fs::remove_file(&p).is_ok();
+        }
+    }
+    false
+}
+
+/// Rename the legacy public helpers to *_impl and add cache-aware wrappers.
+fn generate_thumbnail_impl(source_path: &str, out_path: &str, time_sec: f64) -> Result<String, String> {
+    let ffmpeg = which("ffmpeg");
+    let ts = format!("{time_sec:.3}");
+    let status = ffcmd(&ffmpeg)
+        .args([
+            "-y",
+            "-ss",
+            &ts,
+            "-i",
+            source_path,
+            "-frames:v",
+            "1",
+            "-vf",
+            "scale='min(320,iw)':-2",
+            out_path,
+        ])
+        .status();
+    match status {
+        Ok(s) if s.success() => Ok(out_path.to_string()),
+        Ok(s) => Err(format!("ffmpeg thumbnail failed exit {s}")),
+        Err(e) => Err(format!("ffmpeg spawn error: {e}")),
+    }
+}
+
+/// Generate a deterministic H.264/AAC MP4 preview proxy (impl, writes to `out_path`).
+/// The ORIGINAL source is never overwritten.
+fn generate_preview_proxy_impl(source_path: &str, out_path: &str) -> Result<String, String> {
+    let ffmpeg = which("ffmpeg");
+    let probe = probe_media(source_path);
+    let vf = if probe.height >= 720 {
+        "scale=w=-2:h=720,format=yuv420p"
+    } else if probe.width >= 1280 {
+        "scale=w=1280:h=-2,format=yuv420p"
+    } else {
+        "format=yuv420p"
+    };
+    let status = ffcmd(&ffmpeg)
+        .args([
+            "-y",
+            "-i",
+            source_path,
+            "-vf",
+            vf,
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "23",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            out_path,
+        ])
+        .status();
+    match status {
+        Ok(s) if s.success() => Ok(out_path.to_string()),
+        Ok(s) => Err(format!("ffmpeg preview proxy failed exit {s}")),
+        Err(e) => Err(format!("ffmpeg spawn error: {e}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Cross-language contract: these vectors MUST match packages/media-engine
+    // (cacheKey.ts) so the frontend + backend agree on deterministic cache paths.
+    #[test]
+    fn cache_key_contract_matches_typescript() {
+        // stable_hash("a") djb2 base36 == JS Number.toString(36).
+        let h = 5381u32.wrapping_mul(33).wrapping_add(97); // == 177670
+        assert_eq!(stable_hash("a"), to_base36(h));
+        // proxy key folds the codec signature exactly like TS proxyCacheKey.
+        let pk = proxy_cache_key("C:/v/sample.mp4", "h264+aac");
+        assert_eq!(pk, format!("proxy_{}", stable_hash("C:/v/sample.mp4|h264+aac")));
+        // thumbnail key buckets time to ms exactly like TS thumbnailCacheKey.
+        let tk = thumbnail_cache_key("C:/v/sample.mp4", 1.234);
+        assert_eq!(tk, format!("thumb_{}", stable_hash("C:/v/sample.mp4|1234")));
+        // Different source / signature yields a different key.
+        assert_ne!(pk, proxy_cache_key("C:/v/other.mp4", "h264+aac"));
+        assert_ne!(pk, proxy_cache_key("C:/v/sample.mp4", "hevc+aac"));
+    }
+
+    #[test]
+    fn normalize_codec_is_alnum_only() {
+        assert_eq!(normalize_codec(&Some("h264".into())), "h264");
+        assert_eq!(normalize_codec(&Some("H.264".into())), "h264");
+        assert_eq!(normalize_codec(&None), "na");
+    }
+
+    #[test]
+    fn proxy_codec_signature_folds_codecs() {
+        assert_eq!(
+            proxy_codec_signature(&Some("h264".into()), &Some("aac".into())),
+            "h264+aac"
+        );
+    }
+
+    // â”€â”€ REAL proxy cache lifecycle (PROXY_CACHE gate, Phase B/C) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Drives the ACTUAL ffmpeg encoder (generate_preview_proxy_impl) into a
+    // temporary cache directory, proving MISSâ†’CREATEâ†’ffprobeâ†’HITâ†’reuse end to
+    // end. No AppHandle/managed-cache coupling, no mocked filesystem output.
+    #[test]
+    fn ensure_preview_proxy_real_miss_hit_reuse() {
+        // ffmpeg/ffprobe are hard production dependencies (hvs_capabilities).
+        let ffmpeg_present = std::process::Command::new("ffmpeg")
+            .arg("-version")
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        let ffprobe_present = std::process::Command::new("ffprobe")
+            .arg("-version")
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        assert!(ffmpeg_present, "ffmpeg must be on PATH for proxy lifecycle test");
+        assert!(ffprobe_present, "ffprobe must be on PATH for proxy lifecycle test");
+
+        let tmp = std::env::temp_dir().join(format!(
+            "haios_proxy_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let cache_dir = tmp.join("cache");
+        let src_dir = tmp.join("src");
+        std::fs::create_dir_all(&cache_dir).unwrap();
+        std::fs::create_dir_all(&src_dir).unwrap();
+        let source = src_dir.join("prores_pcm.mov");
+
+        // Generate a small deterministic ProRes/PCM source that REQUIRES a proxy.
+        let gen = std::process::Command::new("ffmpeg")
+            .args([
+                "-y",
+                "-f", "lavfi", "-i", "testsrc=size=640x360:rate=30:duration=2",
+                "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+                "-c:v", "prores", "-c:a", "pcm_s16le", "-t", "2",
+                source.to_str().unwrap(),
+            ])
+            .status()
+            .expect("spawn ffmpeg for fixture");
+        assert!(gen.success(), "prores fixture generation failed");
+        // Sanity: the fixture is genuinely a proxy-required codec.
+        let src_probe = probe_media(source.to_str().unwrap());
+        assert_eq!(src_probe.video_codec.as_deref(), Some("prores"), "fixture must be prores");
+
+        // MISS â†’ generate.
+        let before_meta = std::fs::metadata(&source).unwrap();
+        let before_mod = before_meta.modified().unwrap();
+        let cache = cache_dir.to_string_lossy().to_string();
+        let out1 = ensure_preview_proxy_impl(
+            cache.clone(),
+            source.to_str().unwrap(),
+            &Some("prores".into()),
+            &Some("pcm_s16le".into()),
+        )
+        .expect("proxy generation on miss");
+        assert!(std::path::Path::new(&out1).is_file(), "proxy file must exist after miss");
+        let proxy_files: Vec<_> = std::fs::read_dir(&cache_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().map(|x| x == "mp4").unwrap_or(false))
+            .collect();
+        assert_eq!(proxy_files.len(), 1, "exactly one proxy file expected in cache");
+
+        // ffprobe the produced proxy: H.264 video + AAC audio + mp4 container.
+        let probe = probe_media(&out1);
+        assert_eq!(probe.video_codec.as_deref(), Some("h264"), "proxy video must be h264");
+        assert_eq!(probe.audio_codec.as_deref(), Some("aac"), "proxy audio must be aac");
+        let container = ffprobe_container(&out1);
+        assert!(container.contains("mp4"), "proxy container must be mp4 (got {container})");
+        assert!(ffmpeg_decodes(&out1), "proxy must be decodable/playable");
+        let mtime1 = std::fs::metadata(&out1).unwrap().modified().unwrap();
+
+        // HIT â†’ reuse, no regeneration.
+        let out2 = ensure_preview_proxy_impl(
+            cache.clone(),
+            source.to_str().unwrap(),
+            &Some("prores".into()),
+            &Some("pcm_s16le".into()),
+        )
+        .expect("proxy hit");
+        assert_eq!(out1, out2, "hit must return identical deterministic path");
+        let mtime2 = std::fs::metadata(&out2).unwrap().modified().unwrap();
+        assert_eq!(mtime1, mtime2, "proxy must NOT be regenerated on hit (mtime stable)");
+
+        // Original source immutable across the whole lifecycle.
+        let after_meta = std::fs::metadata(&source).unwrap();
+        assert_eq!(before_meta.len(), after_meta.len(), "source size must not change");
+        assert_eq!(before_mod, after_meta.modified().unwrap(), "source mtime must not change");
+
+        // Cleanup test-only artifacts (do not leak into production cache).
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    fn ffprobe_container(path: &str) -> String {
+        let out = std::process::Command::new("ffprobe")
+            .args([
+                "-v", "error",
+                "-show_entries", "format=format_name",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                path,
+            ])
+            .output()
+            .expect("spawn ffprobe");
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    }
+
+    fn ffmpeg_decodes(path: &str) -> bool {
+        std::process::Command::new("ffmpeg")
+            .args(["-v", "error", "-i", path, "-f", "null", "-"])
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    }
 }

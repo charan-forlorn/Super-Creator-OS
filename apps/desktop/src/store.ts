@@ -30,6 +30,10 @@ import {
 } from "@haios/ai-core";
 import { type AIProvider, OfflineProvider, ProviderUnavailableError } from "@haios/ai-providers";
 import type { MediaProbe } from "./bridge";
+import { PureMediaCache } from "@haios/media-engine";
+
+/** R2.2 — deterministic, browser-safe cache lifecycle tracker (no fs IO). */
+const mediaCache = new PureMediaCache("");
 
 let clipCounter = 0;
 let captionCounter = 0;
@@ -54,6 +58,8 @@ export interface StudioState {
   thumbnails: Record<string, string>;
   /** Deterministically-cached preview proxy paths keyed by asset id (ROOT_CAUSE_3). */
   previewProxies: Record<string, string>;
+  /** Deterministic media cache lifecycle state (HIT/MISS/STALE) keyed by cache key. */
+  cacheState: Record<string, "missing" | "fresh" | "stale">;
   lastError: string | null;
   dirty: boolean;
 
@@ -65,6 +71,12 @@ export interface StudioState {
   importProbedMedia: (probe: MediaProbe) => string | null;
   setThumbnail: (assetId: string, url: string) => void;
   setPreviewProxy: (assetId: string, proxyPath: string) => void;
+  /** R2.2 — record a deterministic proxy cache entry + record its lifecycle state. */
+  recordProxyCache: (sourcePath: string, codecSignature: string, revision: number) => void;
+  /** R2.2 — record a deterministic thumbnail cache entry + record its lifecycle state. */
+  recordThumbnailCache: (sourcePath: string, timeSec: number, revision: number) => void;
+  /** R2.2 — invalidate cache entries for a source (proxy + thumbnails). */
+  invalidateSourceCache: (sourcePath: string) => void;
 
   selectClip: (id: string | null) => void;
   /** R2.1 — toggle/extend selection (multi-select). */
@@ -115,19 +127,22 @@ export const useStudio = create<StudioState>((set, get) => {
     provider: new OfflineProvider(),
     thumbnails: {},
     previewProxies: {},
+    cacheState: {},
     lastError: null,
     dirty: false,
 
     newProject: () => {
       const { bus, registry } = makeBus();
-      set({ project: bus.project, bus, registry, selectedClipId: null, playheadSec: 0, previewProxies: {}, dirty: false, lastError: null });
+      mediaCache.clear();
+      set({ project: bus.project, bus, registry, selectedClipId: null, playheadSec: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, dirty: false, lastError: null });
     },
 
     loadProject: (raw) => {
       const p = parseProject(raw); // fail-closed on bad schema version
       const registry = createStudioRegistry();
       const bus = new CommandBus(registry, p);
-      set({ project: p, bus, registry, selectedClipId: null, playheadSec: 0, previewProxies: {}, dirty: false, lastError: null });
+      mediaCache.clear();
+      set({ project: p, bus, registry, selectedClipId: null, playheadSec: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, dirty: false, lastError: null });
     },
 
     markSaved: () => set({ dirty: false }),
@@ -176,6 +191,24 @@ export const useStudio = create<StudioState>((set, get) => {
     // Original source path is never overwritten.
     setPreviewProxy: (assetId, proxyPath) =>
       set((s) => ({ previewProxies: { ...s.previewProxies, [assetId]: proxyPath } })),
+
+    // R2.2 — record a deterministic proxy cache entry + its lifecycle state.
+    recordProxyCache: (sourcePath, codecSignature, revision) => {
+      const entry = mediaCache.recordProxy(sourcePath, codecSignature, revision);
+      set((s) => ({ cacheState: { ...s.cacheState, [entry.key]: "fresh" } }));
+    },
+
+    // R2.2 — record a deterministic thumbnail cache entry + its lifecycle state.
+    recordThumbnailCache: (sourcePath, timeSec, revision) => {
+      const entry = mediaCache.recordThumbnail(sourcePath, timeSec, revision);
+      set((s) => ({ cacheState: { ...s.cacheState, [entry.key]: "fresh" } }));
+    },
+
+    // R2.2 — invalidate every cache entry for a source (proxy + thumbnails).
+    invalidateSourceCache: (sourcePath) => {
+      const removed = mediaCache.invalidateSource(sourcePath);
+      if (removed > 0) set({ cacheState: {} });
+    },
 
     selectClip: (id) => set({ selectedClipId: id, selectedClipIds: id ? [id] : [] }),
     toggleClipSelection: (id) =>

@@ -165,3 +165,22 @@ export function previewNeedsProxy(input: PreviewCompatInput): boolean {
   if (a && !DIRECT_AUDIO_CODECS.has(a)) return true;
   return false;
 }
+
+/* ----------------------------- R2.2 cache ----------------------------- */
+export {
+  stableHash,
+  normalizeCodec,
+  proxyCacheKey,
+  thumbnailCacheKey,
+  cacheFileName,
+  cachePath,
+  type CacheKind,
+} from "./cacheKey.js";
+export {
+  PureMediaCache,
+  describeProxy,
+  describeThumbnail,
+  type CacheState,
+  type CacheEntry,
+  type CacheRecord,
+} from "./cache.js";

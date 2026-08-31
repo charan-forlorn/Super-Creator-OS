@@ -87,6 +87,30 @@ fn hvs_capabilities() -> serde_json::Value {
     bridge::hvs_capabilities()
 }
 
+/// R2.2 — Build (or HIT) a deterministic H.264/AAC MP4 preview proxy inside the
+/// managed cache. Returns the cache path. On HIT the existing file is reused.
+#[tauri::command]
+fn ensure_preview_proxy(
+    source_path: String,
+    video_codec: Option<String>,
+    audio_codec: Option<String>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    bridge::ensure_preview_proxy(&app, &source_path, &video_codec, &audio_codec)
+}
+
+/// R2.2 — Build (or HIT) a deterministic thumbnail inside the managed cache.
+#[tauri::command]
+fn ensure_thumbnail(source_path: String, time_sec: f64, app: tauri::AppHandle) -> Result<String, String> {
+    bridge::ensure_thumbnail(&app, &source_path, time_sec)
+}
+
+/// R2.2 — Invalidate a cache entry by deterministic key + kind.
+#[tauri::command]
+fn invalidate_cache(kind: String, key: String, app: tauri::AppHandle) -> bool {
+    bridge::invalidate_cache_entry(&app, &kind, &key)
+}
+
 /// Start a render. Returns the job id. Runs ffmpeg synchronously on a spawned
 /// thread and reports progress to the frontend via an event.
 #[tauri::command]
@@ -172,6 +196,9 @@ pub fn run() {
             generate_thumbnail,
             generate_preview_proxy,
             hvs_capabilities,
+            ensure_preview_proxy,
+            ensure_thumbnail,
+            invalidate_cache,
             hvs_render,
             verify_render,
             cancel_render

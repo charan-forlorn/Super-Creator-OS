@@ -15,6 +15,22 @@
       "height": 240,
       "fps": 25,
       "hasAudio": true,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "asset-prores",
+      "name": "sample_prores.mov",
+      "sourcePath": "E2E_FIXTURE_PRORES_MOV",
+      "kind": "video",
+      "durationSec": 3,
+      "width": 640,
+      "height": 360,
+      "fps": 30,
+      "hasAudio": true,
+      "videoCodec": "prores",
+      "audioCodec": "pcm_s16le",
       "createdAt": "2026-01-01T00:00:00.000Z"
     }
   ],

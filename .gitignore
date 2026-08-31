@@ -100,6 +100,7 @@ apps/desktop/dist-e2e/
 apps/desktop/e2e/bin/
 apps/desktop/e2e/artifacts/
 apps/desktop/e2e/fixtures/*.mp4
+apps/desktop/e2e/fixtures/*.mov
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/target/release/
 apps/desktop/src-tauri/target/debug/
