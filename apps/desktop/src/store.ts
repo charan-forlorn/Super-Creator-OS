@@ -17,6 +17,7 @@ import {
   DELETE_CLIP,
   MOVE_CLIP,
   TRIM_CLIP,
+  SET_CLIP_AUDIO,
   SPLIT_CLIP,
   ADD_CAPTION,
   PLACE_CAPTION,
@@ -111,6 +112,7 @@ export interface StudioState {
   /** R2.1 — commit a group move (all selected clips shifted by delta seconds) as ONE undoable unit. */
   commitGroupMove: (deltaSec: number) => void;
   trimSelected: (newInPoint?: number, newSourceEnd?: number) => void;
+  setSelectedAudio: (gainDb: number, muted: boolean) => boolean;
   splitSelected: (t?: number) => void;
   duplicateSelected: () => void;
   addCaption: (trackId: string, text: string, start: number, duration: number) => void;
@@ -290,7 +292,7 @@ export const useStudio = create<StudioState>((set, get) => {
 
     addClip: (assetId, trackId, inPoint, duration, start) => {
       const id = uid("clip");
-      const clip: Clip = { id, assetId, inPoint, duration, start, trackId, transform: { scale: 1, x: 0, y: 0, opacity: 1 } };
+      const clip: Clip = { id, assetId, inPoint, duration, start, trackId, transform: { scale: 1, x: 0, y: 0, opacity: 1 }, audio: { gainDb: 0, muted: false } };
       get().bus.execute(ADD_CLIP, { clip });
       set({ project: get().bus.project, dirty: true, selectedClipId: id });
     },
@@ -339,6 +341,19 @@ export const useStudio = create<StudioState>((set, get) => {
         set({ project: get().bus.project, dirty: true });
       } catch (e) {
         set({ lastError: (e as Error).message });
+      }
+    },
+
+    setSelectedAudio: (gainDb, muted) => {
+      const id = get().selectedClipId;
+      if (!id) return false;
+      try {
+        get().bus.execute(SET_CLIP_AUDIO, { clipId: id, gainDb, muted });
+        set({ project: get().bus.project, dirty: true, lastError: null });
+        return true;
+      } catch (e) {
+        set({ lastError: (e as Error).message });
+        return false;
       }
     },
 

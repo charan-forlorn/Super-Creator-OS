@@ -139,6 +139,33 @@ export const moveClipCommand: EditCommand<z.infer<typeof moveClipSchema>> = {
   },
 };
 
+/* ----------------------------- clipAudio ---------------------------- */
+export const SET_CLIP_AUDIO = "clip.audio";
+export const setClipAudioSchema = z.object({
+  clipId: z.string().min(1),
+  gainDb: z.number().min(-60).max(0),
+  muted: z.boolean(),
+});
+export const setClipAudioCommand: EditCommand<z.infer<typeof setClipAudioSchema>> = {
+  type: SET_CLIP_AUDIO,
+  schema: setClipAudioSchema,
+  execute(prev, { clipId, gainDb, muted }) {
+    const { clip, track } = findClip(prev, clipId);
+    const prior = clip.audio ?? { gainDb: 0, muted: false };
+    const updated: Clip = { ...clip, audio: { gainDb, muted } };
+    const tracks = prev.tracks.map((t) =>
+      t.id === track.id ? { ...t, clips: t.clips.map((c) => c.id === clipId ? updated : c) } : t,
+    );
+    return {
+      next: { ...prev, tracks, updatedAt: new Date().toISOString() },
+      inverse: {
+        type: SET_CLIP_AUDIO,
+        execute: (p) => setClipAudioCommand.execute(p, { clipId, gainDb: prior.gainDb, muted: prior.muted }),
+      },
+    };
+  },
+};
+
 /* ----------------------------- trimClip ----------------------------- */
 export const TRIM_CLIP = "clip.trim";
 export const trimClipSchema = z.object({
@@ -448,6 +475,7 @@ export const placeProbedMediaCommand: EditCommand<z.infer<typeof placeProbedMedi
         start,
         trackId: targetTrackId,
         transform: { scale: 1, x: 0, y: 0, opacity: 1 },
+        audio: { gainDb: 0, muted: false },
       };
       next = {
         ...next,

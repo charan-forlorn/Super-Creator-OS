@@ -49,6 +49,13 @@ export const clipSchema = z.object({
       opacity: z.number().min(0).max(1).default(1),
     })
     .default({}),
+  /** Clip-local audio controls; defaults preserve source audio for legacy projects. */
+  audio: z
+    .object({
+      gainDb: z.number().min(-60).max(0).default(0),
+      muted: z.boolean().default(false),
+    })
+    .default({}),
 });
 export type Clip = z.infer<typeof clipSchema>;
 

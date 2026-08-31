@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, existsSync, statSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -72,19 +72,26 @@ function renderReal(project: Project, outPath: string): void {
   const H = 1080;
   const inputs: string[] = [];
   const concatParts: string[] = [];
+  const audioParts: string[] = [];
   videoClips.forEach((clip, i) => {
     const asset = assets.find((x) => x.id === clip.assetId);
     if (!asset) throw new Error(`clip ${clip.id} missing asset`);
     inputs.push("-ss", String(clip.inPoint), "-t", String(clip.duration), "-i", asset.sourcePath);
     concatParts.push(
-      `[${i}:v]scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1[${i}v]`,
+      `[${i}:v]trim=duration=${clip.duration},setpts=PTS-STARTPTS,scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1[${i}v]`,
     );
+    const gainDb = clip.audio?.muted ? -120 : (clip.audio?.gainDb ?? 0);
+    const gain = Math.pow(10, gainDb / 20);
+    audioParts.push(asset.hasAudio
+      ? `[${i}:a]atrim=duration=${clip.duration},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp,aresample=44100,volume=${gain}[${i}a]`
+      : `anullsrc=r=44100:cl=mono:d=${clip.duration},volume=${gain}[${i}a]`);
   });
   const vlist = videoClips.map((_, i) => `[${i}v]`).join("");
+  const alist = videoClips.map((_, i) => `[${i}a]`).join("");
   let filter = concatParts.join(";") + ";";
-  filter += `${vlist}concat=n=${videoClips.length}:v=1:a=0[vout]`;
-  const dur = Math.max(project.durationSec, 0.1);
-  filter += `;aevalsrc=0:d=${dur.toFixed(3)}[aout]`;
+  filter += `${vlist}concat=n=${videoClips.length}:v=1:a=0[vout];`;
+  filter += audioParts.join(";") + ";";
+  filter += `${alist}concat=n=${videoClips.length}:v=0:a=1[aout]`;
   const args = [
     "-y",
     ...inputs,
@@ -113,6 +120,13 @@ function renderReal(project: Project, outPath: string): void {
 }
 
 /** Real ffprobe verification of a rendered output. */
+function outputMeanVolumeDb(outPath: string): number {
+  const r = spawnSync("ffmpeg", ["-v", "info", "-i", outPath, "-af", "volumedetect", "-f", "null", "-"], { encoding: "utf8" });
+  const text = `${r.stdout ?? ""}\n${r.stderr ?? ""}`;
+  const m = /mean_volume:\s*(-?[\d.]+) dB/.exec(text);
+  return m ? Number(m[1]) : Number.NEGATIVE_INFINITY;
+}
+
 function verifyOutput(outPath: string) {
   const raw = execFileSync(
     "ffprobe",
@@ -271,6 +285,7 @@ describe("E2E-01 — single narrative import -> edit -> save -> reopen -> render
         String(v.container).includes("mp4");
       A.OUTPUT_VIDEO_CODEC = v.videoCodec === "h264";
       A.OUTPUT_AUDIO_CODEC = v.audioCodec === "aac";
+      A.OUTPUT_AUDIO_NON_SILENT = outputMeanVolumeDb(outPath) > -80;
       A.OUTPUT_RESOLUTION_EXPECTED = v.width === 1920 && v.height === 1080;
       A.OUTPUT_DURATION_WITHIN_TOLERANCE =
         v.durationSec >= 5.5 && v.durationSec <= 6.5;

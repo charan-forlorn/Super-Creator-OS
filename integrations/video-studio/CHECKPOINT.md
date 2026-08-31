@@ -132,8 +132,31 @@ R2_3_GUI_REGRESSION=PASS
 R2_2_GUI_REGRESSION=PASS
 CRITICAL_DEFECTS=0
 
+## R2.5 RECONSTRUCTED AUDIO WORKSPACE + SOURCE AUDIO PRESERVATION
+SCOPE_AUTHORITY=RECONSTRUCTED_FROM_REPO_CAPABILITY_GAPS
+ORIGINAL_R2_5_SPEC_RECOVERED=FALSE
+CLIP_AUDIO_MODEL=PASS (legacy-safe defaults gainDb=0, muted=false)
+CLIP_AUDIO_COMMAND=PASS (undoable gain/mute, fail-closed -60..0 dB)
+AUDIO_WORKSPACE_UI=PASS (Inspector gain + mute controls)
+PREVIEW_SOURCE_AUDIO=PASS (default unmuted; dB -> linear volume; mute/undo verified)
+EXPORT_SOURCE_AUDIO=PASS (embedded audio preserved; mute/gain applied; no-audio fallback stays silent)
+OUTPUT_AUDIO_NON_SILENT=PASS (real ffmpeg + volumedetect)
+R2_5_REAL_GUI=PASS (unmuted -> mute -> undo -> -12 dB gain)
+PROJECT_MODEL_TESTS=14/14 PASS
+COMMAND_SYSTEM_TESTS=35/35 PASS
+DESKTOP_TESTS=33/33 PASS
+RUST_TESTS=7/7 PASS
+E2E_EXPORT=20/20 PASS
+DESKTOP_TYPECHECK=PASS
+PRODUCTION_FRONTEND_BUILD=PASS
+PRODUCTION_TAURI_RELEASE_BUILD=PASS
+FINAL_E2E_TAURI_RELEASE_BUILD=PASS
+R2_4_GUI_REGRESSION=PASS
+R2_3_GUI_REGRESSION=PASS
+R2_2_GUI_REGRESSION=PASS
+CRITICAL_DEFECTS=0
+
 ## NEXT EXACT ACTION
-Reconstruct and implement R2.5 from the next highest production-editor capability gap.
-Current highest gap: Audio Workspace / clip-level audio control.
+Reconstruct R2.6 from the next highest production-editor capability gap using repo evidence only.
 Do not infer reconstructed milestones are the original spec.
 BLOCKERS=none

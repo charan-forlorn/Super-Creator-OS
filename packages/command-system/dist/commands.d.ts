@@ -28,6 +28,21 @@ export declare const moveClipSchema: z.ZodObject<{
     newStart: number;
 }>;
 export declare const moveClipCommand: EditCommand<z.infer<typeof moveClipSchema>>;
+export declare const SET_CLIP_AUDIO = "clip.audio";
+export declare const setClipAudioSchema: z.ZodObject<{
+    clipId: z.ZodString;
+    gainDb: z.ZodNumber;
+    muted: z.ZodBoolean;
+}, "strip", z.ZodTypeAny, {
+    clipId: string;
+    gainDb: number;
+    muted: boolean;
+}, {
+    clipId: string;
+    gainDb: number;
+    muted: boolean;
+}>;
+export declare const setClipAudioCommand: EditCommand<z.infer<typeof setClipAudioSchema>>;
 export declare const TRIM_CLIP = "clip.trim";
 export declare const trimClipSchema: z.ZodObject<{
     clipId: z.ZodString;
@@ -195,8 +210,22 @@ export declare const addTrackSchema: z.ZodObject<{
                 y?: number | undefined;
                 opacity?: number | undefined;
             }>>;
+            audio: z.ZodDefault<z.ZodObject<{
+                gainDb: z.ZodDefault<z.ZodNumber>;
+                muted: z.ZodDefault<z.ZodBoolean>;
+            }, "strip", z.ZodTypeAny, {
+                gainDb: number;
+                muted: boolean;
+            }, {
+                gainDb?: number | undefined;
+                muted?: boolean | undefined;
+            }>>;
         }, "strip", z.ZodTypeAny, {
             id: string;
+            audio: {
+                gainDb: number;
+                muted: boolean;
+            };
             assetId: string;
             inPoint: number;
             duration: number;
@@ -215,6 +244,10 @@ export declare const addTrackSchema: z.ZodObject<{
             duration: number;
             start: number;
             trackId: string;
+            audio?: {
+                gainDb?: number | undefined;
+                muted?: boolean | undefined;
+            } | undefined;
             transform?: {
                 scale?: number | undefined;
                 x?: number | undefined;
@@ -284,6 +317,10 @@ export declare const addTrackSchema: z.ZodObject<{
         kind: "video" | "audio" | "text";
         clips: {
             id: string;
+            audio: {
+                gainDb: number;
+                muted: boolean;
+            };
             assetId: string;
             inPoint: number;
             duration: number;
@@ -321,6 +358,10 @@ export declare const addTrackSchema: z.ZodObject<{
             duration: number;
             start: number;
             trackId: string;
+            audio?: {
+                gainDb?: number | undefined;
+                muted?: boolean | undefined;
+            } | undefined;
             transform?: {
                 scale?: number | undefined;
                 x?: number | undefined;
@@ -350,6 +391,10 @@ export declare const addTrackSchema: z.ZodObject<{
         kind: "video" | "audio" | "text";
         clips: {
             id: string;
+            audio: {
+                gainDb: number;
+                muted: boolean;
+            };
             assetId: string;
             inPoint: number;
             duration: number;
@@ -389,6 +434,10 @@ export declare const addTrackSchema: z.ZodObject<{
             duration: number;
             start: number;
             trackId: string;
+            audio?: {
+                gainDb?: number | undefined;
+                muted?: boolean | undefined;
+            } | undefined;
             transform?: {
                 scale?: number | undefined;
                 x?: number | undefined;

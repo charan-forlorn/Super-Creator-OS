@@ -1,7 +1,7 @@
 import { useStudio } from "../store";
 
 export function Inspector() {
-  const { project, selectedClipId, moveSelected, trimSelected, changeAspect } = useStudio();
+  const { project, selectedClipId, moveSelected, trimSelected, setSelectedAudio, changeAspect } = useStudio();
   const clip = project.tracks.flatMap((t) => t.clips).find((c) => c.id === selectedClipId);
 
   return (
@@ -35,6 +35,24 @@ export function Inspector() {
           <div className="inspector-row">
             <label>Scale</label>
             <span>{clip.transform?.scale ?? 1}</span>
+          </div>
+          <div className="inspector-row">
+            <label>Gain (dB)</label>
+            <input
+              data-testid="audio-gain"
+              type="number" min={-60} max={0} step={1}
+              value={clip.audio?.gainDb ?? 0}
+              onChange={(e) => setSelectedAudio(Number(e.target.value), clip.audio?.muted ?? false)}
+            />
+          </div>
+          <div className="inspector-row">
+            <label>Mute</label>
+            <input
+              data-testid="audio-muted"
+              type="checkbox"
+              checked={clip.audio?.muted ?? false}
+              onChange={(e) => setSelectedAudio(clip.audio?.gainDb ?? 0, e.target.checked)}
+            />
           </div>
         </div>
       )}

@@ -23,6 +23,14 @@ export function Preview() {
 
   useEffect(() => {
     const v = videoRef.current;
+    if (!v || !clip) return;
+    const audio = clip.audio ?? { gainDb: 0, muted: false };
+    v.muted = audio.muted;
+    v.volume = Math.max(0, Math.min(1, Math.pow(10, audio.gainDb / 20)));
+  }, [clip?.id, clip?.audio?.gainDb, clip?.audio?.muted]);
+
+  useEffect(() => {
+    const v = videoRef.current;
     if (!v || !asset) return;
     const local = playheadSec - (clip?.start ?? 0) + (clip?.inPoint ?? 0);
     if (Math.abs(v.currentTime - local) > 0.2) {
@@ -81,7 +89,6 @@ export function Preview() {
               }
             }}
             onEnded={() => setPlaying(false)}
-            muted
           />
         ) : (
           <div className="preview-placeholder">Import media and select a clip to preview</div>

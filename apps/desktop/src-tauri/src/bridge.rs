@@ -304,6 +304,23 @@ pub fn hvs_capabilities() -> Value {
 ///   - each clip is trimmed via -ss/-to against its source in-point/duration
 ///   - scale/crop to the requested resolution
 ///   - captions rendered as drawtext overlays
+fn clip_audio_linear_gain(clip: &Value) -> f64 {
+    let audio = clip.get("audio");
+    let muted = audio.and_then(|a| a.get("muted")).and_then(|v| v.as_bool()).unwrap_or(false);
+    if muted { return 0.0; }
+    let gain_db = audio.and_then(|a| a.get("gainDb")).and_then(|v| v.as_f64()).unwrap_or(0.0).clamp(-60.0, 0.0);
+    10_f64.powf(gain_db / 20.0)
+}
+
+fn video_clip_audio_filter(input_idx: usize, clip: &Value, duration: f64, has_audio: bool) -> String {
+    let gain = clip_audio_linear_gain(clip);
+    if has_audio {
+        format!("[{input_idx}:a]atrim=duration={duration:.3},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp,aresample=44100,volume={gain:.6}[{input_idx}va]")
+    } else {
+        format!("anullsrc=r=44100:cl=mono:d={duration:.3},volume={gain:.6}[{input_idx}va]")
+    }
+}
+
 pub fn run_render(
     job_id: &str,
     project_json: &str,
@@ -355,78 +372,72 @@ pub fn run_render(
         return;
     }
 
-    // Concatenate video clips with trim and scale using the concat filter.
-    // Build inputs and a filter_complex.
+    // Concatenate video clips with exact source trims and scale to the target.
+    // Each video input is bounded with -t so export duration matches the model.
     let mut inputs: Vec<String> = Vec::new();
     let mut concat_parts: Vec<String> = Vec::new();
-    let mut part_idx = 0;
+    let mut video_audio_parts: Vec<String> = Vec::new();
     for (i, clip) in video_clips.iter().enumerate() {
         let asset_id = clip.get("assetId").and_then(|v| v.as_str()).unwrap_or("");
         let asset = assets.iter().find(|a| a.get("id").and_then(|v| v.as_str()) == Some(asset_id));
         let source = match asset.and_then(|a| a.get("sourcePath").and_then(|v| v.as_str())) {
-            Some(s) => s.to_string(),
+            Some(src) => src.to_string(),
             None => {
                 emit_state(app, job_id, "FAILED", 0.0, None, Some(format!("clip {i} missing asset")));
                 return;
             }
         };
         let in_point = clip.get("inPoint").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let duration = clip.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let start = clip.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        inputs.push("-ss".into());
-        inputs.push(format!("{in_point:.3}"));
-        inputs.push("-i".into());
-        inputs.push(source.clone());
-        // scale each clip to target resolution
+        let duration = clip.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.001);
+        inputs.extend(["-ss".into(), format!("{in_point:.3}"), "-t".into(), format!("{duration:.3}"), "-i".into(), source]);
         concat_parts.push(format!(
-            "[{i}:v]scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1[{i}v]"
+            "[{i}:v]trim=duration={duration:.3},setpts=PTS-STARTPTS,scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1[{i}v]"
         ));
-        part_idx = i;
+        let has_audio = asset.and_then(|a| a.get("hasAudio")).and_then(|v| v.as_bool()).unwrap_or(false);
+        video_audio_parts.push(video_clip_audio_filter(i, clip, duration, has_audio));
     }
-    // Concat video parts.
-    let vlist: Vec<String> = (0..=part_idx).map(|i| format!("[{i}v]")).collect();
+    let vlist: Vec<String> = (0..video_clips.len()).map(|i| format!("[{i}v]")).collect();
     let mut filter = concat_parts.join(";");
     filter.push(';');
     filter.push_str(&format!("{}concat=n={}:v=1:a=0[vout]", vlist.join(""), vlist.len()));
 
-    // Audio: collect audio clips; map each as an input and concatenate. If none,
-    // synthesize a silent track matched to the project duration so the container
-    // is valid.
-    let dur = project.get("durationSec").and_then(|v| v.as_f64()).unwrap_or(10.0).max(0.1);
-    let audio_arg: Vec<String>;
+    // Explicit audio tracks retain priority. When absent, preserve embedded audio
+    // from video clips instead of replacing it with global silence.
+    let audio_arg: Vec<String> = vec!["-map".into(), "[vout]".into(), "-map".into(), "[aout]".into()];
     if !audio_clips.is_empty() {
-        let total_before = inputs.iter().filter(|x| x.as_str() == "-i").count();
-        for clip in audio_clips.iter() {
+        let first_audio_input = video_clips.len();
+        let mut audio_filters: Vec<String> = Vec::new();
+        let mut audio_labels: Vec<String> = Vec::new();
+        for (offset, clip) in audio_clips.iter().enumerate() {
             let asset_id = clip.get("assetId").and_then(|v| v.as_str()).unwrap_or("");
             let asset = assets.iter().find(|a| a.get("id").and_then(|v| v.as_str()) == Some(asset_id));
             let source = match asset.and_then(|a| a.get("sourcePath").and_then(|v| v.as_str())) {
-                Some(s) => s.to_string(),
+                Some(src) => src.to_string(),
                 None => continue,
             };
             let in_point = clip.get("inPoint").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            inputs.push("-ss".into());
-            inputs.push(format!("{in_point:.3}"));
-            inputs.push("-i".into());
-            inputs.push(source);
+            let duration = clip.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.001);
+            let idx = first_audio_input + offset;
+            inputs.extend(["-ss".into(), format!("{in_point:.3}"), "-t".into(), format!("{duration:.3}"), "-i".into(), source]);
+            let gain = clip_audio_linear_gain(clip);
+            audio_filters.push(format!("[{idx}:a]atrim=duration={duration:.3},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp,aresample=44100,volume={gain:.6}[a{idx}]"));
+            audio_labels.push(format!("[a{idx}]"));
         }
-        let total_after = inputs.iter().filter(|x| x.as_str() == "-i").count();
-        let n_audio = total_after - total_before;
-        if n_audio == 0 {
+        if audio_labels.is_empty() {
+            let dur = project.get("durationSec").and_then(|v| v.as_f64()).unwrap_or(0.1).max(0.1);
             filter.push_str(&format!(";aevalsrc=0:d={dur:.3}[aout]"));
         } else {
-            let alist: Vec<String> = (total_before..total_after)
-                .map(|i| format!("[{i}:a]aformat=sample_fmts=fltp,aresample=44100[{i}a]"))
-                .collect();
             filter.push(';');
-            filter.push_str(&alist.join(";"));
-            let concat_list: Vec<String> = (total_before..total_after).map(|i| format!("[{i}a]")).collect();
+            filter.push_str(&audio_filters.join(";"));
             filter.push(';');
-            filter.push_str(&format!("{}concat=n={}:v=0:a=1[aout]", concat_list.join(""), n_audio));
+            filter.push_str(&format!("{}concat=n={}:v=0:a=1[aout]", audio_labels.join(""), audio_labels.len()));
         }
-        audio_arg = vec!["-map".into(), "[vout]".into(), "-map".into(), "[aout]".into()];
     } else {
-        filter.push_str(&format!(";aevalsrc=0:d={dur:.3}[aout]"));
-        audio_arg = vec!["-map".into(), "[vout]".into(), "-map".into(), "[aout]".into()];
+        filter.push(';');
+        filter.push_str(&video_audio_parts.join(";"));
+        let labels: Vec<String> = (0..video_clips.len()).map(|i| format!("[{i}va]")).collect();
+        filter.push(';');
+        filter.push_str(&format!("{}concat=n={}:v=0:a=1[aout]", labels.join(""), labels.len()));
     }
 
     let mut cmd = ffcmd(&ffmpeg);
@@ -995,6 +1006,28 @@ mod tests {
         assert_eq!(out1, out2);
         assert_eq!(mtime1, std::fs::metadata(&out2).unwrap().modified().unwrap());
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn clip_audio_gain_contract() {
+        let default_clip = json!({});
+        assert!((clip_audio_linear_gain(&default_clip) - 1.0).abs() < 1e-9);
+        let muted = json!({"audio": {"gainDb": -6.0, "muted": true}});
+        assert_eq!(clip_audio_linear_gain(&muted), 0.0);
+        let minus_six = json!({"audio": {"gainDb": -6.0, "muted": false}});
+        assert!((clip_audio_linear_gain(&minus_six) - 0.501187).abs() < 0.00001);
+    }
+
+    #[test]
+    fn video_clip_audio_filter_uses_source_or_silence_deterministically() {
+        let clip = json!({"audio": {"gainDb": -12.0, "muted": false}});
+        let embedded = video_clip_audio_filter(0, &clip, 2.5, true);
+        assert!(embedded.contains("[0:a]"));
+        assert!(embedded.contains("atrim=duration=2.500"));
+        assert!(embedded.contains("volume=0.251189"));
+        let silent = video_clip_audio_filter(1, &clip, 1.25, false);
+        assert!(silent.contains("anullsrc=r=44100:cl=mono:d=1.250"));
+        assert!(silent.contains("[1va]"));
     }
 
     fn ffprobe_container(path: &str) -> String {
