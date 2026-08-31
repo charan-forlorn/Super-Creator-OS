@@ -2,10 +2,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::path::Path;
 
 use tauri::Manager;
 
 mod bridge;
+mod project_io;
 
 // Shared mutable registry of render jobs (job_id -> cancellation flag).
 // Cancellation is cooperative: the render loop checks the flag between ffmpeg steps.
@@ -115,6 +117,39 @@ fn invalidate_cache(kind: String, key: String, app: tauri::AppHandle) -> bool {
     bridge::invalidate_cache_entry(&app, &kind, &key)
 }
 
+#[tauri::command]
+fn project_save(path: String, project_json: String) -> Result<(), String> {
+    project_io::save_project(Path::new(&path), &project_json)
+}
+
+#[tauri::command]
+fn project_open(path: String) -> Result<String, String> {
+    project_io::open_project(Path::new(&path))
+}
+
+#[tauri::command]
+fn project_autosave(
+    project_id: String,
+    project_json: String,
+    project_path: Option<String>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let base = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    project_io::write_autosave(&base, &project_id, &project_json, project_path)
+}
+
+#[tauri::command]
+fn project_latest_autosave(app: tauri::AppHandle) -> Result<Option<project_io::AutosaveEnvelope>, String> {
+    let base = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    project_io::latest_autosave(&base)
+}
+
+#[tauri::command]
+fn project_clear_autosave(project_id: String, app: tauri::AppHandle) -> Result<bool, String> {
+    let base = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    project_io::clear_autosave(&base, &project_id)
+}
+
 /// Start a render. Returns the job id. Runs ffmpeg synchronously on a spawned
 /// thread and reports progress to the frontend via an event.
 #[tauri::command]
@@ -204,6 +239,11 @@ pub fn run() {
             ensure_thumbnail,
             ensure_waveform,
             invalidate_cache,
+            project_save,
+            project_open,
+            project_autosave,
+            project_latest_autosave,
+            project_clear_autosave,
             hvs_render,
             verify_render,
             cancel_render

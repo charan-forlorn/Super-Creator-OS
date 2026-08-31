@@ -124,9 +124,44 @@ export const projectSchema = z.object({
 });
 export type Project = z.infer<typeof projectSchema>;
 
+type ProjectMigrationDocument = Record<string, unknown>;
+type ProjectMigration = (document: ProjectMigrationDocument) => ProjectMigrationDocument;
+
+/**
+ * Explicit migration chain. Add only one-version-at-a-time migrations here
+ * (for example `1: migrateV1ToV2`) when PROJECT_SCHEMA_VERSION advances.
+ * Missing steps fail closed rather than guessing at persisted user data.
+ */
+const PROJECT_MIGRATIONS: Readonly<Partial<Record<number, ProjectMigration>>> = Object.freeze({});
+
+export function migrateProjectDocument(raw: unknown): unknown {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return raw;
+  const document = raw as ProjectMigrationDocument;
+  const version = document.schemaVersion;
+  if (typeof version !== "number" || !Number.isInteger(version)) return raw;
+  if (version > PROJECT_SCHEMA_VERSION) {
+    throw new Error(`Unsupported project schemaVersion ${version}: newer than supported ${PROJECT_SCHEMA_VERSION}`);
+  }
+  if (version < 1) throw new Error(`Unsupported project schemaVersion ${version}`);
+
+  let current: ProjectMigrationDocument = { ...document };
+  let currentVersion = version;
+  while (currentVersion < PROJECT_SCHEMA_VERSION) {
+    const migrate = PROJECT_MIGRATIONS[currentVersion];
+    if (!migrate) throw new Error(`Missing project migration ${currentVersion}->${currentVersion + 1}`);
+    current = migrate(current);
+    if (current.schemaVersion !== currentVersion + 1) {
+      throw new Error(`Invalid project migration ${currentVersion}->${currentVersion + 1}`);
+    }
+    currentVersion += 1;
+  }
+  return current;
+}
+
 /** Reject any persisted project whose schemaVersion is not the current one. */
 export function parseProject(raw: unknown): Project {
-  const parsed = projectSchema.safeParse(raw);
+  const migrated = migrateProjectDocument(raw);
+  const parsed = projectSchema.safeParse(migrated);
   if (!parsed.success) {
     throw new Error(`Invalid project document: ${parsed.error.message}`);
   }

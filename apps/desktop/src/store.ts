@@ -83,10 +83,12 @@ export interface StudioState {
   mediaAnalysis: Record<string, AssetAnalysisState>;
   lastError: string | null;
   dirty: boolean;
+  /** Persisted project file currently associated with the editing document. */
+  projectPath: string | null;
 
   newProject: () => void;
-  loadProject: (raw: unknown) => void;
-  markSaved: () => void;
+  loadProject: (raw: unknown, projectPath?: string | null, dirty?: boolean) => void;
+  markSaved: (projectPath?: string | null, expectedUpdatedAt?: string) => void;
 
   /** Atomic import + timeline placement (ROOT_CAUSE_1 fix). Returns the created clip id. */
   importProbedMedia: (probe: MediaProbe) => string | null;
@@ -161,22 +163,28 @@ export const useStudio = create<StudioState>((set, get) => {
     mediaAnalysis: {},
     lastError: null,
     dirty: false,
+    projectPath: null,
 
     newProject: () => {
       const { bus, registry } = makeBus();
       mediaCache.clear();
-      set({ project: bus.project, bus, registry, selectedClipId: null, playheadSec: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty: false, lastError: null });
+      set({ project: bus.project, bus, registry, selectedClipId: null, selectedClipIds: [], playheadSec: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty: false, projectPath: null, lastError: null });
     },
 
-    loadProject: (raw) => {
+    loadProject: (raw, projectPath = null, dirty = false) => {
       const p = parseProject(raw); // fail-closed on bad schema version
       const registry = createStudioRegistry();
       const bus = new CommandBus(registry, p);
       mediaCache.clear();
-      set({ project: p, bus, registry, selectedClipId: null, playheadSec: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty: false, lastError: null });
+      set({ project: p, bus, registry, selectedClipId: null, selectedClipIds: [], playheadSec: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty, projectPath, lastError: null });
     },
 
-    markSaved: () => set({ dirty: false }),
+    markSaved: (projectPath, expectedUpdatedAt) => set((state) => ({
+      dirty: expectedUpdatedAt !== undefined && state.project.updatedAt !== expectedUpdatedAt
+        ? state.dirty
+        : false,
+      projectPath: projectPath === undefined ? state.projectPath : projectPath,
+    })),
 
     // ROOT_CAUSE_1 FIX — atomic import + placement.
     // A single CommandBus operation (PLACE_PROBED_MEDIA) adds the asset, ensures

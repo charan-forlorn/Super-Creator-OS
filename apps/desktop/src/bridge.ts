@@ -50,6 +50,13 @@ export interface HvsCapabilities {
   container: string;
 }
 
+export interface ProjectAutosaveEnvelope {
+  projectJson: string;
+  projectPath: string | null;
+  savedAtMs: number;
+  projectId: string;
+}
+
 export async function probeMedia(path: string): Promise<MediaProbe> {
   return invoke<MediaProbe>("probe_media", { path });
 }
@@ -92,6 +99,26 @@ export async function verifyRender(outputPath: string, resolution: string): Prom
 
 export async function cancelRender(jobId: string): Promise<boolean> {
   return invoke<boolean>("cancel_render", { jobId });
+}
+
+export async function saveProjectFile(path: string, projectJson: string): Promise<void> {
+  return invoke<void>("project_save", { path, projectJson });
+}
+
+export async function openProjectFile(path: string): Promise<string> {
+  return invoke<string>("project_open", { path });
+}
+
+export async function autosaveProject(projectId: string, projectJson: string, projectPath: string | null): Promise<void> {
+  return invoke<void>("project_autosave", { projectId, projectJson, projectPath });
+}
+
+export async function latestProjectAutosave(): Promise<ProjectAutosaveEnvelope | null> {
+  return invoke<ProjectAutosaveEnvelope | null>("project_latest_autosave");
+}
+
+export async function clearProjectAutosave(projectId: string): Promise<boolean> {
+  return invoke<boolean>("project_clear_autosave", { projectId });
 }
 
 export async function selectMediaFile(): Promise<string | null> {
