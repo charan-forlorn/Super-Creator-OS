@@ -9,9 +9,14 @@ export class ClipMathError extends Error {
   }
 }
 
-/** The source end consumed by a clip: inPoint + duration. */
-export function sourceEnd(clip: Pick<Clip, "inPoint" | "duration">): number {
-  return clip.inPoint + clip.duration;
+/** Source seconds consumed by a timeline clip. */
+export function sourceSpan(clip: { duration: number; playbackRate?: number }): number {
+  return clip.duration * (clip.playbackRate ?? 1);
+}
+
+/** The source end consumed by a clip. */
+export function sourceEnd(clip: { inPoint: number; duration: number; playbackRate?: number }): number {
+  return clip.inPoint + sourceSpan(clip);
 }
 
 /**
@@ -20,7 +25,7 @@ export function sourceEnd(clip: Pick<Clip, "inPoint" | "duration">): number {
  * Returns null when valid, otherwise a human-readable failure reason.
  */
 export function validateClipAgainstAsset(
-  clip: Pick<Clip, "inPoint" | "duration">,
+  clip: Pick<Clip, "inPoint" | "duration"> & Partial<Pick<Clip, "playbackRate">>,
   asset: Pick<MediaAsset, "durationSec">,
 ): string | null {
   if (clip.duration <= 0) {
@@ -48,7 +53,8 @@ export interface TrimResult {
  */
 export function trimLeft(clip: Clip, newInPoint: number): Clip {
   const end = sourceEnd(clip);
-  const newDuration = end - newInPoint;
+  const rate = clip.playbackRate ?? 1;
+  const newDuration = (end - newInPoint) / rate;
   if (newDuration <= 0) {
     throw new ClipMathError(
       `INVALID_TRIM_LEFT: newInPoint ${newInPoint} would yield duration ${newDuration}`,
@@ -65,7 +71,8 @@ export function trimLeft(clip: Clip, newInPoint: number): Clip {
  * In-point is preserved; duration = newEnd - inPoint.
  */
 export function trimRight(clip: Clip, newSourceEnd: number): Clip {
-  const newDuration = newSourceEnd - clip.inPoint;
+  const rate = clip.playbackRate ?? 1;
+  const newDuration = (newSourceEnd - clip.inPoint) / rate;
   if (newDuration <= 0) {
     throw new ClipMathError(
       `INVALID_TRIM_RIGHT: newSourceEnd ${newSourceEnd} produces duration ${newDuration}`,
@@ -94,11 +101,12 @@ export function splitClip(clip: Clip, t: number): SplitResult {
       `INVALID_SPLIT_POINT: t=${t} must satisfy 0 < t < ${clip.duration}`,
     );
   }
+  const rate = clip.playbackRate ?? 1;
   const left: Clip = { ...clip, duration: t };
   const right: Clip = {
     ...clip,
     id: `${clip.id}__r`,
-    inPoint: clip.inPoint + t,
+    inPoint: clip.inPoint + t * rate,
     start: clip.start + t,
     duration: clip.duration - t,
   };

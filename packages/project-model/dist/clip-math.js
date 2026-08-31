@@ -5,9 +5,13 @@ export class ClipMathError extends Error {
         this.name = "ClipMathError";
     }
 }
-/** The source end consumed by a clip: inPoint + duration. */
+/** Source seconds consumed by a timeline clip. */
+export function sourceSpan(clip) {
+    return clip.duration * (clip.playbackRate ?? 1);
+}
+/** The source end consumed by a clip. */
 export function sourceEnd(clip) {
-    return clip.inPoint + clip.duration;
+    return clip.inPoint + sourceSpan(clip);
 }
 /**
  * A clip is valid iff it consumes a sub-range within its source asset.
@@ -34,7 +38,8 @@ export function validateClipAgainstAsset(clip, asset) {
  */
 export function trimLeft(clip, newInPoint) {
     const end = sourceEnd(clip);
-    const newDuration = end - newInPoint;
+    const rate = clip.playbackRate ?? 1;
+    const newDuration = (end - newInPoint) / rate;
     if (newDuration <= 0) {
         throw new ClipMathError(`INVALID_TRIM_LEFT: newInPoint ${newInPoint} would yield duration ${newDuration}`);
     }
@@ -48,7 +53,8 @@ export function trimLeft(clip, newInPoint) {
  * In-point is preserved; duration = newEnd - inPoint.
  */
 export function trimRight(clip, newSourceEnd) {
-    const newDuration = newSourceEnd - clip.inPoint;
+    const rate = clip.playbackRate ?? 1;
+    const newDuration = (newSourceEnd - clip.inPoint) / rate;
     if (newDuration <= 0) {
         throw new ClipMathError(`INVALID_TRIM_RIGHT: newSourceEnd ${newSourceEnd} produces duration ${newDuration}`);
     }
@@ -67,11 +73,12 @@ export function splitClip(clip, t) {
     if (!(t > 0 && t < clip.duration)) {
         throw new ClipMathError(`INVALID_SPLIT_POINT: t=${t} must satisfy 0 < t < ${clip.duration}`);
     }
+    const rate = clip.playbackRate ?? 1;
     const left = { ...clip, duration: t };
     const right = {
         ...clip,
         id: `${clip.id}__r`,
-        inPoint: clip.inPoint + t,
+        inPoint: clip.inPoint + t * rate,
         start: clip.start + t,
         duration: clip.duration - t,
     };

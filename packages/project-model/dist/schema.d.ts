@@ -66,6 +66,8 @@ export declare const clipSchema: z.ZodObject<{
     /** Position on the timeline track, seconds. */
     start: z.ZodNumber;
     trackId: z.ZodString;
+    /** Source playback rate. Timeline duration remains authoritative; source span = duration * playbackRate. */
+    playbackRate: z.ZodDefault<z.ZodNumber>;
     /** Optional transform for preview/export. */
     transform: z.ZodDefault<z.ZodObject<{
         scale: z.ZodDefault<z.ZodNumber>;
@@ -130,6 +132,7 @@ export declare const clipSchema: z.ZodObject<{
     duration: number;
     start: number;
     trackId: string;
+    playbackRate: number;
     transform: {
         scale: number;
         x: number;
@@ -156,6 +159,7 @@ export declare const clipSchema: z.ZodObject<{
         gainDb?: number | undefined;
         muted?: boolean | undefined;
     } | undefined;
+    playbackRate?: number | undefined;
     transform?: {
         scale?: number | undefined;
         x?: number | undefined;
@@ -246,6 +250,8 @@ export declare const trackSchema: z.ZodObject<{
         /** Position on the timeline track, seconds. */
         start: z.ZodNumber;
         trackId: z.ZodString;
+        /** Source playback rate. Timeline duration remains authoritative; source span = duration * playbackRate. */
+        playbackRate: z.ZodDefault<z.ZodNumber>;
         /** Optional transform for preview/export. */
         transform: z.ZodDefault<z.ZodObject<{
             scale: z.ZodDefault<z.ZodNumber>;
@@ -310,6 +316,7 @@ export declare const trackSchema: z.ZodObject<{
         duration: number;
         start: number;
         trackId: string;
+        playbackRate: number;
         transform: {
             scale: number;
             x: number;
@@ -336,6 +343,7 @@ export declare const trackSchema: z.ZodObject<{
             gainDb?: number | undefined;
             muted?: boolean | undefined;
         } | undefined;
+        playbackRate?: number | undefined;
         transform?: {
             scale?: number | undefined;
             x?: number | undefined;
@@ -425,6 +433,7 @@ export declare const trackSchema: z.ZodObject<{
         duration: number;
         start: number;
         trackId: string;
+        playbackRate: number;
         transform: {
             scale: number;
             x: number;
@@ -470,6 +479,7 @@ export declare const trackSchema: z.ZodObject<{
             gainDb?: number | undefined;
             muted?: boolean | undefined;
         } | undefined;
+        playbackRate?: number | undefined;
         transform?: {
             scale?: number | undefined;
             x?: number | undefined;
@@ -563,6 +573,8 @@ export declare const projectSchema: z.ZodObject<{
             /** Position on the timeline track, seconds. */
             start: z.ZodNumber;
             trackId: z.ZodString;
+            /** Source playback rate. Timeline duration remains authoritative; source span = duration * playbackRate. */
+            playbackRate: z.ZodDefault<z.ZodNumber>;
             /** Optional transform for preview/export. */
             transform: z.ZodDefault<z.ZodObject<{
                 scale: z.ZodDefault<z.ZodNumber>;
@@ -627,6 +639,7 @@ export declare const projectSchema: z.ZodObject<{
             duration: number;
             start: number;
             trackId: string;
+            playbackRate: number;
             transform: {
                 scale: number;
                 x: number;
@@ -653,6 +666,7 @@ export declare const projectSchema: z.ZodObject<{
                 gainDb?: number | undefined;
                 muted?: boolean | undefined;
             } | undefined;
+            playbackRate?: number | undefined;
             transform?: {
                 scale?: number | undefined;
                 x?: number | undefined;
@@ -742,6 +756,7 @@ export declare const projectSchema: z.ZodObject<{
             duration: number;
             start: number;
             trackId: string;
+            playbackRate: number;
             transform: {
                 scale: number;
                 x: number;
@@ -787,6 +802,7 @@ export declare const projectSchema: z.ZodObject<{
                 gainDb?: number | undefined;
                 muted?: boolean | undefined;
             } | undefined;
+            playbackRate?: number | undefined;
             transform?: {
                 scale?: number | undefined;
                 x?: number | undefined;
@@ -857,6 +873,7 @@ export declare const projectSchema: z.ZodObject<{
             duration: number;
             start: number;
             trackId: string;
+            playbackRate: number;
             transform: {
                 scale: number;
                 x: number;
@@ -924,6 +941,7 @@ export declare const projectSchema: z.ZodObject<{
                 gainDb?: number | undefined;
                 muted?: boolean | undefined;
             } | undefined;
+            playbackRate?: number | undefined;
             transform?: {
                 scale?: number | undefined;
                 x?: number | undefined;

@@ -2,14 +2,23 @@ import type { Clip, MediaAsset } from "./schema.js";
 export declare class ClipMathError extends Error {
     constructor(message: string);
 }
-/** The source end consumed by a clip: inPoint + duration. */
-export declare function sourceEnd(clip: Pick<Clip, "inPoint" | "duration">): number;
+/** Source seconds consumed by a timeline clip. */
+export declare function sourceSpan(clip: {
+    duration: number;
+    playbackRate?: number;
+}): number;
+/** The source end consumed by a clip. */
+export declare function sourceEnd(clip: {
+    inPoint: number;
+    duration: number;
+    playbackRate?: number;
+}): number;
 /**
  * A clip is valid iff it consumes a sub-range within its source asset.
  *   inPoint >= 0  AND  inPoint + duration <= assetDuration (+ eps)
  * Returns null when valid, otherwise a human-readable failure reason.
  */
-export declare function validateClipAgainstAsset(clip: Pick<Clip, "inPoint" | "duration">, asset: Pick<MediaAsset, "durationSec">): string | null;
+export declare function validateClipAgainstAsset(clip: Pick<Clip, "inPoint" | "duration"> & Partial<Pick<Clip, "playbackRate">>, asset: Pick<MediaAsset, "durationSec">): string | null;
 export interface TrimResult {
     /** The mutated clip. */
     clip: Clip;

@@ -32,6 +32,8 @@ export function Preview() {
   useEffect(() => {
     applyClipAudio(videoRef.current, clip, transitionActive ? transitionProgress : 1);
     applyClipAudio(outgoingRef.current, outgoingClip, transitionActive ? 1 - transitionProgress : 1);
+    applyClipPlaybackRate(videoRef.current, clip);
+    applyClipPlaybackRate(outgoingRef.current, outgoingClip);
   }, [clip, outgoingClip, transitionActive, transitionProgress]);
 
   useEffect(() => {
@@ -91,7 +93,7 @@ export function Preview() {
               onError={onError}
               onTimeUpdate={(e) => {
                 if (!e.currentTarget.paused && transitionClip) {
-                  setPlayhead(transitionClip.start - transitionClip.inPoint + e.currentTarget.currentTime);
+                  setPlayhead(timelineTimeForClip(transitionClip, e.currentTarget.currentTime));
                 }
               }}
               onEnded={() => setPlaying(false)}
@@ -110,7 +112,7 @@ export function Preview() {
             onError={onError}
             onTimeUpdate={(e) => {
               if (!e.currentTarget.paused && clip) {
-                setPlayhead(clip.start - clip.inPoint + e.currentTarget.currentTime);
+                setPlayhead(timelineTimeForClip(clip, e.currentTarget.currentTime));
               }
             }}
             onEnded={() => setPlaying(false)}
@@ -148,13 +150,14 @@ export function Preview() {
   );
 }
 
-type PreviewAudioClip = {
+type PreviewPlaybackClip = {
   start: number;
   inPoint: number;
+  playbackRate?: number;
   audio?: { gainDb: number; muted: boolean };
 };
 
-function applyClipAudio(video: HTMLVideoElement | null, clip: PreviewAudioClip | undefined, layerGain: number) {
+function applyClipAudio(video: HTMLVideoElement | null, clip: PreviewPlaybackClip | undefined, layerGain: number) {
   if (!video || !clip) return;
   const audio = clip.audio ?? { gainDb: 0, muted: false };
   video.muted = audio.muted;
@@ -162,9 +165,22 @@ function applyClipAudio(video: HTMLVideoElement | null, clip: PreviewAudioClip |
   video.volume = Math.max(0, Math.min(1, base * layerGain));
 }
 
-function syncVideoTime(video: HTMLVideoElement | null, clip: PreviewAudioClip | undefined, playheadSec: number) {
+export function sourceTimeForClip(clip: { start: number; inPoint: number; playbackRate?: number }, playheadSec: number): number {
+  return clip.inPoint + (playheadSec - clip.start) * (clip.playbackRate ?? 1);
+}
+
+export function timelineTimeForClip(clip: { start: number; inPoint: number; playbackRate?: number }, sourceTimeSec: number): number {
+  return clip.start + (sourceTimeSec - clip.inPoint) / (clip.playbackRate ?? 1);
+}
+
+function applyClipPlaybackRate(video: HTMLVideoElement | null, clip: PreviewPlaybackClip | undefined) {
   if (!video || !clip) return;
-  const local = playheadSec - clip.start + clip.inPoint;
+  video.playbackRate = clip.playbackRate ?? 1;
+}
+
+function syncVideoTime(video: HTMLVideoElement | null, clip: PreviewPlaybackClip | undefined, playheadSec: number) {
+  if (!video || !clip) return;
+  const local = sourceTimeForClip(clip, playheadSec);
   if (Math.abs(video.currentTime - local) <= 0.2) return;
   try { video.currentTime = Math.max(0, local); } catch { /* metadata not ready */ }
 }

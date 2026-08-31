@@ -295,6 +295,19 @@ fn clip_audio_linear_gain(clip: &Value) -> f64 {
     10_f64.powf(gain_db / 20.0)
 }
 
+fn clip_playback_rate(clip: &Value) -> f64 {
+    clip.get("playbackRate").and_then(|v| v.as_f64()).unwrap_or(1.0).clamp(0.25, 4.0)
+}
+
+fn audio_atempo_chain(rate: f64) -> String {
+    let mut remaining = rate.clamp(0.25, 4.0);
+    let mut factors: Vec<f64> = Vec::new();
+    while remaining < 0.5 - 1e-9 { factors.push(0.5); remaining /= 0.5; }
+    while remaining > 2.0 + 1e-9 { factors.push(2.0); remaining /= 2.0; }
+    if (remaining - 1.0).abs() > 1e-9 { factors.push(remaining); }
+    factors.into_iter().map(|v| format!("atempo={v:.6}")).collect::<Vec<_>>().join(",")
+}
+
 fn transition_in_duration(clip: &Value) -> Option<f64> {
     let t = clip.get("transitionIn")?;
     if t.get("type").and_then(|v| v.as_str()) != Some("crossfade") { return None; }
@@ -303,20 +316,19 @@ fn transition_in_duration(clip: &Value) -> Option<f64> {
 
 fn video_clip_audio_filter_with_transition(input_idx: usize, clip: &Value, duration: f64, has_audio: bool, fade_out: Option<f64>) -> String {
     let gain = clip_audio_linear_gain(clip);
+    let rate = clip_playback_rate(clip);
+    let source_duration = duration * rate;
+    let tempo = audio_atempo_chain(rate);
+    let tempo_filter = if tempo.is_empty() { String::new() } else { format!(",{tempo}") };
     let start = clip.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.0);
     let delay_ms = (start * 1000.0).round() as u64;
     let mut fades = String::new();
-    if let Some(d) = transition_in_duration(clip) {
-        fades.push_str(&format!(",afade=t=in:st=0:d={:.3}", d.min(duration)));
-    }
-    if let Some(d) = fade_out {
-        let d = d.min(duration);
-        fades.push_str(&format!(",afade=t=out:st={:.3}:d={:.3}", (duration - d).max(0.0), d));
-    }
+    if let Some(d) = transition_in_duration(clip) { fades.push_str(&format!(",afade=t=in:st=0:d={:.3}", d.min(duration))); }
+    if let Some(d) = fade_out { let d = d.min(duration); fades.push_str(&format!(",afade=t=out:st={:.3}:d={:.3}", (duration - d).max(0.0), d)); }
     if has_audio {
-        format!("[{input_idx}:a]atrim=duration={duration:.3},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp,aresample=44100,volume={gain:.6}{fades},adelay={delay_ms}|{delay_ms}[{input_idx}va]")
+        format!("[{input_idx}:a]atrim=duration={source_duration:.3},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp,aresample=44100{tempo_filter},volume={gain:.6}{fades},adelay={delay_ms}|{delay_ms}[{input_idx}va]")
     } else {
-        format!("anullsrc=r=44100:cl=mono:d={duration:.3},volume={gain:.6}{fades},adelay={delay_ms}|{delay_ms}[{input_idx}va]")
+        format!("anullsrc=r=44100:cl=mono:d={source_duration:.3}{tempo_filter},volume={gain:.6}{fades},adelay={delay_ms}|{delay_ms}[{input_idx}va]")
     }
 }
 
@@ -349,6 +361,8 @@ fn even_px(value: f64) -> i32 {
 }
 
 fn video_clip_filter(input_idx: usize, clip: &Value, duration: f64, w: i32, h: i32) -> String {
+    let rate = clip_playback_rate(clip);
+    let source_duration = duration * rate;
     let (scale, x, y, opacity) = clip_transform_values(clip);
     let (brightness, contrast, saturation) = clip_effect_values(clip);
     let scaled_w = even_px(w as f64 * scale);
@@ -356,7 +370,7 @@ fn video_clip_filter(input_idx: usize, clip: &Value, duration: f64, w: i32, h: i
     let left = (w - scaled_w) as f64 / 2.0 + x * w as f64 / 2.0;
     let top = (h - scaled_h) as f64 / 2.0 + y * h as f64 / 2.0;
     format!(
-        "color=c=black:s={w}x{h}:d={duration:.3}:r=30[{input_idx}bg];[{input_idx}:v]trim=duration={duration:.3},setpts=PTS-STARTPTS,scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1,eq=brightness={brightness:.6}:contrast={contrast:.6}:saturation={saturation:.6},scale={scaled_w}:{scaled_h},format=rgba,colorchannelmixer=aa={opacity:.6}[{input_idx}fg];[{input_idx}bg][{input_idx}fg]overlay=x={left:.3}:y={top:.3}:shortest=1[{input_idx}v]"
+        "color=c=black:s={w}x{h}:d={duration:.3}:r=30[{input_idx}bg];[{input_idx}:v]trim=duration={source_duration:.3},setpts=(PTS-STARTPTS)/{rate:.6},scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1,eq=brightness={brightness:.6}:contrast={contrast:.6}:saturation={saturation:.6},scale={scaled_w}:{scaled_h},format=rgba,colorchannelmixer=aa={opacity:.6}[{input_idx}fg];[{input_idx}bg][{input_idx}fg]overlay=x={left:.3}:y={top:.3}:shortest=1[{input_idx}v]"
     )
 }
 
@@ -515,7 +529,8 @@ pub fn run_render(
         };
         let in_point = clip.get("inPoint").and_then(|v| v.as_f64()).unwrap_or(0.0);
         let duration = clip.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.001);
-        inputs.extend(["-ss".into(), format!("{in_point:.3}"), "-t".into(), format!("{duration:.3}"), "-i".into(), source]);
+        let source_duration = duration * clip_playback_rate(clip);
+        inputs.extend(["-ss".into(), format!("{in_point:.3}"), "-t".into(), format!("{source_duration:.3}"), "-i".into(), source]);
         concat_parts.push(video_clip_filter(i, clip, duration, w, h));
         let has_audio = asset.and_then(|a| a.get("hasAudio")).and_then(|v| v.as_bool()).unwrap_or(false);
         let fade_out = video_clips.get(i + 1).and_then(transition_in_duration);
@@ -550,12 +565,16 @@ pub fn run_render(
             };
             let in_point = clip.get("inPoint").and_then(|v| v.as_f64()).unwrap_or(0.0);
             let duration = clip.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.001);
+            let rate = clip_playback_rate(clip);
+            let source_duration = duration * rate;
             let idx = first_audio_input + offset;
-            inputs.extend(["-ss".into(), format!("{in_point:.3}"), "-t".into(), format!("{duration:.3}"), "-i".into(), source]);
+            inputs.extend(["-ss".into(), format!("{in_point:.3}"), "-t".into(), format!("{source_duration:.3}"), "-i".into(), source]);
             let gain = clip_audio_linear_gain(clip);
             let start = clip.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.0);
             let delay_ms = (start * 1000.0).round() as u64;
-            audio_filters.push(format!("[{idx}:a]atrim=duration={duration:.3},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp,aresample=44100,volume={gain:.6},adelay={delay_ms}|{delay_ms}[a{idx}]"));
+            let tempo = audio_atempo_chain(rate);
+            let tempo_filter = if tempo.is_empty() { String::new() } else { format!(",{tempo}") };
+            audio_filters.push(format!("[{idx}:a]atrim=duration={source_duration:.3},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp,aresample=44100{tempo_filter},volume={gain:.6},adelay={delay_ms}|{delay_ms}[a{idx}]"));
             audio_labels.push(format!("[a{idx}]"));
         }
         if audio_labels.is_empty() {
@@ -1265,6 +1284,25 @@ mod tests {
         let early = window_peak(1.52, 0.08);
         let late = window_peak(1.90, 0.08);
         assert!(early > late * 3, "outgoing audio must fade down across overlap: early={early} late={late}");
+    }
+
+    #[test]
+    fn playback_rate_filter_contract_retimes_video_and_audio() {
+        let clip = json!({"start": 0.0, "duration": 2.0, "playbackRate": 2.0, "audio": {"gainDb": 0.0, "muted": false}});
+        let vf = video_clip_filter(0, &clip, 2.0, 320, 180);
+        assert!(vf.contains("trim=duration=4.000"), "{vf}");
+        assert!(vf.contains("setpts=(PTS-STARTPTS)/2.000000"), "{vf}");
+        let af = video_clip_audio_filter(0, &clip, 2.0, true);
+        assert!(af.contains("atrim=duration=4.000"), "{af}");
+        assert!(af.contains("atempo=2.000000"), "{af}");
+    }
+
+    #[test]
+    fn quarter_speed_audio_uses_valid_atempo_chain() {
+        let clip = json!({"start": 0.0, "duration": 4.0, "playbackRate": 0.25, "audio": {"gainDb": 0.0, "muted": false}});
+        let af = video_clip_audio_filter(0, &clip, 4.0, true);
+        assert!(af.contains("atempo=0.500000,atempo=0.500000"), "{af}");
+        assert!(af.contains("atrim=duration=1.000"), "{af}");
     }
 
     #[test]

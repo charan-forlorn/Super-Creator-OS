@@ -162,6 +162,33 @@ export const setClipEffectsCommand = {
         return { next: { ...prev, tracks, updatedAt: new Date().toISOString() }, inverse: { type: SET_CLIP_EFFECTS, execute: (p) => setClipEffectsCommand.execute(p, { clipId, ...prior }) } };
     },
 };
+/* ---------------------------- clipSpeed ----------------------------- */
+export const SET_CLIP_SPEED = "clip.speed";
+export const setClipSpeedSchema = z.object({ clipId: z.string().min(1), playbackRate: z.number().min(0.25).max(4) });
+export const setClipSpeedCommand = {
+    type: SET_CLIP_SPEED, schema: setClipSpeedSchema,
+    execute(prev, { clipId, playbackRate }) {
+        const { clip, track } = findClip(prev, clipId);
+        const priorRate = clip.playbackRate ?? 1;
+        const duration = clip.duration * priorRate / playbackRate;
+        if (clip.transitionIn && clip.transitionIn.duration > duration + 1e-9)
+            throw new CommandError("SPEED_CONFLICTS_WITH_TRANSITION");
+        const updated = { ...clip, playbackRate, duration };
+        const ordered = track.clips.map((c) => c.id === clipId ? updated : c).sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+        const changedIndex = ordered.findIndex((c) => c.id === clipId);
+        for (let i = changedIndex + 1; i < ordered.length; i += 1) {
+            const current = ordered[i];
+            if (!current.transitionIn)
+                break;
+            const previous = ordered[i - 1];
+            ordered[i] = { ...current, start: previous.start + previous.duration - current.transitionIn.duration };
+        }
+        const byId = new Map(ordered.map((c) => [c.id, c]));
+        const tracks = prev.tracks.map((t) => t.id === track.id ? { ...t, clips: t.clips.map((c) => byId.get(c.id) ?? c) } : t);
+        const next = { ...prev, tracks, durationSec: recomputeDuration({ ...prev, tracks }), updatedAt: new Date().toISOString() };
+        return { next, inverse: { type: SET_CLIP_SPEED, execute: (p) => setClipSpeedCommand.execute(p, { clipId, playbackRate: priorRate }) } };
+    },
+};
 /* -------------------------- clipTransition ------------------------- */
 export const SET_CLIP_TRANSITION = "clip.transition";
 export const setClipTransitionSchema = z.object({
@@ -533,6 +560,7 @@ export const placeProbedMediaCommand = {
                 transform: { scale: 1, x: 0, y: 0, opacity: 1 },
                 audio: { gainDb: 0, muted: false },
                 effects: { brightness: 0, contrast: 1, saturation: 1 },
+                playbackRate: 1,
                 transitionIn: null,
             };
             next = {

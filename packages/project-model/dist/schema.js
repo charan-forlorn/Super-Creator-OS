@@ -34,6 +34,8 @@ export const clipSchema = z.object({
     /** Position on the timeline track, seconds. */
     start: z.number().nonnegative(),
     trackId: z.string().min(1),
+    /** Source playback rate. Timeline duration remains authoritative; source span = duration * playbackRate. */
+    playbackRate: z.number().min(0.25).max(4).default(1),
     /** Optional transform for preview/export. */
     transform: z
         .object({

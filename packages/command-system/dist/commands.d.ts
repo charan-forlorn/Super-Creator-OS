@@ -61,6 +61,18 @@ export declare const setClipEffectsSchema: z.ZodObject<{
     saturation: number;
 }>;
 export declare const setClipEffectsCommand: EditCommand<z.infer<typeof setClipEffectsSchema>>;
+export declare const SET_CLIP_SPEED = "clip.speed";
+export declare const setClipSpeedSchema: z.ZodObject<{
+    clipId: z.ZodString;
+    playbackRate: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    clipId: string;
+    playbackRate: number;
+}, {
+    clipId: string;
+    playbackRate: number;
+}>;
+export declare const setClipSpeedCommand: EditCommand<z.infer<typeof setClipSpeedSchema>>;
 export declare const SET_CLIP_TRANSITION = "clip.transition";
 export declare const setClipTransitionSchema: z.ZodObject<{
     clipId: z.ZodString;
@@ -248,6 +260,7 @@ export declare const addTrackSchema: z.ZodObject<{
             duration: z.ZodNumber;
             start: z.ZodNumber;
             trackId: z.ZodString;
+            playbackRate: z.ZodDefault<z.ZodNumber>;
             transform: z.ZodDefault<z.ZodObject<{
                 scale: z.ZodDefault<z.ZodNumber>;
                 x: z.ZodDefault<z.ZodNumber>;
@@ -308,6 +321,7 @@ export declare const addTrackSchema: z.ZodObject<{
             duration: number;
             start: number;
             trackId: string;
+            playbackRate: number;
             transform: {
                 scale: number;
                 x: number;
@@ -334,6 +348,7 @@ export declare const addTrackSchema: z.ZodObject<{
                 gainDb?: number | undefined;
                 muted?: boolean | undefined;
             } | undefined;
+            playbackRate?: number | undefined;
             transform?: {
                 scale?: number | undefined;
                 x?: number | undefined;
@@ -421,6 +436,7 @@ export declare const addTrackSchema: z.ZodObject<{
             duration: number;
             start: number;
             trackId: string;
+            playbackRate: number;
             transform: {
                 scale: number;
                 x: number;
@@ -466,6 +482,7 @@ export declare const addTrackSchema: z.ZodObject<{
                 gainDb?: number | undefined;
                 muted?: boolean | undefined;
             } | undefined;
+            playbackRate?: number | undefined;
             transform?: {
                 scale?: number | undefined;
                 x?: number | undefined;
@@ -513,6 +530,7 @@ export declare const addTrackSchema: z.ZodObject<{
             duration: number;
             start: number;
             trackId: string;
+            playbackRate: number;
             transform: {
                 scale: number;
                 x: number;
@@ -560,6 +578,7 @@ export declare const addTrackSchema: z.ZodObject<{
                 gainDb?: number | undefined;
                 muted?: boolean | undefined;
             } | undefined;
+            playbackRate?: number | undefined;
             transform?: {
                 scale?: number | undefined;
                 x?: number | undefined;

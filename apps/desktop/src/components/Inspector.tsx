@@ -1,7 +1,7 @@
 import { useStudio } from "../store";
 
 export function Inspector() {
-  const { project, selectedClipId, moveSelected, trimSelected, setSelectedAudio, setSelectedEffects, setSelectedTransition, setSelectedTransform, changeAspect } = useStudio();
+  const { project, selectedClipId, moveSelected, trimSelected, setSelectedAudio, setSelectedEffects, setSelectedSpeed, setSelectedTransition, setSelectedTransform, changeAspect } = useStudio();
   const clip = project.tracks.flatMap((t) => t.clips).find((c) => c.id === selectedClipId);
   const transform = clip?.transform ?? { scale: 1, x: 0, y: 0, opacity: 1 };
   const effects = clip?.effects ?? { brightness: 0, contrast: 1, saturation: 1 };
@@ -17,6 +17,9 @@ export function Inspector() {
           <Field label="In-point (s)" value={clip.inPoint.toFixed(2)} />
           <Field label="Duration (s)" value={clip.duration.toFixed(2)} />
           <Field label="Start (s)" value={clip.start.toFixed(2)} />
+          <div className="panel-subhead">Timing</div>
+          <TransformField testId="clip-speed" label="Speed (x)" value={clip.playbackRate ?? 1} min={0.25} max={4} step={0.05}
+            onChange={(value) => setSelectedSpeed(value)} />
           <div className="inspector-row">
             <label>Move start</label>
             <input

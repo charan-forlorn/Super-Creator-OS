@@ -307,3 +307,39 @@ CRITICAL_DEFECTS=0
 Seal and publish the exact R2.10 transition scope only after staged semantic-diff, encoding, secret, and generated-artifact audits pass.
 After R2.10 closure, reconstruct the next highest production-editor capability gap from repository evidence; do not infer the original roadmap.
 BLOCKERS=none
+
+## R2.11 RECONSTRUCTED CLIP SPEED / RETIME WORKSPACE
+SCOPE_AUTHORITY=RECONSTRUCTED_FROM_REPO_CAPABILITY_GAPS
+ORIGINAL_R2_11_SPEC_RECOVERED=FALSE
+PLAYBACK_RATE_MODEL=PASS (legacy default 1x; bounded 0.25x–4x)
+RATE_AWARE_CLIP_MATH=PASS (source span = timeline duration x playbackRate)
+RATE_AWARE_SPLIT_TRIM=PASS
+CLIP_SPEED_COMMAND=PASS (atomic undo/redo + source-span preservation)
+SPEED_TRANSITION_REFLOW=PASS (following crossfade chain reflows; hard cut stops propagation)
+SPEED_STORE=PASS (CommandBus-only mutation authority)
+SPEED_INSPECTOR_UI=PASS
+PREVIEW_SPEED_MAPPING=PASS
+PREVIEW_PLAYBACK_RATE=PASS
+EXPORT_VIDEO_RETIME=PASS (source-span trim + setpts)
+EXPORT_AUDIO_RETIME=PASS (source-span atrim + chained atempo)
+QUARTER_SPEED_ATEMPO_CHAIN=PASS
+R2_11_REAL_GUI=PASS
+R2_11_REAL_TAURI_RENDER=PASS
+R2_10_TRANSITION_GUI_REGRESSION=PASS
+R2_10_TRANSITION_RENDER_REGRESSION=PASS
+PROJECT_MODEL_TESTS=20/20 PASS
+COMMAND_SYSTEM_TESTS=45/45 PASS
+MEDIA_ENGINE_TESTS=14/14 PASS
+TIMELINE_TESTS=7/7 PASS
+AI_CORE_TESTS=9/9 PASS
+DESKTOP_TESTS=40/40 PASS
+RUST_TESTS=24/24 PASS
+DESKTOP_TYPECHECK=PASS
+PRODUCTION_FRONTEND_BUILD=PASS
+E2E_TAURI_RELEASE_BUILD=PASS
+PRODUCTION_TAURI_RELEASE_BUILD=PASS
+CRITICAL_DEFECTS=0
+
+## NEXT EXACT ACTION
+Seal and publish the exact R2.11 speed/retime scope only after semantic-diff, encoding, secret, generated-artifact, staged-scope, and tree-integrity audits pass.
+BLOCKERS=none
