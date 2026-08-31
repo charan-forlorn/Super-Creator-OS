@@ -347,6 +347,67 @@ fn video_clip_filter(input_idx: usize, clip: &Value, duration: f64, w: i32, h: i
     )
 }
 
+
+fn safe_caption_color(value: Option<&str>, fallback: &str) -> String {
+    match value {
+        Some(v) if v.len() == 7 && v.starts_with('#') && v[1..].chars().all(|c| c.is_ascii_hexdigit()) => v.to_ascii_uppercase(),
+        _ => fallback.to_string(),
+    }
+}
+
+fn ffmpeg_filter_path(path: &str) -> String {
+    path.replace('\\', "/").replace(':', "\\:").replace('\'', "\\'")
+}
+
+fn caption_font_path() -> String {
+    let windir = std::env::var("WINDIR").unwrap_or_else(|_| "C:\\Windows".to_string());
+    for name in ["segoeui.ttf", "arial.ttf", "LeelawUI.ttf"] {
+        let p = std::path::Path::new(&windir).join("Fonts").join(name);
+        if p.is_file() { return p.to_string_lossy().to_string(); }
+    }
+    "C:\\Windows\\Fonts\\segoeui.ttf".to_string()
+}
+
+fn caption_drawtext_filter(input: &str, output: &str, caption: &Value, text_path: &str, w: i32, h: i32, font_path: &str) -> String {
+    let style = caption.get("style");
+    let start = caption.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.0);
+    let duration = caption.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.001).max(0.001);
+    let end = start + duration;
+    let x = style.and_then(|s| s.get("x")).and_then(|v| v.as_f64()).unwrap_or(0.5) * w as f64;
+    let y = style.and_then(|s| s.get("y")).and_then(|v| v.as_f64()).unwrap_or(0.85) * h as f64;
+    let size = style.and_then(|s| s.get("fontSizePx")).and_then(|v| v.as_f64()).unwrap_or(48.0).round().clamp(8.0, 300.0) as i32;
+    let fg = safe_caption_color(style.and_then(|s| s.get("color")).and_then(|v| v.as_str()), "#FFFFFF");
+    let bg = safe_caption_color(style.and_then(|s| s.get("backgroundColor")).and_then(|v| v.as_str()), "#000000");
+    let bg_opacity = style.and_then(|s| s.get("backgroundOpacity")).and_then(|v| v.as_f64()).unwrap_or(0.6).clamp(0.0, 1.0);
+    format!("[{input}]drawtext=fontfile='{}':textfile='{}':expansion=none:fontsize={size}:fontcolor={fg}:box=1:boxcolor={bg}@{bg_opacity:.3}:boxborderw=8:x={x:.3}-text_w/2:y={y:.3}-text_h/2:enable='between(t,{start:.3},{end:.3})'[{output}]", ffmpeg_filter_path(font_path), ffmpeg_filter_path(text_path))
+}
+
+
+fn prepare_caption_chain(tracks: &[Value], w: i32, h: i32) -> Result<(Vec<String>, String, Option<std::path::PathBuf>), String> {
+    let mut captions: Vec<Value> = Vec::new();
+    for t in tracks.iter() {
+        if t.get("kind").and_then(|v| v.as_str()) == Some("text") {
+            captions.extend(t.get("captions").and_then(|v| v.as_array()).cloned().unwrap_or_default());
+        }
+    }
+    if captions.is_empty() { return Ok((Vec::new(), "vout".to_string(), None)); }
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos();
+    let dir = std::env::temp_dir().join(format!("haios-captions-{}-{stamp}", std::process::id()));
+    std::fs::create_dir_all(&dir).map_err(|e| format!("caption temp dir: {e}"))?;
+    let font = caption_font_path();
+    let mut filters = Vec::new();
+    let mut input = "vout".to_string();
+    for (i, caption) in captions.iter().enumerate() {
+        let text_path = dir.join(format!("caption-{i}.txt"));
+        let text = caption.get("text").and_then(|v| v.as_str()).unwrap_or("");
+        if let Err(e) = std::fs::write(&text_path, text.as_bytes()) { let _ = std::fs::remove_dir_all(&dir); return Err(format!("caption textfile: {e}")); }
+        let out = if i + 1 == captions.len() { "vfinal".to_string() } else { format!("vcap{i}") };
+        filters.push(caption_drawtext_filter(&input, &out, caption, &text_path.to_string_lossy(), w, h, &font));
+        input = out;
+    }
+    Ok((filters, input, Some(dir)))
+}
+
 pub fn run_render(
     job_id: &str,
     project_json: &str,
@@ -425,9 +486,17 @@ pub fn run_render(
     filter.push(';');
     filter.push_str(&format!("{}concat=n={}:v=1:a=0[vout]", vlist.join(""), vlist.len()));
 
+    // Burn timeline captions using UTF-8 text files so caption text is never parsed
+    // as filter syntax. This keeps Unicode text and untrusted punctuation inert.
+    let (caption_filters, video_map_label, caption_temp_dir) = match prepare_caption_chain(&tracks, w, h) {
+        Ok(v) => v,
+        Err(e) => { emit_state(app, job_id, "FAILED", 0.0, None, Some(e)); return; }
+    };
+    for caption_filter in caption_filters { filter.push(';'); filter.push_str(&caption_filter); }
+
     // Explicit audio tracks retain priority. When absent, preserve embedded audio
     // from video clips instead of replacing it with global silence.
-    let audio_arg: Vec<String> = vec!["-map".into(), "[vout]".into(), "-map".into(), "[aout]".into()];
+    let audio_arg: Vec<String> = vec!["-map".into(), format!("[{video_map_label}]"), "-map".into(), "[aout]".into()];
     if !audio_clips.is_empty() {
         let first_audio_input = video_clips.len();
         let mut audio_filters: Vec<String> = Vec::new();
@@ -477,10 +546,12 @@ pub fn run_render(
     ]);
     emit_state(app, job_id, "RENDERING", 0.4, None, None);
     if is_cancelled(app, job_id) {
+        if let Some(dir) = caption_temp_dir.as_ref() { let _ = std::fs::remove_dir_all(dir); }
         emit_state(app, job_id, "CANCELLED", 0.4, None, None);
         return;
     }
     let status = cmd.status();
+    if let Some(dir) = caption_temp_dir.as_ref() { let _ = std::fs::remove_dir_all(dir); }
     match status {
         Ok(s) if s.success() => {
             emit_state(app, job_id, "VERIFYING", 0.85, Some(output_path), None);
@@ -1040,6 +1111,44 @@ mod tests {
         assert!(filter.contains("colorchannelmixer=aa=0.600000"));
         assert!(filter.contains("overlay=x=-240.000:y=-540.000"));
         assert!(filter.ends_with("[2v]"));
+    }
+
+    #[test]
+    fn caption_filter_contract_uses_textfile_timing_position_and_style() {
+        let c = json!({"text": "สวัสดี Caption", "start": 1.25, "duration": 2.5, "style": {"x": 0.25, "y": 0.75, "fontSizePx": 52, "color": "#FFCC00", "backgroundColor": "#112233", "backgroundOpacity": 0.4}});
+        let f = caption_drawtext_filter("vin", "vout", &c, r"C:\Temp\cap.txt", 1920, 1080, r"C:\Windows\Fonts\segoeui.ttf");
+        assert!(f.contains("textfile="));
+        assert!(f.contains("enable='between(t,1.250,3.750)'"));
+        assert!(f.contains("x=480.000-text_w/2"));
+        assert!(f.contains("y=810.000-text_h/2"));
+        assert!(f.contains("fontsize=52"));
+        assert!(f.contains("fontcolor=#FFCC00"));
+        assert!(f.contains("boxcolor=#112233@0.400"));
+    }
+
+    #[test]
+    fn caption_chain_writes_utf8_and_returns_final_label() {
+        let tracks = vec![json!({"kind": "text", "captions": [{"text": "ไทย UTF-8", "start": 0.0, "duration": 1.0, "style": {}}]})];
+        let (filters, label, dir) = prepare_caption_chain(&tracks, 320, 180).expect("caption chain");
+        assert_eq!(label, "vfinal");
+        assert_eq!(filters.len(), 1);
+        let dir = dir.expect("temp dir");
+        assert_eq!(std::fs::read_to_string(dir.join("caption-0.txt")).unwrap(), "ไทย UTF-8");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn caption_filter_executes_unicode_textfile_with_real_ffmpeg() {
+        let tmp = std::env::temp_dir().join(format!("haios-caption-proof-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&tmp);
+        let text = tmp.join("caption.txt");
+        std::fs::write(&text, "สวัสดี Caption".as_bytes()).unwrap();
+        let c = json!({"start": 0.0, "duration": 1.0, "style": {"x": 0.5, "y": 0.5, "fontSizePx": 48, "color": "#FFFFFF", "backgroundColor": "#000000", "backgroundOpacity": 0.0}});
+        let f = caption_drawtext_filter("0:v", "out", &c, &text.to_string_lossy(), 320, 180, &caption_font_path());
+        let out = std::process::Command::new("ffmpeg").args(["-v", "error", "-f", "lavfi", "-i", "color=c=black:s=320x180:d=1", "-filter_complex", &f, "-map", "[out]", "-frames:v", "1", "-pix_fmt", "rgb24", "-f", "rawvideo", "-"]).output().expect("spawn ffmpeg caption proof");
+        assert!(out.status.success(), "drawtext graph must execute");
+        assert!(out.stdout.iter().any(|b| *b > 16), "caption must produce non-black pixels");
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     #[test]
