@@ -314,7 +314,111 @@ struct RenderCompositionPlan {
     assets: Vec<Value>,
 }
 
+fn render_project_invalid(message: impl AsRef<str>) -> String {
+    format!("RENDER_PROJECT_INVALID: {}", message.as_ref())
+}
+fn render_object<'a>(value: &'a Value, context: &str) -> Result<&'a serde_json::Map<String, Value>, String> {
+    value.as_object().ok_or_else(|| render_project_invalid(format!("{context} must be an object")))
+}
+fn render_array<'a>(object: &'a serde_json::Map<String, Value>, key: &str, context: &str) -> Result<&'a Vec<Value>, String> {
+    object.get(key).and_then(Value::as_array).ok_or_else(|| render_project_invalid(format!("{context}.{key} must be an array")))
+}
+fn render_string<'a>(object: &'a serde_json::Map<String, Value>, key: &str, context: &str, nonempty: bool) -> Result<&'a str, String> {
+    let value = object.get(key).and_then(Value::as_str).ok_or_else(|| render_project_invalid(format!("{context}.{key} must be a string")))?;
+    if nonempty && value.is_empty() { return Err(render_project_invalid(format!("{context}.{key} must be non-empty"))); }
+    Ok(value)
+}
+fn render_number(object: &serde_json::Map<String, Value>, key: &str, context: &str) -> Result<f64, String> {
+    object.get(key).and_then(Value::as_f64).ok_or_else(|| render_project_invalid(format!("{context}.{key} must be a number")))
+}
+fn render_optional_number(object: &serde_json::Map<String, Value>, key: &str, context: &str) -> Result<Option<f64>, String> {
+    match object.get(key) { None => Ok(None), Some(value) => value.as_f64().map(Some).ok_or_else(|| render_project_invalid(format!("{context}.{key} must be a number"))) }
+}
+fn render_optional_bool(object: &serde_json::Map<String, Value>, key: &str, context: &str) -> Result<Option<bool>, String> {
+    match object.get(key) { None => Ok(None), Some(value) => value.as_bool().map(Some).ok_or_else(|| render_project_invalid(format!("{context}.{key} must be boolean"))) }
+}
+
+fn validate_render_asset(value: &Value, index: usize) -> Result<(), String> {
+    let context = format!("assets[{index}]"); let object = render_object(value, &context)?;
+    render_string(object, "id", &context, true)?; render_string(object, "name", &context, true)?;
+    render_string(object, "sourcePath", &context, true)?;
+    let kind = render_string(object, "kind", &context, true)?;
+    if !matches!(kind, "video" | "audio" | "image") { return Err(render_project_invalid(format!("{context}.kind unsupported"))); }
+    if render_number(object, "durationSec", &context)? < 0.0 { return Err(render_project_invalid(format!("{context}.durationSec must be nonnegative"))); }
+    for key in ["width", "height"] { if let Some(v)=render_optional_number(object,key,&context)? { if v < 0.0 || v.fract()!=0.0 { return Err(render_project_invalid(format!("{context}.{key} must be a nonnegative integer"))); } } }
+    if let Some(v)=render_optional_number(object,"fps",&context)? { if v <= 0.0 { return Err(render_project_invalid(format!("{context}.fps must be positive"))); } }
+    render_optional_bool(object,"hasAudio",&context)?;
+    if let Some(v)=object.get("checksum") { if !v.is_string() { return Err(render_project_invalid(format!("{context}.checksum must be a string"))); } }
+    render_string(object,"createdAt",&context,false)?; Ok(())
+}
+fn validate_render_transform(value: &Value, context: &str) -> Result<(), String> {
+    let object=render_object(value,context)?;
+    if let Some(v)=render_optional_number(object,"scale",context)? { if v<=0.0 { return Err(render_project_invalid(format!("{context}.scale must be positive"))); } }
+    render_optional_number(object,"x",context)?; render_optional_number(object,"y",context)?;
+    if let Some(v)=render_optional_number(object,"opacity",context)? { if !(0.0..=1.0).contains(&v) { return Err(render_project_invalid(format!("{context}.opacity out of range"))); } }
+    Ok(())
+}
+
+fn validate_render_clip(value: &Value, context: &str) -> Result<(), String> {
+    let object=render_object(value,context)?;
+    render_string(object,"id",context,true)?; render_string(object,"assetId",context,true)?; render_string(object,"trackId",context,true)?;
+    if render_number(object,"inPoint",context)? < 0.0 { return Err(render_project_invalid(format!("{context}.inPoint must be nonnegative"))); }
+    if render_number(object,"duration",context)? <= 0.0 { return Err(render_project_invalid(format!("{context}.duration must be positive"))); }
+    if render_number(object,"start",context)? < 0.0 { return Err(render_project_invalid(format!("{context}.start must be nonnegative"))); }
+    if let Some(v)=render_optional_number(object,"playbackRate",context)? { if !(0.25..=4.0).contains(&v) { return Err(render_project_invalid(format!("{context}.playbackRate out of range"))); } }
+    if let Some(v)=object.get("transform") { validate_render_transform(v,&format!("{context}.transform"))?; }
+    if let Some(v)=object.get("effects") { let o=render_object(v,&format!("{context}.effects"))?;
+        if let Some(n)=render_optional_number(o,"brightness",context)? { if !(-1.0..=1.0).contains(&n) { return Err(render_project_invalid(format!("{context}.effects.brightness out of range"))); } }
+        if let Some(n)=render_optional_number(o,"contrast",context)? { if !(0.0..=2.0).contains(&n) { return Err(render_project_invalid(format!("{context}.effects.contrast out of range"))); } }
+        if let Some(n)=render_optional_number(o,"saturation",context)? { if !(0.0..=3.0).contains(&n) { return Err(render_project_invalid(format!("{context}.effects.saturation out of range"))); } }
+    }
+    if let Some(v)=object.get("transitionIn") { if !v.is_null() { let o=render_object(v,&format!("{context}.transitionIn"))?; if render_string(o,"type",context,true)? != "crossfade" { return Err(render_project_invalid(format!("{context}.transitionIn.type unsupported"))); } let d=render_number(o,"duration",context)?; if !(0.1..=2.0).contains(&d) { return Err(render_project_invalid(format!("{context}.transitionIn.duration out of range"))); } } }
+    if let Some(v)=object.get("audio") { let o=render_object(v,&format!("{context}.audio"))?; if let Some(n)=render_optional_number(o,"gainDb",context)? { if !(-60.0..=0.0).contains(&n) { return Err(render_project_invalid(format!("{context}.audio.gainDb out of range"))); } } render_optional_bool(o,"muted",context)?; }
+    Ok(())
+}
+
+fn validate_render_caption(value: &Value, context: &str) -> Result<(), String> {
+    let object=render_object(value,context)?;
+    render_string(object,"id",context,true)?; render_string(object,"text",context,false)?; render_string(object,"trackId",context,true)?;
+    if render_number(object,"start",context)? < 0.0 { return Err(render_project_invalid(format!("{context}.start must be nonnegative"))); }
+    if render_number(object,"duration",context)? <= 0.0 { return Err(render_project_invalid(format!("{context}.duration must be positive"))); }
+    if let Some(v)=object.get("style") { let c=format!("{context}.style"); let o=render_object(v,&c)?;
+        if let Some(n)=render_optional_number(o,"fontSizePx",&c)? { if n<=0.0 { return Err(render_project_invalid(format!("{c}.fontSizePx must be positive"))); } }
+        for key in ["color","backgroundColor"] { if let Some(x)=o.get(key) { if !x.is_string() { return Err(render_project_invalid(format!("{c}.{key} must be a string"))); } } }
+        if let Some(n)=render_optional_number(o,"backgroundOpacity",&c)? { if !(0.0..=1.0).contains(&n) { return Err(render_project_invalid(format!("{c}.backgroundOpacity out of range"))); } }
+        render_optional_number(o,"x",&c)?; render_optional_number(o,"y",&c)?;
+    }
+    Ok(())
+}
+fn validate_render_track(value: &Value, index: usize) -> Result<(), String> {
+    let context=format!("tracks[{index}]"); let object=render_object(value,&context)?;
+    render_string(object,"id",&context,true)?; let kind=render_string(object,"kind",&context,true)?;
+    if !matches!(kind,"video"|"audio"|"text") { return Err(render_project_invalid(format!("{context}.kind unsupported"))); }
+    for (i,clip) in render_array(object,"clips",&context)?.iter().enumerate() { validate_render_clip(clip,&format!("{context}.clips[{i}]"))?; }
+    if let Some(v)=object.get("captions") { let a=v.as_array().ok_or_else(||render_project_invalid(format!("{context}.captions must be an array")))?; for (i,caption) in a.iter().enumerate() { validate_render_caption(caption,&format!("{context}.captions[{i}]"))?; } }
+    for key in ["visible","muted","locked"] { render_optional_bool(object,key,&context)?; }
+    Ok(())
+}
+
+fn validate_render_project_v2(project: &Value) -> Result<(), String> {
+    let object=render_object(project,"project")?;
+    let version=object.get("schemaVersion").and_then(Value::as_i64).ok_or_else(||"RENDER_SCHEMA_UNSUPPORTED: missing".to_string())?;
+    if version != 2 { return Err(format!("RENDER_SCHEMA_UNSUPPORTED: {version}")); }
+    render_string(object,"id","project",true)?; render_string(object,"name","project",true)?;
+    render_string(object,"createdAt","project",false)?; render_string(object,"updatedAt","project",false)?;
+    for (i,asset) in render_array(object,"assets","project")?.iter().enumerate() { validate_render_asset(asset,i)?; }
+    for (i,track) in render_array(object,"tracks","project")?.iter().enumerate() { validate_render_track(track,i)?; }
+    if render_number(object,"durationSec","project")? < 0.0 { return Err(render_project_invalid("project.durationSec must be nonnegative")); }
+    if let Some(v)=object.get("aspectRatio") { let r=v.as_str().ok_or_else(||render_project_invalid("project.aspectRatio must be a string"))?; if !matches!(r,"1920x1080"|"1080x1920"|"1080x1080") { return Err(render_project_invalid("project.aspectRatio unsupported")); } }
+    Ok(())
+}
+fn compare_unicode_code_points(a: &str, b: &str) -> std::cmp::Ordering {
+    let mut ai=a.chars().map(|c| c as u32); let mut bi=b.chars().map(|c| c as u32);
+    loop { match (ai.next(),bi.next()) { (Some(x),Some(y)) if x!=y => return x.cmp(&y), (Some(_),Some(_)) => {}, (None,Some(_)) => return std::cmp::Ordering::Less, (Some(_),None) => return std::cmp::Ordering::Greater, (None,None) => return std::cmp::Ordering::Equal } }
+}
+
 fn build_render_composition_plan(project: &Value) -> Result<RenderCompositionPlan, String> {
+    validate_render_project_v2(project)?;
     let duration_sec = project.get("durationSec").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.0);
     let assets = project.get("assets").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     let tracks = project.get("tracks").and_then(|v| v.as_array()).cloned().unwrap_or_default();
@@ -325,17 +429,25 @@ fn build_render_composition_plan(project: &Value) -> Result<RenderCompositionPla
         let kind = track.get("kind").and_then(|v| v.as_str()).unwrap_or("").to_string();
         let visible = track.get("visible").and_then(|v| v.as_bool()).unwrap_or(true);
         let muted = track.get("muted").and_then(|v| v.as_bool()).unwrap_or(false);
-        let clips = track.get("clips").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+        let mut clips = track.get("clips").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+        clips.sort_by(|a, b| {
+            let a_start = a.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let b_start = b.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            a_start.partial_cmp(&b_start).unwrap_or(std::cmp::Ordering::Equal).then_with(|| {
+                compare_unicode_code_points(a.get("id").and_then(|v| v.as_str()).unwrap_or(""), b.get("id").and_then(|v| v.as_str()).unwrap_or(""))
+            })
+        });
         let captions = track.get("captions").and_then(|v| v.as_array()).cloned().unwrap_or_default();
         if visible && (kind == "video" || kind == "text") {
             visual_layers.push(RenderVisualLayer { track_id: track_id.clone(), track_index, kind: kind.clone(), clips: clips.clone(), captions });
         }
         if kind != "video" && kind != "audio" { continue; }
+        if muted { continue; }
         for (clip_index, clip) in clips.iter().cloned().enumerate() {
             let asset_id = clip.get("assetId").and_then(|v| v.as_str()).unwrap_or("");
             let asset = assets.iter().find(|asset| asset.get("id").and_then(|v| v.as_str()) == Some(asset_id))
                 .cloned().ok_or_else(|| format!("RENDER_ASSET_NOT_FOUND: {asset_id}"))?;
-            if muted || clip.get("audio").and_then(|a| a.get("muted")).and_then(|v| v.as_bool()).unwrap_or(false) { continue; }
+            if clip.get("audio").and_then(|a| a.get("muted")).and_then(|v| v.as_bool()).unwrap_or(false) { continue; }
             let contributes = kind == "audio" || asset.get("hasAudio").and_then(|v| v.as_bool()).unwrap_or(false);
             if contributes {
                 let fade_out = clips.get(clip_index + 1).and_then(transition_in_duration);
@@ -1271,8 +1383,21 @@ mod tests {
     // Drives the ACTUAL ffmpeg encoder (generate_preview_proxy_impl) into a
     // temporary cache directory, proving MISSâ†’CREATEâ†’ffprobeâ†’HITâ†’reuse end to
     // end. No AppHandle/managed-cache coupling, no mocked filesystem output.
+    fn p44_complete_project(mut project: Value) -> Value {
+        let root = project.as_object_mut().unwrap();
+        root.entry("id").or_insert(json!("p44-test")); root.entry("name").or_insert(json!("P4.4 Test"));
+        root.entry("createdAt").or_insert(json!("2026-01-01T00:00:00Z")); root.entry("updatedAt").or_insert(json!("2026-01-01T00:00:00Z"));
+        root.entry("aspectRatio").or_insert(json!("1920x1080"));
+        for asset in root.get_mut("assets").unwrap().as_array_mut().unwrap() { let o=asset.as_object_mut().unwrap(); let id=o.get("id").unwrap().as_str().unwrap().to_string(); o.entry("name").or_insert(json!(format!("{id}.media"))); o.entry("durationSec").or_insert(json!(10)); o.entry("createdAt").or_insert(json!("2026-01-01T00:00:00Z")); }
+        for track in root.get_mut("tracks").unwrap().as_array_mut().unwrap() { let o=track.as_object_mut().unwrap(); let track_id=o.get("id").unwrap().as_str().unwrap().to_string();
+            for clip in o.get_mut("clips").unwrap().as_array_mut().unwrap() { let c=clip.as_object_mut().unwrap(); c.entry("inPoint").or_insert(json!(0)); c.entry("trackId").or_insert(json!(track_id.clone())); }
+            if let Some(captions)=o.get_mut("captions").and_then(Value::as_array_mut) { for caption in captions { caption.as_object_mut().unwrap().entry("trackId").or_insert(json!(track_id.clone())); } }
+        }
+        project
+    }
+
     fn p44_plan_fixture() -> Value {
-        json!({
+        p44_complete_project(json!({
             "schemaVersion": 2, "durationSec": 10.0,
             "assets": [
                 {"id":"va","sourcePath":"C:/va.mp4","kind":"video","hasAudio":true},
@@ -1290,7 +1415,56 @@ mod tests {
                 {"id":"muted-video","kind":"video","visible":true,"muted":true,"locked":false,"clips":[{"id":"c-muted-track","assetId":"va","start":0,"duration":2,"audio":{"gainDb":0,"muted":false}}],"captions":[]},
                 {"id":"clip-muted","kind":"video","visible":true,"muted":false,"locked":false,"clips":[{"id":"c-muted-clip","assetId":"va","start":0,"duration":2,"audio":{"gainDb":0,"muted":true}}],"captions":[]}
             ]
-        })
+        }))
+    }
+
+    #[test]
+    fn p46_render_plan_rejects_malformed_v2_document() {
+        let mut cases = Vec::new();
+        let mut missing_id = p44_plan_fixture(); missing_id.as_object_mut().unwrap().remove("id"); cases.push(missing_id);
+        let mut invalid_kind = p44_plan_fixture(); invalid_kind["tracks"][0]["kind"] = json!("bogus"); cases.push(invalid_kind);
+        let mut invalid_start = p44_plan_fixture(); invalid_start["tracks"][0]["clips"][0]["start"] = json!(-1); cases.push(invalid_start);
+        let mut invalid_visible = p44_plan_fixture(); invalid_visible["tracks"][0]["visible"] = json!("yes"); cases.push(invalid_visible);
+        for project in cases {
+            let error = build_render_composition_plan(&project).unwrap_err();
+            assert!(error.contains("RENDER_PROJECT_INVALID"), "{error}");
+        }
+    }
+
+    #[test]
+    fn p46_render_plan_rejects_future_schema() {
+        let mut project = p44_plan_fixture();
+        project["schemaVersion"] = json!(3);
+        let error = build_render_composition_plan(&project).unwrap_err();
+        assert!(error.contains("RENDER_SCHEMA_UNSUPPORTED"), "{error}");
+    }
+
+    #[test]
+    fn p46_render_plan_ignores_missing_asset_on_fully_disabled_track() {
+        let mut project = p44_plan_fixture();
+        project["tracks"].as_array_mut().unwrap().push(json!({
+            "id":"disabled","kind":"video","visible":false,"muted":true,"locked":false,
+            "clips":[{"id":"disabled-c","assetId":"offline","trackId":"disabled","start":0,"inPoint":0,"duration":2,"audio":{"gainDb":0,"muted":false}}],"captions":[]
+        }));
+        let plan = build_render_composition_plan(&project).expect("fully disabled track must not require media");
+        assert!(!plan.visual_layers.iter().any(|layer| layer.track_id == "disabled"));
+        assert!(!plan.audio.iter().any(|entry| entry.track_id == "disabled"));
+    }
+
+    #[test]
+    fn p46_render_plan_sorts_same_track_clips_by_start_then_id() {
+        let mut project = p44_plan_fixture();
+        project["tracks"][0]["clips"] = json!([
+            {"id":"late","assetId":"va","trackId":"back","start":3,"inPoint":0,"duration":2,"transitionIn":{"type":"crossfade","duration":1},"audio":{"gainDb":0,"muted":false}},
+            {"id":"early-b","assetId":"va","trackId":"back","start":0,"inPoint":0,"duration":2,"audio":{"gainDb":0,"muted":false}},
+            {"id":"early-a","assetId":"va","trackId":"back","start":0,"inPoint":0,"duration":2,"audio":{"gainDb":0,"muted":false}}
+        ]);
+        let plan = build_render_composition_plan(&project).expect("plan");
+        let layer = plan.visual_layers.iter().find(|layer| layer.track_id == "back").unwrap();
+        let visual_ids: Vec<_> = layer.clips.iter().map(|clip| clip.get("id").and_then(|v| v.as_str()).unwrap()).collect();
+        assert_eq!(visual_ids, vec!["early-a", "early-b", "late"]);
+        let audio: Vec<_> = plan.audio.iter().filter(|entry| entry.track_id == "back").map(|entry| (entry.clip_id.as_str(), entry.fade_out)).collect();
+        assert_eq!(audio, vec![("early-a", None), ("early-b", Some(1.0)), ("late", None)]);
     }
 
     #[test]
@@ -1365,7 +1539,8 @@ mod tests {
             "-v","error","-y","-f","lavfi","-i","sine=frequency=880:duration=2",music.to_str().unwrap()
         ]).status().unwrap();
         assert!(gen_music.success());
-        let project = json!({
+        let project = p44_complete_project(json!({
+            "schemaVersion":2,
             "durationSec":2.0,
             "assets":[
                 {"id":"red","sourcePath":red.to_string_lossy(),"kind":"video","hasAudio":true},
@@ -1377,7 +1552,7 @@ mod tests {
                 {"id":"front","kind":"video","visible":true,"muted":false,"clips":[{"id":"b","assetId":"blue","start":0.0,"inPoint":0.0,"duration":2.0,"playbackRate":1.0,"transform":{"scale":0.5,"x":0.0,"y":0.0,"opacity":1.0},"effects":{"brightness":0.0,"contrast":1.0,"saturation":1.0},"audio":{"gainDb":0.0,"muted":false}}],"captions":[]},
                 {"id":"music","kind":"audio","visible":true,"muted":false,"clips":[{"id":"m","assetId":"music","start":0.0,"inPoint":0.0,"duration":2.0,"playbackRate":1.0,"audio":{"gainDb":-6.0,"muted":false}}],"captions":[]}
             ]
-        });
+        }));
         let plan = build_render_composition_plan(&project).unwrap();
         let graph = build_multitrack_render_graph(&plan, 64, 64).unwrap();
         assert!(graph.filter.contains("amix=inputs=2"), "{}", graph.filter);

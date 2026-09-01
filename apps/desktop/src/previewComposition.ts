@@ -46,12 +46,21 @@ function sourceTime(clip: { start: number; inPoint: number; playbackRate: number
   return clip.inPoint + (playheadSec - clip.start) * clip.playbackRate;
 }
 
+function compareUnicodeCodePoints(a: string, b: string): number {
+  const left = Array.from(a, (char) => char.codePointAt(0)!);
+  const right = Array.from(b, (char) => char.codePointAt(0)!);
+  for (let i = 0; i < Math.min(left.length, right.length); i += 1) {
+    if (left[i] !== right[i]) return left[i] - right[i];
+  }
+  return left.length - right.length;
+}
+
 function resolveVisualClips(
   clips: Clip[],
   playheadSec: number,
   assetById: Map<string, MediaAsset>,
 ): PreviewVisualClip[] {
-  const ordered = [...clips].sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+  const ordered = [...clips].sort((a, b) => a.start - b.start || compareUnicodeCodePoints(a.id, b.id));
   const transitionIndex = ordered.findIndex((clip) =>
     clip.transitionIn?.type === "crossfade" &&
     playheadSec >= clip.start &&
@@ -67,7 +76,7 @@ function resolveVisualClips(
       previewVisualClip(incoming, progress, playheadSec, assetById),
     ];
   }
-  const active = ordered.find((clip) => isActive(clip.start, clip.duration, playheadSec));
+  const active = [...ordered].reverse().find((clip) => isActive(clip.start, clip.duration, playheadSec));
   return active ? [previewVisualClip(active, 1, playheadSec, assetById)] : [];
 }
 

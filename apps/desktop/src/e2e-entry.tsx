@@ -60,6 +60,11 @@ async function bootstrapE2E() {
     try { document.documentElement.setAttribute(`data-e2e-${key}`, String(value)); } catch { /* test-only diagnostics */ }
   };
   mark("seed-start", Date.now());
+  window.addEventListener("haios-e2e-load-project", ((event: Event) => {
+    const nextProject = (event as CustomEvent).detail;
+    useStudio.getState().loadProject(nextProject);
+    mark("project-loaded", nextProject?.id ?? "unknown");
+  }) as EventListener);
 
   // Mirror the production import flow: for each seeded video asset, generate a
   // deterministic thumbnail AND (if the codec needs it) a cached H.264/AAC proxy

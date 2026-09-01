@@ -45,6 +45,20 @@ describe("P4.3 preview composition frame", () => {
     expect(frame.visualLayers.flatMap((layer) => layer.clips.map((entry) => entry.clip.id)))
       .toEqual(["c-back", "c-front"]);
   });
+  it("matches export stacking for same-start Unicode clip IDs", () => {
+    const assets = [asset("a", "video"), asset("b", "video")];
+    const t = track("v", "video", [clip("\u00E4", "a", "v", 0), clip("z", "b", "v", 0)]);
+    const frame = compilePreviewFrame(compileCompositionPlan(project([t], assets)), 1);
+    expect(frame.visualLayers[0].clips[0].clip.id).toBe("\u00E4");
+  });
+
+  it("matches export stacking for ordinary overlapping clips", () => {
+    const assets = [asset("early", "video"), asset("late", "video")];
+    const t = track("v", "video", [clip("early", "early", "v", 0, 4), clip("late", "late", "v", 1, 4)]);
+    const frame = compilePreviewFrame(compileCompositionPlan(project([t], assets)), 2);
+    expect(frame.visualLayers[0].clips[0].clip.id).toBe("late");
+  });
+
   it("computes an independent crossfade for each active visual track", () => {
     const assets = [asset("base", "video"), asset("out", "video"), asset("in", "video")];
     const base = track("base-track", "video", [clip("base-c", "base", "base-track", 0, 8)]);

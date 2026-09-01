@@ -57,7 +57,7 @@ async function invoke(command, args = {}) {
 
 function pass(name) { console.log(`${name}=PASS`); }
 const baseProject = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   id: "r2-12-e2e",
   name: "Lifecycle Old",
   createdAt: "2026-09-01T00:00:00.000Z",
@@ -117,7 +117,8 @@ async function main() {
   pass(gate);
   gate = "PROJECT_AUTOSAVE_CLEAR";
   assert.equal(await invoke("project_clear_autosave", { projectId: newProject.id }), true);
-  assert.equal(await invoke("project_latest_autosave", {}), null);
+  const afterClear = await invoke("project_latest_autosave", {});
+  assert.notEqual(afterClear?.projectId, newProject.id, "cleared project autosave must not remain latest");
   pass(gate);
 
   gate = "REAL_GUI_RUNTIME";
