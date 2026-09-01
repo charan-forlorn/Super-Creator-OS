@@ -3,11 +3,12 @@ import { parseProject, projectSchema, type Project } from "./schema.js";
 export { parseProject, projectSchema, PROJECT_SCHEMA_VERSION } from "./schema.js";
 export * from "./schema.js";
 export * from "./clip-math.js";
+export * from "./composition.js";
 
 export function createEmptyProject(name: string, id: string): Project {
   const now = new Date().toISOString();
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id,
     name,
     createdAt: now,

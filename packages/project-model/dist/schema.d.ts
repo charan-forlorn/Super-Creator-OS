@@ -4,7 +4,7 @@ import { z } from "zod";
  * persisted shape changes. Old versions are rejected fail-closed unless an
  * explicit migration exists.
  */
-export declare const PROJECT_SCHEMA_VERSION: 1;
+export declare const PROJECT_SCHEMA_VERSION: 2;
 declare const rationalSchema: z.ZodObject<{
     num: z.ZodNumber;
     den: z.ZodNumber;
@@ -419,9 +419,16 @@ export declare const trackSchema: z.ZodObject<{
             backgroundOpacity?: number | undefined;
         } | undefined;
     }>, "many">>;
+    /** Track contributes visual layers unless hidden. Visibility does not mute audio. */
+    visible: z.ZodDefault<z.ZodBoolean>;
+    /** Track audio contribution is disabled when muted. */
+    muted: z.ZodDefault<z.ZodBoolean>;
+    /** Editing commands must fail closed when targeting a locked track. */
+    locked: z.ZodDefault<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
     id: string;
     kind: "video" | "audio" | "text";
+    muted: boolean;
     clips: {
         id: string;
         audio: {
@@ -465,6 +472,8 @@ export declare const trackSchema: z.ZodObject<{
             backgroundOpacity: number;
         };
     }[];
+    visible: boolean;
+    locked: boolean;
 }, {
     id: string;
     kind: "video" | "audio" | "text";
@@ -496,6 +505,7 @@ export declare const trackSchema: z.ZodObject<{
             duration: number;
         } | null | undefined;
     }[];
+    muted?: boolean | undefined;
     captions?: {
         id: string;
         duration: number;
@@ -511,6 +521,8 @@ export declare const trackSchema: z.ZodObject<{
             backgroundOpacity?: number | undefined;
         } | undefined;
     }[] | undefined;
+    visible?: boolean | undefined;
+    locked?: boolean | undefined;
 }>;
 export type Track = z.infer<typeof trackSchema>;
 export declare const exportResolutionSchema: z.ZodEnum<["1920x1080", "1080x1920", "1080x1080"]>;
@@ -742,9 +754,16 @@ export declare const projectSchema: z.ZodObject<{
                 backgroundOpacity?: number | undefined;
             } | undefined;
         }>, "many">>;
+        /** Track contributes visual layers unless hidden. Visibility does not mute audio. */
+        visible: z.ZodDefault<z.ZodBoolean>;
+        /** Track audio contribution is disabled when muted. */
+        muted: z.ZodDefault<z.ZodBoolean>;
+        /** Editing commands must fail closed when targeting a locked track. */
+        locked: z.ZodDefault<z.ZodBoolean>;
     }, "strip", z.ZodTypeAny, {
         id: string;
         kind: "video" | "audio" | "text";
+        muted: boolean;
         clips: {
             id: string;
             audio: {
@@ -788,6 +807,8 @@ export declare const projectSchema: z.ZodObject<{
                 backgroundOpacity: number;
             };
         }[];
+        visible: boolean;
+        locked: boolean;
     }, {
         id: string;
         kind: "video" | "audio" | "text";
@@ -819,6 +840,7 @@ export declare const projectSchema: z.ZodObject<{
                 duration: number;
             } | null | undefined;
         }[];
+        muted?: boolean | undefined;
         captions?: {
             id: string;
             duration: number;
@@ -834,6 +856,8 @@ export declare const projectSchema: z.ZodObject<{
                 backgroundOpacity?: number | undefined;
             } | undefined;
         }[] | undefined;
+        visible?: boolean | undefined;
+        locked?: boolean | undefined;
     }>, "many">;
     /** Duration of the composed timeline, seconds. */
     durationSec: z.ZodNumber;
@@ -862,6 +886,7 @@ export declare const projectSchema: z.ZodObject<{
     tracks: {
         id: string;
         kind: "video" | "audio" | "text";
+        muted: boolean;
         clips: {
             id: string;
             audio: {
@@ -905,6 +930,8 @@ export declare const projectSchema: z.ZodObject<{
                 backgroundOpacity: number;
             };
         }[];
+        visible: boolean;
+        locked: boolean;
     }[];
     aspectRatio: "1920x1080" | "1080x1920" | "1080x1080";
 }, {
@@ -958,6 +985,7 @@ export declare const projectSchema: z.ZodObject<{
                 duration: number;
             } | null | undefined;
         }[];
+        muted?: boolean | undefined;
         captions?: {
             id: string;
             duration: number;
@@ -973,10 +1001,13 @@ export declare const projectSchema: z.ZodObject<{
                 backgroundOpacity?: number | undefined;
             } | undefined;
         }[] | undefined;
+        visible?: boolean | undefined;
+        locked?: boolean | undefined;
     }[];
     aspectRatio?: "1920x1080" | "1080x1920" | "1080x1080" | undefined;
 }>;
 export type Project = z.infer<typeof projectSchema>;
+export declare function migrateProjectDocument(raw: unknown): unknown;
 /** Reject any persisted project whose schemaVersion is not the current one. */
 export declare function parseProject(raw: unknown): Project;
 export {};

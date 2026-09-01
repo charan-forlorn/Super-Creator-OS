@@ -4,7 +4,7 @@ import { z } from "zod";
  * persisted shape changes. Old versions are rejected fail-closed unless an
  * explicit migration exists.
  */
-export const PROJECT_SCHEMA_VERSION = 1;
+export const PROJECT_SCHEMA_VERSION = 2;
 const rationalSchema = z.object({
     num: z.number().int().nonnegative(),
     den: z.number().int().positive(),
@@ -93,6 +93,12 @@ export const trackSchema = z.object({
     kind: z.enum(["video", "audio", "text"]),
     clips: z.array(clipSchema),
     captions: z.array(captionSchema).default([]),
+    /** Track contributes visual layers unless hidden. Visibility does not mute audio. */
+    visible: z.boolean().default(true),
+    /** Track audio contribution is disabled when muted. */
+    muted: z.boolean().default(false),
+    /** Editing commands must fail closed when targeting a locked track. */
+    locked: z.boolean().default(false),
 });
 export const exportResolutionSchema = z.enum(["1920x1080", "1080x1920", "1080x1080"]);
 export const projectSchema = z.object({
@@ -108,9 +114,54 @@ export const projectSchema = z.object({
     /** Output aspect ratio preset for export. */
     aspectRatio: exportResolutionSchema.default("1920x1080"),
 });
+/**
+ * Explicit migration chain. Add only one-version-at-a-time migrations here
+ * (for example `1: migrateV1ToV2`) when PROJECT_SCHEMA_VERSION advances.
+ * Missing steps fail closed rather than guessing at persisted user data.
+ */
+function migrateV1ToV2(document) {
+    const tracks = Array.isArray(document.tracks)
+        ? document.tracks.map((track) => {
+            if (typeof track !== "object" || track === null || Array.isArray(track))
+                return track;
+            return { ...track, visible: true, muted: false, locked: false };
+        })
+        : document.tracks;
+    return { ...document, schemaVersion: 2, tracks };
+}
+const PROJECT_MIGRATIONS = Object.freeze({
+    1: migrateV1ToV2,
+});
+export function migrateProjectDocument(raw) {
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw))
+        return raw;
+    const document = raw;
+    const version = document.schemaVersion;
+    if (typeof version !== "number" || !Number.isInteger(version))
+        return raw;
+    if (version > PROJECT_SCHEMA_VERSION) {
+        throw new Error(`Unsupported project schemaVersion ${version}: newer than supported ${PROJECT_SCHEMA_VERSION}`);
+    }
+    if (version < 1)
+        throw new Error(`Unsupported project schemaVersion ${version}`);
+    let current = { ...document };
+    let currentVersion = version;
+    while (currentVersion < PROJECT_SCHEMA_VERSION) {
+        const migrate = PROJECT_MIGRATIONS[currentVersion];
+        if (!migrate)
+            throw new Error(`Missing project migration ${currentVersion}->${currentVersion + 1}`);
+        current = migrate(current);
+        if (current.schemaVersion !== currentVersion + 1) {
+            throw new Error(`Invalid project migration ${currentVersion}->${currentVersion + 1}`);
+        }
+        currentVersion += 1;
+    }
+    return current;
+}
 /** Reject any persisted project whose schemaVersion is not the current one. */
 export function parseProject(raw) {
-    const parsed = projectSchema.safeParse(raw);
+    const migrated = migrateProjectDocument(raw);
+    const parsed = projectSchema.safeParse(migrated);
     if (!parsed.success) {
         throw new Error(`Invalid project document: ${parsed.error.message}`);
     }

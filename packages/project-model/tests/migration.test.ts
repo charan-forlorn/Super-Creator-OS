@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as projectModel from "../src/index";
 
 const currentDocument = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   id: "migration-current",
   name: "Current",
   createdAt: "2026-01-01T00:00:00.000Z",
@@ -25,6 +25,6 @@ describe("project schema migration foundation", () => {
 
   it("fails closed for future schema versions", () => {
     const migrate = (projectModel as any).migrateProjectDocument;
-    expect(() => migrate({ ...currentDocument, schemaVersion: 2 })).toThrow(/newer than supported/i);
+    expect(() => migrate({ ...currentDocument, schemaVersion: 3 })).toThrow(/newer than supported/i);
   });
 });

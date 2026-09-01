@@ -447,7 +447,7 @@ export const placeCaptionCommand = {
         };
         const tracks = existing
             ? prev.tracks.map((t) => t.id === trackId ? { ...t, captions: [...t.captions, caption] } : t)
-            : [...prev.tracks, { id: trackId, kind: "text", clips: [], captions: [caption] }];
+            : [...prev.tracks, { id: trackId, kind: "text", clips: [], captions: [caption], visible: true, muted: false, locked: false }];
         const next = {
             ...prev, tracks,
             durationSec: Math.max(prev.durationSec, start + duration),
@@ -549,6 +549,9 @@ export const addTrackSchema = z.object({
         kind: z.enum(["video", "audio", "text"]),
         clips: z.array(clipSchema).default([]),
         captions: z.array(captionSchema).default([]),
+        visible: z.boolean().default(true),
+        muted: z.boolean().default(false),
+        locked: z.boolean().default(false),
     }),
 });
 export const addTrackCommand = {
@@ -656,7 +659,7 @@ export const placeProbedMediaCommand = {
             targetTrackId = existing.id;
         }
         else {
-            tracks = [...tracks, { id: newTrackId, kind: trackKind, clips: [], captions: [] }];
+            tracks = [...tracks, { id: newTrackId, kind: trackKind, clips: [], captions: [], visible: true, muted: false, locked: false }];
             targetTrackId = newTrackId;
         }
         let next = {
@@ -750,7 +753,7 @@ function ensureTimelineTrack(project, asset) {
     const id = `timeline-${kind}`;
     if (project.tracks.some((t) => t.id === id))
         throw new CommandError(`TIMELINE_TRACK_ID_CONFLICT: ${id}`);
-    const track = { id, kind, clips: [], captions: [] };
+    const track = { id, kind, clips: [], captions: [], visible: true, muted: false, locked: false };
     return { tracks: [...project.tracks, track], track };
 }
 export const timelineInsertAssetCommand = {

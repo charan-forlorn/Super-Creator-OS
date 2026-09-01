@@ -446,7 +446,11 @@ export declare const addTrackSchema: z.ZodObject<{
                 backgroundOpacity?: number | undefined;
             } | undefined;
         }>, "many">>;
+        visible: z.ZodDefault<z.ZodBoolean>;
+        muted: z.ZodDefault<z.ZodBoolean>;
+        locked: z.ZodDefault<z.ZodBoolean>;
     }, "strip", z.ZodTypeAny, {
+        muted: boolean;
         id: string;
         kind: "video" | "audio" | "text";
         clips: {
@@ -492,9 +496,12 @@ export declare const addTrackSchema: z.ZodObject<{
                 backgroundOpacity: number;
             };
         }[];
+        visible: boolean;
+        locked: boolean;
     }, {
         id: string;
         kind: "video" | "audio" | "text";
+        muted?: boolean | undefined;
         clips?: {
             id: string;
             assetId: string;
@@ -538,9 +545,12 @@ export declare const addTrackSchema: z.ZodObject<{
                 backgroundOpacity?: number | undefined;
             } | undefined;
         }[] | undefined;
+        visible?: boolean | undefined;
+        locked?: boolean | undefined;
     }>;
 }, "strip", z.ZodTypeAny, {
     track: {
+        muted: boolean;
         id: string;
         kind: "video" | "audio" | "text";
         clips: {
@@ -586,11 +596,14 @@ export declare const addTrackSchema: z.ZodObject<{
                 backgroundOpacity: number;
             };
         }[];
+        visible: boolean;
+        locked: boolean;
     };
 }, {
     track: {
         id: string;
         kind: "video" | "audio" | "text";
+        muted?: boolean | undefined;
         clips?: {
             id: string;
             assetId: string;
@@ -634,6 +647,8 @@ export declare const addTrackSchema: z.ZodObject<{
                 backgroundOpacity?: number | undefined;
             } | undefined;
         }[] | undefined;
+        visible?: boolean | undefined;
+        locked?: boolean | undefined;
     };
 }>;
 export declare const addTrackCommand: EditCommand<z.infer<typeof addTrackSchema>>;

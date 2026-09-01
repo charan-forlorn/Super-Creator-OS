@@ -463,7 +463,7 @@ export const placeCaptionCommand: EditCommand<z.infer<typeof placeCaptionSchema>
     };
     const tracks = existing
       ? prev.tracks.map((t) => t.id === trackId ? { ...t, captions: [...t.captions, caption] } : t)
-      : [...prev.tracks, { id: trackId, kind: "text" as const, clips: [], captions: [caption] }];
+      : [...prev.tracks, { id: trackId, kind: "text" as const, clips: [], captions: [caption], visible: true, muted: false, locked: false }];
     const next: Project = {
       ...prev, tracks,
       durationSec: Math.max(prev.durationSec, start + duration),
@@ -571,6 +571,9 @@ export const addTrackSchema = z.object({
     kind: z.enum(["video", "audio", "text"]),
     clips: z.array(clipSchema).default([]),
     captions: z.array(captionSchema).default([]),
+    visible: z.boolean().default(true),
+    muted: z.boolean().default(false),
+    locked: z.boolean().default(false),
   }),
 });
 export const addTrackCommand: EditCommand<z.infer<typeof addTrackSchema>> = {
@@ -681,7 +684,7 @@ export const placeProbedMediaCommand: EditCommand<z.infer<typeof placeProbedMedi
     if (existing) {
       targetTrackId = existing.id;
     } else {
-      tracks = [...tracks, { id: newTrackId, kind: trackKind, clips: [], captions: [] }];
+      tracks = [...tracks, { id: newTrackId, kind: trackKind, clips: [], captions: [], visible: true, muted: false, locked: false }];
       targetTrackId = newTrackId;
     }
 
@@ -788,7 +791,7 @@ function ensureTimelineTrack(project: Project, asset: MediaAsset): { tracks: Tra
   if (existing) return { tracks: project.tracks, track: existing };
   const id = `timeline-${kind}`;
   if (project.tracks.some((t) => t.id === id)) throw new CommandError(`TIMELINE_TRACK_ID_CONFLICT: ${id}`);
-  const track: Track = { id, kind, clips: [], captions: [] };
+  const track: Track = { id, kind, clips: [], captions: [], visible: true, muted: false, locked: false };
   return { tracks: [...project.tracks, track], track };
 }
 

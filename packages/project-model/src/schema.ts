@@ -5,7 +5,7 @@ import { z } from "zod";
  * persisted shape changes. Old versions are rejected fail-closed unless an
  * explicit migration exists.
  */
-export const PROJECT_SCHEMA_VERSION = 1 as const;
+export const PROJECT_SCHEMA_VERSION = 2 as const;
 
 const rationalSchema = z.object({
   num: z.number().int().nonnegative(),
@@ -103,6 +103,12 @@ export const trackSchema = z.object({
   kind: z.enum(["video", "audio", "text"]),
   clips: z.array(clipSchema),
   captions: z.array(captionSchema).default([]),
+  /** Track contributes visual layers unless hidden. Visibility does not mute audio. */
+  visible: z.boolean().default(true),
+  /** Track audio contribution is disabled when muted. */
+  muted: z.boolean().default(false),
+  /** Editing commands must fail closed when targeting a locked track. */
+  locked: z.boolean().default(false),
 });
 export type Track = z.infer<typeof trackSchema>;
 
@@ -132,7 +138,19 @@ type ProjectMigration = (document: ProjectMigrationDocument) => ProjectMigration
  * (for example `1: migrateV1ToV2`) when PROJECT_SCHEMA_VERSION advances.
  * Missing steps fail closed rather than guessing at persisted user data.
  */
-const PROJECT_MIGRATIONS: Readonly<Partial<Record<number, ProjectMigration>>> = Object.freeze({});
+function migrateV1ToV2(document: ProjectMigrationDocument): ProjectMigrationDocument {
+  const tracks = Array.isArray(document.tracks)
+    ? document.tracks.map((track) => {
+        if (typeof track !== "object" || track === null || Array.isArray(track)) return track;
+        return { ...track, visible: true, muted: false, locked: false };
+      })
+    : document.tracks;
+  return { ...document, schemaVersion: 2, tracks };
+}
+
+const PROJECT_MIGRATIONS: Readonly<Partial<Record<number, ProjectMigration>>> = Object.freeze({
+  1: migrateV1ToV2,
+});
 
 export function migrateProjectDocument(raw: unknown): unknown {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return raw;
