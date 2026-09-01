@@ -40,8 +40,9 @@ export function Timeline() {
     startVals: Record<string, number>; // clipId -> start (move) or inPoint (trim)
   } | null>(null);
   const groupPreviewRef = useRef<number | null>(null);
+  const [movePreview, setMovePreview] = useState<{ ids: string[]; delta: number } | null>(null);
   const [rippleTrimEnabled, setRippleTrimEnabled] = useState(false);
-  const [ripplePreview, setRipplePreview] = useState<{ clipId: string; duration: number; sourceEnd: number } | null>(null);
+  const [ripplePreview, setRipplePreview] = useState<{ clipId: string; duration: number; sourceEnd?: number; inPoint?: number } | null>(null);
 
   const pxPerSec = PX_PER_SEC_BASE * zoom;
   const totalSec = Math.max(project.durationSec, 10) + 5;
@@ -78,6 +79,8 @@ export function Timeline() {
     }
     dragRef.current = { mode, startX: ev.clientX, startVals };
     groupPreviewRef.current = null;
+    setMovePreview(null);
+    setRipplePreview(null);
     ev.preventDefault();
   }
 
@@ -94,28 +97,17 @@ export function Timeline() {
     });
     const targets = Object.keys(d.startVals);
     if (d.mode === "move") {
-      if (targets.length > 1) {
-        // A group drag is preview-only until mouse-up. Mutating a primary clip
-        // here would create an extra history entry and double-shift it when the
-        // atomic batch below commits. Snap the group delta from its primary.
-        const primaryId = selectedClipId && d.startVals[selectedClipId] !== undefined
-          ? selectedClipId
-          : targets[0];
-        const base = d.startVals[primaryId];
-        let nextStart = base + dxSec;
-        const snapped = snap(nextStart, points, 0.25 / zoom);
-        if (snapped.snapped) nextStart = snapped.value;
-        groupPreviewRef.current = nextStart - base;
-        return;
-      }
-
-      const id = targets[0];
-      if (!id) return;
-      const base = d.startVals[id];
+      const primaryId = selectedClipId && d.startVals[selectedClipId] !== undefined ? selectedClipId : targets[0];
+      if (!primaryId) return;
+      const base = d.startVals[primaryId];
       let nextStart = base + dxSec;
       const snapped = snap(nextStart, points, 0.25 / zoom);
       if (snapped.snapped) nextStart = snapped.value;
-      moveSelected(Math.max(0, nextStart));
+      const rawDelta = nextStart - base;
+      const minRaw = Math.min(...targets.map((id) => d.startVals[id] + rawDelta));
+      const delta = rawDelta + (minRaw < 0 ? -minRaw : 0);
+      groupPreviewRef.current = delta;
+      setMovePreview({ ids: targets, delta });
       return;
     }
 
@@ -123,10 +115,12 @@ export function Timeline() {
       if (d.mode === "trim-l") {
         if (id !== selectedClipId) continue;
         const clip = project.tracks.flatMap((t) => t.clips).find((c) => c.id === id)!;
-        let nip = clip.inPoint + dxSec;
-        const snapped = snap(clip.inPoint + dxSec, [0, ...points], 0.25 / zoom);
-        if (snapped.snapped) nip = snapped.value;
-        trimSelected(clamp(nip, 0, clip.inPoint + clip.duration - 0.1));
+        const rate = clip.playbackRate ?? 1;
+        const originalSourceEnd = clip.inPoint + clip.duration * rate;
+        const maxInPoint = originalSourceEnd - 0.1 * rate;
+        const nip = clamp(d.startVals[id] + dxSec * rate, 0, maxInPoint);
+        const duration = (originalSourceEnd - nip) / rate;
+        setRipplePreview({ clipId: id, duration, inPoint: nip });
       } else {
         if (id !== selectedClipId) continue;
         const clip = project.tracks.flatMap((t) => t.clips).find((c) => c.id === id)!;
@@ -138,8 +132,7 @@ export function Timeline() {
         const span = newEnd - clip.start;
         if (span > 0.1) {
           const sourceEnd = clip.inPoint + span * (clip.playbackRate ?? 1);
-          if (rippleTrimEnabled) setRipplePreview({ clipId: id, duration: span, sourceEnd });
-          else trimSelected(undefined, sourceEnd);
+          setRipplePreview({ clipId: id, duration: span, sourceEnd });
         }
       }
     }
@@ -152,14 +145,22 @@ export function Timeline() {
     // Commit a group move (delta) as one atomic undoable unit when multiple clips
     // were dragged, or when a single clip moved with others selected.
     const targets = Object.keys(d.startVals);
-    if (d.mode === "move" && targets.length > 1) {
+    if (d.mode === "move") {
       const delta = groupPreviewRef.current ?? 0;
-      if (Math.abs(delta) > 1e-6) commitGroupMove(delta);
+      if (Math.abs(delta) > 1e-6) {
+        if (targets.length > 1) commitGroupMove(delta);
+        else if (targets[0]) moveSelected(d.startVals[targets[0]] + delta);
+      }
     }
-    if (d.mode === "trim-r" && rippleTrimEnabled && ripplePreview) {
-      rippleTrimSelected(undefined, ripplePreview.sourceEnd);
+    if (d.mode === "trim-l" && ripplePreview?.inPoint !== undefined) {
+      trimSelected(ripplePreview.inPoint);
+    }
+    if (d.mode === "trim-r" && ripplePreview?.sourceEnd !== undefined) {
+      if (rippleTrimEnabled) rippleTrimSelected(undefined, ripplePreview.sourceEnd);
+      else trimSelected(undefined, ripplePreview.sourceEnd);
     }
     groupPreviewRef.current = null;
+    setMovePreview(null);
     setRipplePreview(null);
   }
 
@@ -250,6 +251,7 @@ export function Timeline() {
                     onMouseDownMove={(e) => onClipMouseDown(e, clip, "move")}
                     onMouseDownTrimL={(e) => onClipMouseDown(e, clip, "trim-l")}
                     onMouseDownTrimR={(e) => onClipMouseDown(e, clip, "trim-r")}
+                    previewStart={movePreview?.ids.includes(clip.id) ? clip.start + movePreview.delta : undefined}
                     previewDuration={ripplePreview?.clipId === clip.id ? ripplePreview.duration : undefined}
                   />
                 ))}
@@ -271,6 +273,7 @@ function ClipView({
   onMouseDownMove,
   onMouseDownTrimL,
   onMouseDownTrimR,
+  previewStart,
   previewDuration,
 }: {
   clip: { id: string; start: number; duration: number; inPoint: number };
@@ -281,9 +284,10 @@ function ClipView({
   onMouseDownMove: (e: React.MouseEvent) => void;
   onMouseDownTrimL: (e: React.MouseEvent) => void;
   onMouseDownTrimR: (e: React.MouseEvent) => void;
+  previewStart?: number;
   previewDuration?: number;
 }) {
-  const left = clip.start * pxPerSec;
+  const left = (previewStart ?? clip.start) * pxPerSec;
   const w = Math.max(8, (previewDuration ?? clip.duration) * pxPerSec);
   const cls = ["clip", selected ? "selected" : "", primary ? "primary" : ""].filter(Boolean).join(" ");
   return (
