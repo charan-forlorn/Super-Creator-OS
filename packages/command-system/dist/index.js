@@ -1,6 +1,6 @@
 import { CommandRegistry } from "./registry.js";
 import { CommandBus } from "./bus.js";
-import { addAssetCommand, removeAssetCommand, addClipCommand, deleteClipCommand, moveClipCommand, trimClipCommand, rippleDeleteClipsCommand, rippleTrimClipCommand, setClipAudioCommand, setClipEffectsCommand, setClipSpeedCommand, setClipTransitionCommand, setClipTransformCommand, splitClipCommand, addCaptionCommand, placeCaptionCommand, removeCaptionCommand, changeAspectCommand, addTrackCommand, removeTrackCommand, placeProbedMediaCommand, relinkMediaCommand, } from "./commands.js";
+import { addAssetCommand, removeAssetCommand, addClipCommand, deleteClipCommand, moveClipCommand, trimClipCommand, rippleDeleteClipsCommand, rippleTrimClipCommand, setClipAudioCommand, setClipEffectsCommand, setClipSpeedCommand, setClipTransitionCommand, setClipTransformCommand, splitClipCommand, addCaptionCommand, placeCaptionCommand, removeCaptionCommand, changeAspectCommand, addTrackCommand, removeTrackCommand, placeProbedMediaCommand, timelineInsertAssetCommand, timelineOverwriteAssetCommand, relinkMediaCommand, } from "./commands.js";
 export * from "./types.js";
 export * from "./registry.js";
 export * from "./bus.js";
@@ -30,6 +30,8 @@ export function createStudioRegistry() {
         addTrackCommand,
         removeTrackCommand,
         placeProbedMediaCommand,
+        timelineInsertAssetCommand,
+        timelineOverwriteAssetCommand,
         relinkMediaCommand,
     ];
     for (const c of cmds)

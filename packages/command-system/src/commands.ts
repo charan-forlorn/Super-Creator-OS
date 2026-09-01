@@ -741,6 +741,158 @@ export const placeProbedMediaCommand: EditCommand<z.infer<typeof placeProbedMedi
   },
 };
 
+
+/* ---------------------- insert / overwrite edit --------------------- */
+export const TIMELINE_INSERT_ASSET = "timeline.insertAsset";
+export const TIMELINE_OVERWRITE_ASSET = "timeline.overwriteAsset";
+export const timelineAssetEditSchema = z.object({
+  assetId: z.string().min(1),
+  clipId: z.string().min(1),
+  atSec: z.number().nonnegative(),
+});
+
+type TimelineAssetEdit = z.infer<typeof timelineAssetEditSchema>;
+
+function restoreTimelineEditSnapshot(prev: Project, snapshot: Project): { next: Project; inverse: EditCommand } {
+  const current = prev;
+  return {
+    next: snapshot,
+    inverse: { type: "timeline.restore", execute: (p) => restoreTimelineEditSnapshot(p, current) },
+  };
+}
+
+function timelineTrackKind(asset: MediaAsset): "video" | "audio" {
+  return asset.kind === "audio" ? "audio" : "video";
+}
+
+
+function makeTimelineEditClip(asset: MediaAsset, trackId: string, clipId: string, atSec: number): Clip {
+  return {
+    id: clipId, assetId: asset.id, inPoint: 0, duration: asset.durationSec, start: atSec, trackId,
+    transform: { scale: 1, x: 0, y: 0, opacity: 1 },
+    audio: { gainDb: 0, muted: false },
+    effects: { brightness: 0, contrast: 1, saturation: 1 },
+    playbackRate: 1, transitionIn: null,
+  };
+}
+
+function assertTimelineClipIdAvailable(project: Project, clipId: string): void {
+  if (project.tracks.some((t) => t.clips.some((c) => c.id === clipId))) {
+    throw new CommandError(`TIMELINE_CLIP_ID_DUPLICATE: ${clipId}`);
+  }
+}
+
+function ensureTimelineTrack(project: Project, asset: MediaAsset): { tracks: Track[]; track: Track } {
+  const kind = timelineTrackKind(asset);
+  const existing = project.tracks.find((t) => t.kind === kind);
+  if (existing) return { tracks: project.tracks, track: existing };
+  const id = `timeline-${kind}`;
+  if (project.tracks.some((t) => t.id === id)) throw new CommandError(`TIMELINE_TRACK_ID_CONFLICT: ${id}`);
+  const track: Track = { id, kind, clips: [], captions: [] };
+  return { tracks: [...project.tracks, track], track };
+}
+
+
+export const timelineInsertAssetCommand: EditCommand<TimelineAssetEdit> = {
+  type: TIMELINE_INSERT_ASSET,
+  schema: timelineAssetEditSchema,
+  execute(prev, { assetId, clipId, atSec }) {
+    const asset = findAsset(prev, assetId);
+    assertTimelineClipIdAvailable(prev, clipId);
+    const ensured = ensureTimelineTrack(prev, asset);
+    const ordered = [...ensured.track.clips].sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+    const covering = ordered.filter((c) => c.start < atSec - 1e-9 && c.start + c.duration > atSec + 1e-9);
+    if (covering.length > 1) throw new CommandError("TIMELINE_OVERLAP_CONFLICT");
+    const nextAtBoundary = ordered.find((c) => c.start >= atSec - 1e-9);
+    if (covering[0]?.transitionIn || nextAtBoundary?.transitionIn) throw new CommandError("TIMELINE_TRANSITION_CONFLICT");
+    const inserted = makeTimelineEditClip(asset, ensured.track.id, clipId, atSec);
+    const badInserted = validateClipAgainstAsset(inserted, asset);
+    if (badInserted) throw new CommandError(`INVALID_TIMELINE_EDIT: ${badInserted}`);
+    const split = covering[0];
+    const replacement: Clip[] = [];
+
+
+    for (const c of ordered) {
+      if (split && c.id === split.id) {
+        const leftDuration = atSec - c.start;
+        const rightDuration = c.start + c.duration - atSec;
+        const rate = c.playbackRate ?? 1;
+        const rightId = `${c.id}__insert_r_${clipId}`;
+        assertTimelineClipIdAvailable(prev, rightId);
+        const right: Clip = {
+          ...c, id: rightId, start: atSec + asset.durationSec,
+          inPoint: c.inPoint + leftDuration * rate, duration: rightDuration,
+        };
+        const left: Clip = { ...c, duration: leftDuration };
+        if (validateClipAgainstAsset(left, findAsset(prev, left.assetId)) || validateClipAgainstAsset(right, findAsset(prev, right.assetId))) {
+          throw new CommandError("INVALID_TIMELINE_INSERT_SPLIT");
+        }
+        replacement.push(left, right);
+      } else if (c.start >= atSec - 1e-9) replacement.push({ ...c, start: c.start + asset.durationSec });
+      else replacement.push(c);
+    }
+    replacement.push(inserted);
+    replacement.sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+    const tracks = ensured.tracks.map((t) => t.id === ensured.track.id ? { ...t, clips: replacement } : t);
+    const next = { ...prev, tracks, durationSec: recomputeDuration({ ...prev, tracks }), updatedAt: new Date().toISOString() };
+    return { next, inverse: { type: "timeline.restore", execute: (p) => restoreTimelineEditSnapshot(p, prev) } };
+  },
+};
+
+
+export const timelineOverwriteAssetCommand: EditCommand<TimelineAssetEdit> = {
+  type: TIMELINE_OVERWRITE_ASSET,
+  schema: timelineAssetEditSchema,
+  execute(prev, { assetId, clipId, atSec }) {
+    const asset = findAsset(prev, assetId);
+    assertTimelineClipIdAvailable(prev, clipId);
+    const ensured = ensureTimelineTrack(prev, asset);
+    const ordered = [...ensured.track.clips].sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+    const endSec = atSec + asset.durationSec;
+    for (let i = 1; i < ordered.length; i += 1) {
+      const a = ordered[i - 1], b = ordered[i];
+      if (b.start < a.start + a.duration - 1e-9 && b.start < endSec - 1e-9 && a.start + a.duration > atSec + 1e-9) {
+        throw new CommandError("TIMELINE_OVERLAP_CONFLICT");
+      }
+    }
+    const transitionConflict = ordered.some((c) => c.transitionIn && c.start <= endSec + 1e-9 && c.start + c.duration >= atSec - 1e-9);
+    if (transitionConflict) throw new CommandError("TIMELINE_TRANSITION_CONFLICT");
+    const inserted = makeTimelineEditClip(asset, ensured.track.id, clipId, atSec);
+    const replacement: Clip[] = [];
+
+
+    for (const c of ordered) {
+      const clipEnd = c.start + c.duration;
+      if (clipEnd <= atSec + 1e-9 || c.start >= endSec - 1e-9) {
+        replacement.push(c);
+        continue;
+      }
+      const keepLeft = c.start < atSec - 1e-9;
+      const keepRight = clipEnd > endSec + 1e-9;
+      const rate = c.playbackRate ?? 1;
+      if (keepLeft) replacement.push({ ...c, duration: atSec - c.start });
+      if (keepRight) {
+        const rightId = keepLeft ? `${c.id}__overwrite_r_${clipId}` : c.id;
+        if (keepLeft) assertTimelineClipIdAvailable(prev, rightId);
+        const right: Clip = {
+          ...c,
+          id: rightId,
+          start: endSec,
+          inPoint: c.inPoint + (endSec - c.start) * rate,
+          duration: clipEnd - endSec,
+        };
+        if (validateClipAgainstAsset(right, findAsset(prev, right.assetId))) throw new CommandError("INVALID_TIMELINE_OVERWRITE_SPLIT");
+        replacement.push(right);
+      }
+    }
+    replacement.push(inserted);
+    replacement.sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+    const tracks = ensured.tracks.map((t) => t.id === ensured.track.id ? { ...t, clips: replacement } : t);
+    const next = { ...prev, tracks, durationSec: recomputeDuration({ ...prev, tracks }), updatedAt: new Date().toISOString() };
+    return { next, inverse: { type: "timeline.restore", execute: (p) => restoreTimelineEditSnapshot(p, prev) } };
+  },
+};
+
 /* ----------------------------- relinkMedia -------------------------- */
 export const RELINK_MEDIA = "media.relink";
 export const relinkMediaSchema = z.object({

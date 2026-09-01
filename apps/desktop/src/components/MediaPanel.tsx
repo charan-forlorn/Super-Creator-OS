@@ -51,7 +51,7 @@ function scheduleAnalysis(assetId: string, sourcePath: string, initialProbe?: Me
 }
 
 export function MediaPanel() {
-  const { project, importProbedMedia, relinkMedia, thumbnails, mediaAnalysis } = useStudio();
+  const { project, importProbedMedia, relinkMedia, thumbnails, mediaAnalysis, selectedAssetId, selectAsset, insertSelectedAssetAtPlayhead, overwriteSelectedAssetAtPlayhead } = useStudio();
   const [busy, setBusy] = useState(false);
   const assetSignature = useMemo(
     () => project.assets.map((a) => `${a.id}:${a.sourcePath}`).join("|"),
@@ -108,7 +108,7 @@ export function MediaPanel() {
           const probe = analysis?.probe;
           const missing = analysis?.status === "missing";
           return (
-            <div key={a.id} className={`media-item${missing ? " missing" : ""}`} data-testid={`media-item-${a.id}`}>
+            <div key={a.id} className={`media-item${missing ? " missing" : ""}${selectedAssetId === a.id ? " selected" : ""}`} data-testid={`media-item-${a.id}`} data-selected={selectedAssetId === a.id ? "true" : "false"} onClick={() => selectAsset(a.id)}>
               <div className="media-thumb">
                 {thumbnails[a.id]
                   ? <img src={previewUrlForPath(thumbnails[a.id])} alt="" data-testid={`thumbnail-${a.id}`} />
@@ -136,6 +136,10 @@ export function MediaPanel() {
             </div>
           );
         })}
+      </div>
+      <div className="media-edit-actions" data-testid="media-edit-actions">
+        <button data-testid="insert-edit" disabled={!selectedAssetId} onClick={insertSelectedAssetAtPlayhead}>Insert @ Playhead</button>
+        <button data-testid="overwrite-edit" disabled={!selectedAssetId} onClick={overwriteSelectedAssetAtPlayhead}>Overwrite @ Playhead</button>
       </div>
       <div className="rail-section">Text</div>
       <CaptionPanel />

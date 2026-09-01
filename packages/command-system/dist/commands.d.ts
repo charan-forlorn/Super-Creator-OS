@@ -718,6 +718,24 @@ export declare const placeProbedMediaSchema: z.ZodObject<{
     place?: boolean | undefined;
 }>;
 export declare const placeProbedMediaCommand: EditCommand<z.infer<typeof placeProbedMediaSchema>>;
+export declare const TIMELINE_INSERT_ASSET = "timeline.insertAsset";
+export declare const TIMELINE_OVERWRITE_ASSET = "timeline.overwriteAsset";
+export declare const timelineAssetEditSchema: z.ZodObject<{
+    assetId: z.ZodString;
+    clipId: z.ZodString;
+    atSec: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    clipId: string;
+    assetId: string;
+    atSec: number;
+}, {
+    clipId: string;
+    assetId: string;
+    atSec: number;
+}>;
+type TimelineAssetEdit = z.infer<typeof timelineAssetEditSchema>;
+export declare const timelineInsertAssetCommand: EditCommand<TimelineAssetEdit>;
+export declare const timelineOverwriteAssetCommand: EditCommand<TimelineAssetEdit>;
 export declare const RELINK_MEDIA = "media.relink";
 export declare const relinkMediaSchema: z.ZodObject<{
     assetId: z.ZodString;
@@ -802,4 +820,5 @@ export declare const splitClipSchema: z.ZodObject<{
     t: number;
 }>;
 export declare const splitClipCommand: EditCommand<z.infer<typeof splitClipSchema>>;
+export {};
 //# sourceMappingURL=commands.d.ts.map

@@ -19,6 +19,8 @@ import {
   TRIM_CLIP,
   RIPPLE_DELETE_CLIPS,
   RIPPLE_TRIM_CLIP,
+  TIMELINE_INSERT_ASSET,
+  TIMELINE_OVERWRITE_ASSET,
   SET_CLIP_AUDIO,
   SET_CLIP_EFFECTS,
   SET_CLIP_SPEED,
@@ -71,6 +73,8 @@ export interface StudioState {
   /** R2.1 — multi-selection. `selectedClipId` mirrors the primary selection for
    *  single-clip consumers (Inspector, AICommandBar) so they need no changes. */
   selectedClipIds: string[];
+  /** Runtime-only media-bin selection for insert/overwrite editing. */
+  selectedAssetId: string | null;
   playheadSec: number;
   zoom: number;
   scrollSec: number;
@@ -104,6 +108,9 @@ export interface StudioState {
   invalidateSourceCache: (sourcePath: string) => void;
   setMediaAnalysis: (assetId: string, state: AssetAnalysisState) => void;
   relinkMedia: (assetId: string, probe: MediaProbe) => boolean;
+  selectAsset: (id: string | null) => void;
+  insertSelectedAssetAtPlayhead: () => boolean;
+  overwriteSelectedAssetAtPlayhead: () => boolean;
 
   selectClip: (id: string | null) => void;
   /** R2.1 — toggle/extend selection (multi-select). */
@@ -157,6 +164,7 @@ export const useStudio = create<StudioState>((set, get) => {
     registry: initial.registry,
     selectedClipId: null,
     selectedClipIds: [],
+    selectedAssetId: null,
     playheadSec: 0,
     zoom: 1,
     scrollSec: 0,
@@ -173,7 +181,7 @@ export const useStudio = create<StudioState>((set, get) => {
     newProject: () => {
       const { bus, registry } = makeBus();
       mediaCache.clear();
-      set({ project: bus.project, bus, registry, selectedClipId: null, selectedClipIds: [], playheadSec: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty: false, projectPath: null, lastError: null });
+      set({ project: bus.project, bus, registry, selectedClipId: null, selectedClipIds: [], selectedAssetId: null, playheadSec: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty: false, projectPath: null, lastError: null });
     },
 
     loadProject: (raw, projectPath = null, dirty = false) => {
@@ -181,7 +189,7 @@ export const useStudio = create<StudioState>((set, get) => {
       const registry = createStudioRegistry();
       const bus = new CommandBus(registry, p);
       mediaCache.clear();
-      set({ project: p, bus, registry, selectedClipId: null, selectedClipIds: [], playheadSec: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty, projectPath, lastError: null });
+      set({ project: p, bus, registry, selectedClipId: null, selectedClipIds: [], selectedAssetId: null, playheadSec: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty, projectPath, lastError: null });
     },
 
     markSaved: (projectPath, expectedUpdatedAt) => set((state) => ({
@@ -284,6 +292,48 @@ export const useStudio = create<StudioState>((set, get) => {
             lastError: null,
           };
         });
+        return true;
+      } catch (error) {
+        set({ lastError: (error as Error).message });
+        return false;
+      }
+    },
+
+    selectAsset: (id) => set((state) => {
+      if (id === null) return { selectedAssetId: null, lastError: null };
+      if (!state.project.assets.some((asset) => asset.id === id)) {
+        return { selectedAssetId: state.selectedAssetId, lastError: `ASSET_NOT_FOUND: ${id}` };
+      }
+      return { selectedAssetId: id, lastError: null };
+    }),
+
+    insertSelectedAssetAtPlayhead: () => {
+      const assetId = get().selectedAssetId;
+      if (!assetId) {
+        set({ lastError: "SELECT_MEDIA_ASSET_REQUIRED" });
+        return false;
+      }
+      const clipId = uid("clip");
+      try {
+        get().bus.execute(TIMELINE_INSERT_ASSET, { assetId, clipId, atSec: get().playheadSec });
+        set({ project: get().bus.project, selectedClipId: clipId, selectedClipIds: [clipId], dirty: true, lastError: null });
+        return true;
+      } catch (error) {
+        set({ lastError: (error as Error).message });
+        return false;
+      }
+    },
+
+    overwriteSelectedAssetAtPlayhead: () => {
+      const assetId = get().selectedAssetId;
+      if (!assetId) {
+        set({ lastError: "SELECT_MEDIA_ASSET_REQUIRED" });
+        return false;
+      }
+      const clipId = uid("clip");
+      try {
+        get().bus.execute(TIMELINE_OVERWRITE_ASSET, { assetId, clipId, atSec: get().playheadSec });
+        set({ project: get().bus.project, selectedClipId: clipId, selectedClipIds: [clipId], dirty: true, lastError: null });
         return true;
       } catch (error) {
         set({ lastError: (error as Error).message });
