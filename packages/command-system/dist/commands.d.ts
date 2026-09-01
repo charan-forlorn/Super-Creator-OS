@@ -155,14 +155,17 @@ export declare const placeCaptionSchema: z.ZodObject<{
     text: z.ZodString;
     start: z.ZodDefault<z.ZodNumber>;
     duration: z.ZodDefault<z.ZodNumber>;
+    targetTrackId: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     text: string;
     duration: number;
     start: number;
+    targetTrackId?: string | undefined;
 }, {
     text: string;
     duration?: number | undefined;
     start?: number | undefined;
+    targetTrackId?: string | undefined;
 }>;
 export declare const placeCaptionCommand: EditCommand<z.infer<typeof placeCaptionSchema>>;
 export declare const ADD_CAPTION = "caption.add";
@@ -451,8 +454,8 @@ export declare const addTrackSchema: z.ZodObject<{
         locked: z.ZodDefault<z.ZodBoolean>;
     }, "strip", z.ZodTypeAny, {
         muted: boolean;
-        id: string;
         kind: "video" | "audio" | "text";
+        id: string;
         clips: {
             id: string;
             audio: {
@@ -499,8 +502,8 @@ export declare const addTrackSchema: z.ZodObject<{
         visible: boolean;
         locked: boolean;
     }, {
-        id: string;
         kind: "video" | "audio" | "text";
+        id: string;
         muted?: boolean | undefined;
         clips?: {
             id: string;
@@ -551,8 +554,8 @@ export declare const addTrackSchema: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     track: {
         muted: boolean;
-        id: string;
         kind: "video" | "audio" | "text";
+        id: string;
         clips: {
             id: string;
             audio: {
@@ -601,8 +604,8 @@ export declare const addTrackSchema: z.ZodObject<{
     };
 }, {
     track: {
-        id: string;
         kind: "video" | "audio" | "text";
+        id: string;
         muted?: boolean | undefined;
         clips?: {
             id: string;
@@ -656,6 +659,46 @@ export declare const REMOVE_TRACK = "track.remove";
 export declare const removeTrackCommand: EditCommand<{
     trackId: string;
 }>;
+export declare const REORDER_TRACK = "track.reorder";
+export declare const reorderTrackSchema: z.ZodObject<{
+    trackId: z.ZodString;
+    toIndex: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    trackId: string;
+    toIndex: number;
+}, {
+    trackId: string;
+    toIndex: number;
+}>;
+export declare const reorderTrackCommand: EditCommand<z.infer<typeof reorderTrackSchema>>;
+export declare const SET_TRACK_CONTROLS = "track.setControls";
+export declare const setTrackControlsSchema: z.ZodEffects<z.ZodObject<{
+    trackId: z.ZodString;
+    visible: z.ZodOptional<z.ZodBoolean>;
+    muted: z.ZodOptional<z.ZodBoolean>;
+    locked: z.ZodOptional<z.ZodBoolean>;
+}, "strip", z.ZodTypeAny, {
+    trackId: string;
+    muted?: boolean | undefined;
+    visible?: boolean | undefined;
+    locked?: boolean | undefined;
+}, {
+    trackId: string;
+    muted?: boolean | undefined;
+    visible?: boolean | undefined;
+    locked?: boolean | undefined;
+}>, {
+    trackId: string;
+    muted?: boolean | undefined;
+    visible?: boolean | undefined;
+    locked?: boolean | undefined;
+}, {
+    trackId: string;
+    muted?: boolean | undefined;
+    visible?: boolean | undefined;
+    locked?: boolean | undefined;
+}>;
+export declare const setTrackControlsCommand: EditCommand<z.infer<typeof setTrackControlsSchema>>;
 export declare const PLACE_PROBED_MEDIA = "media.placeProbed";
 export declare const placeProbedMediaSchema: z.ZodObject<{
     probe: z.ZodObject<{
@@ -672,8 +715,8 @@ export declare const placeProbedMediaSchema: z.ZodObject<{
         audioCodec: z.ZodOptional<z.ZodNullable<z.ZodString>>;
         probeStatus: z.ZodString;
     }, "strip", z.ZodTypeAny, {
-        id: string;
         kind: "video" | "audio" | "image" | "unknown";
+        id: string;
         name: string;
         sourcePath: string;
         durationSec: number;
@@ -685,8 +728,8 @@ export declare const placeProbedMediaSchema: z.ZodObject<{
         videoCodec?: string | null | undefined;
         audioCodec?: string | null | undefined;
     }, {
-        id: string;
         kind: "video" | "audio" | "image" | "unknown";
+        id: string;
         name: string;
         sourcePath: string;
         durationSec: number;
@@ -699,10 +742,11 @@ export declare const placeProbedMediaSchema: z.ZodObject<{
         audioCodec?: string | null | undefined;
     }>;
     place: z.ZodDefault<z.ZodBoolean>;
+    targetTrackId: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     probe: {
-        id: string;
         kind: "video" | "audio" | "image" | "unknown";
+        id: string;
         name: string;
         sourcePath: string;
         durationSec: number;
@@ -715,10 +759,11 @@ export declare const placeProbedMediaSchema: z.ZodObject<{
         audioCodec?: string | null | undefined;
     };
     place: boolean;
+    targetTrackId?: string | undefined;
 }, {
     probe: {
-        id: string;
         kind: "video" | "audio" | "image" | "unknown";
+        id: string;
         name: string;
         sourcePath: string;
         durationSec: number;
@@ -730,6 +775,7 @@ export declare const placeProbedMediaSchema: z.ZodObject<{
         videoCodec?: string | null | undefined;
         audioCodec?: string | null | undefined;
     };
+    targetTrackId?: string | undefined;
     place?: boolean | undefined;
 }>;
 export declare const placeProbedMediaCommand: EditCommand<z.infer<typeof placeProbedMediaSchema>>;
@@ -739,14 +785,17 @@ export declare const timelineAssetEditSchema: z.ZodObject<{
     assetId: z.ZodString;
     clipId: z.ZodString;
     atSec: z.ZodNumber;
+    targetTrackId: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     clipId: string;
     assetId: string;
     atSec: number;
+    targetTrackId?: string | undefined;
 }, {
     clipId: string;
     assetId: string;
     atSec: number;
+    targetTrackId?: string | undefined;
 }>;
 type TimelineAssetEdit = z.infer<typeof timelineAssetEditSchema>;
 export declare const timelineInsertAssetCommand: EditCommand<TimelineAssetEdit>;

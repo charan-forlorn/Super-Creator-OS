@@ -69,13 +69,12 @@ describe("R1 import placement — ROOT_CAUSE_1 (stale React snapshot race)", () 
     expect(bus.project.tracks[0].clips).toHaveLength(2);
   });
 
-  it("ADD_TRACK rejects a duplicate media-kind track (single-track-per-kind invariant)", () => {
+  it("ADD_TRACK allows multiple same-kind tracks but rejects duplicate ids", () => {
     const bus = createCommandBus(createEmptyProject("P", "p1"));
     bus.execute(ADD_TRACK, { track: { id: "tv1", kind: "video" } });
-    expect(() => bus.execute(ADD_TRACK, { track: { id: "tv2", kind: "video" } })).toThrow();
-    // text tracks may be multiple
-    expect(() => bus.execute(ADD_TRACK, { track: { id: "tt1", kind: "text" } })).not.toThrow();
-    expect(() => bus.execute(ADD_TRACK, { track: { id: "tt2", kind: "text" } })).not.toThrow();
+    expect(() => bus.execute(ADD_TRACK, { track: { id: "tv2", kind: "video" } })).not.toThrow();
+    expect(() => bus.execute(ADD_TRACK, { track: { id: "tv2", kind: "audio" } })).toThrow(/TRACK_DUPLICATE_ID/);
+    expect(bus.project.tracks.map((track) => track.id)).toEqual(["tv1", "tv2"]);
   });
 
   it("ADD_TRACK then undo removes the track it created", () => {
