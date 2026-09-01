@@ -36,6 +36,11 @@ async function rect(id) {
   return wd("GET", `/session/${sessionId}/element/${id}/rect`);
 }
 async function click(id) {
+  await wd("POST", `/session/${sessionId}/execute/sync`, {
+    script: "arguments[0].scrollIntoView({block:'center',inline:'nearest'});",
+    args: [{ [ELEMENT]: id }],
+  });
+  await sleep(80);
   await wd("POST", `/session/${sessionId}/element/${id}/click`, {});
   await sleep(150);
 }
@@ -59,9 +64,11 @@ async function main() {
   await pointerClickClip("c0");
 
   const video = await find("video.preview-video");
+  let audio = await find('audio[data-preview-audio="c0"]');
   gate = "SOURCE_AUDIO_DEFAULT_UNMUTED";
-  assert.equal(await prop(video, "muted"), false);
-  assert.ok(Math.abs(Number(await prop(video, "volume")) - 1) < 0.001);
+  assert.equal(await prop(video, "muted"), true, "visual video stays muted to avoid double-play");
+  assert.equal(await prop(audio, "muted"), false, "dedicated audio runtime is audible by default");
+  assert.ok(Math.abs(Number(await prop(audio, "volume")) - 1) < 0.001);
   pass(gate);
 
   gate = "AUDIO_CONTROLS_VISIBLE";
@@ -71,11 +78,15 @@ async function main() {
 
   gate = "AUDIO_MUTE_PREVIEW";
   await click(mute);
+  let mutedAudioPresent = true;
+  try { await find('audio[data-preview-audio="c0"]'); } catch { mutedAudioPresent = false; }
+  assert.equal(mutedAudioPresent, false, "muted clip must leave the effective audio mix");
   assert.equal(await prop(video, "muted"), true);
   pass(gate);
   gate = "AUDIO_UNDO_RESTORE";
   await click(await find('button[title="Ctrl+Z"]'));
-  assert.equal(await prop(video, "muted"), false);
+  audio = await find('audio[data-preview-audio="c0"]');
+  assert.equal(await prop(audio, "muted"), false);
   pass(gate);
 
   gate = "AUDIO_GAIN_PREVIEW";
@@ -83,7 +94,7 @@ async function main() {
   await wd("POST", `/session/${sessionId}/element/${gain}/value`, { text: "-12", value: ["-", "1", "2"] });
   await sleep(250);
   assert.equal(String(await prop(gain, "value")), "-12", "gain control must commit -12 dB");
-  const volume = Number(await prop(video, "volume"));
+  const volume = Number(await prop(audio, "volume"));
   assert.ok(Math.abs(volume - Math.pow(10, -12 / 20)) < 0.01, `expected -12 dB volume, got ${volume}`);
   pass(gate);
 

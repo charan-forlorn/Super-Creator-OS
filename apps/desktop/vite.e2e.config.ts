@@ -10,6 +10,7 @@ import { resolve } from "node:path";
 // asset-protocol resolver (convertFileSrc) can serve it for real playback
 // inside the bundled webview.
 const E2E_SAMPLE_ABS = resolve(__dirname, "e2e/fixtures/sample.mp4");
+const E2E_PROJECT_FIXTURE = process.env.HAIOS_E2E_PROJECT_FIXTURE ?? "default";
 
 /**
  * TEST-ONLY build config for the GUI E2E harness.
@@ -27,7 +28,11 @@ export default defineConfig({
       enforce: "pre",
       transform(code, id) {
         if (id.endsWith("e2e-entry.tsx")) {
-          return code.replace(/__E2E_SAMPLE_ABS_PATH__/g, JSON.stringify(E2E_SAMPLE_ABS));
+          let transformed = code.replace(/__E2E_SAMPLE_ABS_PATH__/g, JSON.stringify(E2E_SAMPLE_ABS));
+          if (E2E_PROJECT_FIXTURE === "p43") {
+            transformed = transformed.replace("../e2e/fixtures/project.json", "../e2e/fixtures/project-p43.json");
+          }
+          return transformed;
         }
         return null;
       },

@@ -247,7 +247,7 @@ async function waitVideoReady(timeoutMs = 8000) {
 async function pressPlayUntilPlaying() {
   // Click the on-screen play button; retry a few times because play() can reject
   // if fired before metadata is ready (WebView2 asset protocol load latency).
-  const playBtn = await find(".preview-controls button");
+  const playBtn = await find("[data-testid=\"transport-play-toggle\"]");
   for (let i = 0; i < 5; i++) {
     await clickEl(playBtn);
     await sleep(600);

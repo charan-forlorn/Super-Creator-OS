@@ -59,19 +59,23 @@ async function main() {
   gate = "TRANSITION_PREVIEW_DUAL_LAYER";
   const ruler = await find(".ruler-lane"); const rb = await rect(ruler);
   await pointerClick(".ruler-lane", 1.75 * 80, rb.height / 2);
-  const outgoing = await find('[data-testid="transition-outgoing-video"]');
-  const incoming = await find('[data-testid="transition-incoming-video"]');
+  const outgoing = await find('[data-preview-visual="c0"]');
+  const incoming = await find('[data-preview-visual="c1"]');
   assert.ok(outgoing && incoming); pass(gate);
 
   gate = "TRANSITION_PREVIEW_FIDELITY";
   const inOpacity = opacityFromStyle(await attr(incoming, "style"));
   const outOpacity = opacityFromStyle(await attr(outgoing, "style"));
   assert.ok(inOpacity > 0.35 && inOpacity < 0.65, `incoming opacity=${inOpacity}`);
-  assert.ok(outOpacity > 0.95, `outgoing opacity=${outOpacity}`);
-  const inVolume = Number(await prop(incoming, "volume"));
-  const outVolume = Number(await prop(outgoing, "volume"));
-  assert.ok(inVolume > 0.35 && inVolume < 0.65, `incoming volume=${inVolume}`);
-  assert.ok(outVolume > 0.35 && outVolume < 0.65, `outgoing volume=${outVolume}`);
+  assert.ok(outOpacity > 0.35 && outOpacity < 0.65, `outgoing opacity=${outOpacity}`);
+  assert.equal(await prop(incoming, "muted"), true, "visual incoming video must stay muted");
+  assert.equal(await prop(outgoing, "muted"), true, "visual outgoing video must stay muted");
+  const inAudio = await find('audio[data-preview-audio="c1"]');
+  const outAudio = await find('audio[data-preview-audio="c0"]');
+  const inVolume = Number(await prop(inAudio, "volume"));
+  const outVolume = Number(await prop(outAudio, "volume"));
+  assert.ok(inVolume > 0.35 && inVolume < 0.65, `incoming audio volume=${inVolume}`);
+  assert.ok(outVolume > 0.35 && outVolume < 0.65, `outgoing audio volume=${outVolume}`);
   pass(gate);
 
   gate = "REAL_GUI_RUNTIME";

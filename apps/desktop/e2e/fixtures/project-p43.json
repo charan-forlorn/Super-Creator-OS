@@ -1,0 +1,230 @@
+{
+  "schemaVersion": 2,
+  "id": "p43-e2e-project",
+  "name": "P4.3 Multi-Layer Preview",
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "updatedAt": "2026-01-01T00:00:00.000Z",
+  "assets": [
+    {
+      "id": "p43-back-asset",
+      "name": "p43-back-asset.mp4",
+      "sourcePath": "E2E_FIXTURE_SAMPLE_MP4",
+      "kind": "video",
+      "durationSec": 12,
+      "hasAudio": true,
+      "audioCodec": "aac",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "width": 320,
+      "height": 240,
+      "fps": 25,
+      "videoCodec": "h264"
+    },
+    {
+      "id": "p43-hidden-asset",
+      "name": "p43-hidden-asset.mp4",
+      "sourcePath": "E2E_FIXTURE_SAMPLE_MP4",
+      "kind": "video",
+      "durationSec": 12,
+      "hasAudio": true,
+      "audioCodec": "aac",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "width": 320,
+      "height": 240,
+      "fps": 25,
+      "videoCodec": "h264"
+    },
+    {
+      "id": "p43-front-asset",
+      "name": "p43-front-asset.mp4",
+      "sourcePath": "E2E_FIXTURE_SAMPLE_MP4",
+      "kind": "video",
+      "durationSec": 12,
+      "hasAudio": true,
+      "audioCodec": "aac",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "width": 320,
+      "height": 240,
+      "fps": 25,
+      "videoCodec": "h264"
+    },
+    {
+      "id": "p43-music-asset",
+      "name": "p43-music-asset.mp4",
+      "sourcePath": "E2E_FIXTURE_SAMPLE_MP4",
+      "kind": "audio",
+      "durationSec": 12,
+      "hasAudio": true,
+      "audioCodec": "aac",
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "v-back",
+      "kind": "video",
+      "clips": [
+        {
+          "id": "p43-back",
+          "assetId": "p43-back-asset",
+          "trackId": "v-back",
+          "start": 0,
+          "inPoint": 0,
+          "duration": 6,
+          "playbackRate": 1,
+          "transform": {
+            "scale": 1,
+            "x": 0,
+            "y": 0,
+            "opacity": 1
+          },
+          "effects": {
+            "brightness": 0,
+            "contrast": 1,
+            "saturation": 1
+          },
+          "transitionIn": null,
+          "audio": {
+            "gainDb": 0,
+            "muted": false
+          }
+        }
+      ],
+      "captions": [],
+      "visible": true,
+      "muted": false,
+      "locked": false
+    },
+    {
+      "id": "v-hidden",
+      "kind": "video",
+      "clips": [
+        {
+          "id": "p43-hidden",
+          "assetId": "p43-hidden-asset",
+          "trackId": "v-hidden",
+          "start": 0,
+          "inPoint": 0,
+          "duration": 6,
+          "playbackRate": 1,
+          "transform": {
+            "scale": 1,
+            "x": 0,
+            "y": 0,
+            "opacity": 1
+          },
+          "effects": {
+            "brightness": 0,
+            "contrast": 1,
+            "saturation": 1
+          },
+          "transitionIn": null,
+          "audio": {
+            "gainDb": 0,
+            "muted": false
+          }
+        }
+      ],
+      "captions": [],
+      "visible": false,
+      "muted": true,
+      "locked": false
+    },
+    {
+      "id": "v-front",
+      "kind": "video",
+      "clips": [
+        {
+          "id": "p43-front",
+          "assetId": "p43-front-asset",
+          "trackId": "v-front",
+          "start": 0,
+          "inPoint": 0,
+          "duration": 6,
+          "playbackRate": 1,
+          "transform": {
+            "scale": 0.55,
+            "x": 0.25,
+            "y": 0.15,
+            "opacity": 0.9
+          },
+          "effects": {
+            "brightness": 0,
+            "contrast": 1,
+            "saturation": 1
+          },
+          "transitionIn": null,
+          "audio": {
+            "gainDb": 0,
+            "muted": false
+          }
+        }
+      ],
+      "captions": [],
+      "visible": true,
+      "muted": false,
+      "locked": false
+    },
+    {
+      "id": "text-front",
+      "kind": "text",
+      "clips": [],
+      "visible": true,
+      "muted": false,
+      "locked": false,
+      "captions": [
+        {
+          "id": "p43-caption",
+          "text": "P4.3",
+          "start": 0,
+          "duration": 6,
+          "trackId": "text-front",
+          "style": {
+            "x": 0.5,
+            "y": 0.2,
+            "fontSizePx": 42,
+            "color": "#FFFFFF",
+            "backgroundColor": "#000000",
+            "backgroundOpacity": 0.6
+          }
+        }
+      ]
+    },
+    {
+      "id": "a-music",
+      "kind": "audio",
+      "clips": [
+        {
+          "id": "p43-music",
+          "assetId": "p43-music-asset",
+          "trackId": "a-music",
+          "start": 0,
+          "inPoint": 0,
+          "duration": 6,
+          "playbackRate": 1,
+          "transform": {
+            "scale": 1,
+            "x": 0,
+            "y": 0,
+            "opacity": 1
+          },
+          "effects": {
+            "brightness": 0,
+            "contrast": 1,
+            "saturation": 1
+          },
+          "transitionIn": null,
+          "audio": {
+            "gainDb": 0,
+            "muted": false
+          }
+        }
+      ],
+      "captions": [],
+      "visible": true,
+      "muted": false,
+      "locked": false
+    }
+  ],
+  "durationSec": 6,
+  "aspectRatio": "1920x1080"
+}

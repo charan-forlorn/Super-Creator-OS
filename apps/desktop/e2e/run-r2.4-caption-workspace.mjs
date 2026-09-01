@@ -84,11 +84,12 @@ async function main() {
   gate = "CAPTION_ADD";
   const input = await find('[data-testid="caption-text"]');
   await typeInto(input, "R2.4 caption proof");
-  await click(await find('[data-testid="caption-add"]'));
+  const addBtn = await find('[data-testid="caption-add"]');
+  await wd("POST", `/session/${sessionId}/element/${addBtn}/click`, {});
+  await sleep(120);
   const row = await waitFor('[data-testid="caption-row-cap-1"]');
   assert.match(await text(row), /R2\.4 caption proof/);
   pass(gate);
-
   gate = "CAPTION_PREVIEW_OVERLAY";
   const overlay = await waitFor('.caption-overlay');
   assert.equal((await text(overlay)).trim(), "R2.4 caption proof");
