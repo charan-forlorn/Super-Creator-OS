@@ -127,9 +127,14 @@ body { background: var(--bg); color: var(--fg); }
 .ruler-tick { position: absolute; top: 2px; font-size: 10px; color: var(--muted); border-left: 1px solid var(--border); padding-left: 3px; }
 .playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); z-index: 5; pointer-events: none; }
 .track { display: flex; align-items: stretch; height: 46px; border-bottom: 1px solid var(--border); }
-.track-label { width: 64px; flex: 0 0 64px; font-size: 11px; color: var(--muted); text-transform: uppercase; display: flex; align-items: center; padding-left: 8px; border-right: 1px solid var(--border); }
+.track-label { width: 64px; flex: 0 0 64px; font-size: 11px; color: var(--muted); text-transform: uppercase; display: flex; align-items: center; justify-content: center; gap: 1px; padding: 0 2px; border-right: 1px solid var(--border); box-sizing: border-box; }
 .track-video .track-label { color: var(--accent); }
-.track-audio .track-label { color: var(--accent-2); }
+.track-audio .track-label { color: var(--accent-2); }.track-label button { min-width: 13px; width: 13px; height: 20px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: inherit; font-size: 9px; cursor: pointer; }
+.track-label button[data-selected="true"] { background: var(--accent); color: #fff; }
+.track.target-selected { background: rgba(79, 157, 255, 0.06); }
+.track-target-tools { display: flex; align-items: center; gap: 3px; }
+.selected-track-target { color: var(--muted); font-size: 10px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-toolbar button:disabled { opacity: 0.45; cursor: default; }
 .track-lane { position: relative; flex: 1; }
 .clip { position: absolute; top: 5px; height: 36px; background: linear-gradient(180deg, #2f6fb0, #274f78); border: 1px solid #4f9dff; border-radius: 5px; display: flex; align-items: center; cursor: grab; overflow: hidden; }
 .clip.selected { outline: 2px solid var(--accent-2); }

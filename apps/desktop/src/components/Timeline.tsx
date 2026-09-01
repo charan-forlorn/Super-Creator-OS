@@ -4,11 +4,51 @@ import { pxToSec, collectSnapCandidates, findMagneticSnap, clamp, type SnapTarge
 
 const PX_PER_SEC_BASE = 80;
 
+export function TrackTargetToolbar({ selectedTrackId, onAdd, onRemove, onMove }: {
+  selectedTrackId: string | null;
+  onAdd: (kind: "video" | "audio" | "text") => void;
+  onRemove: () => void;
+  onMove: (direction: -1 | 1) => void;
+}) {
+  return <span className="track-target-tools" data-testid="track-target-tools">
+    <button data-testid="track-add-video" onClick={() => onAdd("video")} title="Add video track">+V</button>
+    <button data-testid="track-add-audio" onClick={() => onAdd("audio")} title="Add audio track">+A</button>
+    <button data-testid="track-add-text" onClick={() => onAdd("text")} title="Add text track">+T</button>
+    <button data-testid="track-remove-selected" disabled={!selectedTrackId} onClick={onRemove} title="Remove target track">−</button>
+    <button data-testid="track-move-up" disabled={!selectedTrackId} onClick={() => onMove(-1)} title="Move target track up">↑</button>
+    <button data-testid="track-move-down" disabled={!selectedTrackId} onClick={() => onMove(1)} title="Move target track down">↓</button>
+    <span data-testid="selected-track-target" className="selected-track-target">Target: {selectedTrackId ?? "none"}</span>
+  </span>;
+}
+
+export function TrackLabelControls({ track, selected, onSelect, onControls }: {
+  track: { id: string; kind: string; visible: boolean; muted: boolean; locked: boolean };
+  selected: boolean;
+  onSelect: () => void;
+  onControls: (controls: { visible?: boolean; muted?: boolean; locked?: boolean }) => void;
+}) {
+  const act = (controls: { visible?: boolean; muted?: boolean; locked?: boolean }) => (e: React.MouseEvent) => {
+    e.stopPropagation(); onSelect(); onControls(controls);
+  };
+  return <div className="track-label" data-testid={`track-row-${track.id}`}>
+    <button data-testid={`track-select-${track.id}`} data-selected={selected ? "true" : "false"} title={`Target ${track.kind} track`} onClick={(e) => { e.stopPropagation(); onSelect(); }}>{track.kind.slice(0, 1).toUpperCase()}</button>
+    <button data-testid={`track-visible-${track.id}`} aria-pressed={track.visible} title={track.visible ? "Hide track" : "Show track"} onClick={act({ visible: !track.visible })}>{track.visible ? "👁" : "○"}</button>
+    <button data-testid={`track-muted-${track.id}`} aria-pressed={track.muted} title={track.muted ? "Unmute track" : "Mute track"} onClick={act({ muted: !track.muted })}>{track.muted ? "M" : "♪"}</button>
+    <button data-testid={`track-locked-${track.id}`} aria-pressed={track.locked} title={track.locked ? "Unlock track" : "Lock track"} onClick={act({ locked: !track.locked })}>{track.locked ? "🔒" : "🔓"}</button>
+  </div>;
+}
+
 export function Timeline() {
   const {
     project,
     selectedClipId,
     selectedClipIds,
+    selectedTrackId,
+    selectTrack,
+    addTrack,
+    removeSelectedTrack,
+    moveSelectedTrack,
+    setSelectedTrackControls,
     selectClip,
     toggleClipSelection,
     setClipSelection,
@@ -62,10 +102,11 @@ export function Timeline() {
 
   function onClipMouseDown(
     ev: React.MouseEvent,
-    clip: { id: string; start: number; inPoint: number; duration: number; playbackRate?: number },
+    clip: { id: string; trackId: string; start: number; inPoint: number; duration: number; playbackRate?: number },
     mode: "move" | "trim-l" | "trim-r",
   ) {
     ev.stopPropagation();
+    selectTrack(clip.trackId);
     // Mouse-down is the sole selection authority. Keeping selection mutation here
     // lets a drag capture the post-gesture group; click only stops background
     // propagation (otherwise Ctrl-click would toggle twice).
@@ -225,8 +266,9 @@ export function Timeline() {
     setMarqueePreview({ left: ev.clientX - r.left, top: ev.clientY - r.top, width: 0, height: 0 });
   }
 
-  function onTrackClick(ev: React.MouseEvent) {
+  function onTrackClick(ev: React.MouseEvent, trackId: string) {
     if (suppressTrackClickRef.current) return;
+    selectTrack(trackId);
     const rect = (ev.currentTarget as HTMLElement).getBoundingClientRect();
     const sec = clamp(
       pxToSec({ pxPerSecBase: PX_PER_SEC_BASE, zoom, scrollSec, playheadSec, snapInterval }, ev.clientX - rect.left),
@@ -273,6 +315,7 @@ export function Timeline() {
           <input type="checkbox" data-testid="snap-toggle" checked={snapEnabled} onChange={(e) => setSnapEnabled(e.target.checked)} />
           Snap
         </label>
+        <TrackTargetToolbar selectedTrackId={selectedTrackId} onAdd={(kind) => { addTrack(kind); }} onRemove={() => { removeSelectedTrack(); }} onMove={(direction) => { moveSelectedTrack(direction); }} />
         <div className="spacer" />
         <span>Zoom</span>
         <input
@@ -329,8 +372,8 @@ export function Timeline() {
             </div>
           </div>
           {project.tracks.map((track) => (
-            <div key={track.id} className={`track track-${track.kind}`} onClick={onTrackClick}>
-              <div className="track-label">{track.kind}</div>
+            <div key={track.id} className={`track track-${track.kind}${selectedTrackId === track.id ? " target-selected" : ""}`} onClick={(e) => onTrackClick(e, track.id)}>
+              <TrackLabelControls track={track} selected={selectedTrackId === track.id} onSelect={() => selectTrack(track.id)} onControls={(controls) => setSelectedTrackControls(controls)} />
               <div className="track-lane" onMouseDown={onLaneMouseDown}>
                 {track.clips.map((clip) => (
                   <ClipView

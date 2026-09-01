@@ -3,6 +3,7 @@ import {
   type Project,
   type Clip,
   type Caption,
+  type Track,
   type ExportResolution,
   createEmptyProject,
   parseProject,
@@ -33,6 +34,10 @@ import {
   CHANGE_ASPECT,
   PLACE_PROBED_MEDIA,
   RELINK_MEDIA,
+  ADD_TRACK,
+  REMOVE_TRACK,
+  REORDER_TRACK,
+  SET_TRACK_CONTROLS,
 } from "@haios/command-system";
 import {
   type AiEditPlan,
@@ -75,6 +80,8 @@ export interface StudioState {
   selectedClipIds: string[];
   /** Runtime-only media-bin selection for insert/overwrite editing. */
   selectedAssetId: string | null;
+  /** Runtime-only canonical target track for UI editing operations. */
+  selectedTrackId: string | null;
   playheadSec: number;
   /** Runtime-only shuttle direction: -1 reverse, 0 paused, 1 forward. */
   transportRate: -1 | 0 | 1;
@@ -111,6 +118,11 @@ export interface StudioState {
   setMediaAnalysis: (assetId: string, state: AssetAnalysisState) => void;
   relinkMedia: (assetId: string, probe: MediaProbe) => boolean;
   selectAsset: (id: string | null) => void;
+  selectTrack: (id: string | null) => void;
+  addTrack: (kind: Track["kind"]) => string | null;
+  removeSelectedTrack: () => boolean;
+  moveSelectedTrack: (direction: -1 | 1) => boolean;
+  setSelectedTrackControls: (controls: Partial<Pick<Track, "visible" | "muted" | "locked">>) => boolean;
   insertSelectedAssetAtPlayhead: () => boolean;
   overwriteSelectedAssetAtPlayhead: () => boolean;
 
@@ -170,6 +182,12 @@ function clampTimelineSec(sec: number, durationSec: number): number {
   return Math.min(Math.max(0, durationSec), Math.max(0, sec));
 }
 
+function compatibleTargetTrackId(project: Project, selectedTrackId: string | null, kind: Track["kind"]): string | undefined {
+  if (!selectedTrackId) return undefined;
+  const track = project.tracks.find((candidate) => candidate.id === selectedTrackId);
+  return track?.kind === kind ? track.id : undefined;
+}
+
 function makeBus(): { bus: CommandBus; registry: CommandRegistry } {
   const registry = createStudioRegistry();
   const bus = new CommandBus(registry, createEmptyProject("Untitled", uid("proj")));
@@ -185,6 +203,7 @@ export const useStudio = create<StudioState>((set, get) => {
     selectedClipId: null,
     selectedClipIds: [],
     selectedAssetId: null,
+    selectedTrackId: null,
     playheadSec: 0,
     transportRate: 0,
     zoom: 1,
@@ -202,7 +221,7 @@ export const useStudio = create<StudioState>((set, get) => {
     newProject: () => {
       const { bus, registry } = makeBus();
       mediaCache.clear();
-      set({ project: bus.project, bus, registry, selectedClipId: null, selectedClipIds: [], selectedAssetId: null, playheadSec: 0, transportRate: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty: false, projectPath: null, lastError: null });
+      set({ project: bus.project, bus, registry, selectedClipId: null, selectedClipIds: [], selectedAssetId: null, selectedTrackId: null, playheadSec: 0, transportRate: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty: false, projectPath: null, lastError: null });
     },
 
     loadProject: (raw, projectPath = null, dirty = false) => {
@@ -210,7 +229,7 @@ export const useStudio = create<StudioState>((set, get) => {
       const registry = createStudioRegistry();
       const bus = new CommandBus(registry, p);
       mediaCache.clear();
-      set({ project: p, bus, registry, selectedClipId: null, selectedClipIds: [], selectedAssetId: null, playheadSec: 0, transportRate: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty, projectPath, lastError: null });
+      set({ project: p, bus, registry, selectedClipId: null, selectedClipIds: [], selectedAssetId: null, selectedTrackId: null, playheadSec: 0, transportRate: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty, projectPath, lastError: null });
     },
 
     markSaved: (projectPath, expectedUpdatedAt) => set((state) => ({
@@ -248,6 +267,7 @@ export const useStudio = create<StudioState>((set, get) => {
             probeStatus: probe.probeStatus,
           },
           place: true,
+          targetTrackId: compatibleTargetTrackId(get().project, get().selectedTrackId, probe.kind === "audio" ? "audio" : "video"),
         });
         set({ project: get().bus.project, dirty: true, selectedClipId: res.clipId ?? null });
         return res.clipId ?? null;
@@ -328,6 +348,55 @@ export const useStudio = create<StudioState>((set, get) => {
       return { selectedAssetId: id, lastError: null };
     }),
 
+    selectTrack: (id) => set((state) => {
+      if (id === null) return { selectedTrackId: null, lastError: null };
+      if (!state.project.tracks.some((track) => track.id === id)) {
+        return { selectedTrackId: state.selectedTrackId, lastError: `TRACK_NOT_FOUND: ${id}` };
+      }
+      return { selectedTrackId: id, lastError: null };
+    }),
+
+    addTrack: (kind) => {
+      const id = uid(`track-${kind}`);
+      const track: Track = { id, kind, clips: [], captions: [], visible: true, muted: false, locked: false };
+      try {
+        get().bus.execute(ADD_TRACK, { track });
+        set({ project: get().bus.project, selectedTrackId: id, dirty: true, lastError: null });
+        return id;
+      } catch (error) { set({ lastError: (error as Error).message }); return null; }
+    },
+    removeSelectedTrack: () => {
+      const id = get().selectedTrackId;
+      if (!id) { set({ lastError: "SELECT_TRACK_REQUIRED" }); return false; }
+      try {
+        get().bus.execute(REMOVE_TRACK, { trackId: id });
+        set({ project: get().bus.project, selectedTrackId: null, selectedClipId: null, selectedClipIds: [], dirty: true, lastError: null });
+        return true;
+      } catch (error) { set({ lastError: (error as Error).message }); return false; }
+    },
+
+    moveSelectedTrack: (direction) => {
+      const id = get().selectedTrackId;
+      if (!id) { set({ lastError: "SELECT_TRACK_REQUIRED" }); return false; }
+      const index = get().project.tracks.findIndex((track) => track.id === id);
+      const toIndex = index + direction;
+      if (index < 0 || toIndex < 0 || toIndex >= get().project.tracks.length) return false;
+      try {
+        get().bus.execute(REORDER_TRACK, { trackId: id, toIndex });
+        set({ project: get().bus.project, dirty: true, lastError: null });
+        return true;
+      } catch (error) { set({ lastError: (error as Error).message }); return false; }
+    },
+    setSelectedTrackControls: (controls) => {
+      const id = get().selectedTrackId;
+      if (!id) { set({ lastError: "SELECT_TRACK_REQUIRED" }); return false; }
+      try {
+        get().bus.execute(SET_TRACK_CONTROLS, { trackId: id, ...controls });
+        set({ project: get().bus.project, dirty: true, lastError: null });
+        return true;
+      } catch (error) { set({ lastError: (error as Error).message }); return false; }
+    },
+
     insertSelectedAssetAtPlayhead: () => {
       const assetId = get().selectedAssetId;
       if (!assetId) {
@@ -336,7 +405,10 @@ export const useStudio = create<StudioState>((set, get) => {
       }
       const clipId = uid("clip");
       try {
-        get().bus.execute(TIMELINE_INSERT_ASSET, { assetId, clipId, atSec: get().playheadSec });
+        get().bus.execute(TIMELINE_INSERT_ASSET, {
+          assetId, clipId, atSec: get().playheadSec,
+          targetTrackId: compatibleTargetTrackId(get().project, get().selectedTrackId, get().project.assets.find((asset) => asset.id === assetId)?.kind === "audio" ? "audio" : "video"),
+        });
         set({ project: get().bus.project, selectedClipId: clipId, selectedClipIds: [clipId], dirty: true, lastError: null });
         return true;
       } catch (error) {
@@ -353,7 +425,10 @@ export const useStudio = create<StudioState>((set, get) => {
       }
       const clipId = uid("clip");
       try {
-        get().bus.execute(TIMELINE_OVERWRITE_ASSET, { assetId, clipId, atSec: get().playheadSec });
+        get().bus.execute(TIMELINE_OVERWRITE_ASSET, {
+          assetId, clipId, atSec: get().playheadSec,
+          targetTrackId: compatibleTargetTrackId(get().project, get().selectedTrackId, get().project.assets.find((asset) => asset.id === assetId)?.kind === "audio" ? "audio" : "video"),
+        });
         set({ project: get().bus.project, selectedClipId: clipId, selectedClipIds: [clipId], dirty: true, lastError: null });
         return true;
       } catch (error) {
@@ -612,7 +687,7 @@ export const useStudio = create<StudioState>((set, get) => {
 
     placeCaption: (text, start, duration) => {
       try {
-        get().bus.execute(PLACE_CAPTION, { text, start, duration });
+        get().bus.execute(PLACE_CAPTION, { text, start, duration, targetTrackId: compatibleTargetTrackId(get().project, get().selectedTrackId, "text") });
         set({ project: get().bus.project, dirty: true, lastError: null });
         return true;
       } catch (e) {
