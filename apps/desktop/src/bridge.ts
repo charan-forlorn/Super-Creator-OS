@@ -101,6 +101,11 @@ export async function cancelRender(jobId: string): Promise<boolean> {
   return invoke<boolean>("cancel_render", { jobId });
 }
 
+export async function listenRenderProgress(handler: (progress: RenderProgress) => void): Promise<() => void> {
+  const { listen } = await import("@tauri-apps/api/event");
+  return listen<RenderProgress>("render-progress", (event) => handler(event.payload));
+}
+
 export async function saveProjectFile(path: string, projectJson: string): Promise<void> {
   return invoke<void>("project_save", { path, projectJson });
 }

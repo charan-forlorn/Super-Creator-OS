@@ -1,10 +1,10 @@
-﻿use serde_json::{json, Value};
+use serde_json::{json, Value};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
 use tauri::Emitter;
 
-use crate::{is_cancelled, MediaProbe, RenderVerification};
+use crate::{finish_render_job, is_cancelled, MediaProbe, RenderStateView, RenderVerification};
 
 /// Spawn a media CLI (ffmpeg/ffprobe) with explicit stdio. The bundled Tauri app
 /// is a GUI-subsystem process with NO console; relying on Rust's default
@@ -455,6 +455,49 @@ fn prepare_caption_chain(tracks: &[Value], w: i32, h: i32) -> Result<(Vec<String
     Ok((filters, input, Some(dir)))
 }
 
+fn render_temp_path(output: &Path, job_id: &str) -> Result<std::path::PathBuf, String> {
+    let parent = output.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+    let stem = output.file_stem().and_then(|x| x.to_str()).filter(|x| !x.is_empty()).unwrap_or("render");
+    let safe_job: String = job_id.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).collect();
+    Ok(parent.join(format!(".{stem}.{safe_job}.rendering.mp4")))
+}
+
+fn render_backup_path(target: &Path) -> Result<std::path::PathBuf, String> {
+    let name = target.file_name().ok_or_else(|| "render output requires a file name".to_string())?;
+    let mut backup_name = name.to_os_string();
+    backup_name.push(".haios-prev");
+    Ok(target.with_file_name(backup_name))
+}
+
+fn finalize_render_output(temp: &Path, target: &Path) -> Result<(), String> {
+    if !temp.is_file() { return Err(format!("render temp output missing: {}", temp.display())); }
+    let backup = render_backup_path(target)?;
+    if backup.exists() { std::fs::remove_file(&backup).map_err(|e| format!("remove stale render backup failed: {e}"))?; }
+    if target.exists() { std::fs::rename(target, &backup).map_err(|e| format!("backup existing render failed: {e}"))?; }
+    if let Err(error) = std::fs::rename(temp, target) {
+        if backup.exists() { let _ = std::fs::rename(&backup, target); }
+        return Err(format!("finalize render output failed: {error}"));
+    }
+    if backup.exists() { std::fs::remove_file(&backup).map_err(|e| format!("remove render backup failed: {e}"))?; }
+    Ok(())
+}
+
+enum RenderProcessOutcome { Exited(std::process::ExitStatus), Cancelled }
+
+fn wait_for_render_process(mut child: std::process::Child, app: &tauri::AppHandle, job_id: &str) -> Result<RenderProcessOutcome, String> {
+    loop {
+        if is_cancelled(app, job_id) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Ok(RenderProcessOutcome::Cancelled);
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => return Ok(RenderProcessOutcome::Exited(status)),
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(80)),
+            Err(error) => { let _ = child.kill(); let _ = child.wait(); return Err(format!("ffmpeg wait error: {error}")); }
+        }
+    }
+}
 pub fn run_render(
     job_id: &str,
     project_json: &str,
@@ -482,6 +525,7 @@ pub fn run_render(
         emit_state(app, job_id, "FAILED", 0.0, None, Some("project has no tracks".to_string()));
         return;
     }
+    emit_state(app, job_id, "PREPARING", 0.15, None, None);
 
     // For the vertical slice we render a single combined video track and a single
     // combined audio track. Multiple clips on one track are concatenated in time.
@@ -594,36 +638,80 @@ pub fn run_render(
         filter.push_str(&format!("{}amix=inputs={}:duration=longest:normalize=0,apad,atrim=duration={timeline_duration:.3}[aout]", labels.join(""), labels.len()));
     }
 
+    let target = Path::new(output_path);
+    let temp_output = match render_temp_path(target, job_id) {
+        Ok(path) => path,
+        Err(error) => { if let Some(dir) = caption_temp_dir.as_ref() { let _ = std::fs::remove_dir_all(dir); } emit_state(app, job_id, "FAILED", 0.0, None, Some(error)); return; }
+    };
+    if let Some(parent) = temp_output.parent().filter(|p| !p.as_os_str().is_empty()) {
+        if let Err(error) = std::fs::create_dir_all(parent) {
+            if let Some(dir) = caption_temp_dir.as_ref() { let _ = std::fs::remove_dir_all(dir); }
+            emit_state(app, job_id, "FAILED", 0.0, None, Some(format!("create render directory failed: {error}")));
+            return;
+        }
+    }
+    let _ = std::fs::remove_file(&temp_output);
+    let temp_output_string = temp_output.to_string_lossy().into_owned();
     let mut cmd = ffcmd(&ffmpeg);
+    cmd.stdout(Stdio::null());
     cmd.args(["-y"]);
     cmd.args(&inputs);
     cmd.args(["-filter_complex", &filter]);
     cmd.args(&audio_arg);
     cmd.args([
         "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k",
-        "-movflags", "+faststart",
-        output_path,
+        "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", &temp_output_string,
     ]);
     emit_state(app, job_id, "RENDERING", 0.4, None, None);
     if is_cancelled(app, job_id) {
         if let Some(dir) = caption_temp_dir.as_ref() { let _ = std::fs::remove_dir_all(dir); }
+        let _ = std::fs::remove_file(&temp_output);
         emit_state(app, job_id, "CANCELLED", 0.4, None, None);
         return;
     }
-    let status = cmd.status();
+    let child = match cmd.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            if let Some(dir) = caption_temp_dir.as_ref() { let _ = std::fs::remove_dir_all(dir); }
+            let _ = std::fs::remove_file(&temp_output);
+            emit_state(app, job_id, "FAILED", 0.0, None, Some(format!("ffmpeg spawn error: {error}")));
+            return;
+        }
+    };
+    let outcome = wait_for_render_process(child, app, job_id);
     if let Some(dir) = caption_temp_dir.as_ref() { let _ = std::fs::remove_dir_all(dir); }
-    match status {
-        Ok(s) if s.success() => {
-            emit_state(app, job_id, "VERIFYING", 0.85, Some(output_path), None);
-            // verification is confirmed by the frontend via verify_render; mark COMPLETED.
+    match outcome {
+        Ok(RenderProcessOutcome::Cancelled) => {
+            let _ = std::fs::remove_file(&temp_output);
+            emit_state(app, job_id, "CANCELLED", 0.4, None, None);
+        }
+        Ok(RenderProcessOutcome::Exited(status)) if status.success() => {
+            if is_cancelled(app, job_id) {
+                let _ = std::fs::remove_file(&temp_output);
+                emit_state(app, job_id, "CANCELLED", 0.8, None, None);
+                return;
+            }
+            emit_state(app, job_id, "VERIFYING", 0.9, Some(output_path), None);
+            let verification = verify_render(&temp_output_string, resolution);
+            if !verification.ok {
+                let _ = std::fs::remove_file(&temp_output);
+                emit_state(app, job_id, "FAILED", 0.9, None, Some(verification.error.unwrap_or_else(|| "render verification failed".to_string())));
+                return;
+            }
+            if let Err(error) = finalize_render_output(&temp_output, target) {
+                let _ = std::fs::remove_file(&temp_output);
+                emit_state(app, job_id, "FAILED", 0.95, None, Some(error));
+                return;
+            }
             emit_state(app, job_id, "COMPLETED", 1.0, Some(output_path), None);
         }
-        Ok(s) => {
-            emit_state(app, job_id, "FAILED", 0.0, None, Some(format!("ffmpeg exit {s}")));
+        Ok(RenderProcessOutcome::Exited(status)) => {
+            let _ = std::fs::remove_file(&temp_output);
+            emit_state(app, job_id, "FAILED", 0.0, None, Some(format!("ffmpeg exit {status}")));
         }
-        Err(e) => {
-            emit_state(app, job_id, "FAILED", 0.0, None, Some(format!("ffmpeg spawn error: {e}")));
+        Err(error) => {
+            let _ = std::fs::remove_file(&temp_output);
+            emit_state(app, job_id, "FAILED", 0.0, None, Some(error));
         }
     }
 }
@@ -723,14 +811,17 @@ pub fn verify_render(output_path: &str, resolution: &str) -> RenderVerification 
 }
 
 fn emit_state(app: &tauri::AppHandle, job_id: &str, status: &str, progress: f64, output_path: Option<&str>, error: Option<String>) {
-    let payload = json!({
-        "job_id": job_id,
-        "status": status,
-        "progress": progress,
-        "output_path": output_path,
-        "error": error,
-    });
+    let payload = RenderStateView {
+        job_id: job_id.to_string(),
+        status: status.to_string(),
+        progress: progress.clamp(0.0, 1.0),
+        output_path: output_path.map(str::to_string),
+        error,
+    };
     let _ = app.emit("render-progress", payload);
+    if matches!(status, "COMPLETED" | "FAILED" | "CANCELLED") {
+        finish_render_job(app, job_id);
+    }
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1399,6 +1490,32 @@ mod tests {
         assert!(silent.contains("[1va]"));
     }
 
+    #[test]
+    fn render_temp_path_is_sibling_mp4_and_job_scoped() {
+        let output = std::path::Path::new("C:/exports/final.mp4");
+        let temp = render_temp_path(output, "job-123").expect("temp path");
+        assert_eq!(temp.parent(), output.parent());
+        assert_eq!(temp.extension().and_then(|x| x.to_str()), Some("mp4"));
+        let name = temp.file_name().and_then(|x| x.to_str()).unwrap();
+        assert!(name.contains("job-123"));
+        assert_ne!(temp, output);
+    }
+
+    #[test]
+    fn finalize_render_output_replaces_target_only_after_temp_exists() {
+        let dir = std::env::temp_dir().join(format!("haios-render-finalize-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let target = dir.join("out.mp4");
+        let temp = dir.join(".out.job.mp4");
+        std::fs::write(&target, b"old").unwrap();
+        std::fs::write(&temp, b"new").unwrap();
+        finalize_render_output(&temp, &target).expect("finalize");
+        assert_eq!(std::fs::read(&target).unwrap(), b"new");
+        assert!(!temp.exists());
+        assert!(!dir.join("out.mp4.haios-prev").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
     fn ffprobe_container(path: &str) -> String {
         let out = std::process::Command::new("ffprobe")
             .args([

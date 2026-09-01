@@ -210,6 +210,10 @@ fn cancel_render(job_id: String, app: tauri::AppHandle) -> Result<bool, String> 
 }
 
 /// Check whether a render job was cancelled (used by the render loop).
+pub fn finish_render_job(app: &tauri::AppHandle, job_id: &str) {
+    let state = app.state::<RenderState>();
+    state.jobs.lock().unwrap().remove(job_id);
+}
 pub fn is_cancelled(app: &tauri::AppHandle, job_id: &str) -> bool {
     let cancelled = {
         app.state::<RenderState>()

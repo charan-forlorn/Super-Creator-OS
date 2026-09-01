@@ -152,3 +152,9 @@ body { background: var(--bg); color: var(--fg); }
 .caption-list { display: grid; gap: 6px; max-height: 160px; overflow: auto; }
 .caption-row { display: flex; justify-content: space-between; gap: 8px; align-items: center; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 6px; }
 .caption-row-text { font-size: 12px; overflow-wrap: anywhere; }
+
+.top-bar .render-progress {
+  width: 96px;
+  height: 8px;
+  accent-color: var(--accent);
+}

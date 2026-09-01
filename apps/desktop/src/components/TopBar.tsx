@@ -1,15 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStudio } from "../store";
 import {
   autosaveProject,
+  cancelRender,
   clearProjectAutosave,
   hvsCapabilities,
   hvsRender,
   latestProjectAutosave,
+  listenRenderProgress,
   openProjectFile,
   saveProjectFile,
   selectOutputFile,
-  verifyRender,
 } from "../bridge";
 import {
   forgetRecentProject,
@@ -17,6 +18,13 @@ import {
   readRecentProjects,
   rememberRecentProject,
 } from "../projectLifecycle";
+import {
+  applyRenderProgress,
+  createRenderSession,
+  isRenderTerminal,
+  renderStatusText,
+  type RenderSession,
+} from "../renderLifecycle";
 
 async function confirmDiscard(message: string): Promise<boolean> {
   const { confirm } = await import("@tauri-apps/plugin-dialog");
@@ -55,6 +63,8 @@ export function TopBar() {
   } = useStudio();
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [renderSession, setRenderSession] = useState<RenderSession | null>(null);
+  const renderSessionRef = useRef<RenderSession | null>(null);
   const [recentProjects, setRecentProjects] = useState<string[]>(() => readRecentProjects());
 
   async function persistProject(path: string) {
@@ -181,6 +191,30 @@ export function TopBar() {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let disposed = false;
+    void listenRenderProgress((progress) => {
+      const current = renderSessionRef.current;
+      if (current?.busy && current.jobId !== progress.jobId) return;
+      const base = current?.jobId === progress.jobId
+        ? current
+        : createRenderSession(progress.jobId, progress.outputPath ?? "");
+      const next = applyRenderProgress(base, progress);
+      renderSessionRef.current = next;
+      setRenderSession(next);
+      setBusy(next.busy);
+      setStatus(renderStatusText(progress));
+    }).then((dispose) => {
+      if (disposed) dispose();
+      else unlisten = dispose;
+    }).catch(() => undefined);
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let disposed = false;
     void (async () => {
       try {
         const { getCurrentWindow } = await import("@tauri-apps/api/window");
@@ -205,29 +239,48 @@ export function TopBar() {
   }, []);
 
   async function handleExport() {
+    if (renderSessionRef.current?.busy) return;
     setBusy(true);
-    setStatus("Exporting...");
+    setStatus("Preparing export...");
     try {
       const caps = await hvsCapabilities();
       if (!caps.ffmpeg) {
         setStatus("ffmpeg not available");
+        setBusy(false);
         return;
       }
       const out = await selectOutputFile();
       if (!out) {
         setStatus("");
+        setBusy(false);
         return;
       }
       const jobId = await hvsRender(JSON.stringify(project), out, project.aspectRatio);
-      setStatus(`Render job ${jobId} started...`);
-      // Phase 2 replaces this immediate verification with the real render event lifecycle.
-      const ver = await verifyRender(out, project.aspectRatio);
-      if (ver.ok) setStatus(`Exported & verified: ${out}`);
-      else setStatus(`Render produced output but verify failed: ${ver.error}`);
+      const observed = renderSessionRef.current;
+      if (!observed || observed.jobId !== jobId) {
+        const queued = createRenderSession(jobId, out);
+        renderSessionRef.current = queued;
+        setRenderSession(queued);
+        setStatus("Export queued...");
+      } else if (isRenderTerminal(observed.status)) {
+        setBusy(false);
+      }
     } catch (error) {
-      setStatus(`Export failed: ${(error as Error).message}`);
-    } finally {
       setBusy(false);
+      setStatus(`Export failed: ${(error as Error).message}`);
+    }
+  }
+
+  async function handleCancelExport() {
+    const active = renderSessionRef.current;
+    if (!active?.busy) return;
+    setStatus("Cancelling export...");
+    try {
+      await cancelRender(active.jobId);
+    } catch (error) {
+      if (renderSessionRef.current?.busy) {
+        setStatus(`Cancel failed: ${(error as Error).message}`);
+      }
     }
   }
 
@@ -260,6 +313,12 @@ export function TopBar() {
       <button disabled={busy} onClick={handleSaveAs}>Save As</button>
       <button disabled={busy || !canUndo()} onClick={undo} title="Ctrl+Z">Undo</button>
       <button disabled={busy || !canRedo()} onClick={redo} title="Ctrl+Shift+Z">Redo</button>
+      {renderSession?.busy ? (
+        <>
+          <progress className="render-progress" max={1} value={renderSession.progress} aria-label="Export progress" />
+          <button onClick={handleCancelExport}>Cancel Export</button>
+        </>
+      ) : null}
       <button className="primary" disabled={busy} onClick={handleExport}>Export</button>
       <div className="status">{status}</div>
     </header>
