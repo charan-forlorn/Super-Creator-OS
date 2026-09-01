@@ -113,6 +113,7 @@ body { background: var(--bg); color: var(--fg); }
 .timeline-toolbar input[type=range] { width: 120px; }
 .timeline-scroll { overflow-x: auto; overflow-y: hidden; flex: 1; }
 .timeline-inner { position: relative; min-height: 100%; }
+.timeline-marquee { position: absolute; border: 1px solid var(--accent); background: rgba(79, 157, 255, 0.16); z-index: 12; pointer-events: none; box-sizing: border-box; }
 .timeline-ruler { display: flex; height: 22px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
 .ruler-label { width: 64px; flex: 0 0 64px; border-right: 1px solid var(--border); }
 .ruler-lane { position: relative; flex: 1; }

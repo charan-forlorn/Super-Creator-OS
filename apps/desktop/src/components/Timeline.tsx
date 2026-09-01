@@ -11,6 +11,7 @@ export function Timeline() {
     selectedClipIds,
     selectClip,
     toggleClipSelection,
+    setClipSelection,
     selectAllClips,
     clearClipSelection,
     playheadSec,
@@ -40,6 +41,13 @@ export function Timeline() {
     startVals: Record<string, number>; // clipId -> start (move) or inPoint (trim)
   } | null>(null);
   const groupPreviewRef = useRef<number | null>(null);
+  const marqueeRef = useRef<{
+    startClientX: number; startClientY: number;
+    currentClientX: number; currentClientY: number;
+    additive: boolean; moved: boolean; innerLeft: number; innerTop: number;
+  } | null>(null);
+  const suppressTrackClickRef = useRef(false);
+  const [marqueePreview, setMarqueePreview] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const [movePreview, setMovePreview] = useState<{ ids: string[]; delta: number } | null>(null);
   const [rippleTrimEnabled, setRippleTrimEnabled] = useState(false);
   const [ripplePreview, setRipplePreview] = useState<{ clipId: string; duration: number; sourceEnd?: number; inPoint?: number } | null>(null);
@@ -85,6 +93,17 @@ export function Timeline() {
   }
 
   function onMouseMove(ev: React.MouseEvent) {
+    const marquee = marqueeRef.current;
+    if (marquee) {
+      marquee.currentClientX = ev.clientX;
+      marquee.currentClientY = ev.clientY;
+      marquee.moved ||= Math.hypot(ev.clientX - marquee.startClientX, ev.clientY - marquee.startClientY) >= 4;
+      const left = Math.min(marquee.startClientX, ev.clientX) - marquee.innerLeft;
+      const top = Math.min(marquee.startClientY, ev.clientY) - marquee.innerTop;
+      setMarqueePreview({ left, top, width: Math.abs(ev.clientX - marquee.startClientX), height: Math.abs(ev.clientY - marquee.startClientY) });
+      ev.preventDefault();
+      return;
+    }
     const d = dragRef.current;
     if (!d) return;
     const dxSec = (ev.clientX - d.startX) / pxPerSec;
@@ -139,6 +158,25 @@ export function Timeline() {
   }
 
   function onMouseUp() {
+    const marquee = marqueeRef.current;
+    if (marquee) {
+      marqueeRef.current = null;
+      setMarqueePreview(null);
+      if (marquee.moved) {
+        const left = Math.min(marquee.startClientX, marquee.currentClientX);
+        const right = Math.max(marquee.startClientX, marquee.currentClientX);
+        const top = Math.min(marquee.startClientY, marquee.currentClientY);
+        const bottom = Math.max(marquee.startClientY, marquee.currentClientY);
+        const ids = Array.from(document.querySelectorAll<HTMLElement>(".track-lane .clip"))
+          .filter((el) => { const r = el.getBoundingClientRect(); return r.left < right && r.right > left && r.top < bottom && r.bottom > top; })
+          .map((el) => el.dataset.clipId)
+          .filter((id): id is string => Boolean(id));
+        setClipSelection(ids, marquee.additive);
+        suppressTrackClickRef.current = true;
+        window.setTimeout(() => { suppressTrackClickRef.current = false; }, 0);
+      }
+      return;
+    }
     const d = dragRef.current;
     dragRef.current = null;
     if (!d) return;
@@ -164,7 +202,17 @@ export function Timeline() {
     setRipplePreview(null);
   }
 
+  function onLaneMouseDown(ev: React.MouseEvent) {
+    if (ev.button !== 0) return;
+    const inner = (ev.currentTarget as HTMLElement).closest<HTMLElement>(".timeline-inner");
+    if (!inner) return;
+    const r = inner.getBoundingClientRect();
+    marqueeRef.current = { startClientX: ev.clientX, startClientY: ev.clientY, currentClientX: ev.clientX, currentClientY: ev.clientY, additive: ev.shiftKey || ev.ctrlKey || ev.metaKey, moved: false, innerLeft: r.left, innerTop: r.top };
+    setMarqueePreview({ left: ev.clientX - r.left, top: ev.clientY - r.top, width: 0, height: 0 });
+  }
+
   function onTrackClick(ev: React.MouseEvent) {
+    if (suppressTrackClickRef.current) return;
     const rect = (ev.currentTarget as HTMLElement).getBoundingClientRect();
     const sec = clamp(
       pxToSec({ pxPerSecBase: PX_PER_SEC_BASE, zoom, scrollSec, playheadSec, snapInterval }, ev.clientX - rect.left),
@@ -225,6 +273,13 @@ export function Timeline() {
           onMouseUp={onMouseUp}
           onMouseLeave={onMouseUp}
         >
+          {marqueePreview && (
+            <div
+              className="timeline-marquee"
+              data-testid="timeline-marquee"
+              style={{ left: marqueePreview.left, top: marqueePreview.top, width: marqueePreview.width, height: marqueePreview.height }}
+            />
+          )}
           <div className="timeline-ruler">
             <div className="ruler-label" />
             <div className="ruler-lane" onClick={onRulerClick}>
@@ -239,7 +294,7 @@ export function Timeline() {
           {project.tracks.map((track) => (
             <div key={track.id} className={`track track-${track.kind}`} onClick={onTrackClick}>
               <div className="track-label">{track.kind}</div>
-              <div className="track-lane">
+              <div className="track-lane" onMouseDown={onLaneMouseDown}>
                 {track.clips.map((clip) => (
                   <ClipView
                     key={clip.id}

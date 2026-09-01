@@ -108,6 +108,7 @@ export interface StudioState {
   selectClip: (id: string | null) => void;
   /** R2.1 — toggle/extend selection (multi-select). */
   toggleClipSelection: (id: string) => void;
+  setClipSelection: (ids: string[], extend?: boolean) => void;
   selectAllClips: () => void;
   clearClipSelection: () => void;
   setPlayhead: (sec: number) => void;
@@ -297,6 +298,15 @@ export const useStudio = create<StudioState>((set, get) => {
         const next = has
           ? s.selectedClipIds.filter((x) => x !== id)
           : [...s.selectedClipIds, id];
+        return { selectedClipIds: next, selectedClipId: next.length ? next[next.length - 1] : null };
+      }),
+    setClipSelection: (ids, extend = false) =>
+      set((s) => {
+        const valid = new Set(s.project.tracks.flatMap((t) => t.clips.map((c) => c.id)));
+        const incoming = ids.filter((id, index) => valid.has(id) && ids.indexOf(id) === index);
+        const next = extend
+          ? [...s.selectedClipIds, ...incoming.filter((id) => !s.selectedClipIds.includes(id))]
+          : incoming;
         return { selectedClipIds: next, selectedClipId: next.length ? next[next.length - 1] : null };
       }),
     selectAllClips: () =>
