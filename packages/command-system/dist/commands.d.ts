@@ -109,6 +109,30 @@ export declare const setClipTransformSchema: z.ZodObject<{
     opacity: number;
 }>;
 export declare const setClipTransformCommand: EditCommand<z.infer<typeof setClipTransformSchema>>;
+export declare const RIPPLE_DELETE_CLIPS = "clip.rippleDelete";
+export declare const rippleDeleteClipsSchema: z.ZodObject<{
+    clipIds: z.ZodArray<z.ZodString, "many">;
+}, "strip", z.ZodTypeAny, {
+    clipIds: string[];
+}, {
+    clipIds: string[];
+}>;
+export declare const RIPPLE_TRIM_CLIP = "clip.rippleTrim";
+export declare const rippleTrimClipSchema: z.ZodObject<{
+    clipId: z.ZodString;
+    newInPoint: z.ZodOptional<z.ZodNumber>;
+    newSourceEnd: z.ZodOptional<z.ZodNumber>;
+}, "strip", z.ZodTypeAny, {
+    clipId: string;
+    newInPoint?: number | undefined;
+    newSourceEnd?: number | undefined;
+}, {
+    clipId: string;
+    newInPoint?: number | undefined;
+    newSourceEnd?: number | undefined;
+}>;
+export declare const rippleDeleteClipsCommand: EditCommand<z.infer<typeof rippleDeleteClipsSchema>>;
+export declare const rippleTrimClipCommand: EditCommand<z.infer<typeof rippleTrimClipSchema>>;
 export declare const TRIM_CLIP = "clip.trim";
 export declare const trimClipSchema: z.ZodObject<{
     clipId: z.ZodString;

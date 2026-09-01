@@ -17,6 +17,8 @@ import {
   DELETE_CLIP,
   MOVE_CLIP,
   TRIM_CLIP,
+  RIPPLE_DELETE_CLIPS,
+  RIPPLE_TRIM_CLIP,
   SET_CLIP_AUDIO,
   SET_CLIP_EFFECTS,
   SET_CLIP_SPEED,
@@ -114,10 +116,12 @@ export interface StudioState {
 
   addClip: (assetId: string, trackId: string, inPoint: number, duration: number, start: number) => void;
   deleteSelected: () => void;
+  rippleDeleteSelected: () => void;
   moveSelected: (newStart: number) => void;
   /** R2.1 — commit a group move (all selected clips shifted by delta seconds) as ONE undoable unit. */
   commitGroupMove: (deltaSec: number) => void;
   trimSelected: (newInPoint?: number, newSourceEnd?: number) => void;
+  rippleTrimSelected: (newInPoint?: number, newSourceEnd?: number) => void;
   setSelectedAudio: (gainDb: number, muted: boolean) => boolean;
   setSelectedEffects: (brightness: number, contrast: number, saturation: number) => boolean;
   setSelectedSpeed: (playbackRate: number) => boolean;
@@ -325,6 +329,17 @@ export const useStudio = create<StudioState>((set, get) => {
       }
     },
 
+    rippleDeleteSelected: () => {
+      const ids = get().selectedClipIds;
+      if (ids.length === 0) return;
+      try {
+        get().bus.execute(RIPPLE_DELETE_CLIPS, { clipIds: ids });
+        set({ project: get().bus.project, selectedClipIds: [], selectedClipId: null, dirty: true, lastError: null });
+      } catch (e) {
+        set({ lastError: (e as Error).message });
+      }
+    },
+
     moveSelected: (newStart) => {
       const id = get().selectedClipId;
       if (!id) return;
@@ -431,6 +446,17 @@ export const useStudio = create<StudioState>((set, get) => {
       try {
         get().bus.execute(TRIM_CLIP, { clipId: id, newInPoint, newSourceEnd });
         set({ project: get().bus.project, dirty: true });
+      } catch (e) {
+        set({ lastError: (e as Error).message });
+      }
+    },
+
+    rippleTrimSelected: (newInPoint, newSourceEnd) => {
+      const id = get().selectedClipId;
+      if (!id) return;
+      try {
+        get().bus.execute(RIPPLE_TRIM_CLIP, { clipId: id, newInPoint, newSourceEnd });
+        set({ project: get().bus.project, dirty: true, lastError: null });
       } catch (e) {
         set({ lastError: (e as Error).message });
       }

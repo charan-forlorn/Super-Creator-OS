@@ -158,3 +158,8 @@ body { background: var(--bg); color: var(--fg); }
   height: 8px;
   accent-color: var(--accent);
 }
+
+/* R2.14 practical ripple-edit controls. */
+.ripple-toggle { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; user-select: none; }
+.ripple-toggle input { accent-color: var(--accent); }
+.timeline-toolbar [data-testid="ripple-delete"] { white-space: nowrap; }

@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useStudio } from "../store";
 import { pxToSec, collectSnapPoints, snap, clamp } from "@haios/timeline";
 
@@ -25,6 +25,8 @@ export function Timeline() {
     trimSelected,
     splitSelected,
     deleteSelected,
+    rippleDeleteSelected,
+    rippleTrimSelected,
     duplicateSelected,
   } = useStudio();
 
@@ -38,6 +40,8 @@ export function Timeline() {
     startVals: Record<string, number>; // clipId -> start (move) or inPoint (trim)
   } | null>(null);
   const groupPreviewRef = useRef<number | null>(null);
+  const [rippleTrimEnabled, setRippleTrimEnabled] = useState(false);
+  const [ripplePreview, setRipplePreview] = useState<{ clipId: string; duration: number; sourceEnd: number } | null>(null);
 
   const pxPerSec = PX_PER_SEC_BASE * zoom;
   const totalSec = Math.max(project.durationSec, 10) + 5;
@@ -45,7 +49,7 @@ export function Timeline() {
 
   function onClipMouseDown(
     ev: React.MouseEvent,
-    clip: { id: string; start: number; inPoint: number },
+    clip: { id: string; start: number; inPoint: number; duration: number; playbackRate?: number },
     mode: "move" | "trim-l" | "trim-r",
   ) {
     ev.stopPropagation();
@@ -70,7 +74,7 @@ export function Timeline() {
     const startVals: Record<string, number> = {};
     for (const id of targets) {
       const c = project.tracks.flatMap((t) => t.clips).find((x) => x.id === id);
-      if (c) startVals[id] = mode === "trim-l" ? c.inPoint : c.start;
+      if (c) startVals[id] = mode === "trim-l" ? c.inPoint : mode === "trim-r" ? c.duration : c.start;
     }
     dragRef.current = { mode, startX: ev.clientX, startVals };
     groupPreviewRef.current = null;
@@ -126,12 +130,17 @@ export function Timeline() {
       } else {
         if (id !== selectedClipId) continue;
         const clip = project.tracks.flatMap((t) => t.clips).find((c) => c.id === id)!;
-        const rightEdge = clip.start + clip.duration;
+        const baseDuration = d.startVals[id];
+        const rightEdge = clip.start + baseDuration;
         let newEnd = rightEdge + dxSec;
         const snapped = snap(newEnd, points, 0.25 / zoom);
         if (snapped.snapped) newEnd = snapped.value;
         const span = newEnd - clip.start;
-        if (span > 0.1) trimSelected(undefined, clip.inPoint + span);
+        if (span > 0.1) {
+          const sourceEnd = clip.inPoint + span * (clip.playbackRate ?? 1);
+          if (rippleTrimEnabled) setRipplePreview({ clipId: id, duration: span, sourceEnd });
+          else trimSelected(undefined, sourceEnd);
+        }
       }
     }
   }
@@ -147,7 +156,11 @@ export function Timeline() {
       const delta = groupPreviewRef.current ?? 0;
       if (Math.abs(delta) > 1e-6) commitGroupMove(delta);
     }
+    if (d.mode === "trim-r" && rippleTrimEnabled && ripplePreview) {
+      rippleTrimSelected(undefined, ripplePreview.sourceEnd);
+    }
     groupPreviewRef.current = null;
+    setRipplePreview(null);
   }
 
   function onTrackClick(ev: React.MouseEvent) {
@@ -178,6 +191,11 @@ export function Timeline() {
     <div className="timeline">
       <div className="timeline-toolbar">
         <button onClick={deleteSelected} title="Delete selected (Del)">🗑</button>
+        <button data-testid="ripple-delete" onClick={rippleDeleteSelected} title="Ripple delete selected (Shift+Del)">Ripple Delete</button>
+        <label className="ripple-toggle" title="Ripple downstream clips when trimming the right edge">
+          <input type="checkbox" data-testid="ripple-trim-toggle" checked={rippleTrimEnabled} onChange={(e) => setRippleTrimEnabled(e.target.checked)} />
+          Ripple Trim
+        </label>
         <button onClick={duplicateSelected} title="Duplicate selected (Ctrl+D)">⎘</button>
         <button onClick={() => splitSelected()} title="Split selected at playhead (S)">✂</button>
         <button onClick={selectAllClips} title="Select all (Ctrl+A)">⤢</button>
@@ -232,6 +250,7 @@ export function Timeline() {
                     onMouseDownMove={(e) => onClipMouseDown(e, clip, "move")}
                     onMouseDownTrimL={(e) => onClipMouseDown(e, clip, "trim-l")}
                     onMouseDownTrimR={(e) => onClipMouseDown(e, clip, "trim-r")}
+                    previewDuration={ripplePreview?.clipId === clip.id ? ripplePreview.duration : undefined}
                   />
                 ))}
               </div>
@@ -252,6 +271,7 @@ function ClipView({
   onMouseDownMove,
   onMouseDownTrimL,
   onMouseDownTrimR,
+  previewDuration,
 }: {
   clip: { id: string; start: number; duration: number; inPoint: number };
   trackKind: string;
@@ -261,9 +281,10 @@ function ClipView({
   onMouseDownMove: (e: React.MouseEvent) => void;
   onMouseDownTrimL: (e: React.MouseEvent) => void;
   onMouseDownTrimR: (e: React.MouseEvent) => void;
+  previewDuration?: number;
 }) {
   const left = clip.start * pxPerSec;
-  const w = Math.max(8, clip.duration * pxPerSec);
+  const w = Math.max(8, (previewDuration ?? clip.duration) * pxPerSec);
   const cls = ["clip", selected ? "selected" : "", primary ? "primary" : ""].filter(Boolean).join(" ");
   return (
     <div

@@ -11,6 +11,7 @@ export function useKeyboard() {
     undo,
     redo,
     deleteSelected,
+    rippleDeleteSelected,
     splitSelected,
     duplicateSelected,
     commitGroupMove,
@@ -24,7 +25,13 @@ export function useKeyboard() {
   useEffect(() => {
     function onKey(ev: KeyboardEvent) {
       const target = ev.target as HTMLElement;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      const inputType = target?.tagName === "INPUT" ? (target as HTMLInputElement).type : "";
+      const textEditingTarget = target && (
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable ||
+        (target.tagName === "INPUT" && !["checkbox", "radio", "button", "submit", "reset"].includes(inputType))
+      );
+      if (textEditingTarget) return;
 
       const mod = ev.ctrlKey || ev.metaKey;
 
@@ -68,11 +75,12 @@ export function useKeyboard() {
         }
         return;
       }
-      // Delete / Backspace
+      // Delete / Backspace. Shift+Delete is production ripple delete.
       if (ev.key === "Delete" || ev.key === "Backspace") {
         if (selectedClipIds.length) {
           ev.preventDefault();
-          deleteSelected();
+          if (ev.shiftKey) rippleDeleteSelected();
+          else deleteSelected();
         }
         return;
       }
@@ -96,6 +104,7 @@ export function useKeyboard() {
     undo,
     redo,
     deleteSelected,
+    rippleDeleteSelected,
     splitSelected,
     duplicateSelected,
     commitGroupMove,

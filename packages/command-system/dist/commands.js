@@ -258,6 +258,119 @@ export const setClipTransformCommand = {
         };
     },
 };
+/* --------------------------- ripple editing ------------------------- */
+export const RIPPLE_DELETE_CLIPS = "clip.rippleDelete";
+export const rippleDeleteClipsSchema = z.object({ clipIds: z.array(z.string().min(1)).min(1) });
+export const RIPPLE_TRIM_CLIP = "clip.rippleTrim";
+export const rippleTrimClipSchema = z.object({
+    clipId: z.string().min(1),
+    newInPoint: z.number().nonnegative().optional(),
+    newSourceEnd: z.number().nonnegative().optional(),
+});
+function restoreRippleSnapshot(prev, snapshots) {
+    const wanted = new Map(snapshots.map((s) => [s.trackId, s.clips]));
+    const current = prev.tracks.filter((t) => wanted.has(t.id)).map((t) => ({ trackId: t.id, clips: t.clips }));
+    const tracks = prev.tracks.map((t) => wanted.has(t.id) ? { ...t, clips: wanted.get(t.id) } : t);
+    const next = { ...prev, tracks, durationSec: recomputeDuration({ ...prev, tracks }), updatedAt: new Date().toISOString() };
+    return { next, inverse: { type: "clip.rippleRestore", execute: (p) => restoreRippleSnapshot(p, current) } };
+}
+function mergeIntervals(intervals) {
+    const ordered = [...intervals].sort((a, b) => a.start - b.start || a.end - b.end);
+    const merged = [];
+    for (const interval of ordered) {
+        const last = merged[merged.length - 1];
+        if (last && interval.start <= last.end + 1e-9)
+            last.end = Math.max(last.end, interval.end);
+        else
+            merged.push({ ...interval });
+    }
+    return merged;
+}
+export const rippleDeleteClipsCommand = {
+    type: RIPPLE_DELETE_CLIPS,
+    schema: rippleDeleteClipsSchema,
+    execute(prev, { clipIds }) {
+        if (new Set(clipIds).size !== clipIds.length)
+            throw new CommandError("RIPPLE_DUPLICATE_CLIP_ID");
+        const selected = new Set(clipIds);
+        for (const id of clipIds)
+            findClip(prev, id);
+        const affected = prev.tracks.filter((t) => t.clips.some((c) => selected.has(c.id)));
+        const snapshots = affected.map((t) => ({ trackId: t.id, clips: t.clips }));
+        const replacements = new Map();
+        for (const track of affected) {
+            const ordered = [...track.clips].sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+            for (let i = 0; i < ordered.length; i += 1) {
+                if (!selected.has(ordered[i].id))
+                    continue;
+                const prevClip = ordered[i - 1];
+                const nextClip = ordered[i + 1];
+                if (ordered[i].transitionIn && prevClip && !selected.has(prevClip.id))
+                    throw new CommandError("RIPPLE_TRANSITION_CONFLICT");
+                if (nextClip?.transitionIn && !selected.has(nextClip.id))
+                    throw new CommandError("RIPPLE_TRANSITION_CONFLICT");
+            }
+            const intervals = mergeIntervals(ordered.filter((c) => selected.has(c.id)).map((c) => ({ start: c.start, end: c.start + c.duration })));
+            const remaining = ordered.filter((c) => !selected.has(c.id)).map((clip) => {
+                for (const interval of intervals) {
+                    if (clip.start < interval.end - 1e-9 && clip.start + clip.duration > interval.start + 1e-9)
+                        throw new CommandError("RIPPLE_OVERLAP_CONFLICT");
+                }
+                const shift = intervals.filter((x) => x.end <= clip.start + 1e-9).reduce((sum, x) => sum + x.end - x.start, 0);
+                return shift > 0 ? { ...clip, start: Math.max(0, clip.start - shift) } : clip;
+            });
+            replacements.set(track.id, remaining);
+        }
+        const tracks = prev.tracks.map((t) => replacements.has(t.id) ? { ...t, clips: replacements.get(t.id) } : t);
+        const next = { ...prev, tracks, durationSec: recomputeDuration({ ...prev, tracks }), updatedAt: new Date().toISOString() };
+        return { next, inverse: { type: "clip.rippleRestore", execute: (p) => restoreRippleSnapshot(p, snapshots) } };
+    },
+};
+export const rippleTrimClipCommand = {
+    type: RIPPLE_TRIM_CLIP,
+    schema: rippleTrimClipSchema,
+    execute(prev, { clipId, newInPoint, newSourceEnd }) {
+        if (newInPoint === undefined && newSourceEnd === undefined)
+            throw new CommandError("INVALID_RIPPLE_TRIM");
+        const { clip, track } = findClip(prev, clipId);
+        const asset = findAsset(prev, clip.assetId);
+        const rate = clip.playbackRate ?? 1;
+        const sourceEnd = clip.inPoint + clip.duration * rate;
+        let updated;
+        if (newSourceEnd !== undefined) {
+            const sourceSpan = newSourceEnd - clip.inPoint;
+            if (sourceSpan <= 0)
+                throw new CommandError("INVALID_RIPPLE_TRIM");
+            updated = { ...clip, duration: sourceSpan / rate };
+        }
+        else {
+            const nip = newInPoint;
+            const sourceSpan = sourceEnd - nip;
+            if (sourceSpan <= 0)
+                throw new CommandError("INVALID_RIPPLE_TRIM");
+            updated = { ...clip, inPoint: nip, duration: sourceSpan / rate };
+        }
+        const bad = validateClipAgainstAsset(updated, asset);
+        if (bad)
+            throw new CommandError(`INVALID_RIPPLE_TRIM: ${bad}`);
+        if (updated.transitionIn && updated.transitionIn.duration > updated.duration + 1e-9)
+            throw new CommandError("RIPPLE_TRIM_TRANSITION_CONFLICT");
+        const ordered = [...track.clips].sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+        const index = ordered.findIndex((c) => c.id === clipId);
+        const nextClip = ordered[index + 1];
+        if (nextClip?.transitionIn && nextClip.transitionIn.duration > updated.duration + 1e-9)
+            throw new CommandError("RIPPLE_TRIM_TRANSITION_CONFLICT");
+        const delta = updated.duration - clip.duration;
+        const changed = ordered.map((c, i) => i === index ? updated : i > index ? { ...c, start: c.start + delta } : c);
+        if (changed.some((c) => c.start < -1e-9))
+            throw new CommandError("RIPPLE_TRIM_NEGATIVE_START");
+        const byId = new Map(changed.map((c) => [c.id, { ...c, start: Math.max(0, c.start) }]));
+        const snapshots = [{ trackId: track.id, clips: track.clips }];
+        const tracks = prev.tracks.map((t) => t.id === track.id ? { ...t, clips: t.clips.map((c) => byId.get(c.id) ?? c) } : t);
+        const next = { ...prev, tracks, durationSec: recomputeDuration({ ...prev, tracks }), updatedAt: new Date().toISOString() };
+        return { next, inverse: { type: "clip.rippleRestore", execute: (p) => restoreRippleSnapshot(p, snapshots) } };
+    },
+};
 /* ----------------------------- trimClip ----------------------------- */
 export const TRIM_CLIP = "clip.trim";
 export const trimClipSchema = z.object({
@@ -276,16 +389,19 @@ export const trimClipCommand = {
         }
         const { clip, track } = findClip(prev, clipId);
         const asset = findAsset(prev, clip.assetId);
+        const rate = clip.playbackRate ?? 1;
+        const originalSourceEnd = clip.inPoint + clip.duration * rate;
         let updated = clip;
         if (newSourceEnd !== undefined) {
-            const duration = newSourceEnd - clip.inPoint;
+            const sourceSpan = newSourceEnd - clip.inPoint;
+            const duration = sourceSpan / rate;
             if (duration <= 0)
                 throw new CommandError(`INVALID_TRIM: duration ${duration}`);
             updated = { ...clip, duration };
         }
         else {
             const nip = newInPoint;
-            const duration = clip.inPoint + clip.duration - nip;
+            const duration = (originalSourceEnd - nip) / rate;
             if (duration <= 0)
                 throw new CommandError(`INVALID_TRIM: duration ${duration}`);
             updated = { ...clip, inPoint: nip, duration };
@@ -293,13 +409,17 @@ export const trimClipCommand = {
         const bad = validateClipAgainstAsset(updated, asset);
         if (bad)
             throw new CommandError(`INVALID_TRIM: ${bad}`);
+        if (updated.transitionIn && updated.transitionIn.duration > updated.duration + 1e-9)
+            throw new CommandError("TRIM_TRANSITION_CONFLICT");
         const tracks = prev.tracks.map((t) => t.id === track.id ? { ...t, clips: t.clips.map((c) => (c.id === clipId ? updated : c)) } : t);
-        const next = { ...prev, tracks, updatedAt: new Date().toISOString() };
+        const next = { ...prev, tracks, durationSec: recomputeDuration({ ...prev, tracks }), updatedAt: new Date().toISOString() };
         return {
             next,
             inverse: {
                 type: TRIM_CLIP,
-                execute: (p) => trimClipCommand.execute(p, { clipId, newInPoint: clip.inPoint }),
+                execute: (p) => trimClipCommand.execute(p, newSourceEnd !== undefined
+                    ? { clipId, newSourceEnd: originalSourceEnd }
+                    : { clipId, newInPoint: clip.inPoint }),
             },
         };
     },
