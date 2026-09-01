@@ -18,6 +18,10 @@ export function useKeyboard() {
     selectedClipIds,
     selectedClipId,
     playheadSec,
+    stepPlayhead,
+    jumpPlayhead,
+    toggleTransport,
+    setTransportRate,
     selectAllClips,
     clearClipSelection,
   } = useStudio();
@@ -66,13 +70,14 @@ export function useKeyboard() {
         clearClipSelection();
         return;
       }
-      // Nudge selection left/right by 0.5s (hold Shift = 0.1s fine)
+      // Arrow keys nudge clips when selected; otherwise navigate the playhead.
       if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") {
+        ev.preventDefault();
+        const direction = ev.key === "ArrowLeft" ? -1 : 1;
         if (selectedClipIds.length) {
-          ev.preventDefault();
           const step = ev.shiftKey ? 0.1 : 0.5;
-          commitGroupMove(ev.key === "ArrowLeft" ? -step : step);
-        }
+          commitGroupMove(direction * step);
+        } else stepPlayhead(direction, ev.shiftKey);
         return;
       }
       // Delete / Backspace. Shift+Delete is production ripple delete.
@@ -93,10 +98,12 @@ export function useKeyboard() {
         }
         return;
       }
-      // Space: reserved for play toggle (handled by Preview); no-op here to avoid scroll.
-      if (ev.code === "Space") {
-        ev.preventDefault();
-      }
+      if (ev.key === "Home") { ev.preventDefault(); jumpPlayhead("start"); return; }
+      if (ev.key === "End") { ev.preventDefault(); jumpPlayhead("end"); return; }
+      if (!mod && (ev.key === "j" || ev.key === "J")) { ev.preventDefault(); setTransportRate(-1); return; }
+      if (!mod && (ev.key === "k" || ev.key === "K")) { ev.preventDefault(); setTransportRate(0); return; }
+      if (!mod && (ev.key === "l" || ev.key === "L")) { ev.preventDefault(); setTransportRate(1); return; }
+      if (ev.code === "Space") { ev.preventDefault(); toggleTransport(); return; }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -111,6 +118,10 @@ export function useKeyboard() {
     selectedClipIds,
     selectedClipId,
     playheadSec,
+    stepPlayhead,
+    jumpPlayhead,
+    toggleTransport,
+    setTransportRate,
     selectAllClips,
     clearClipSelection,
   ]);

@@ -76,6 +76,8 @@ export interface StudioState {
   /** Runtime-only media-bin selection for insert/overwrite editing. */
   selectedAssetId: string | null;
   playheadSec: number;
+  /** Runtime-only shuttle direction: -1 reverse, 0 paused, 1 forward. */
+  transportRate: -1 | 0 | 1;
   zoom: number;
   scrollSec: number;
   snapInterval: number;
@@ -119,6 +121,11 @@ export interface StudioState {
   selectAllClips: () => void;
   clearClipSelection: () => void;
   setPlayhead: (sec: number) => void;
+  stepPlayhead: (direction: -1 | 1, coarse?: boolean) => void;
+  jumpPlayhead: (target: "start" | "end") => void;
+  setTransportRate: (rate: -1 | 0 | 1) => void;
+  toggleTransport: () => void;
+  fitTimelineZoom: (viewportWidthPx: number) => void;
   setZoom: (z: number) => void;
   setScroll: (s: number) => void;
 
@@ -150,6 +157,19 @@ export interface StudioState {
   runAiInstruction: (instruction: string) => Promise<AiEditPlan | { error: string }>;
 }
 
+function navigationFrameStep(project: Project, playheadSec: number): number {
+  const videoClips = project.tracks.filter((track) => track.kind === "video").flatMap((track) => track.clips);
+  const active = videoClips.find((clip) => playheadSec >= clip.start && playheadSec < clip.start + clip.duration);
+  const activeFps = active ? project.assets.find((asset) => asset.id === active.assetId)?.fps : undefined;
+  const fallbackFps = project.assets.find((asset) => asset.kind === "video" && asset.fps)?.fps;
+  const fps = activeFps ?? fallbackFps ?? 30;
+  return 1 / fps;
+}
+
+function clampTimelineSec(sec: number, durationSec: number): number {
+  return Math.min(Math.max(0, durationSec), Math.max(0, sec));
+}
+
 function makeBus(): { bus: CommandBus; registry: CommandRegistry } {
   const registry = createStudioRegistry();
   const bus = new CommandBus(registry, createEmptyProject("Untitled", uid("proj")));
@@ -166,6 +186,7 @@ export const useStudio = create<StudioState>((set, get) => {
     selectedClipIds: [],
     selectedAssetId: null,
     playheadSec: 0,
+    transportRate: 0,
     zoom: 1,
     scrollSec: 0,
     snapInterval: 1,
@@ -181,7 +202,7 @@ export const useStudio = create<StudioState>((set, get) => {
     newProject: () => {
       const { bus, registry } = makeBus();
       mediaCache.clear();
-      set({ project: bus.project, bus, registry, selectedClipId: null, selectedClipIds: [], selectedAssetId: null, playheadSec: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty: false, projectPath: null, lastError: null });
+      set({ project: bus.project, bus, registry, selectedClipId: null, selectedClipIds: [], selectedAssetId: null, playheadSec: 0, transportRate: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty: false, projectPath: null, lastError: null });
     },
 
     loadProject: (raw, projectPath = null, dirty = false) => {
@@ -189,7 +210,7 @@ export const useStudio = create<StudioState>((set, get) => {
       const registry = createStudioRegistry();
       const bus = new CommandBus(registry, p);
       mediaCache.clear();
-      set({ project: p, bus, registry, selectedClipId: null, selectedClipIds: [], selectedAssetId: null, playheadSec: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty, projectPath, lastError: null });
+      set({ project: p, bus, registry, selectedClipId: null, selectedClipIds: [], selectedAssetId: null, playheadSec: 0, transportRate: 0, previewProxies: {}, thumbnails: {}, cacheState: {}, mediaAnalysis: {}, dirty, projectPath, lastError: null });
     },
 
     markSaved: (projectPath, expectedUpdatedAt) => set((state) => ({
@@ -367,6 +388,19 @@ export const useStudio = create<StudioState>((set, get) => {
       })),
     clearClipSelection: () => set({ selectedClipIds: [], selectedClipId: null }),
     setPlayhead: (sec) => set({ playheadSec: Math.max(0, sec) }),
+    stepPlayhead: (direction, coarse = false) => set((state) => {
+      const step = coarse ? 1 : navigationFrameStep(state.project, state.playheadSec);
+      return { playheadSec: clampTimelineSec(state.playheadSec + direction * step, state.project.durationSec) };
+    }),
+    jumpPlayhead: (target) => set((state) => ({ playheadSec: target === "start" ? 0 : Math.max(0, state.project.durationSec) })),
+    setTransportRate: (rate) => set({ transportRate: rate }),
+    toggleTransport: () => set((state) => ({ transportRate: state.transportRate === 0 ? 1 : 0 })),
+    fitTimelineZoom: (viewportWidthPx) => set((state) => {
+      if (!Number.isFinite(viewportWidthPx) || viewportWidthPx <= 64) return { lastError: "TIMELINE_VIEWPORT_INVALID" };
+      const totalSec = Math.max(state.project.durationSec, 10) + 5;
+      const zoom = Math.max(0.25, Math.min(4, (viewportWidthPx - 64) / (totalSec * 80)));
+      return { zoom, scrollSec: 0 };
+    }),
     setZoom: (z) => set({ zoom: Math.max(0.1, Math.min(10, z)) }),
     setScroll: (s) => set({ scrollSec: Math.max(0, s) }),
 

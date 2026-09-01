@@ -1,13 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useStudio } from "../store";
 import { resolvePreviewSource } from "../mediaUrl";
 import { PlaybackDiagnostics } from "../previewDiagnostics";
 
 export function Preview() {
-  const { project, playheadSec, setPlayhead, previewProxies } = useStudio();
+  const { project, playheadSec, setPlayhead, previewProxies, transportRate, setTransportRate, toggleTransport } = useStudio();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const outgoingRef = useRef<HTMLVideoElement | null>(null);
-  const [playing, setPlaying] = useState(false);
   const diagRef = useRef<PlaybackDiagnostics>(new PlaybackDiagnostics());
 
   const videoTrack = project.tracks.find((t) => t.kind === "video");
@@ -41,17 +40,49 @@ export function Preview() {
     syncVideoTime(outgoingRef.current, outgoingClip, playheadSec);
   }, [playheadSec, clip, outgoingClip]);
 
-  function togglePlay() {
+  useEffect(() => {
     const primary = videoRef.current;
-    if (!primary) return;
     const videos = [outgoingRef.current, primary].filter((v): v is HTMLVideoElement => Boolean(v));
-    if (primary.paused) {
-      Promise.all(videos.map((v) => v.play())).then(() => setPlaying(true)).catch(() => setPlaying(false));
-    } else {
-      videos.forEach((v) => v.pause());
-      setPlaying(false);
+    if (transportRate === 1 && primary) {
+      Promise.all(videos.map((video) => video.play())).catch(() => setTransportRate(0));
+      return;
     }
-  }
+    videos.forEach((video) => video.pause());
+  }, [transportRate, clip?.id, outgoingClip?.id, setTransportRate]);
+
+  useEffect(() => {
+    if (transportRate !== 1 || clip) return;
+    let last = performance.now();
+    const timer = window.setInterval(() => {
+      const now = performance.now();
+      const elapsed = Math.max(0, (now - last) / 1000);
+      last = now;
+      const state = useStudio.getState();
+      if (state.transportRate !== 1) return;
+      const next = Math.min(state.project.durationSec, state.playheadSec + elapsed);
+      state.setPlayhead(next);
+      if (next >= state.project.durationSec) state.setTransportRate(0);
+    }, 33);
+    return () => window.clearInterval(timer);
+  }, [transportRate, clip?.id]);
+
+  useEffect(() => {
+    if (transportRate !== -1) return;
+    let last = performance.now();
+    const timer = window.setInterval(() => {
+      const now = performance.now();
+      const elapsed = Math.max(0, (now - last) / 1000);
+      last = now;
+      const state = useStudio.getState();
+      if (state.transportRate !== -1) return;
+      const next = Math.max(0, state.playheadSec - elapsed);
+      state.setPlayhead(next);
+      if (next <= 0) state.setTransportRate(0);
+    }, 33);
+    return () => window.clearInterval(timer);
+  }, [transportRate]);
+
+  function togglePlay() { toggleTransport(); }
 
   function seekTo(sec: number) {
     setPlayhead(sec);
@@ -88,15 +119,15 @@ export function Preview() {
               style={videoTransformStyle(transitionClip, transitionProgress)}
               onLoadedMetadata={() => diagRef.current.record({ type: "loadedmetadata" })}
               onCanPlay={() => diagRef.current.record({ type: "canplay" })}
-              onPlay={() => { diagRef.current.record({ type: "play" }); setPlaying(true); }}
-              onPause={() => { diagRef.current.record({ type: "pause" }); setPlaying(false); }}
+              onPlay={() => diagRef.current.record({ type: "play" })}
+              onPause={() => diagRef.current.record({ type: "pause" })}
               onError={onError}
               onTimeUpdate={(e) => {
                 if (!e.currentTarget.paused && transitionClip) {
                   setPlayhead(timelineTimeForClip(transitionClip, e.currentTarget.currentTime));
                 }
               }}
-              onEnded={() => setPlaying(false)}
+              onEnded={() => setTransportRate(0)}
             />
           </>
         ) : asset && previewSrc ? (
@@ -107,15 +138,15 @@ export function Preview() {
             style={videoTransformStyle(clip)}
             onLoadedMetadata={() => diagRef.current.record({ type: "loadedmetadata" })}
             onCanPlay={() => diagRef.current.record({ type: "canplay" })}
-            onPlay={() => { diagRef.current.record({ type: "play" }); setPlaying(true); }}
-            onPause={() => { diagRef.current.record({ type: "pause" }); setPlaying(false); }}
+            onPlay={() => diagRef.current.record({ type: "play" })}
+            onPause={() => diagRef.current.record({ type: "pause" })}
             onError={onError}
             onTimeUpdate={(e) => {
               if (!e.currentTarget.paused && clip) {
                 setPlayhead(timelineTimeForClip(clip, e.currentTarget.currentTime));
               }
             }}
-            onEnded={() => setPlaying(false)}
+            onEnded={() => setTransportRate(0)}
           />
         ) : (
           <div className="preview-placeholder">Import media and select a clip to preview</div>
@@ -135,8 +166,12 @@ export function Preview() {
         )}
       </div>
       <div className="preview-controls">
-        <button onClick={togglePlay}>{playing ? "❚❚" : "►"}</button>
+        <button data-testid="transport-reverse" onClick={() => setTransportRate(-1)} title="Reverse (J)">J</button>
+        <button data-testid="transport-stop" onClick={() => setTransportRate(0)} title="Stop (K)">K</button>
+        <button data-testid="transport-play-toggle" data-transport-rate={transportRate} onClick={togglePlay} title="Play/Pause (Space)">{transportRate === 1 ? "❚❚" : transportRate === -1 ? "◀" : "►"}</button>
+        <button data-testid="transport-forward" onClick={() => setTransportRate(1)} title="Forward (L)">L</button>
         <input
+          data-testid="transport-seek"
           type="range"
           min={0}
           max={Math.max(0.1, project.durationSec)}

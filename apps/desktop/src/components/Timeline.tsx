@@ -18,6 +18,7 @@ export function Timeline() {
     setPlayhead,
     zoom,
     setZoom,
+    fitTimelineZoom,
     scrollSec,
     setScroll,
     snapInterval,
@@ -47,6 +48,7 @@ export function Timeline() {
     additive: boolean; moved: boolean; innerLeft: number; innerTop: number;
   } | null>(null);
   const suppressTrackClickRef = useRef(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const [marqueePreview, setMarqueePreview] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const [movePreview, setMovePreview] = useState<{ ids: string[]; delta: number } | null>(null);
   const [rippleTrimEnabled, setRippleTrimEnabled] = useState(false);
@@ -238,6 +240,13 @@ export function Timeline() {
 
   // Ruler clicks set the playhead WITHOUT clearing selection, so an existing
   // multi-selection can be split at the chosen time through a real GUI gesture.
+  function fitTimeline() {
+    const viewport = scrollRef.current;
+    if (!viewport) return;
+    fitTimelineZoom(viewport.clientWidth);
+    viewport.scrollLeft = 0;
+  }
+
   function onRulerClick(ev: React.MouseEvent) {
     const rect = (ev.currentTarget as HTMLElement).getBoundingClientRect();
     const sec = clamp(
@@ -267,6 +276,7 @@ export function Timeline() {
         <div className="spacer" />
         <span>Zoom</span>
         <input
+          data-testid="timeline-zoom-range"
           type="range"
           min={0.25}
           max={4}
@@ -274,11 +284,13 @@ export function Timeline() {
           value={zoom}
           onChange={(e) => setZoom(Number(e.target.value))}
         />
-        <button onClick={() => setZoom(zoom / 1.25)}>−</button>
-        <button onClick={() => setZoom(zoom * 1.25)}>+</button>
+        <button data-testid="zoom-out" onClick={() => setZoom(zoom / 1.25)}>−</button>
+        <button data-testid="zoom-in" onClick={() => setZoom(zoom * 1.25)}>+</button>
+        <button data-testid="zoom-fit" onClick={fitTimeline} title="Fit timeline to viewport">Fit</button>
         <span className="sel-count" data-testid="selection-count">{selectedClipIds.length} selected</span>
       </div>
       <div
+        ref={scrollRef}
         className="timeline-scroll"
         onScroll={(e) => setScroll(e.currentTarget.scrollLeft / pxPerSec)}
       >
