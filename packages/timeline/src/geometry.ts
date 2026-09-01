@@ -7,6 +7,22 @@ export interface SnapResult {
   target?: "playhead" | "clip-start" | "clip-end" | "grid";
 }
 
+export type SnapTarget = "playhead" | "clip-start" | "clip-end" | "grid";
+
+export interface SnapCandidate {
+  value: number;
+  target: SnapTarget;
+  clipId?: string;
+}
+
+export interface MagneticSnapResult {
+  snapped: boolean;
+  delta: number;
+  guideSec?: number;
+  target?: SnapTarget;
+  clipId?: string;
+}
+
 export interface TimelineView {
   /** Pixels per second at zoom = 1. */
   pxPerSecBase: number;
@@ -32,21 +48,48 @@ export function pxToSec(view: TimelineView, px: number): number {
   return view.scrollSec + px / pxPerSec(view);
 }
 
-/**
- * Collect snap candidates from the project: clip edges + playhead + grid lines.
- */
-export function collectSnapPoints(project: Project, view: TimelineView): number[] {
-  const pts: number[] = [view.playheadSec];
+/** Collect typed magnetic snap candidates, excluding active moving clips. */
+export function collectSnapCandidates(project: Project, view: TimelineView, excludeClipIds: ReadonlySet<string> = new Set()): SnapCandidate[] {
+  const out: SnapCandidate[] = [{ value: view.playheadSec, target: "playhead" }];
   for (const track of project.tracks) {
     for (const c of track.clips) {
-      pts.push(c.start, c.start + c.duration);
+      if (excludeClipIds.has(c.id)) continue;
+      out.push({ value: c.start, target: "clip-start", clipId: c.id });
+      out.push({ value: c.start + c.duration, target: "clip-end", clipId: c.id });
     }
   }
   if (view.snapInterval > 0) {
     const maxSec = Math.max(project.durationSec, view.playheadSec) + 10;
-    for (let s = 0; s <= maxSec; s += view.snapInterval) pts.push(s);
+    for (let value = 0; value <= maxSec; value += view.snapInterval) {
+      out.push({ value, target: "grid" });
+    }
   }
-  return [...new Set(pts)].sort((a, b) => a - b);
+  return out;
+}
+
+export function findMagneticSnap(edges: readonly number[], candidates: readonly SnapCandidate[], toleranceSec: number): MagneticSnapResult {
+  let best: { distance: number; delta: number; candidate: SnapCandidate } | null = null;
+  for (const edge of edges) {
+    for (const candidate of candidates) {
+      const delta = candidate.value - edge;
+      const distance = Math.abs(delta);
+      if (distance > toleranceSec) continue;
+      if (!best || distance < best.distance - 1e-12) best = { distance, delta, candidate };
+    }
+  }
+  if (!best) return { snapped: false, delta: 0 };
+  return {
+    snapped: true,
+    delta: Number(best.delta.toFixed(12)),
+    guideSec: best.candidate.value,
+    target: best.candidate.target,
+    ...(best.candidate.clipId ? { clipId: best.candidate.clipId } : {}),
+  };
+}
+
+/** Collect legacy numeric snap points for existing callers. */
+export function collectSnapPoints(project: Project, view: TimelineView): number[] {
+  return [...new Set(collectSnapCandidates(project, view).map((c) => c.value))].sort((a, b) => a - b);
 }
 
 /**

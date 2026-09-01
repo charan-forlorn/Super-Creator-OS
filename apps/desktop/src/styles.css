@@ -169,3 +169,7 @@ body { background: var(--bg); color: var(--fg); }
 .ripple-toggle { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; user-select: none; }
 .ripple-toggle input { accent-color: var(--accent); }
 .timeline-toolbar [data-testid="ripple-delete"] { white-space: nowrap; }
+/* R2.14E precision magnetic snapping. */
+.snap-toggle { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; user-select: none; }
+.snap-toggle input { accent-color: var(--accent); }
+.snap-guide { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--accent-2); z-index: 11; pointer-events: none; box-shadow: 0 0 0 1px rgba(110, 231, 168, 0.15); }

@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useStudio } from "../store";
-import { pxToSec, collectSnapPoints, snap, clamp } from "@haios/timeline";
+import { pxToSec, collectSnapCandidates, findMagneticSnap, clamp, type SnapTarget } from "@haios/timeline";
 
 const PX_PER_SEC_BASE = 80;
 
@@ -51,6 +51,8 @@ export function Timeline() {
   const [movePreview, setMovePreview] = useState<{ ids: string[]; delta: number } | null>(null);
   const [rippleTrimEnabled, setRippleTrimEnabled] = useState(false);
   const [ripplePreview, setRipplePreview] = useState<{ clipId: string; duration: number; sourceEnd?: number; inPoint?: number } | null>(null);
+  const [snapEnabled, setSnapEnabled] = useState(false);
+  const [snapGuide, setSnapGuide] = useState<{ sec: number; target: SnapTarget } | null>(null);
 
   const pxPerSec = PX_PER_SEC_BASE * zoom;
   const totalSec = Math.max(project.durationSec, 10) + 5;
@@ -89,6 +91,7 @@ export function Timeline() {
     groupPreviewRef.current = null;
     setMovePreview(null);
     setRipplePreview(null);
+    setSnapGuide(null);
     ev.preventDefault();
   }
 
@@ -107,24 +110,28 @@ export function Timeline() {
     const d = dragRef.current;
     if (!d) return;
     const dxSec = (ev.clientX - d.startX) / pxPerSec;
-    const points = collectSnapPoints(project, {
-      pxPerSecBase: PX_PER_SEC_BASE,
-      zoom,
-      scrollSec,
-      playheadSec,
-      snapInterval,
-    });
     const targets = Object.keys(d.startVals);
+    const snapView = { pxPerSecBase: PX_PER_SEC_BASE, zoom, scrollSec, playheadSec, snapInterval };
+    const candidates = snapEnabled && !ev.altKey
+      ? collectSnapCandidates(project, snapView, new Set(targets))
+      : [];
     if (d.mode === "move") {
-      const primaryId = selectedClipId && d.startVals[selectedClipId] !== undefined ? selectedClipId : targets[0];
-      if (!primaryId) return;
-      const base = d.startVals[primaryId];
-      let nextStart = base + dxSec;
-      const snapped = snap(nextStart, points, 0.25 / zoom);
-      if (snapped.snapped) nextStart = snapped.value;
-      const rawDelta = nextStart - base;
-      const minRaw = Math.min(...targets.map((id) => d.startVals[id] + rawDelta));
-      const delta = rawDelta + (minRaw < 0 ? -minRaw : 0);
+      if (targets.length === 0) return;
+      const moving = targets.map((id) => project.tracks.flatMap((t) => t.clips).find((c) => c.id === id)).filter((c): c is NonNullable<typeof c> => Boolean(c));
+      if (moving.length === 0) return;
+      const rawLeft = Math.min(...moving.map((c) => d.startVals[c.id] + dxSec));
+      const rawRight = Math.max(...moving.map((c) => d.startVals[c.id] + c.duration + dxSec));
+      let delta = dxSec;
+      const magnetic = findMagneticSnap([rawLeft, rawRight], candidates, 0.25 / zoom);
+      if (magnetic.snapped) {
+        delta += magnetic.delta;
+        setSnapGuide({ sec: magnetic.guideSec!, target: magnetic.target! });
+      } else setSnapGuide(null);
+      const minAdjusted = Math.min(...moving.map((c) => d.startVals[c.id] + delta));
+      if (minAdjusted < 0) {
+        delta -= minAdjusted;
+        setSnapGuide(null);
+      }
       groupPreviewRef.current = delta;
       setMovePreview({ ids: targets, delta });
       return;
@@ -139,6 +146,7 @@ export function Timeline() {
         const maxInPoint = originalSourceEnd - 0.1 * rate;
         const nip = clamp(d.startVals[id] + dxSec * rate, 0, maxInPoint);
         const duration = (originalSourceEnd - nip) / rate;
+        setSnapGuide(null);
         setRipplePreview({ clipId: id, duration, inPoint: nip });
       } else {
         if (id !== selectedClipId) continue;
@@ -146,8 +154,11 @@ export function Timeline() {
         const baseDuration = d.startVals[id];
         const rightEdge = clip.start + baseDuration;
         let newEnd = rightEdge + dxSec;
-        const snapped = snap(newEnd, points, 0.25 / zoom);
-        if (snapped.snapped) newEnd = snapped.value;
+        const magnetic = findMagneticSnap([newEnd], candidates, 0.25 / zoom);
+        if (magnetic.snapped) {
+          newEnd += magnetic.delta;
+          setSnapGuide({ sec: magnetic.guideSec!, target: magnetic.target! });
+        } else setSnapGuide(null);
         const span = newEnd - clip.start;
         if (span > 0.1) {
           const sourceEnd = clip.inPoint + span * (clip.playbackRate ?? 1);
@@ -200,6 +211,7 @@ export function Timeline() {
     groupPreviewRef.current = null;
     setMovePreview(null);
     setRipplePreview(null);
+    setSnapGuide(null);
   }
 
   function onLaneMouseDown(ev: React.MouseEvent) {
@@ -248,6 +260,10 @@ export function Timeline() {
         <button onClick={duplicateSelected} title="Duplicate selected (Ctrl+D)">⎘</button>
         <button onClick={() => splitSelected()} title="Split selected at playhead (S)">✂</button>
         <button onClick={selectAllClips} title="Select all (Ctrl+A)">⤢</button>
+        <label className="snap-toggle" title="Magnetic snapping (hold Alt to bypass)">
+          <input type="checkbox" data-testid="snap-toggle" checked={snapEnabled} onChange={(e) => setSnapEnabled(e.target.checked)} />
+          Snap
+        </label>
         <div className="spacer" />
         <span>Zoom</span>
         <input
@@ -278,6 +294,15 @@ export function Timeline() {
               className="timeline-marquee"
               data-testid="timeline-marquee"
               style={{ left: marqueePreview.left, top: marqueePreview.top, width: marqueePreview.width, height: marqueePreview.height }}
+            />
+          )}
+          {snapGuide && (
+            <div
+              className="snap-guide"
+              data-testid="snap-guide"
+              data-snap-target={snapGuide.target}
+              data-guide-sec={snapGuide.sec}
+              style={{ left: 64 + snapGuide.sec * pxPerSec }}
             />
           )}
           <div className="timeline-ruler">

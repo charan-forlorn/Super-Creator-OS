@@ -7,22 +7,50 @@ export function secToPx(view, sec) {
 export function pxToSec(view, px) {
     return view.scrollSec + px / pxPerSec(view);
 }
-/**
- * Collect snap candidates from the project: clip edges + playhead + grid lines.
- */
-export function collectSnapPoints(project, view) {
-    const pts = [view.playheadSec];
+/** Collect typed magnetic snap candidates, excluding active moving clips. */
+export function collectSnapCandidates(project, view, excludeClipIds = new Set()) {
+    const out = [{ value: view.playheadSec, target: "playhead" }];
     for (const track of project.tracks) {
         for (const c of track.clips) {
-            pts.push(c.start, c.start + c.duration);
+            if (excludeClipIds.has(c.id))
+                continue;
+            out.push({ value: c.start, target: "clip-start", clipId: c.id });
+            out.push({ value: c.start + c.duration, target: "clip-end", clipId: c.id });
         }
     }
     if (view.snapInterval > 0) {
         const maxSec = Math.max(project.durationSec, view.playheadSec) + 10;
-        for (let s = 0; s <= maxSec; s += view.snapInterval)
-            pts.push(s);
+        for (let value = 0; value <= maxSec; value += view.snapInterval) {
+            out.push({ value, target: "grid" });
+        }
     }
-    return [...new Set(pts)].sort((a, b) => a - b);
+    return out;
+}
+export function findMagneticSnap(edges, candidates, toleranceSec) {
+    let best = null;
+    for (const edge of edges) {
+        for (const candidate of candidates) {
+            const delta = candidate.value - edge;
+            const distance = Math.abs(delta);
+            if (distance > toleranceSec)
+                continue;
+            if (!best || distance < best.distance - 1e-12)
+                best = { distance, delta, candidate };
+        }
+    }
+    if (!best)
+        return { snapped: false, delta: 0 };
+    return {
+        snapped: true,
+        delta: Number(best.delta.toFixed(12)),
+        guideSec: best.candidate.value,
+        target: best.candidate.target,
+        ...(best.candidate.clipId ? { clipId: best.candidate.clipId } : {}),
+    };
+}
+/** Collect legacy numeric snap points for existing callers. */
+export function collectSnapPoints(project, view) {
+    return [...new Set(collectSnapCandidates(project, view).map((c) => c.value))].sort((a, b) => a - b);
 }
 /**
  * Snap a value (e.g. a drag start position) to the nearest snap point within
