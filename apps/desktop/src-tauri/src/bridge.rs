@@ -287,6 +287,222 @@ pub fn hvs_capabilities() -> Value {
 ///   - each clip is trimmed via -ss/-to against its source in-point/duration
 ///   - scale/crop to the requested resolution
 ///   - captions rendered as drawtext overlays
+#[derive(Debug, Clone)]
+struct RenderVisualLayer {
+    track_id: String,
+    track_index: usize,
+    kind: String,
+    clips: Vec<Value>,
+    captions: Vec<Value>,
+}
+
+#[derive(Debug, Clone)]
+struct RenderAudioContribution {
+    track_id: String,
+    clip_id: String,
+    asset_id: String,
+    clip: Value,
+    asset: Value,
+    fade_out: Option<f64>,
+}
+
+#[derive(Debug, Clone)]
+struct RenderCompositionPlan {
+    duration_sec: f64,
+    visual_layers: Vec<RenderVisualLayer>,
+    audio: Vec<RenderAudioContribution>,
+    assets: Vec<Value>,
+}
+
+fn build_render_composition_plan(project: &Value) -> Result<RenderCompositionPlan, String> {
+    let duration_sec = project.get("durationSec").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.0);
+    let assets = project.get("assets").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    let tracks = project.get("tracks").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    let mut visual_layers = Vec::new();
+    let mut audio = Vec::new();
+    for (track_index, track) in tracks.iter().enumerate() {
+        let track_id = track.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let kind = track.get("kind").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let visible = track.get("visible").and_then(|v| v.as_bool()).unwrap_or(true);
+        let muted = track.get("muted").and_then(|v| v.as_bool()).unwrap_or(false);
+        let clips = track.get("clips").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+        let captions = track.get("captions").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+        if visible && (kind == "video" || kind == "text") {
+            visual_layers.push(RenderVisualLayer { track_id: track_id.clone(), track_index, kind: kind.clone(), clips: clips.clone(), captions });
+        }
+        if kind != "video" && kind != "audio" { continue; }
+        for (clip_index, clip) in clips.iter().cloned().enumerate() {
+            let asset_id = clip.get("assetId").and_then(|v| v.as_str()).unwrap_or("");
+            let asset = assets.iter().find(|asset| asset.get("id").and_then(|v| v.as_str()) == Some(asset_id))
+                .cloned().ok_or_else(|| format!("RENDER_ASSET_NOT_FOUND: {asset_id}"))?;
+            if muted || clip.get("audio").and_then(|a| a.get("muted")).and_then(|v| v.as_bool()).unwrap_or(false) { continue; }
+            let contributes = kind == "audio" || asset.get("hasAudio").and_then(|v| v.as_bool()).unwrap_or(false);
+            if contributes {
+                let fade_out = clips.get(clip_index + 1).and_then(transition_in_duration);
+                audio.push(RenderAudioContribution { track_id: track_id.clone(), clip_id: clip.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string(), asset_id: asset_id.to_string(), clip, asset, fade_out });
+            }
+        }
+    }
+    Ok(RenderCompositionPlan { duration_sec, visual_layers, audio, assets })
+}
+#[derive(Debug)]
+struct RenderGraph {
+    inputs: Vec<String>,
+    filter: String,
+    video_label: String,
+    audio_label: String,
+    caption_temp_dir: Option<std::path::PathBuf>,
+}
+
+fn p44_asset_for_clip(plan: &RenderCompositionPlan, clip: &Value) -> Result<Value, String> {
+    let asset_id = clip.get("assetId").and_then(|v| v.as_str()).unwrap_or("");
+    plan.assets.iter()
+        .find(|asset| asset.get("id").and_then(|v| v.as_str()) == Some(asset_id))
+        .cloned()
+        .ok_or_else(|| format!("RENDER_ASSET_NOT_FOUND: {asset_id}"))
+}
+
+fn p44_input_key(track_id: &str, clip: &Value) -> String {
+    format!("{}\u{0}{}", track_id, clip.get("id").and_then(|v| v.as_str()).unwrap_or(""))
+}
+
+fn p44_ensure_input(
+    inputs: &mut Vec<String>,
+    indices: &mut std::collections::HashMap<String, usize>,
+    track_id: &str,
+    clip: &Value,
+    asset: &Value,
+) -> Result<usize, String> {
+    let key = p44_input_key(track_id, clip);
+    if let Some(index) = indices.get(&key) { return Ok(*index); }
+    let source = asset.get("sourcePath").and_then(|v| v.as_str())
+        .ok_or_else(|| format!("RENDER_SOURCE_PATH_MISSING: {}", key))?;
+    let in_point = clip.get("inPoint").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let duration = clip.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.001);
+    let source_duration = duration * clip_playback_rate(clip);
+    let index = indices.len();
+    inputs.extend(["-ss".into(), format!("{in_point:.3}"), "-t".into(), format!("{source_duration:.3}"), "-i".into(), source.to_string()]);
+    indices.insert(key, index);
+    Ok(index)
+}
+
+fn p44_video_clip_layer_filter(input_idx: usize, clip: &Value, duration: f64, w: i32, h: i32, tag: &str) -> String {
+    let rate = clip_playback_rate(clip);
+    let source_duration = duration * rate;
+    let (scale, x, y, opacity) = clip_transform_values(clip);
+    let (brightness, contrast, saturation) = clip_effect_values(clip);
+    let scaled_w = even_px(w as f64 * scale);
+    let scaled_h = even_px(h as f64 * scale);
+    let left = (w - scaled_w) as f64 / 2.0 + x * w as f64 / 2.0;
+    let top = (h - scaled_h) as f64 / 2.0 + y * h as f64 / 2.0;
+    format!(
+        "color=c=black@0.0:s={w}x{h}:d={duration:.3}:r=30,format=rgba[{tag}bg];[{input_idx}:v]trim=duration={source_duration:.3},setpts=(PTS-STARTPTS)/{rate:.6},scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color=black@0.0,setsar=1,eq=brightness={brightness:.6}:contrast={contrast:.6}:saturation={saturation:.6},scale={scaled_w}:{scaled_h},format=rgba,colorchannelmixer=aa={opacity:.6}[{tag}fg];[{tag}bg][{tag}fg]overlay=x={left:.3}:y={top:.3}:shortest=1,format=rgba[{tag}]"
+    )
+}
+
+fn p44_video_track_filter(layer_pos: usize, entries: &[(usize, Value)], duration: f64, w: i32, h: i32) -> String {
+    let mut parts = vec![format!("color=c=black@0.0:s={w}x{h}:d={duration:.3}:r=30,format=rgba[vtrack{layer_pos}base0]")];
+    for (i, (input_idx, clip)) in entries.iter().enumerate() {
+        let clip_duration = clip.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.001).max(0.001);
+        let start = clip.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.0);
+        let end = start + clip_duration;
+        let tag = format!("p44l{layer_pos}c{i}");
+        parts.push(p44_video_clip_layer_filter(*input_idx, clip, clip_duration, w, h, &tag));
+        let shifted = format!("{tag}t");
+        if let Some(d) = transition_in_duration(clip) {
+            parts.push(format!("[{tag}]fade=t=in:st=0:d={:.3}:alpha=1,setpts=PTS+{start:.3}/TB[{shifted}]", d.min(clip_duration)));
+        } else {
+            parts.push(format!("[{tag}]setpts=PTS+{start:.3}/TB[{shifted}]"));
+        }
+        let base_in = format!("vtrack{layer_pos}base{i}");
+        let base_out = if i + 1 == entries.len() { format!("vtrack{layer_pos}") } else { format!("vtrack{layer_pos}base{}", i + 1) };
+        parts.push(format!("[{base_in}][{shifted}]overlay=x=0:y=0:eof_action=pass:repeatlast=0:shortest=0:enable='between(t,{start:.3},{end:.3})'[{base_out}]"));
+    }
+    parts.join(";")
+}
+
+fn build_multitrack_render_graph(plan: &RenderCompositionPlan, w: i32, h: i32) -> Result<RenderGraph, String> {
+    let duration = plan.duration_sec.max(0.1);
+    let mut inputs = Vec::new();
+    let mut indices = std::collections::HashMap::<String, usize>::new();
+    let mut visual_entries = std::collections::HashMap::<usize, Vec<(usize, Value)>>::new();
+    for (layer_pos, layer) in plan.visual_layers.iter().enumerate() {
+        if layer.kind != "video" { continue; }
+        let mut entries = Vec::new();
+        for clip in &layer.clips {
+            let asset = p44_asset_for_clip(plan, clip)?;
+            let input_idx = p44_ensure_input(&mut inputs, &mut indices, &layer.track_id, clip, &asset)?;
+            entries.push((input_idx, clip.clone()));
+        }
+        visual_entries.insert(layer_pos, entries);
+    }
+    for entry in &plan.audio {
+        let _ = p44_ensure_input(&mut inputs, &mut indices, &entry.track_id, &entry.clip, &entry.asset)?;
+    }
+
+    let mut filters = vec![format!("color=c=black:s={w}x{h}:d={duration:.3}:r=30[vcomp0]")];
+    let has_captions = plan.visual_layers.iter().any(|layer| layer.kind == "text" && !layer.captions.is_empty());
+    let caption_temp_dir = if has_captions {
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos();
+        let dir = std::env::temp_dir().join(format!("haios-p44-captions-{}-{stamp}", std::process::id()));
+        std::fs::create_dir_all(&dir).map_err(|e| format!("caption temp dir: {e}"))?;
+        Some(dir)
+    } else { None };
+    let font = caption_font_path();
+    for (layer_pos, layer) in plan.visual_layers.iter().enumerate() {
+        let current = format!("vcomp{layer_pos}");
+        let next = format!("vcomp{}", layer_pos + 1);
+        if layer.kind == "video" {
+            let entries = visual_entries.get(&layer_pos).cloned().unwrap_or_default();
+            if entries.is_empty() {
+                filters.push(format!("[{current}]null[{next}]"));
+            } else {
+                filters.push(p44_video_track_filter(layer.track_index, &entries, duration, w, h));
+                filters.push(format!("[{current}][vtrack{}]overlay=x=0:y=0:eof_action=pass:repeatlast=0:shortest=0[{next}]", layer.track_index));
+            }
+        } else {
+            let mut input_label = current;
+            if layer.captions.is_empty() {
+                filters.push(format!("[{input_label}]null[{next}]"));
+            } else {
+                let dir = caption_temp_dir.as_ref().expect("caption temp dir");
+                for (caption_index, caption) in layer.captions.iter().enumerate() {
+                    let text_path = dir.join(format!("caption-{layer_pos}-{caption_index}.txt"));
+                    let text = caption.get("text").and_then(|v| v.as_str()).unwrap_or("");
+                    if let Err(e) = std::fs::write(&text_path, text.as_bytes()) {
+                        let _ = std::fs::remove_dir_all(dir);
+                        return Err(format!("caption textfile: {e}"));
+                    }
+                    let output_label = if caption_index + 1 == layer.captions.len() { next.clone() } else { format!("vtxt{layer_pos}_{caption_index}") };
+                    filters.push(caption_drawtext_filter(&input_label, &output_label, caption, &text_path.to_string_lossy(), w, h, &font));
+                    input_label = output_label;
+                }
+            }
+        }
+    }
+    let last_visual = format!("vcomp{}", plan.visual_layers.len());
+    filters.push(format!("[{last_visual}]null[vout]"));
+    let mut audio_labels = Vec::new();
+    for entry in &plan.audio {
+        let key = format!("{}\0{}", entry.track_id, entry.clip_id);
+        let input_idx = *indices.get(&key).ok_or_else(|| format!("RENDER_INPUT_NOT_FOUND: {key} asset={}", entry.asset_id))?;
+        let clip_duration = entry.clip.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.001).max(0.001);
+        filters.push(video_clip_audio_filter_with_transition(input_idx, &entry.clip, clip_duration, true, entry.fade_out));
+        audio_labels.push(format!("[{input_idx}va]"));
+    }
+    if audio_labels.is_empty() {
+        filters.push(format!("aevalsrc=0:d={duration:.3}[aout]"));
+    } else {
+        filters.push(format!("{}amix=inputs={}:duration=longest:normalize=0,apad,atrim=duration={duration:.3}[aout]", audio_labels.join(""), audio_labels.len()));
+    }
+    Ok(RenderGraph {
+        inputs,
+        filter: filters.join(";"),
+        video_label: "vout".to_string(),
+        audio_label: "aout".to_string(),
+        caption_temp_dir,
+    })
+}
 fn clip_audio_linear_gain(clip: &Value) -> f64 {
     let audio = clip.get("audio");
     let muted = audio.and_then(|a| a.get("muted")).and_then(|v| v.as_bool()).unwrap_or(false);
@@ -360,6 +576,7 @@ fn even_px(value: f64) -> i32 {
     n
 }
 
+#[cfg(test)]
 fn video_clip_filter(input_idx: usize, clip: &Value, duration: f64, w: i32, h: i32) -> String {
     let rate = clip_playback_rate(clip);
     let source_duration = duration * rate;
@@ -375,6 +592,7 @@ fn video_clip_filter(input_idx: usize, clip: &Value, duration: f64, w: i32, h: i
 }
 
 
+#[cfg(test)]
 fn video_timeline_filter(clips: &[Value], duration: f64, w: i32, h: i32) -> String {
     let duration = duration.max(0.1);
     let mut parts = vec![format!("color=c=black:s={w}x{h}:d={duration:.3}:r=30[vbase0]")];
@@ -430,6 +648,7 @@ fn caption_drawtext_filter(input: &str, output: &str, caption: &Value, text_path
 }
 
 
+#[cfg(test)]
 fn prepare_caption_chain(tracks: &[Value], w: i32, h: i32) -> Result<(Vec<String>, String, Option<std::path::PathBuf>), String> {
     let mut captions: Vec<Value> = Vec::new();
     for t in tracks.iter() {
@@ -527,116 +746,27 @@ pub fn run_render(
     }
     emit_state(app, job_id, "PREPARING", 0.15, None, None);
 
-    // For the vertical slice we render a single combined video track and a single
-    // combined audio track. Multiple clips on one track are concatenated in time.
     let ffmpeg = which("ffmpeg");
-
-    // Gather all clips across video tracks.
-    let mut video_clips: Vec<Value> = Vec::new();
-    let mut audio_clips: Vec<Value> = Vec::new();
-    let assets = project.get("assets").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-    for t in tracks.iter() {
-        let kind = t.get("kind").and_then(|v| v.as_str()).unwrap_or("");
-        let clips = t.get("clips").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-        if kind == "video" {
-            video_clips.extend(clips);
-        } else if kind == "audio" {
-            audio_clips.extend(clips);
-        }
-    }
-
-    if video_clips.is_empty() {
-        emit_state(app, job_id, "FAILED", 0.0, None, Some("no video clips to render".to_string()));
+    let plan = match build_render_composition_plan(&project) {
+        Ok(plan) => plan,
+        Err(error) => { emit_state(app, job_id, "FAILED", 0.0, None, Some(error)); return; }
+    };
+    let has_video = plan.visual_layers.iter().any(|layer| layer.kind == "video" && !layer.clips.is_empty());
+    if !has_video {
+        emit_state(app, job_id, "FAILED", 0.0, None, Some("no visible video clips to render".to_string()));
         return;
     }
-    video_clips.sort_by(|a, b| {
-        let sa = a.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let sb = b.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        sa.partial_cmp(&sb).unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| a.get("id").and_then(|v| v.as_str()).unwrap_or("").cmp(b.get("id").and_then(|v| v.as_str()).unwrap_or("")))
-    });
-
-    // Concatenate video clips with exact source trims and scale to the target.
-    // Each video input is bounded with -t so export duration matches the model.
-    let mut inputs: Vec<String> = Vec::new();
-    let mut concat_parts: Vec<String> = Vec::new();
-    let mut video_audio_parts: Vec<String> = Vec::new();
-    for (i, clip) in video_clips.iter().enumerate() {
-        let asset_id = clip.get("assetId").and_then(|v| v.as_str()).unwrap_or("");
-        let asset = assets.iter().find(|a| a.get("id").and_then(|v| v.as_str()) == Some(asset_id));
-        let source = match asset.and_then(|a| a.get("sourcePath").and_then(|v| v.as_str())) {
-            Some(src) => src.to_string(),
-            None => {
-                emit_state(app, job_id, "FAILED", 0.0, None, Some(format!("clip {i} missing asset")));
-                return;
-            }
-        };
-        let in_point = clip.get("inPoint").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let duration = clip.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.001);
-        let source_duration = duration * clip_playback_rate(clip);
-        inputs.extend(["-ss".into(), format!("{in_point:.3}"), "-t".into(), format!("{source_duration:.3}"), "-i".into(), source]);
-        concat_parts.push(video_clip_filter(i, clip, duration, w, h));
-        let has_audio = asset.and_then(|a| a.get("hasAudio")).and_then(|v| v.as_bool()).unwrap_or(false);
-        let fade_out = video_clips.get(i + 1).and_then(transition_in_duration);
-        video_audio_parts.push(video_clip_audio_filter_with_transition(i, clip, duration, has_audio, fade_out));
-    }
-    let timeline_duration = project.get("durationSec").and_then(|v| v.as_f64()).unwrap_or_else(|| video_clips.iter().map(|c| c.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0) + c.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0)).fold(0.0, f64::max)).max(0.1);
-    let mut filter = concat_parts.join(";");
-    filter.push(';');
-    filter.push_str(&video_timeline_filter(&video_clips, timeline_duration, w, h));
-
-    // Burn timeline captions using UTF-8 text files so caption text is never parsed
-    // as filter syntax. This keeps Unicode text and untrusted punctuation inert.
-    let (caption_filters, video_map_label, caption_temp_dir) = match prepare_caption_chain(&tracks, w, h) {
-        Ok(v) => v,
-        Err(e) => { emit_state(app, job_id, "FAILED", 0.0, None, Some(e)); return; }
+    let graph = match build_multitrack_render_graph(&plan, w, h) {
+        Ok(graph) => graph,
+        Err(error) => { emit_state(app, job_id, "FAILED", 0.0, None, Some(error)); return; }
     };
-    for caption_filter in caption_filters { filter.push(';'); filter.push_str(&caption_filter); }
-
-    // Explicit audio tracks retain priority. When absent, preserve embedded audio
-    // from video clips instead of replacing it with global silence.
-    let audio_arg: Vec<String> = vec!["-map".into(), format!("[{video_map_label}]"), "-map".into(), "[aout]".into()];
-    if !audio_clips.is_empty() {
-        let first_audio_input = video_clips.len();
-        let mut audio_filters: Vec<String> = Vec::new();
-        let mut audio_labels: Vec<String> = Vec::new();
-        for (offset, clip) in audio_clips.iter().enumerate() {
-            let asset_id = clip.get("assetId").and_then(|v| v.as_str()).unwrap_or("");
-            let asset = assets.iter().find(|a| a.get("id").and_then(|v| v.as_str()) == Some(asset_id));
-            let source = match asset.and_then(|a| a.get("sourcePath").and_then(|v| v.as_str())) {
-                Some(src) => src.to_string(),
-                None => continue,
-            };
-            let in_point = clip.get("inPoint").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let duration = clip.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.001);
-            let rate = clip_playback_rate(clip);
-            let source_duration = duration * rate;
-            let idx = first_audio_input + offset;
-            inputs.extend(["-ss".into(), format!("{in_point:.3}"), "-t".into(), format!("{source_duration:.3}"), "-i".into(), source]);
-            let gain = clip_audio_linear_gain(clip);
-            let start = clip.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0).max(0.0);
-            let delay_ms = (start * 1000.0).round() as u64;
-            let tempo = audio_atempo_chain(rate);
-            let tempo_filter = if tempo.is_empty() { String::new() } else { format!(",{tempo}") };
-            audio_filters.push(format!("[{idx}:a]atrim=duration={source_duration:.3},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp,aresample=44100{tempo_filter},volume={gain:.6},adelay={delay_ms}|{delay_ms}[a{idx}]"));
-            audio_labels.push(format!("[a{idx}]"));
-        }
-        if audio_labels.is_empty() {
-            let dur = project.get("durationSec").and_then(|v| v.as_f64()).unwrap_or(0.1).max(0.1);
-            filter.push_str(&format!(";aevalsrc=0:d={dur:.3}[aout]"));
-        } else {
-            filter.push(';');
-            filter.push_str(&audio_filters.join(";"));
-            filter.push(';');
-            filter.push_str(&format!("{}amix=inputs={}:duration=longest:normalize=0,apad,atrim=duration={timeline_duration:.3}[aout]", audio_labels.join(""), audio_labels.len()));
-        }
-    } else {
-        filter.push(';');
-        filter.push_str(&video_audio_parts.join(";"));
-        let labels: Vec<String> = (0..video_clips.len()).map(|i| format!("[{i}va]")).collect();
-        filter.push(';');
-        filter.push_str(&format!("{}amix=inputs={}:duration=longest:normalize=0,apad,atrim=duration={timeline_duration:.3}[aout]", labels.join(""), labels.len()));
-    }
+    let inputs = graph.inputs;
+    let filter = graph.filter;
+    let caption_temp_dir = graph.caption_temp_dir;
+    let audio_arg: Vec<String> = vec![
+        "-map".into(), format!("[{}]", graph.video_label),
+        "-map".into(), format!("[{}]", graph.audio_label),
+    ];
 
     let target = Path::new(output_path);
     let temp_output = match render_temp_path(target, job_id) {
@@ -1141,6 +1271,138 @@ mod tests {
     // Drives the ACTUAL ffmpeg encoder (generate_preview_proxy_impl) into a
     // temporary cache directory, proving MISSâ†’CREATEâ†’ffprobeâ†’HITâ†’reuse end to
     // end. No AppHandle/managed-cache coupling, no mocked filesystem output.
+    fn p44_plan_fixture() -> Value {
+        json!({
+            "schemaVersion": 2, "durationSec": 10.0,
+            "assets": [
+                {"id":"va","sourcePath":"C:/va.mp4","kind":"video","hasAudio":true},
+                {"id":"vs","sourcePath":"C:/vs.mp4","kind":"video","hasAudio":false},
+                {"id":"ma","sourcePath":"C:/ma.wav","kind":"audio","hasAudio":true}
+            ],
+            "tracks": [
+                {"id":"back","kind":"video","visible":true,"muted":false,"locked":false,"clips":[{"id":"c-back","assetId":"va","start":0,"duration":2,"audio":{"gainDb":0,"muted":false}}],"captions":[]},
+                {"id":"captions","kind":"text","visible":true,"muted":false,"locked":false,"clips":[],"captions":[{"id":"cap-a","text":"A","start":0,"duration":2,"style":{}}]},
+                {"id":"hidden","kind":"video","visible":false,"muted":false,"locked":false,"clips":[{"id":"c-hidden","assetId":"va","start":0,"duration":2,"audio":{"gainDb":0,"muted":false}}],"captions":[]},
+                {"id":"front","kind":"video","visible":true,"muted":false,"locked":true,"clips":[{"id":"c-front","assetId":"vs","start":0,"duration":2,"audio":{"gainDb":0,"muted":false}}],"captions":[]},
+                {"id":"music-muted","kind":"audio","visible":true,"muted":true,"locked":false,"clips":[{"id":"m0","assetId":"ma","start":0,"duration":2,"audio":{"gainDb":0,"muted":false}}],"captions":[]},
+                {"id":"music-live","kind":"audio","visible":true,"muted":false,"locked":false,"clips":[{"id":"m1","assetId":"ma","start":1,"duration":2,"audio":{"gainDb":-6,"muted":false}}],"captions":[]},
+                {"id":"hidden-text","kind":"text","visible":false,"muted":false,"locked":false,"clips":[],"captions":[{"id":"cap-hidden","text":"H","start":0,"duration":2,"style":{}}]},
+                {"id":"muted-video","kind":"video","visible":true,"muted":true,"locked":false,"clips":[{"id":"c-muted-track","assetId":"va","start":0,"duration":2,"audio":{"gainDb":0,"muted":false}}],"captions":[]},
+                {"id":"clip-muted","kind":"video","visible":true,"muted":false,"locked":false,"clips":[{"id":"c-muted-clip","assetId":"va","start":0,"duration":2,"audio":{"gainDb":0,"muted":true}}],"captions":[]}
+            ]
+        })
+    }
+
+    #[test]
+    fn p44_render_plan_preserves_visible_visual_z_order() {
+        let plan = build_render_composition_plan(&p44_plan_fixture()).expect("plan");
+        let ids: Vec<_> = plan.visual_layers.iter().map(|layer| (layer.track_id.as_str(), layer.track_index, layer.kind.as_str())).collect();
+        assert_eq!(ids, vec![("back",0,"video"),("captions",1,"text"),("front",3,"video"),("muted-video",7,"video"),("clip-muted",8,"video")]);
+        assert_eq!(plan.duration_sec, 10.0);
+    }
+    #[test]
+    fn p44_render_plan_audio_is_visibility_independent_and_mixes_all_unmuted_sources() {
+        let plan = build_render_composition_plan(&p44_plan_fixture()).expect("plan");
+        let ids: Vec<_> = plan.audio.iter().map(|entry| (entry.track_id.as_str(), entry.clip_id.as_str(), entry.asset_id.as_str())).collect();
+        assert_eq!(ids, vec![("back","c-back","va"),("hidden","c-hidden","va"),("music-live","m1","ma")]);
+    }
+
+    #[test]
+    fn p44_render_plan_excludes_hidden_text_and_ignores_lock_for_composition() {
+        let plan = build_render_composition_plan(&p44_plan_fixture()).expect("plan");
+        assert!(plan.visual_layers.iter().any(|layer| layer.track_id == "front"));
+        assert!(!plan.visual_layers.iter().any(|layer| layer.track_id == "hidden-text"));
+        assert_eq!(plan.visual_layers.iter().find(|layer| layer.track_id == "captions").unwrap().captions.len(), 1);
+    }
+
+    #[test]
+    fn p44_render_plan_fails_closed_when_clip_asset_is_missing() {
+        let mut project = p44_plan_fixture();
+        project["tracks"][0]["clips"][0]["assetId"] = json!("missing");
+        let error = build_render_composition_plan(&project).unwrap_err();
+        assert!(error.contains("RENDER_ASSET_NOT_FOUND"), "{error}");
+    }
+
+    #[test]
+    fn p44_graph_reuses_visual_inputs_and_unifies_embedded_plus_explicit_audio() {
+        let plan = build_render_composition_plan(&p44_plan_fixture()).expect("plan");
+        let graph = build_multitrack_render_graph(&plan, 320, 180).expect("graph");
+        assert_eq!(graph.inputs.iter().filter(|arg| arg.as_str() == "-i").count(), 6);
+        assert!(graph.filter.contains("amix=inputs=3:duration=longest:normalize=0"), "{}", graph.filter);
+        assert_eq!(graph.audio_label, "aout");
+    }
+
+    #[test]
+    fn p44_graph_composes_video_and_text_in_canonical_layer_order() {
+        let plan = build_render_composition_plan(&p44_plan_fixture()).expect("plan");
+        let graph = build_multitrack_render_graph(&plan, 320, 180).expect("graph");
+        assert!(graph.filter.contains("[vcomp0][vtrack0]overlay"), "{}", graph.filter);
+        assert!(graph.filter.contains("[vcomp1]drawtext="), "{}", graph.filter);
+        assert!(graph.filter.contains("[vcomp2][vtrack3]overlay"), "{}", graph.filter);
+        assert_eq!(graph.video_label, "vout");
+        if let Some(dir) = graph.caption_temp_dir { let _ = std::fs::remove_dir_all(dir); }
+    }
+
+    #[test]
+    fn p44_multitrack_graph_executes_with_real_ffmpeg() {
+        let tmp = std::env::temp_dir().join(format!("haios-p44-graph-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let red = tmp.join("red.mp4");
+        let blue = tmp.join("blue.mp4");
+        let music = tmp.join("music.wav");
+        let out_path = tmp.join("out.mp4");
+        let gen_red = std::process::Command::new("ffmpeg").args([
+            "-v","error","-y","-f","lavfi","-i","color=c=red:s=64x64:r=30:d=2",
+            "-f","lavfi","-i","sine=frequency=440:duration=2","-c:v","libx264","-pix_fmt","yuv420p","-c:a","aac",red.to_str().unwrap()
+        ]).status().unwrap();
+        assert!(gen_red.success());
+        let gen_blue = std::process::Command::new("ffmpeg").args([
+            "-v","error","-y","-f","lavfi","-i","color=c=blue:s=64x64:r=30:d=2","-c:v","libx264","-pix_fmt","yuv420p",blue.to_str().unwrap()
+        ]).status().unwrap();
+        assert!(gen_blue.success());
+        let gen_music = std::process::Command::new("ffmpeg").args([
+            "-v","error","-y","-f","lavfi","-i","sine=frequency=880:duration=2",music.to_str().unwrap()
+        ]).status().unwrap();
+        assert!(gen_music.success());
+        let project = json!({
+            "durationSec":2.0,
+            "assets":[
+                {"id":"red","sourcePath":red.to_string_lossy(),"kind":"video","hasAudio":true},
+                {"id":"blue","sourcePath":blue.to_string_lossy(),"kind":"video","hasAudio":false},
+                {"id":"music","sourcePath":music.to_string_lossy(),"kind":"audio","hasAudio":true}
+            ],
+            "tracks":[
+                {"id":"back","kind":"video","visible":true,"muted":false,"clips":[{"id":"r","assetId":"red","start":0.0,"inPoint":0.0,"duration":2.0,"playbackRate":1.0,"transform":{"scale":1.0,"x":0.0,"y":0.0,"opacity":1.0},"effects":{"brightness":0.0,"contrast":1.0,"saturation":1.0},"audio":{"gainDb":0.0,"muted":false}}],"captions":[]},
+                {"id":"front","kind":"video","visible":true,"muted":false,"clips":[{"id":"b","assetId":"blue","start":0.0,"inPoint":0.0,"duration":2.0,"playbackRate":1.0,"transform":{"scale":0.5,"x":0.0,"y":0.0,"opacity":1.0},"effects":{"brightness":0.0,"contrast":1.0,"saturation":1.0},"audio":{"gainDb":0.0,"muted":false}}],"captions":[]},
+                {"id":"music","kind":"audio","visible":true,"muted":false,"clips":[{"id":"m","assetId":"music","start":0.0,"inPoint":0.0,"duration":2.0,"playbackRate":1.0,"audio":{"gainDb":-6.0,"muted":false}}],"captions":[]}
+            ]
+        });
+        let plan = build_render_composition_plan(&project).unwrap();
+        let graph = build_multitrack_render_graph(&plan, 64, 64).unwrap();
+        assert!(graph.filter.contains("amix=inputs=2"), "{}", graph.filter);
+        let mut cmd = std::process::Command::new("ffmpeg");
+        cmd.args(["-v","error","-y"]); cmd.args(&graph.inputs);
+        cmd.args(["-filter_complex",&graph.filter,"-map","[vout]","-map","[aout]","-c:v","libx264","-pix_fmt","yuv420p","-c:a","aac",out_path.to_str().unwrap()]);
+        let rendered = cmd.output().unwrap();
+        assert!(rendered.status.success(), "{}", String::from_utf8_lossy(&rendered.stderr));
+        let frame = std::process::Command::new("ffmpeg").args([
+            "-v","error","-ss","0.5","-i",out_path.to_str().unwrap(),"-frames:v","1","-pix_fmt","rgb24","-f","rawvideo","-"
+        ]).output().unwrap();
+        assert!(frame.status.success());
+        let px = |x: usize, y: usize| { let i=(y*64+x)*3; (frame.stdout[i],frame.stdout[i+1],frame.stdout[i+2]) };
+        let corner = px(4,4); let center = px(32,32);
+        assert!(corner.0 > corner.2 + 60, "corner must preserve red back layer: {:?}", corner);
+        assert!(center.2 > center.0 + 60, "center must show blue front layer: {:?}", center);
+        let audio = std::process::Command::new("ffmpeg").args([
+            "-v","error","-i",out_path.to_str().unwrap(),"-map","0:a:0","-ac","1","-ar","44100","-f","s16le","-"
+        ]).output().unwrap();
+        assert!(audio.status.success());
+        assert!(audio.stdout.chunks_exact(2).any(|b| i16::from_le_bytes([b[0],b[1]]).abs() > 100));
+        if let Some(dir) = graph.caption_temp_dir { let _ = std::fs::remove_dir_all(dir); }
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
     #[test]
     fn ensure_preview_proxy_real_miss_hit_reuse() {
         // ffmpeg/ffprobe are hard production dependencies (hvs_capabilities).
