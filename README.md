@@ -2,8 +2,8 @@
 
 An **autonomous, AI-driven video creation and learning system** that transforms raw footage into production-grade content through intelligent storytelling, retention analytics, and persistent memory.
 
-**Tech Stack:** Python 86.5% | TypeScript 13.3% | Other 0.2%  
-**Status:** Active development (Last Updated: July 9, 2026)
+**Tech Stack:** Python 78.8% | TypeScript 17% | JavaScript 2.3% | Rust 1.2% | CSS 0.7%  
+**Status:** Active development (Last Updated: September 2, 2026)
 
 ---
 
@@ -347,4 +347,4 @@ For issues, feature requests, or PRs: [GitHub Issues](https://github.com/charan-
 
 ---
 
-**Made with ❤️ by Charan | Last Updated: July 9, 2026**
+**Made with ❤️ by Charan | Last Updated: September 2, 2026**
