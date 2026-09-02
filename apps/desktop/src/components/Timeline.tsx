@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useStudio } from "../store";
 import { pxToSec, collectSnapCandidates, findMagneticSnap, clamp, type SnapTarget } from "@haios/timeline";
+import { buildCrossTrackMovePlan, isCrossTrackDestinationValid, resolveTrackAtClientY } from "../crossTrackMove";
 
 const PX_PER_SEC_BASE = 80;
 
@@ -21,11 +22,13 @@ export function TrackTargetToolbar({ selectedTrackId, onAdd, onRemove, onMove }:
   </span>;
 }
 
-export function TrackLabelControls({ track, selected, onSelect, onControls }: {
+export function TrackLabelControls({ track, selected, onSelect, onControls, canMoveSelection, onMoveSelection }: {
   track: { id: string; kind: string; visible: boolean; muted: boolean; locked: boolean };
   selected: boolean;
   onSelect: () => void;
   onControls: (controls: { visible?: boolean; muted?: boolean; locked?: boolean }) => void;
+  canMoveSelection?: boolean;
+  onMoveSelection?: () => void;
 }) {
   const act = (controls: { visible?: boolean; muted?: boolean; locked?: boolean }) => (e: React.MouseEvent) => {
     e.stopPropagation(); onSelect(); onControls(controls);
@@ -35,7 +38,13 @@ export function TrackLabelControls({ track, selected, onSelect, onControls }: {
     <button data-testid={`track-visible-${track.id}`} aria-pressed={track.visible} title={track.visible ? "Hide track" : "Show track"} onClick={act({ visible: !track.visible })}>{track.visible ? "👁" : "○"}</button>
     <button data-testid={`track-muted-${track.id}`} aria-pressed={track.muted} title={track.muted ? "Unmute track" : "Mute track"} onClick={act({ muted: !track.muted })}>{track.muted ? "M" : "♪"}</button>
     <button data-testid={`track-locked-${track.id}`} aria-pressed={track.locked} title={track.locked ? "Unlock track" : "Lock track"} onClick={act({ locked: !track.locked })}>{track.locked ? "🔒" : "🔓"}</button>
+    <button data-testid={`track-move-selection-${track.id}`} disabled={!canMoveSelection} title="Move selection to this track" onClick={(e) => { e.stopPropagation(); onMoveSelection?.(); }}>⇄</button>
   </div>;
+}
+
+export function CrossTrackDropIndicator({ targetTrackId, valid }: { targetTrackId: string | null; valid: boolean }) {
+  if (!targetTrackId) return null;
+  return <span className="cross-track-drop-indicator" data-cross-track-drop={valid ? "valid" : "invalid"} data-track-id={targetTrackId} />;
 }
 
 export function Timeline() {
@@ -79,9 +88,13 @@ export function Timeline() {
   const dragRef = useRef<{
     mode: "move" | "trim-l" | "trim-r";
     startX: number;
+    startY: number;
+    anchorClipId: string;
     startVals: Record<string, number>; // clipId -> start (move) or inPoint (trim)
+    sourceTrackIds: Record<string, string>;
   } | null>(null);
   const groupPreviewRef = useRef<number | null>(null);
+  const crossTrackDropRef = useRef<{ targetTrackId: string | null; valid: boolean }>({ targetTrackId: null, valid: false });
   const marqueeRef = useRef<{
     startClientX: number; startClientY: number;
     currentClientX: number; currentClientY: number;
@@ -89,12 +102,14 @@ export function Timeline() {
   } | null>(null);
   const suppressTrackClickRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const innerRef = useRef<HTMLDivElement | null>(null);
   const [marqueePreview, setMarqueePreview] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const [movePreview, setMovePreview] = useState<{ ids: string[]; delta: number } | null>(null);
   const [rippleTrimEnabled, setRippleTrimEnabled] = useState(false);
   const [ripplePreview, setRipplePreview] = useState<{ clipId: string; duration: number; sourceEnd?: number; inPoint?: number } | null>(null);
   const [snapEnabled, setSnapEnabled] = useState(false);
   const [snapGuide, setSnapGuide] = useState<{ sec: number; target: SnapTarget } | null>(null);
+  const [crossTrackDrop, setCrossTrackDrop] = useState<{ targetTrackId: string | null; valid: boolean }>({ targetTrackId: null, valid: false });
 
   const pxPerSec = PX_PER_SEC_BASE * zoom;
   const totalSec = Math.max(project.durationSec, 10) + 5;
@@ -126,12 +141,18 @@ export function Timeline() {
     }
     const targets = nextSelectedIds;
     const startVals: Record<string, number> = {};
+    const sourceTrackIds: Record<string, string> = {};
     for (const id of targets) {
       const c = project.tracks.flatMap((t) => t.clips).find((x) => x.id === id);
-      if (c) startVals[id] = mode === "trim-l" ? c.inPoint : mode === "trim-r" ? c.duration : c.start;
+      if (c) {
+        startVals[id] = mode === "trim-l" ? c.inPoint : mode === "trim-r" ? c.duration : c.start;
+        sourceTrackIds[id] = c.trackId;
+      }
     }
-    dragRef.current = { mode, startX: ev.clientX, startVals };
+    dragRef.current = { mode, startX: ev.clientX, startY: ev.clientY, anchorClipId: clip.id, startVals, sourceTrackIds };
     groupPreviewRef.current = null;
+    crossTrackDropRef.current = { targetTrackId: null, valid: false };
+    setCrossTrackDrop(crossTrackDropRef.current);
     setMovePreview(null);
     setRipplePreview(null);
     setSnapGuide(null);
@@ -177,6 +198,24 @@ export function Timeline() {
       }
       groupPreviewRef.current = delta;
       setMovePreview({ ids: targets, delta });
+      const rects = Array.from(innerRef.current?.querySelectorAll<HTMLElement>(":scope > .track") ?? [])
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          return { trackId: element.dataset.trackId ?? "", top: rect.top, bottom: rect.bottom };
+        })
+        .filter((rect) => rect.trackId.length > 0);
+      const hitTrackId = resolveTrackAtClientY(rects, ev.clientY);
+      const sourceTrackId = d.sourceTrackIds[d.anchorClipId];
+      let valid = false;
+      if (hitTrackId && hitTrackId !== sourceTrackId) {
+        try {
+          valid = buildCrossTrackMovePlan(project, targets, d.anchorClipId, delta, hitTrackId).vertical;
+        } catch {
+          valid = false;
+        }
+      }
+      crossTrackDropRef.current = { targetTrackId: hitTrackId && hitTrackId !== sourceTrackId ? hitTrackId : null, valid };
+      setCrossTrackDrop(crossTrackDropRef.current);
       return;
     }
 
@@ -239,9 +278,10 @@ export function Timeline() {
     const targets = Object.keys(d.startVals);
     if (d.mode === "move") {
       const delta = groupPreviewRef.current ?? 0;
-      if (Math.abs(delta) > 1e-6) {
-        if (targets.length > 1) commitGroupMove(delta);
-        else if (targets[0]) moveSelected(d.startVals[targets[0]] + delta);
+      const targetTrackId = crossTrackDropRef.current.targetTrackId ?? undefined;
+      if (Math.abs(delta) > 1e-6 || targetTrackId) {
+        if (targets.length > 1) commitGroupMove(delta, d.anchorClipId, targetTrackId);
+        else if (targets[0]) moveSelected(d.startVals[targets[0]] + delta, targetTrackId);
       }
     }
     if (d.mode === "trim-l" && ripplePreview?.inPoint !== undefined) {
@@ -252,6 +292,8 @@ export function Timeline() {
       else trimSelected(undefined, ripplePreview.sourceEnd);
     }
     groupPreviewRef.current = null;
+    crossTrackDropRef.current = { targetTrackId: null, valid: false };
+    setCrossTrackDrop(crossTrackDropRef.current);
     setMovePreview(null);
     setRipplePreview(null);
     setSnapGuide(null);
@@ -338,6 +380,7 @@ export function Timeline() {
         onScroll={(e) => setScroll(e.currentTarget.scrollLeft / pxPerSec)}
       >
         <div
+          ref={innerRef}
           className="timeline-inner"
           style={{ width }}
           onMouseMove={onMouseMove}
@@ -371,9 +414,12 @@ export function Timeline() {
               <div className="playhead" style={{ left: playheadSec * pxPerSec }} />
             </div>
           </div>
-          {project.tracks.map((track) => (
-            <div key={track.id} className={`track track-${track.kind}${selectedTrackId === track.id ? " target-selected" : ""}`} onClick={(e) => onTrackClick(e, track.id)}>
-              <TrackLabelControls track={track} selected={selectedTrackId === track.id} onSelect={() => selectTrack(track.id)} onControls={(controls) => setSelectedTrackControls(controls)} />
+          {project.tracks.map((track) => {
+            const canMoveSelection = isCrossTrackDestinationValid(project, selectedClipIds, selectedClipId, track.id);
+            const dropState = crossTrackDrop.targetTrackId === track.id ? crossTrackDrop : null;
+            return <div key={track.id} data-track-id={track.id} className={`track track-${track.kind}${selectedTrackId === track.id ? " target-selected" : ""}${dropState?.valid ? " cross-track-drop-valid" : dropState ? " cross-track-drop-invalid" : ""}`} onClick={(e) => onTrackClick(e, track.id)}>
+              <TrackLabelControls track={track} selected={selectedTrackId === track.id} onSelect={() => selectTrack(track.id)} onControls={(controls) => setSelectedTrackControls(controls)} canMoveSelection={canMoveSelection} onMoveSelection={() => { if (selectedClipId) commitGroupMove(0, selectedClipId, track.id); }} />
+              <CrossTrackDropIndicator targetTrackId={dropState?.targetTrackId ?? null} valid={dropState?.valid ?? false} />
               <div className="track-lane" onMouseDown={onLaneMouseDown}>
                 {track.clips.map((clip) => (
                   <ClipView
@@ -391,8 +437,8 @@ export function Timeline() {
                   />
                 ))}
               </div>
-            </div>
-          ))}
+            </div>;
+          })}
         </div>
       </div>
     </div>

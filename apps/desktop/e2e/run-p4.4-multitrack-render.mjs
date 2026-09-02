@@ -5,7 +5,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 const DRIVER = "http://127.0.0.1:4444";
-const APP = "C:/Workspace/super-creator-os/apps/desktop/src-tauri/target/release/haios-video-studio.exe";
+const APP = process.env.HAIOS_APP_PATH ?? "C:/Workspace/super-creator-os/apps/desktop/src-tauri/target/release/haios-video-studio.exe";
 let sessionId = null;
 let gate = "SESSION";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

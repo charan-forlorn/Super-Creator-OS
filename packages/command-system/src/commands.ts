@@ -153,6 +153,148 @@ export const moveClipCommand: EditCommand<z.infer<typeof moveClipSchema>> = {
   },
 };
 
+/* ----------------------- moveAcrossTracks -------------------------- */
+/**
+ * Atomic cross-track movement authority. This intentionally does not extend
+ * `clip.move`: group topology must be validated as a whole before any clip is
+ * reassigned, which the general CommandBus batch preflight cannot guarantee.
+ */
+export const MOVE_CLIP_ACROSS_TRACKS = "clip.moveAcrossTracks";
+export const moveAcrossTracksSchema = z.object({
+  moves: z.array(z.object({
+    clipId: z.string().min(1),
+    sourceTrackId: z.string().min(1),
+    targetTrackId: z.string().min(1),
+    newStart: z.number().nonnegative(),
+  })).min(1),
+});
+type CrossTrackMove = z.infer<typeof moveAcrossTracksSchema>["moves"][number];
+type CrossTrackSnapshot = Pick<Project, "tracks" | "durationSec">;
+
+function compareUnicodeCodePoints(a: string, b: string): number {
+  const left = Array.from(a, (char) => char.codePointAt(0)!);
+  const right = Array.from(b, (char) => char.codePointAt(0)!);
+  for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
+    if (left[index] !== right[index]) return left[index] - right[index];
+  }
+  return left.length - right.length;
+}
+
+function transitionPredecessors(project: Project): Map<string, string> {
+  const predecessors = new Map<string, string>();
+  for (const track of project.tracks) {
+    const ordered = [...track.clips].sort((a, b) => a.start - b.start || compareUnicodeCodePoints(a.id, b.id));
+    for (let index = 0; index < ordered.length; index += 1) {
+      const current = ordered[index];
+      if (!current.transitionIn) continue;
+      const previous = ordered[index - 1];
+      if (!previous) throw new CommandError("CROSS_TRACK_TRANSITION_CONFLICT");
+      predecessors.set(current.id, previous.id);
+    }
+  }
+  return predecessors;
+}
+
+function assertTransitionTopology(before: Project, after: Project, selectedIds: Set<string>): void {
+  const beforePredecessors = transitionPredecessors(before);
+  for (const [clipId, predecessorId] of beforePredecessors) {
+    if (selectedIds.has(clipId) !== selectedIds.has(predecessorId)) {
+      throw new CommandError("CROSS_TRACK_TRANSITION_CONFLICT");
+    }
+  }
+  const afterPredecessors = transitionPredecessors(after);
+  const afterClips = new Map(after.tracks.flatMap((track) => track.clips).map((clip) => [clip.id, clip]));
+  for (const [clipId, predecessorId] of beforePredecessors) {
+    if (afterPredecessors.get(clipId) !== predecessorId) {
+      throw new CommandError("CROSS_TRACK_TRANSITION_CONFLICT");
+    }
+    const clip = afterClips.get(clipId);
+    const predecessor = afterClips.get(predecessorId);
+    if (!clip || !predecessor || !clip.transitionIn || Math.abs(clip.start - (predecessor.start + predecessor.duration - clip.transitionIn.duration)) > 1e-9) {
+      throw new CommandError("CROSS_TRACK_TRANSITION_CONFLICT");
+    }
+  }
+}
+
+function restoreCrossTrackSnapshot(prev: Project, snapshot: CrossTrackSnapshot): { next: Project; inverse: EditCommand } {
+  const current: CrossTrackSnapshot = { tracks: prev.tracks, durationSec: prev.durationSec };
+  return {
+    next: { ...prev, tracks: snapshot.tracks, durationSec: snapshot.durationSec, updatedAt: new Date().toISOString() },
+    inverse: { type: MOVE_CLIP_ACROSS_TRACKS, execute: (project) => restoreCrossTrackSnapshot(project, current) },
+  };
+}
+
+export const moveAcrossTracksCommand: EditCommand<z.infer<typeof moveAcrossTracksSchema>> = {
+  type: MOVE_CLIP_ACROSS_TRACKS,
+  schema: moveAcrossTracksSchema,
+  execute(prev, { moves }) {
+    const selectedIds = new Set<string>();
+    const resolved: Array<CrossTrackMove & { clip: Clip; source: Track; target: Track }> = [];
+    const trackIdCounts = new Map<string, number>();
+    for (const track of prev.tracks) trackIdCounts.set(track.id, (trackIdCounts.get(track.id) ?? 0) + 1);
+    const assertReferencedTrackIdUnique = (trackId: string) => {
+      if ((trackIdCounts.get(trackId) ?? 0) > 1) throw new CommandError(`CROSS_TRACK_TRACK_ID_AMBIGUOUS: ${trackId}`);
+    };
+    let selectionKind: Track["kind"] | null = null;
+    for (const move of moves) {
+      assertReferencedTrackIdUnique(move.sourceTrackId);
+      assertReferencedTrackIdUnique(move.targetTrackId);
+      if (selectedIds.has(move.clipId)) throw new CommandError(`CROSS_TRACK_DUPLICATE_CLIP_ID: ${move.clipId}`);
+      selectedIds.add(move.clipId);
+      const containments = prev.tracks.flatMap((track) =>
+        track.clips.filter((clip) => clip.id === move.clipId).map((clip) => ({ clip, track })),
+      );
+      if (containments.length > 1) throw new CommandError(`CROSS_TRACK_CLIP_ID_AMBIGUOUS: ${move.clipId}`);
+      let found: { clip: Clip; track: Track };
+      try {
+        found = containments[0] ?? findClip(prev, move.clipId);
+      } catch (error) {
+        if (error instanceof CommandError && error.message.startsWith("CLIP_NOT_FOUND:")) {
+          throw new CommandError(`CROSS_TRACK_CLIP_NOT_FOUND: ${move.clipId}`);
+        }
+        throw error;
+      }
+      const { clip, track: source } = found;
+      if (source.id !== move.sourceTrackId || clip.trackId !== source.id) {
+        throw new CommandError(`CROSS_TRACK_SOURCE_TRACK_DRIFT: ${move.clipId}`);
+      }
+      if (source.kind !== "video" && source.kind !== "audio") throw new CommandError(`CROSS_TRACK_TRACK_KIND_UNSUPPORTED: ${source.kind}`);
+      if (selectionKind !== null && source.kind !== selectionKind) throw new CommandError("CROSS_TRACK_SELECTION_KIND_MISMATCH");
+      selectionKind = source.kind;
+      assertTrackUnlocked(source);
+      const target = prev.tracks.find((candidate) => candidate.id === move.targetTrackId);
+      if (!target) throw new CommandError(`CROSS_TRACK_TARGET_TRACK_NOT_FOUND: ${move.targetTrackId}`);
+      if (target.kind !== source.kind) throw new CommandError(`CROSS_TRACK_TARGET_TRACK_KIND_MISMATCH: ${move.targetTrackId}`);
+      assertTrackUnlocked(target);
+      resolved.push({ ...move, clip, source, target });
+    }
+    if (resolved.every((move) => move.source.id === move.target.id && move.clip.start === move.newStart)) {
+      throw new CommandError("CROSS_TRACK_NO_OP");
+    }
+
+    // Prove no one-sided crossfade can be detached before constructing state.
+    assertTransitionTopology(prev, prev, selectedIds);
+    const movedById = new Map(resolved.map((move) => [move.clipId, move]));
+    const incoming = new Map<string, Clip[]>();
+    for (const move of resolved) {
+      const destination = incoming.get(move.target.id) ?? [];
+      destination.push({ ...move.clip, start: move.newStart, trackId: move.target.id });
+      incoming.set(move.target.id, destination);
+    }
+    const tracks = prev.tracks.map((track) => ({
+      ...track,
+      clips: [
+        ...track.clips.filter((clip) => !movedById.has(clip.id)),
+        ...(incoming.get(track.id) ?? []),
+      ],
+    }));
+    const snapshot: CrossTrackSnapshot = { tracks: prev.tracks, durationSec: prev.durationSec };
+    const next: Project = { ...prev, tracks, durationSec: Math.max(recomputeDuration({ ...prev, tracks }), prev.durationSec), updatedAt: new Date().toISOString() };
+    assertTransitionTopology(prev, next, selectedIds);
+    return { next, inverse: { type: MOVE_CLIP_ACROSS_TRACKS, execute: (project) => restoreCrossTrackSnapshot(project, snapshot) } };
+  },
+};
+
 /* ----------------------------- clipAudio ---------------------------- */
 export const SET_CLIP_AUDIO = "clip.audio";
 export const setClipAudioSchema = z.object({

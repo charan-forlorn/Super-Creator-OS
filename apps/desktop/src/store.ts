@@ -17,6 +17,7 @@ import {
   ADD_CLIP,
   DELETE_CLIP,
   MOVE_CLIP,
+  MOVE_CLIP_ACROSS_TRACKS,
   TRIM_CLIP,
   RIPPLE_DELETE_CLIPS,
   RIPPLE_TRIM_CLIP,
@@ -39,6 +40,7 @@ import {
   REORDER_TRACK,
   SET_TRACK_CONTROLS,
 } from "@haios/command-system";
+import { buildCrossTrackMovePlan } from "./crossTrackMove";
 import {
   type AiEditPlan,
   planToCommands,
@@ -144,9 +146,9 @@ export interface StudioState {
   addClip: (assetId: string, trackId: string, inPoint: number, duration: number, start: number) => void;
   deleteSelected: () => void;
   rippleDeleteSelected: () => void;
-  moveSelected: (newStart: number) => void;
+  moveSelected: (newStart: number, targetTrackId?: string) => boolean;
   /** R2.1 — commit a group move (all selected clips shifted by delta seconds) as ONE undoable unit. */
-  commitGroupMove: (deltaSec: number) => void;
+  commitGroupMove: (deltaSec: number, anchorClipId?: string, anchorTargetTrackId?: string) => boolean;
   trimSelected: (newInPoint?: number, newSourceEnd?: number) => void;
   rippleTrimSelected: (newInPoint?: number, newSourceEnd?: number) => void;
   setSelectedAudio: (gainDb: number, muted: boolean) => boolean;
@@ -509,14 +511,24 @@ export const useStudio = create<StudioState>((set, get) => {
       }
     },
 
-    moveSelected: (newStart) => {
+    moveSelected: (newStart, targetTrackId) => {
       const id = get().selectedClipId;
-      if (!id) return;
+      if (!id) return false;
       try {
-        get().bus.execute(MOVE_CLIP, { clipId: id, newStart });
-        set({ project: get().bus.project, dirty: true });
+        const current = get().project.tracks.flatMap((track) => track.clips).find((clip) => clip.id === id);
+        if (!current) throw new Error(`CROSS_TRACK_SELECTED_CLIP_NOT_FOUND: ${id}`);
+        if (targetTrackId && targetTrackId !== current.trackId) {
+          const plan = buildCrossTrackMovePlan(get().project, [id], id, newStart - current.start, targetTrackId);
+          get().bus.execute(MOVE_CLIP_ACROSS_TRACKS, { moves: plan.moves });
+          set({ project: get().bus.project, dirty: true, lastError: null, selectedTrackId: plan.primaryDestinationTrackId });
+        } else {
+          get().bus.execute(MOVE_CLIP, { clipId: id, newStart });
+          set({ project: get().bus.project, dirty: true, lastError: null });
+        }
+        return true;
       } catch (e) {
         set({ lastError: (e as Error).message });
+        return false;
       }
     },
 
@@ -524,23 +536,25 @@ export const useStudio = create<StudioState>((set, get) => {
     // Preserves relative spacing by clamping the WHOLE group's minimum start to 0
     // (not each clip independently), so a drag near the left edge keeps ordering.
     // Fail-closed: if any clip is missing, the whole gesture is rejected.
-    commitGroupMove: (deltaSec) => {
+    commitGroupMove: (deltaSec, anchorClipId, anchorTargetTrackId) => {
       const ids = get().selectedClipIds;
-      if (ids.length === 0) return;
-      const clips = get().project.tracks.flatMap((t) => t.clips);
-      const found = ids
-        .map((id) => clips.find((x) => x.id === id))
-        .filter((c): c is NonNullable<typeof c> => c !== undefined);
-      if (found.length === 0) return;
-      const rawStarts = found.map((c) => c.start + deltaSec);
-      const minRaw = Math.min(...rawStarts);
-      const shift = minRaw < 0 ? -minRaw : 0; // lift the whole group so min >= 0
-      const moves = found.map((c) => ({ clipId: c.id, newStart: c.start + deltaSec + shift }));
+      const selectedPrimaryId = get().selectedClipId;
+      const primary = anchorClipId ?? selectedPrimaryId;
+      if (ids.length === 0 || !primary) return false;
       try {
-        get().bus.batch(moves.map((m) => ({ commandType: MOVE_CLIP, payload: m })));
-        set({ project: get().bus.project, dirty: true });
+        const plan = buildCrossTrackMovePlan(get().project, ids, primary, deltaSec, anchorTargetTrackId);
+        if (plan.vertical) {
+          get().bus.execute(MOVE_CLIP_ACROSS_TRACKS, { moves: plan.moves });
+          const selectedPrimaryDestination = plan.moves.find((move) => move.clipId === selectedPrimaryId)?.targetTrackId ?? plan.primaryDestinationTrackId;
+          set({ project: get().bus.project, dirty: true, lastError: null, selectedTrackId: selectedPrimaryDestination });
+        } else {
+          get().bus.batch(plan.moves.map(({ clipId, newStart }) => ({ commandType: MOVE_CLIP, payload: { clipId, newStart } })));
+          set({ project: get().bus.project, dirty: true, lastError: null });
+        }
+        return true;
       } catch (e) {
         set({ lastError: (e as Error).message });
+        return false;
       }
     },
 
@@ -731,17 +745,21 @@ export const useStudio = create<StudioState>((set, get) => {
       if (get().bus.canUndo) {
         get().bus.undo();
         const id = get().selectedClipId;
-        const stillThere = id && get().project.tracks.some((t) => t.clips.some((c) => c.id === id));
+        const project = get().bus.project;
+        const selectedTrack = id ? project.tracks.find((track) => track.clips.some((clip) => clip.id === id)) : undefined;
         mediaCache.clear();
-        set({ project: get().bus.project, dirty: true, selectedClipId: stillThere ? id : null, mediaAnalysis: {}, thumbnails: {}, previewProxies: {}, cacheState: {} });
+        set({ project, dirty: true, selectedClipId: selectedTrack ? id : null, selectedTrackId: selectedTrack?.id ?? get().selectedTrackId, mediaAnalysis: {}, thumbnails: {}, previewProxies: {}, cacheState: {} });
       }
     },
 
     redo: () => {
       if (get().bus.canRedo) {
         get().bus.redo();
+        const project = get().bus.project;
+        const id = get().selectedClipId;
+        const selectedTrack = id ? project.tracks.find((track) => track.clips.some((clip) => clip.id === id)) : undefined;
         mediaCache.clear();
-        set({ project: get().bus.project, dirty: true, mediaAnalysis: {}, thumbnails: {}, previewProxies: {}, cacheState: {} });
+        set({ project, dirty: true, selectedTrackId: selectedTrack?.id ?? get().selectedTrackId, mediaAnalysis: {}, thumbnails: {}, previewProxies: {}, cacheState: {} });
       }
     },
 

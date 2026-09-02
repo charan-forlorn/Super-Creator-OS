@@ -65,6 +65,9 @@ async function bootstrapE2E() {
     useStudio.getState().loadProject(nextProject);
     mark("project-loaded", nextProject?.id ?? "unknown");
   }) as EventListener);
+  window.addEventListener("haios-e2e-request-project", (() => {
+    mark("project-json", JSON.stringify(useStudio.getState().project));
+  }) as EventListener);
 
   // Mirror the production import flow: for each seeded video asset, generate a
   // deterministic thumbnail AND (if the codec needs it) a cached H.264/AAC proxy

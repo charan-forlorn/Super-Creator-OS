@@ -28,6 +28,45 @@ export declare const moveClipSchema: z.ZodObject<{
     newStart: number;
 }>;
 export declare const moveClipCommand: EditCommand<z.infer<typeof moveClipSchema>>;
+/**
+ * Atomic cross-track movement authority. This intentionally does not extend
+ * `clip.move`: group topology must be validated as a whole before any clip is
+ * reassigned, which the general CommandBus batch preflight cannot guarantee.
+ */
+export declare const MOVE_CLIP_ACROSS_TRACKS = "clip.moveAcrossTracks";
+export declare const moveAcrossTracksSchema: z.ZodObject<{
+    moves: z.ZodArray<z.ZodObject<{
+        clipId: z.ZodString;
+        sourceTrackId: z.ZodString;
+        targetTrackId: z.ZodString;
+        newStart: z.ZodNumber;
+    }, "strip", z.ZodTypeAny, {
+        clipId: string;
+        newStart: number;
+        sourceTrackId: string;
+        targetTrackId: string;
+    }, {
+        clipId: string;
+        newStart: number;
+        sourceTrackId: string;
+        targetTrackId: string;
+    }>, "many">;
+}, "strip", z.ZodTypeAny, {
+    moves: {
+        clipId: string;
+        newStart: number;
+        sourceTrackId: string;
+        targetTrackId: string;
+    }[];
+}, {
+    moves: {
+        clipId: string;
+        newStart: number;
+        sourceTrackId: string;
+        targetTrackId: string;
+    }[];
+}>;
+export declare const moveAcrossTracksCommand: EditCommand<z.infer<typeof moveAcrossTracksSchema>>;
 export declare const SET_CLIP_AUDIO = "clip.audio";
 export declare const setClipAudioSchema: z.ZodObject<{
     clipId: z.ZodString;
@@ -163,9 +202,9 @@ export declare const placeCaptionSchema: z.ZodObject<{
     targetTrackId?: string | undefined;
 }, {
     text: string;
+    targetTrackId?: string | undefined;
     duration?: number | undefined;
     start?: number | undefined;
-    targetTrackId?: string | undefined;
 }>;
 export declare const placeCaptionCommand: EditCommand<z.infer<typeof placeCaptionSchema>>;
 export declare const ADD_CAPTION = "caption.add";
@@ -453,9 +492,9 @@ export declare const addTrackSchema: z.ZodObject<{
         muted: z.ZodDefault<z.ZodBoolean>;
         locked: z.ZodDefault<z.ZodBoolean>;
     }, "strip", z.ZodTypeAny, {
+        id: string;
         muted: boolean;
         kind: "video" | "audio" | "text";
-        id: string;
         clips: {
             id: string;
             audio: {
@@ -502,8 +541,8 @@ export declare const addTrackSchema: z.ZodObject<{
         visible: boolean;
         locked: boolean;
     }, {
-        kind: "video" | "audio" | "text";
         id: string;
+        kind: "video" | "audio" | "text";
         muted?: boolean | undefined;
         clips?: {
             id: string;
@@ -553,9 +592,9 @@ export declare const addTrackSchema: z.ZodObject<{
     }>;
 }, "strip", z.ZodTypeAny, {
     track: {
+        id: string;
         muted: boolean;
         kind: "video" | "audio" | "text";
-        id: string;
         clips: {
             id: string;
             audio: {
@@ -604,8 +643,8 @@ export declare const addTrackSchema: z.ZodObject<{
     };
 }, {
     track: {
-        kind: "video" | "audio" | "text";
         id: string;
+        kind: "video" | "audio" | "text";
         muted?: boolean | undefined;
         clips?: {
             id: string;
@@ -715,11 +754,11 @@ export declare const placeProbedMediaSchema: z.ZodObject<{
         audioCodec: z.ZodOptional<z.ZodNullable<z.ZodString>>;
         probeStatus: z.ZodString;
     }, "strip", z.ZodTypeAny, {
-        kind: "video" | "audio" | "image" | "unknown";
+        durationSec: number;
         id: string;
         name: string;
+        kind: "video" | "audio" | "image" | "unknown";
         sourcePath: string;
-        durationSec: number;
         hasAudio: boolean;
         probeStatus: string;
         width?: number | undefined;
@@ -728,11 +767,11 @@ export declare const placeProbedMediaSchema: z.ZodObject<{
         videoCodec?: string | null | undefined;
         audioCodec?: string | null | undefined;
     }, {
-        kind: "video" | "audio" | "image" | "unknown";
+        durationSec: number;
         id: string;
         name: string;
+        kind: "video" | "audio" | "image" | "unknown";
         sourcePath: string;
-        durationSec: number;
         hasAudio: boolean;
         probeStatus: string;
         width?: number | undefined;
@@ -745,11 +784,11 @@ export declare const placeProbedMediaSchema: z.ZodObject<{
     targetTrackId: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     probe: {
-        kind: "video" | "audio" | "image" | "unknown";
+        durationSec: number;
         id: string;
         name: string;
+        kind: "video" | "audio" | "image" | "unknown";
         sourcePath: string;
-        durationSec: number;
         hasAudio: boolean;
         probeStatus: string;
         width?: number | undefined;
@@ -762,11 +801,11 @@ export declare const placeProbedMediaSchema: z.ZodObject<{
     targetTrackId?: string | undefined;
 }, {
     probe: {
-        kind: "video" | "audio" | "image" | "unknown";
+        durationSec: number;
         id: string;
         name: string;
+        kind: "video" | "audio" | "image" | "unknown";
         sourcePath: string;
-        durationSec: number;
         hasAudio: boolean;
         probeStatus: string;
         width?: number | undefined;
@@ -816,10 +855,10 @@ export declare const relinkMediaSchema: z.ZodObject<{
         audioCodec: z.ZodOptional<z.ZodNullable<z.ZodString>>;
         probeStatus: z.ZodString;
     }, "strip", z.ZodTypeAny, {
-        kind: "video" | "audio" | "image" | "unknown";
-        name: string;
-        sourcePath: string;
         durationSec: number;
+        name: string;
+        kind: "video" | "audio" | "image" | "unknown";
+        sourcePath: string;
         hasAudio: boolean;
         probeStatus: string;
         width?: number | undefined;
@@ -828,10 +867,10 @@ export declare const relinkMediaSchema: z.ZodObject<{
         videoCodec?: string | null | undefined;
         audioCodec?: string | null | undefined;
     }, {
-        kind: "video" | "audio" | "image" | "unknown";
-        name: string;
-        sourcePath: string;
         durationSec: number;
+        name: string;
+        kind: "video" | "audio" | "image" | "unknown";
+        sourcePath: string;
         hasAudio: boolean;
         probeStatus: string;
         width?: number | undefined;
@@ -842,10 +881,10 @@ export declare const relinkMediaSchema: z.ZodObject<{
     }>;
 }, "strip", z.ZodTypeAny, {
     probe: {
-        kind: "video" | "audio" | "image" | "unknown";
-        name: string;
-        sourcePath: string;
         durationSec: number;
+        name: string;
+        kind: "video" | "audio" | "image" | "unknown";
+        sourcePath: string;
         hasAudio: boolean;
         probeStatus: string;
         width?: number | undefined;
@@ -857,10 +896,10 @@ export declare const relinkMediaSchema: z.ZodObject<{
     assetId: string;
 }, {
     probe: {
-        kind: "video" | "audio" | "image" | "unknown";
-        name: string;
-        sourcePath: string;
         durationSec: number;
+        name: string;
+        kind: "video" | "audio" | "image" | "unknown";
+        sourcePath: string;
         hasAudio: boolean;
         probeStatus: string;
         width?: number | undefined;

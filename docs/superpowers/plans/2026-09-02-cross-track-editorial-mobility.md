@@ -4,7 +4,7 @@
 
 **Goal:** Let video/audio clips move atomically between compatible tracks by pointer drag while preserving CommandBus authority, exact undo/redo, snapping, selection, Preview≈Export, save/reopen, and Phase 4 invariants.
 
-**Architecture:** Extend `MOVE_CLIP` with optional `targetTrackId`, keep Project v2 canonical, and use the existing CommandBus batch transaction for group moves. Add one pure desktop move-planning helper for same-kind lane-delta mapping and DOM track-hit resolution; Timeline remains the gesture coordinator while Preview/Rust continue deriving only from persisted Project membership.
+**Architecture:** Preserve legacy `MOVE_CLIP` for existing same-track callers. Use the dedicated atomic `MOVE_CLIP_ACROSS_TRACKS` command for cross-track selections, keep Project v2 canonical, and use the existing CommandBus batch transaction only for same-track group moves. Add one pure desktop move-planning helper for same-kind lane-delta mapping and DOM track-hit resolution; Timeline remains the gesture coordinator while Preview/Rust continue deriving only from persisted Project membership.
 
 **Tech Stack:** TypeScript 5.6, React 18, Zustand 4, Zod, Vitest 2, Tauri 2, WebView2/tauri-driver, Rust/FFmpeg, pnpm 11.
 
@@ -17,6 +17,7 @@
 - Persisted Project remains canonical truth; runtime drag/drop state is never persisted.
 - Every production mutation must flow through CommandBus; UI validation is advisory only.
 - Existing `{ clipId, newStart }` MOVE_CLIP callers must remain behaviorally unchanged.
+- **Implementation-discovered deviation (narrow):** the original `MOVE_CLIP` extension / per-item batch design is unsafe for cross-track selections. Transition-pair topology and duplicate/non-unique track-ID checks must be evaluated against the complete proposed topology before any clip is reassigned; `CommandBus.batch` validates individual `MOVE_CLIP` operations through intermediate states and cannot provide that guarantee. Therefore cross-track operations use `clip.moveAcrossTracks` as one atomic command, while `clip.move` remains the legacy same-track authority. This is a safety-preserving reconciliation, not a new UI or persistence architecture.
 - Source and destination track locks are fail-closed authority boundaries.
 - Only video→video and audio→audio cross-track movement is valid; text tracks are not clip destinations in this slice.
 - Mixed video+audio selections may move horizontally but vertical group movement is rejected atomically.
@@ -41,7 +42,7 @@
 - `apps/desktop/e2e/run-p5-cross-track-qualification.mjs` — save/reopen + Preview/Export destination semantics using production commands.
 - `integrations/video-studio/CHECKPOINT.md` — terminal evidence only after fresh qualification.
 
-### Task 1: Extend MOVE_CLIP Command Authority
+### Task 1: Add Atomic Cross-Track Command Authority
 
 **Files:**
 - Create: `packages/command-system/tests/phase5-cross-track-move.test.ts`
@@ -50,16 +51,16 @@
 
 **Interfaces:**
 - Consumes: existing `findClip`, `findTrack`, `assertTrackUnlocked`, `recomputeDuration`.
-- Produces: `moveClipSchema = { clipId, newStart, targetTrackId? }`; `MOVE_CLIP` restores both `trackId` and `start` on inverse.
+- Produces: legacy `moveClipSchema = { clipId, newStart }` unchanged, plus `moveAcrossTracksSchema = { moves: [{ clipId, sourceTrackId, targetTrackId, newStart }] }`; the atomic inverse restores the whole validated topology.
 - [ ] **Step 1: Write CommandBus RED tests**
 
 Add fixtures with two video tracks, two audio tracks, one locked track, and exact assertions for containment + `clip.trackId`:
 
 ```ts
-it("moves a video clip to an explicit compatible destination", () => {
+it("moves a video clip to an explicit compatible destination atomically", () => {
   const source = track("v1"); source.clips = [clip("c", "v1", 1)];
   const bus = busWithTracks([source, track("v2")]);
-  bus.execute("clip.move", { clipId: "c", newStart: 4, targetTrackId: "v2" });
+  bus.execute("clip.moveAcrossTracks", { moves: [{ clipId: "c", sourceTrackId: "v1", targetTrackId: "v2", newStart: 4 }] });
   expect(bus.project.tracks.find(t => t.id === "v1")?.clips).toHaveLength(0);
   expect(bus.project.tracks.find(t => t.id === "v2")?.clips[0]).toMatchObject({ id: "c", trackId: "v2", start: 4 });
 });
@@ -69,37 +70,16 @@ it("undoes and redoes membership plus time exactly", () => {
 });
 ```
 
-Also assert: audio→audio PASS; missing target throws `CLIP_MOVE_TARGET_TRACK_NOT_FOUND`; video→audio throws `CLIP_MOVE_TARGET_TRACK_KIND_MISMATCH`; source/destination locked throw `TRACK_LOCKED`; same-track caller without `targetTrackId` remains unchanged.
+Also assert: audio→audio PASS; missing target throws `CROSS_TRACK_TARGET_TRACK_NOT_FOUND`; video→audio throws `CROSS_TRACK_TARGET_TRACK_KIND_MISMATCH`; source/destination locked throw `TRACK_LOCKED`; legacy same-track `clip.move` remains unchanged.
 
 - [ ] **Step 2: Run focused RED**
 
 Run: `pnpm --filter @haios/command-system test -- phase5-cross-track-move.test.ts`
-Expected: FAIL because `moveClipSchema` strips/rejects `targetTrackId` and membership does not change.
+Expected: FAIL because no atomic cross-track command exists yet.
 
 - [ ] **Step 3: Implement minimal command authority**
 
-Use the existing command rather than introducing another movement command:
-
-```ts
-export const moveClipSchema = z.object({
-  clipId: z.string().min(1), newStart: z.number().nonnegative(), targetTrackId: z.string().min(1).optional(),
-});
-```
-```ts
-execute(prev, { clipId, newStart, targetTrackId }) {
-  const { clip, track: source } = findClip(prev, clipId);
-  assertTrackUnlocked(source);
-  const destination = targetTrackId
-    ? prev.tracks.find((track) => track.id === targetTrackId)
-    : source;
-  if (!destination) throw new CommandError(`CLIP_MOVE_TARGET_TRACK_NOT_FOUND: ${targetTrackId}`);
-  if (destination.kind !== source.kind) throw new CommandError(`CLIP_MOVE_TARGET_TRACK_KIND_MISMATCH: ${destination.id}`);
-  assertTrackUnlocked(destination);
-  const moved = { ...clip, start: newStart, trackId: destination.id };
-  // same-track: replace in place; cross-track: remove once from source, append once to destination.
-  // inverse payload: { clipId, newStart: clip.start, targetTrackId: source.id }
-}
-```
+Keep `clip.move` unchanged. Implement `clip.moveAcrossTracks` to validate every source/destination reference, lock, kind, duplicate/non-unique ID, and transition relationship before building the next Project. Remove each selected clip exactly once, add its updated membership exactly once, then snapshot the complete `tracks`/`durationSec` topology for exact atomic undo/redo.
 
 Do not sort persisted destination arrays here; Phase 4 composition already applies canonical start→code-point ordering where render order requires it.
 
@@ -114,7 +94,7 @@ Expected: all PASS, including existing locked `clip.move` coverage.
 
 Run: `pnpm --filter @haios/command-system build`
 Then run a Node import against `packages/command-system/dist/index.js` that moves `c` from `v1` to `v2`, undoes, and redoes.
-Expected: source/dist semantics match and dist contains optional `targetTrackId` typing.
+Expected: source/dist semantics match and dist exports the atomic `moveAcrossTracks` command/types.
 
 - [ ] **Step 6: Commit Task 1 exact scope**
 

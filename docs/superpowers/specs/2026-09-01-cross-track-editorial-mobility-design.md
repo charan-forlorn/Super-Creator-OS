@@ -240,6 +240,7 @@ Phase 5 is not complete until all of the following are fresh and current:
 - `SELECTED_TRACK_AFTER_DROP=PASS`
 - `PREVIEW_AFTER_MOVE=PASS`
 - `EXPORT_AFTER_MOVE=PASS`
+- `PREVIEW_EXPORT_AFTER_MOVE_PARITY=PASS`
 - `SAVE_REOPEN_AFTER_MOVE=PASS`
 - `REAL_TAURI_POINTER_GESTURE=PASS`
 - full TypeScript/Vitest regression PASS;

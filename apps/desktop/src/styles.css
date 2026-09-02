@@ -132,6 +132,11 @@ body { background: var(--bg); color: var(--fg); }
 .track-audio .track-label { color: var(--accent-2); }.track-label button { min-width: 13px; width: 13px; height: 20px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: inherit; font-size: 9px; cursor: pointer; }
 .track-label button[data-selected="true"] { background: var(--accent); color: #fff; }
 .track.target-selected { background: rgba(79, 157, 255, 0.06); }
+.track.cross-track-drop-valid { background: rgba(64, 196, 126, 0.16); outline: 1px solid rgba(64, 196, 126, 0.8); }
+.track.cross-track-drop-invalid { background: rgba(232, 95, 95, 0.16); outline: 1px solid rgba(232, 95, 95, 0.8); }
+.cross-track-drop-indicator { position: absolute; right: 4px; width: 7px; height: 7px; border-radius: 50%; pointer-events: none; }
+.cross-track-drop-indicator[data-cross-track-drop="valid"] { background: #40c47e; }
+.cross-track-drop-indicator[data-cross-track-drop="invalid"] { background: #e85f5f; }
 .track-target-tools { display: flex; align-items: center; gap: 3px; }
 .selected-track-target { color: var(--muted); font-size: 10px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .timeline-toolbar button:disabled { opacity: 0.45; cursor: default; }
