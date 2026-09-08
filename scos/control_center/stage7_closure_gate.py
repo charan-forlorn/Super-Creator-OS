@@ -339,10 +339,17 @@ def _read_latest_commit(root: Path) -> str | None:
     if git_dir.is_file():
         pointer = _read_text(git_dir)
         if pointer and pointer.strip().startswith("gitdir:"):
-            target = (git_dir.parent / pointer.strip()[len("gitdir:"):].strip())
+            raw_target = pointer.strip()[len("gitdir:"):].strip()
+            target = Path(raw_target)
             resolved = target.resolve() if target.is_absolute() else (git_dir.parent / target).resolve()
             if resolved.is_dir():
-                git_dir = resolved
+                worktree_git_dir = resolved
+                commondir_text = _read_text(worktree_git_dir / "commondir")
+                if commondir_text and commondir_text.strip():
+                    common = Path(commondir_text.strip())
+                    git_dir = common.resolve() if common.is_absolute() else (worktree_git_dir / common).resolve()
+                else:
+                    git_dir = worktree_git_dir
     head = _read_text(git_dir / "HEAD")
     if head is None:
         return None

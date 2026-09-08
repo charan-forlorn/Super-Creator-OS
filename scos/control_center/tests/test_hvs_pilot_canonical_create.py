@@ -20,6 +20,8 @@ from pathlib import Path
 
 import pytest
 
+from test_hvs_pilot_packet_admission import _make_inputs, _packet, _write_packet
+
 from scos.control_center import hvs_pilot_canonical_create as cc
 from scos.control_center.hvs_pilot_packet_admission import admit_packet
 from scos.control_center.hvs_pilot_render_readiness import evaluate_render_readiness
@@ -30,22 +32,17 @@ PACKET_SRC = REPO / ".." / "scos-paid-pilot-input" / "authorization-packet.json"
 
 @pytest.fixture
 def env(tmp_path):
-    # Place the packet INSIDE the allowed root so containment passes (gap B fix).
-    root = tmp_path / "approved-input"
-    root.mkdir()
-    # Copy the immutable source packet + all referenced files (read-only reference)
-    # into the allowed root: assets/ and evidence/.
-    src_root = PACKET_SRC.resolve().parent
-    for sub in ("assets", "evidence"):
-        src_sub = src_root / sub
-        if src_sub.is_dir():
-            dst_sub = root / sub
-            dst_sub.mkdir(exist_ok=True)
-            for f in src_sub.iterdir():
-                if f.is_file():
-                    (dst_sub / f.name).write_bytes(f.read_bytes())
-    pkt = root / "authorization-packet.json"
-    pkt.write_text((src_root / "authorization-packet.json").read_text(encoding="utf-8"), encoding="utf-8")
+    # Reuse the deterministic packet fixture from the packet-admission suite.
+    root, _assets = _make_inputs(tmp_path)
+    pkt_data = _packet(root)
+    import hashlib
+    for asset in pkt_data["approved_customer_assets"]:
+        data = (root / asset["source_location_reference"]).read_bytes()
+        asset["sha256"] = hashlib.sha256(data).hexdigest()
+        asset["size_bytes"] = len(data)
+    ev = (root / "evidence" / "PILOT-2026-001-self-authorization.txt").read_bytes()
+    pkt_data["customer_identity_evidence_sha256"] = hashlib.sha256(ev).hexdigest()
+    pkt = _write_packet(root, pkt_data)
     stores = {
         "admission_store_path": str(tmp_path / "admission" / "store.json"),
         "identity_store_path": str(tmp_path / "identity" / "store.jsonl"),
@@ -56,7 +53,7 @@ def env(tmp_path):
         "packet_path": str(pkt),
         "approved_input_root": str(root),
     }
-    (tmp_path / "output").mkdir(parents=True, exist_ok=True)  # readiness requires empty output root
+    (tmp_path / "output").mkdir(parents=True, exist_ok=True)
     return {"root": root, "pkt": pkt, "stores": stores}
 
 

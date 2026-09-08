@@ -11,8 +11,13 @@ written here never enter version control (per task hard constraints).
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
+import json
 
 import pytest
+
+from scos.control_center.hvs_evidence_intake import intake_hvs_render_evidence
+from scos.control_center.hvs_delivery_approval import _stable_approval_request_id
 
 from scos.control_center.hvs_delivery_approval import (
     ALREADY_DECIDED,
@@ -64,6 +69,38 @@ def _verified_packet(**overrides) -> dict:
     }
     base.update(overrides)
     return base
+
+
+def _make_cli_evidence(tmp_path: Path) -> tuple[Path, str]:
+    project = tmp_path / "projects" / "proj-9"
+    artifact = project / "renders" / "x.mp4"
+    evidence = project / "stage6_validation" / "validate.json"
+    artifact.parent.mkdir(parents=True)
+    evidence.parent.mkdir(parents=True)
+    data = b"deterministic-test-artifact"
+    artifact.write_bytes(data)
+    sha = hashlib.sha256(data).hexdigest()
+    payload = {
+        "schema_version": "hvs.quality.stage6/1.0.0",
+        "validation_id": "val-cli",
+        "project_id": "proj-9",
+        "verdict": "PASS",
+        "export_ready": True,
+        "artifact": {"path": str(artifact), "sha256": sha, "size_bytes": len(data)},
+        "checks": [{"check_id": "artifact_integrity", "status": "PASS"}],
+    }
+    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, indent=2)
+    payload["evidence_sha256"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    evidence.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+    ingested = intake_hvs_render_evidence(evidence_path=str(evidence), verify_artifact=True)
+    assert ingested.ok is True, ingested.to_dict()
+    packet = ingested.to_dict()
+    aid = _stable_approval_request_id(
+        packet_id=packet["packet_id"],
+        validation_id=packet["hvs"]["validation_id"],
+        artifact_sha256=packet["artifact"]["sha256"],
+    )
+    return evidence, aid
 
 
 @pytest.fixture
@@ -339,22 +376,21 @@ def test_no_external_side_effects(repo_root):
 
 
 # --- 11) CLI JSON and exit-code contracts ------------------------------------
-def test_cli_create_approve_exit_codes(tmp_path, repo_root, monkeypatch):
+def test_cli_create_approve_exit_codes(tmp_path, repo_root, monkeypatch, capsys):
     import json
 
     from scos.control_center import cli as cli_mod
 
     # Use the real VERIFIED evidence from the Stage 4 rerun so the CLI path is
     # exercised end-to-end through Stage 3 intake re-verification.
-    evidence = (
-        "C:/Workspace/hermes-video-studio/projects/6e852988498a/"
-        "stage6_validation/validate_export_b0126558092ef864.json"
-    )
+    evidence_path, _aid = _make_cli_evidence(tmp_path)
+    evidence = str(evidence_path)
     monkeypatch.setattr(cli_mod, "_repo_root", lambda: repo_root)
 
     rc = cli_mod.main(["create-hvs-delivery-approval", "--evidence-path", evidence])
     assert rc == 0
-    aid = "scos-hvs-approval-51ffd93ced7650c1"  # deterministic for that evidence
+    created = json.loads(capsys.readouterr().out)
+    aid = created["approval_request_id"]
 
     # Inspect returns 0.
     assert cli_mod.main(
@@ -395,18 +431,16 @@ def test_cli_create_approve_exit_codes(tmp_path, repo_root, monkeypatch):
     )
 
 
-def test_cli_reject_missing_reason_exit1(tmp_path, repo_root, monkeypatch):
+def test_cli_reject_missing_reason_exit1(tmp_path, repo_root, monkeypatch, capsys):
     from scos.control_center import cli as cli_mod
 
-    evidence = (
-        "C:/Workspace/hermes-video-studio/projects/6e852988498a/"
-        "stage6_validation/validate_export_b0126558092ef864.json"
-    )
+    evidence_path, _aid = _make_cli_evidence(tmp_path)
+    evidence = str(evidence_path)
     monkeypatch.setattr(cli_mod, "_repo_root", lambda: repo_root)
     assert cli_mod.main(
         ["create-hvs-delivery-approval", "--evidence-path", evidence]
     ) == 0
-    aid = "scos-hvs-approval-51ffd93ced7650c1"
+    aid = json.loads(capsys.readouterr().out)["approval_request_id"]
     # Reject without reason -> exit 1.
     assert (
         cli_mod.main(
@@ -425,20 +459,14 @@ def test_cli_reject_missing_reason_exit1(tmp_path, repo_root, monkeypatch):
 
 
 # --- 12) directly affected Stage 3 / 3.1 intake regression stays usable ------
-def test_stage3_intake_still_verifies_root_relative():
+def test_stage3_intake_still_verifies_root_relative(tmp_path):
     import json
 
     from scos.control_center.hvs_evidence_intake import intake_hvs_render_evidence
 
-    evidence = (
-        "C:/Workspace/hermes-video-studio/projects/6e852988498a/"
-        "stage6_validation/validate_export_b0126558092ef864.json"
-    )
-    res = intake_hvs_render_evidence(evidence_path=evidence, verify_artifact=True)
+    evidence, _aid = _make_cli_evidence(tmp_path)
+    res = intake_hvs_render_evidence(evidence_path=str(evidence), verify_artifact=True)
     assert res.ok is True
     assert res.trust_level == "VERIFIED"
     assert res.operator_action == "review_export_ready"
     assert res.automation_allowed is False
-    assert res.artifact_sha256 == (
-        "7d7ac1a37a4be4e225ad39c1c0f07fd572cbf9f88b8986a64d862f5bea7ad3b9"
-    )

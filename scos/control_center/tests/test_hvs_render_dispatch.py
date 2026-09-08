@@ -1521,6 +1521,11 @@ def test_34_security_scan_new_module():
 
 def test_35_real_hvs_repo_untouched_by_tests():
     """Tests never point hvs_root at the real HVS repo; repo stays clean."""
+    # Canonical HVS is an external production dependency. Without it this
+    # isolation check cannot execute, so remain SKIPPED rather than PASS/FAIL.
+    # Production qualification separately records the dependency as unavailable.
+    if not HVS_REPO_ROOT.is_dir() or not (HVS_REPO_ROOT / ".git").exists():
+        pytest.skip(f"canonical HVS repository unavailable: {HVS_REPO_ROOT}")
     # Every setup helper uses fresh_root() (temp). Assert the real repo dir has
     # no stray renders produced by our tests under projects/<stage5>.
     projects = HVS_REPO_ROOT / "projects"

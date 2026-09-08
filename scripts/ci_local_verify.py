@@ -69,6 +69,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence
 
+# Keep standalone execution and package/module execution on the same import
+# surface so the canonical SCOS media resolver is available before constants
+# are initialized.
+_EARLY_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_EARLY_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_EARLY_REPO_ROOT))
+
 # ---------------------------------------------------------------------------
 # Canonical constants (the shared SCOS/HVS contract, Cohort 8C Â§6)
 # ---------------------------------------------------------------------------
