@@ -3,8 +3,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from pathlib import Path
 from typing import Any
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 CONTRACT = "HAIOS_SCOS_CREATIVE_JOB_V1"
 SCHEMA_VERSION = 1
@@ -107,8 +112,9 @@ def run_bridge(request: dict[str, Any], *, dry_run: bool) -> dict[str, Any]:
     artifacts: list[dict[str, Any]] = []
     output = raw.get("video_path")
     if output:
-        record = _artifact_record(Path(output), root)
-        if record is None:
+        source_path = Path(output).resolve(strict=False)
+        export_root = _root(request.get("export_workspace", str(root)))
+        if not _inside(export_root, root):
             return {
                 "schema_version": SCHEMA_VERSION, "contract": CONTRACT,
                 "goal_id": request["goal_id"], "job_id": request["job_id"],
@@ -116,8 +122,24 @@ def run_bridge(request: dict[str, Any], *, dry_run: bool) -> dict[str, Any]:
                 "execution_trace": raw.get("execution_trace", []), "artifacts": [],
                 "qa": raw.get("qa_report") or {"status": "UNKNOWN"},
                 "learning_events": [],
-                "provenance": {"execution": "local", "reason": "OUTPUT_OUT_OF_BOUNDS"},
+                "provenance": {"execution": "local", "reason": "EXPORT_WORKSPACE_OUT_OF_BOUNDS"},
             }
+        if not source_path.is_file() or not _inside(source_path, _REPO_ROOT):
+            return {
+                "schema_version": SCHEMA_VERSION, "contract": CONTRACT,
+                "goal_id": request["goal_id"], "job_id": request["job_id"],
+                "project_id": request["project_id"], "status": "BLOCKED",
+                "execution_trace": raw.get("execution_trace", []), "artifacts": [],
+                "qa": raw.get("qa_report") or {"status": "UNKNOWN"},
+                "learning_events": [],
+                "provenance": {"execution": "local", "reason": "OUTPUT_SOURCE_INVALID"},
+            }
+        export_root.mkdir(parents=True, exist_ok=True)
+        export_path = export_root / f"{request['job_id']}-{source_path.name}"
+        export_path.write_bytes(source_path.read_bytes())
+        record = _artifact_record(export_path, root)
+        assert record is not None
+        record["source_path"] = str(source_path)
         artifacts.append(record)
     pipeline_status = raw.get("status")
     qa = raw.get("qa_report") or {"status": "UNKNOWN"}

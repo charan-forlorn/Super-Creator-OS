@@ -47,6 +47,7 @@ def test_local_mode_returns_success_envelope(tmp_path: Path, monkeypatch):
         }
 
     monkeypatch.setattr("integrations.haios_bridge.bridge._run_pipeline", fake)
+    monkeypatch.setattr("integrations.haios_bridge.bridge._REPO_ROOT", tmp_path)
     result = run_bridge(_request(tmp_path, mode="local"), dry_run=False)
     assert result["status"] == "SUCCEEDED"
     assert result["artifacts"][0]["sha256"]
@@ -69,6 +70,7 @@ def test_outside_artifact_is_rejected(tmp_path: Path, monkeypatch):
         return {"status": "success", "video_path": str(outside), "qa_report": {"status": "PASS"}, "execution_trace": []}
 
     monkeypatch.setattr("integrations.haios_bridge.bridge._run_pipeline", fake)
+    monkeypatch.setattr("integrations.haios_bridge.bridge._REPO_ROOT", tmp_path)
     result = run_bridge(_request(tmp_path, mode="local"), dry_run=False)
     assert result["status"] == "BLOCKED"
-    assert "OUT_OF_BOUNDS" in result["provenance"]["reason"]
+    assert "OUTPUT_SOURCE_INVALID" in result["provenance"]["reason"]

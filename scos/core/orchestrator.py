@@ -8,8 +8,8 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timezone
 
-from scos.agents.asset_builder import AssetBuilder
 from scos.agents.edit_composer import EditComposer
+from scos.assets.asset_builder_v2 import AssetBuilderV2
 from scos.agents.qa_agent import QAAgent
 from scos.agents.scene_planner import ScenePlanner
 from scos.agents.script_agent import ScriptAgent
@@ -31,7 +31,7 @@ def run_pipeline(input_prompt: str) -> dict:
     agents = {
         "script": ScriptAgent(),
         "scene_plan": ScenePlanner(),
-        "asset_build": AssetBuilder(),
+        "asset_build": AssetBuilderV2(),
         "edit_plan": EditComposer(),
         "render": ffmpeg_engine,
         "qa": QAAgent(),
@@ -45,7 +45,7 @@ def run_pipeline(input_prompt: str) -> dict:
         state.record("scene_plan", "success")
 
         state.asset_bundle = agents["asset_build"].run(
-            {"run_id": run_id, "scene_plan": state.scene_plan}
+            state.scene_plan, run_id
         )
         state.record("asset_build", "success")
 
