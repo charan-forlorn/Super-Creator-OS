@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -53,6 +54,7 @@ from .hvs_project_materialization_service import (
 )
 from .hvs_project_materialization_store import MaterializationStore
 from .hvs_adapter import HermesVideoStudioAdapter, HVSAdapterConfig
+from .video_engine_materialization import initialize_project as hyperframes_initialize_project, inspect_project as hyperframes_inspect_project
 
 # Isolated HVS contracts live under <projects_root>/_contracts/<hvs_name>.json
 _CONTRACTS_SUBDIR = "_contracts"
@@ -308,6 +310,44 @@ def _hvs_inspector_factory(
     return _inspect
 
 
+
+def _use_hyperframes_backend(hvs_repo_path: str | None) -> bool:
+    """Prefer the verified local video backend unless legacy HVS is explicit.
+
+    SCOS_VIDEO_ENGINE=hyperframes is the default. Legacy HVS requires an
+    explicit `hvs` selection and a separately validated repository path.
+    """
+    mode = (os.environ.get("SCOS_VIDEO_ENGINE") or "hyperframes").strip().lower()
+    if mode == "hvs":
+        return False
+    return mode == "hyperframes" or not hvs_repo_path or not Path(hvs_repo_path).is_dir()
+
+
+def _hyperframes_initializer_factory(projects_root: str | None):
+    if not projects_root:
+        raise ValueError("HYPERFRAMES_PROJECT_ROOT_MISSING")
+
+    def _init(**kwargs: Any) -> dict[str, Any]:
+        return hyperframes_initialize_project(
+            project_id=str(kwargs.get("project_id")),
+            projects_root=str(projects_root),
+            expected_payload_hash=str(kwargs.get("expected_payload_hash") or ""),
+            request_id=str(kwargs.get("request_id") or ""),
+        )
+    return _init
+
+
+def _hyperframes_inspector_factory(projects_root: str | None):
+    if not projects_root:
+        raise ValueError("HYPERFRAMES_PROJECT_ROOT_MISSING")
+
+    def _inspect(**kwargs: Any) -> dict[str, Any]:
+        return hyperframes_inspect_project(
+            project_id=str(kwargs.get("project_id")),
+            projects_root=str(projects_root),
+        )
+    return _inspect
+
 def _store(store_path: "str | None") -> MaterializationStore:
     if store_path:
         return MaterializationStore(store_path=Path(store_path))
@@ -404,7 +444,10 @@ def cmd_execute(args: dict[str, Any]) -> dict[str, Any]:
     operator_id = str(args.get("operator_id") or "local-solo-operator")
     now_iso = _now_iso()
     projects_root = args.get("projects_root")
-    hvs_repo_path = args.get("hvs_repo_path") or str(Path(__file__).resolve().parents[3] / "hermes-video-studio")
+    hvs_repo_path = args.get("hvs_repo_path")
+    if hvs_repo_path is None:
+        candidate = Path(__file__).resolve().parents[3] / "hermes-video-studio"
+        hvs_repo_path = str(candidate) if candidate.is_dir() else None
     python_executable = args.get("python_executable") or sys.executable
 
     authorization = store.get_authorization(authorization_id)
@@ -421,6 +464,12 @@ def cmd_execute(args: dict[str, Any]) -> dict[str, Any]:
         "planned_rendition_count": 0,
         "operator_notes": "",
     }
+    if _use_hyperframes_backend(hvs_repo_path):
+        initializer = _hyperframes_initializer_factory(projects_root)
+        inspector = _hyperframes_inspector_factory(projects_root)
+    else:
+        initializer = _hvs_initializer_factory(hvs_repo_path, python_executable, projects_root, authorization)
+        inspector = _hvs_inspector_factory(hvs_repo_path, python_executable, projects_root)
     result = materialize(
         store=store,
         project_id=project_id,
@@ -433,8 +482,8 @@ def cmd_execute(args: dict[str, Any]) -> dict[str, Any]:
         attempt_id=attempt_id,
         operator_id=operator_id,
         now_iso=now_iso,
-        hvs_initializer=_hvs_initializer_factory(hvs_repo_path, python_executable, projects_root, authorization),
-        hvs_inspector=_hvs_inspector_factory(hvs_repo_path, python_executable, projects_root),
+        hvs_initializer=initializer,
+        hvs_inspector=inspector,
     )
     return result.to_response()
 
@@ -443,12 +492,18 @@ def cmd_reconcile(args: dict[str, Any]) -> dict[str, Any]:
     store = _store(args.get("store_path"))
     attempt_id = str(args.get("attempt_id") or "")
     projects_root = args.get("projects_root")
-    hvs_repo_path = args.get("hvs_repo_path") or str(Path(__file__).resolve().parents[3] / "hermes-video-studio")
+    hvs_repo_path = args.get("hvs_repo_path")
+    if hvs_repo_path is None:
+        candidate = Path(__file__).resolve().parents[3] / "hermes-video-studio"
+        hvs_repo_path = str(candidate) if candidate.is_dir() else None
     python_executable = args.get("python_executable") or sys.executable
+    inspector = (_hyperframes_inspector_factory(projects_root)
+                 if _use_hyperframes_backend(hvs_repo_path)
+                 else _hvs_inspector_factory(hvs_repo_path, python_executable, projects_root))
     classification, attempt = reconcile_materialization(
         store=store,
         attempt_id=attempt_id,
-        hvs_inspector=_hvs_inspector_factory(hvs_repo_path, python_executable, projects_root),
+        hvs_inspector=inspector,
     )
     return {"ok": classification == "HVS_PROJECT_MATERIALIZED", "classification": classification, "attempt": attempt.to_dict() if attempt is not None else None}
 

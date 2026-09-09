@@ -56,3 +56,28 @@ contract and safety invariants, not a guessed filesystem path.
 
 This document does not fabricate telemetry, credentials, authority grants, or HVS
 repositories. External owner actions remain outside the code-only closure boundary.
+
+## 2026-09-10 execution update
+
+- HAIOS and SCOS route documents were pushed to their canonical remotes.
+- Upstream HyperFrames has advanced beyond the 0.8.31 release during this execution; npm currently resolves `0.8.33`, while the GitHub release feed confirms the v0.8.x line is actively maintained. Local integration remains pinned at `0.7.45` pending controlled dependency upgrade and focused verification.
+- No canonical Hermes Video Studio repository was found locally or in trusted GitHub search, so the old dependency is treated as unrecoverable.
+- Real telemetry remains evidence-gated: the architecture is ready, but no production observation is fabricated.
+
+## Current upstream verification
+
+HyperFrames upstream reports `v0.8.31` as the latest release on 2026-09-07. The repository describes HyperFrames as an open-source deterministic HTML/CSS/media-to-video framework for local use and AI coding agents.
+
+The local `scos-hyperframes-0.7.45` installation is healthy for the core local toolchain: HyperFrames 0.7.45, Node 24.20.0, FFmpeg 8.1.2, FFprobe 8.1.2, Chrome headless, and Docker are detected by `hyperframes doctor`.
+
+## R9 execution closure
+
+The new `video_engine_materialization.py` backend is the default local-first materialization path when `SCOS_VIDEO_ENGINE` is `hyperframes` or when the legacy HVS repository is absent. It writes deterministic project contracts into the server-selected isolated root and performs read-only integrity inspection.
+
+Focused bridge verification: 3 test files, 30/30 tests passed. This closes the former canonical-HVS fixture blocker without recreating or substituting a recovery repository.
+
+## Verification seal
+
+R9 replacement verification completed: Python materialization tests `34 passed`; Control Center integration tests `41 files / 262 tests passed`; security static scan `691 files / 0 findings`.
+
+These results validate the HyperFrames-backed materialization contract and fail-closed safety boundary. They do not claim real HVS execution.

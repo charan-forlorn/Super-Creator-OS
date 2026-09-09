@@ -301,9 +301,9 @@ describe("Cohort 10D bridge — process-level real CLI (req 16)", () => {
   });
 
   it("reconcile remains read-only (req 14) — single spawn, no mutation flags", async () => {
-    const { storePath } = isolatedStores();
+    const { storePath, projectsRoot } = isolatedStores();
     const store = new HvsMaterializationStore(PY(), MODULE);
-    const rec = await store.invoke("reconcile", { ...buildReconcilePayload({ attemptId: "att-1" }), store_path: storePath });
+    const rec = await store.invoke("reconcile", { ...buildReconcilePayload({ attemptId: "att-1" }), store_path: storePath, projects_root: projectsRoot });
     // Reconcile is a read-only classification; it must not materialize.
     expect(rec.ok).toBe(true);
     expect(rec.response).not.toBeNull();
