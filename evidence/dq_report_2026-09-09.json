@@ -1,0 +1,122 @@
+{
+  "sources": {
+    "db": "C:\\Workspace\\super-creator-os\\memory\\database.json",
+    "telemetry": "C:\\Workspace\\super-creator-os\\memory\\telemetry.json",
+    "anchor_lib": "C:\\Workspace\\super-creator-os\\memory\\highlight_anchor_library.json",
+    "events_found": true
+  },
+  "coverage": {
+    "total_records": 5,
+    "events_rendered": 0,
+    "events_complete": 0,
+    "events_qa_failed": 0,
+    "orphan_rendered": [],
+    "coverage_pct": null,
+    "coverage_pct_raw": null,
+    "coverage_raw": null,
+    "coverage_state": "UNKNOWN",
+    "coverage_reason": "coverage_unavailable",
+    "records_with_loop_run_id": 3,
+    "note": null
+  },
+  "provenance_quality": {
+    "records": 5,
+    "with_provenance": 3,
+    "with_provenance_pct": 60.0,
+    "with_provenance_pct_raw": 60.0,
+    "provenance_valid_pct": 100.0,
+    "with_recommendation_id_pct": 0.0,
+    "match_quality_distribution": {
+      "cold_start": 3
+    }
+  },
+  "hook_adoption": {
+    "adoption_distribution": {
+      "none_suggested": 3
+    },
+    "adoption_rate_pct": null,
+    "rejected_rate_pct": null,
+    "unrecorded": 0,
+    "recorded_pct": 100.0,
+    "recorded_pct_raw": 100.0
+  },
+  "ground_truth_fill": {
+    "joinable_records": 3,
+    "with_observed": 0,
+    "fill_rate_pct": 0.0,
+    "fill_rate_pct_raw": 0.0,
+    "per_niche": {
+      "Gaming (MOBA)": {
+        "records": 3,
+        "with_observed": 0,
+        "fill_pct": 0.0
+      }
+    }
+  },
+  "prediction_calibration": {
+    "calibration_pairs": 0,
+    "mae": null,
+    "mean_pred": null,
+    "mean_obs": null
+  },
+  "niche_distribution": {
+    "records_per_niche": {
+      "Pet Accessories": 1,
+      "Gaming (MOBA)": 4
+    },
+    "canonical_violations": [],
+    "hit_flop_per_niche": {}
+  },
+  "telemetry_health": {
+    "total_rows": 0,
+    "valid_pct": null,
+    "by_platform": {},
+    "orphan_loop_run_ids": [],
+    "duplicate_keys": [],
+    "max_snapshots_per_run": 0
+  },
+  "dataset_growth": {
+    "records_by_day": {
+      "2026-06-15": 2,
+      "2026-06-20": 2,
+      "2026-06-23": 1
+    },
+    "telemetry_by_day": {},
+    "total_records": 5,
+    "total_telemetry_rows": 0
+  },
+  "dq_pass_pct": 100.0,
+  "readiness": {
+    "ready": false,
+    "status": "fail",
+    "coverage_state": "UNKNOWN",
+    "gates": {
+      "coverage_100": false,
+      "provenance_ok": false,
+      "hooks_recorded": true,
+      "ground_truth_fill": false,
+      "dq_pass": true,
+      "niche_hygiene": true,
+      "niche_at_M2": false
+    },
+    "m2_niche": null,
+    "blockers": [
+      "coverage_100",
+      "provenance_ok",
+      "ground_truth_fill",
+      "niche_at_M2"
+    ]
+  },
+  "thresholds": {
+    "coverage_pct": 100,
+    "provenance_pct": 95,
+    "hooks_recorded_pct": 80,
+    "ground_truth_fill_pct": 80,
+    "dq_pass_pct": 95,
+    "min_records_per_niche": 30,
+    "min_hits_per_niche": 5,
+    "min_flops_per_niche": 5,
+    "max_prediction_mae": 20.0,
+    "min_observed_for_percentiles": 8
+  }
+}
