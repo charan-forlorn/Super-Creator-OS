@@ -309,7 +309,7 @@ def test_unique_cache_and_basetemp_per_pytest_gate():
     # outside the repository
     for path in (std.cache_dir, std.basetemp, integ.cache_dir, integ.basetemp):
         assert not path.startswith(str(REPO_ROOT))
-    # unique OS-temp root (gettempdir-based) — run_root is unique
+    # unique OS-temp root (gettempdir-based) â€” run_root is unique
     assert str(run_root) not in (None, "")
 
 
@@ -421,14 +421,29 @@ def test_media_bins_child_local_and_not_permanent():
     after = dict(os.environ)
     media_calls = [c for c in record
                    if c["env"] is not None and "SCOS_FFMPEG_BIN" in c["env"]]
+    expected_ffmpeg = Path(os.environ.get("SCOS_FFMPEG_BIN") or civ._MEDIA_FFMPEG)
+    expected_ffprobe = Path(os.environ.get("SCOS_FFPROBE_BIN") or civ._MEDIA_FFPROBE)
     for c in media_calls:
-        assert c["env"]["SCOS_FFMPEG_BIN"] == str(civ._MEDIA_FFMPEG)
-        assert c["env"]["SCOS_FFPROBE_BIN"] == str(civ._MEDIA_FFPROBE)
+        assert Path(c["env"]["SCOS_FFMPEG_BIN"]) == expected_ffmpeg
+        assert Path(c["env"]["SCOS_FFPROBE_BIN"]) == expected_ffprobe
     # verifier must not mutate the real os.environ
     assert set(before.keys()) == set(after.keys())
     for key in before:
         assert before[key] == after[key], f"verifier mutated env key {key}"
 
+
+def test_media_bins_explicit_environment_override(monkeypatch, tmp_path):
+    ffmpeg = tmp_path / "ffmpeg.exe"
+    ffprobe = tmp_path / "ffprobe.exe"
+    ffmpeg.write_bytes(b"ffmpeg")
+    ffprobe.write_bytes(b"ffprobe")
+    monkeypatch.setenv("SCOS_FFMPEG_BIN", str(ffmpeg))
+    monkeypatch.setenv("SCOS_FFPROBE_BIN", str(ffprobe))
+    monkeypatch.setattr(civ, "_verify_media_binary", lambda p: p in {ffmpeg, ffprobe})
+    env = civ.build_media_env({"PATH": "ORIGINAL"})
+    assert env["SCOS_FFMPEG_BIN"] == str(ffmpeg)
+    assert env["SCOS_FFPROBE_BIN"] == str(ffprobe)
+    assert str(ffmpeg.parent) in env["PATH"]
 
 def test_media_preflight_failure_blocks_media_gates(monkeypatch):
     monkeypatch.setattr(civ, "_verify_media_binary", lambda p: False)
@@ -571,7 +586,7 @@ def test_cohort9d_frontend_gates_present_in_ci_and_local_parity():
 
 
 # ---------------------------------------------------------------------------
-# C1 interpreter-contract (operator §4): precedence, fallback, fail-closed
+# C1 interpreter-contract (operator Â§4): precedence, fallback, fail-closed
 # ---------------------------------------------------------------------------
 
 def _make_fake_python(tmp_path, rel=("venv", "Scripts", "python.exe")):

@@ -239,32 +239,28 @@ def _verify_media_binary(path: Path) -> bool:
     return proc.returncode == 0
 
 
-def build_media_env(base_env: dict) -> dict:
-    """Return a COPY of ``base_env`` with PATH prepended and ffmpeg bins set.
+def _configured_media_binary(env: dict, name: str, fallback: Path) -> Path:
+    """Resolve an explicit process-local media override, else use canonical fallback."""
+    raw = env.get(name) or os.environ.get(name)
+    if raw:
+        candidate = Path(raw)
+        if not candidate.is_absolute() or not _is_regular_executable(candidate):
+            raise RuntimeError(f"configured media binary is invalid: {name}")
+        return candidate
+    return fallback
 
-    The current environment is copied; PATH is prepended (never replaced); no
-    permanent machine mutation occurs. Raises RuntimeError if the required
-    binaries cannot be resolved.
-    """
+
+def build_media_env(base_env: dict) -> dict:
+    """Return a copy of ``base_env`` with verified media binaries configured."""
     env = dict(base_env)
-    ffmpeg = _MEDIA_FFMPEG
-    ffprobe = _MEDIA_FFPROBE
+    ffmpeg = _configured_media_binary(env, "SCOS_FFMPEG_BIN", _MEDIA_FFMPEG)
+    ffprobe = _configured_media_binary(env, "SCOS_FFPROBE_BIN", _MEDIA_FFPROBE)
     if not _verify_media_binary(ffmpeg):
-        raise RuntimeError(
-            f"required media binary not resolvable: {ffmpeg} "
-            f"(install via scoop: scoop install ffmpeg)"
-        )
+        raise RuntimeError(f"required media binary not resolvable: {ffmpeg}")
     if not _verify_media_binary(ffprobe):
-        raise RuntimeError(
-            f"required media binary not resolvable: {ffprobe} "
-            f"(install via scoop: scoop install ffmpeg)"
-        )
+        raise RuntimeError(f"required media binary not resolvable: {ffprobe}")
     existing_path = env.get("PATH", "")
-    # Prepend the shim dir; keep the rest untouched.
-    env["PATH"] = (
-        str(_MEDIA_SHIM_DIR)
-        + (os.pathsep + existing_path if existing_path else "")
-    )
+    env["PATH"] = str(ffmpeg.parent) + (os.pathsep + existing_path if existing_path else "")
     env["SCOS_FFMPEG_BIN"] = str(ffmpeg)
     env["SCOS_FFPROBE_BIN"] = str(ffprobe)
     return env
