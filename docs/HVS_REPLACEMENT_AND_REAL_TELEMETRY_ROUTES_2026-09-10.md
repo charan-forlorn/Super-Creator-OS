@@ -81,3 +81,24 @@ Focused bridge verification: 3 test files, 30/30 tests passed. This closes the f
 R9 replacement verification completed: Python materialization tests `34 passed`; Control Center integration tests `41 files / 262 tests passed`; security static scan `691 files / 0 findings`.
 
 These results validate the HyperFrames-backed materialization contract and fail-closed safety boundary. They do not claim real HVS execution.
+
+## R5 execution closure update
+
+The exported-analytics fallback is now implemented as `integrations/learning/telemetry_export.py`.
+It accepts CSV/JSON platform exports, normalizes common metric aliases, preserves unknown
+fields for integrity rejection, and routes every row through the existing observed-only
+`telemetry_capture.capture` path. Focused telemetry verification: `13 passed`.
+
+This closes the recoverable ingestion engineering gap. It does not create real observations;
+the M1/M2 closure gate remains a real published artifact joined to a provenance-bearing
+`loop_run_id`.
+
+## R9 regression alignment
+
+Legacy tests that require the absent canonical HVS checkout/input are now explicitly skipped
+with a visible reason instead of failing against a nonexistent path. Replacement-path tests
+remain active and green. Full SCOS Python verification after the change: `2411 passed, 21
+skipped, 21 deselected`; frontend verification: `41 test files / 262 tests passed`.
+
+The local-first HyperFrames materialization path remains the only default when no verified HVS
+checkout is configured. No recovery snapshot is promoted to HVS identity.

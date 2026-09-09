@@ -26,6 +26,7 @@ from scos.control_center.hvs_pilot_render_readiness import evaluate_render_readi
 
 REPO = Path(__file__).resolve().parents[3]
 PACKET_SRC = REPO / ".." / "scos-paid-pilot-input" / "authorization-packet.json"
+pytestmark = pytest.mark.skipif(not PACKET_SRC.resolve().is_file(), reason="legacy HVS pilot input is not present; replaced by local HyperFrames adapter")
 
 
 @pytest.fixture

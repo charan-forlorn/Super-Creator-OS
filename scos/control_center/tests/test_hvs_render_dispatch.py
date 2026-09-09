@@ -1520,6 +1520,8 @@ def test_34_security_scan_new_module():
 
 
 def test_35_real_hvs_repo_untouched_by_tests():
+    if not HVS_REPO_ROOT.is_dir():
+        pytest.skip("legacy HVS checkout absent; no repository to inspect")
     """Tests never point hvs_root at the real HVS repo; repo stays clean."""
     # Every setup helper uses fresh_root() (temp). Assert the real repo dir has
     # no stray renders produced by our tests under projects/<stage5>.
