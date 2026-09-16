@@ -69,10 +69,17 @@ export const CAPABILITY_REJECTION_REASONS = [
 export type CapabilityRejectionReason = (typeof CAPABILITY_REJECTION_REASONS)[number];
 export type CapabilityAdmission = { eligible: true } | { eligible: false; reason: CapabilityRejectionReason };
 
-export function evaluateCapabilityCandidate(candidate: CapabilityCandidate): CapabilityAdmission {
+export interface CapabilityAdmissionOptions {
+  readonly allowedCostClasses?: readonly CostClass[];
+}
+
+export const DEFAULT_ALLOWED_COST_CLASSES = ["local_zero_inference_cost", "free_keyless"] as const;
+
+export function evaluateCapabilityCandidate(candidate: CapabilityCandidate, options: CapabilityAdmissionOptions = {}): CapabilityAdmission {
   if (candidate.availability !== "READY") return { eligible: false, reason: "capability_unavailable" };
   if (candidate.costClass === "unknown") return { eligible: false, reason: "unknown_cost" };
-  if (candidate.costClass === "paid" || candidate.costClass === "free_or_variable") {
+  const allowedCosts = options.allowedCostClasses ?? DEFAULT_ALLOWED_COST_CLASSES;
+  if (!allowedCosts.includes(candidate.costClass)) {
     return { eligible: false, reason: "disallowed_cost" };
   }
   if (candidate.currentness !== "CURRENT") {
