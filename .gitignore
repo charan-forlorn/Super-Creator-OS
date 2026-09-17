@@ -65,9 +65,13 @@ work/frames/
 work/data/
 work/edit/
 
-# --- SCOS pipeline runtime artifacts (render output, reports, run-id dirs) ---
+# SCOS pipeline runtime artifacts (render output, reports, run-id dirs) ---
 scos/work/
 scos/memory/runs.json
+.cc_status_temp/
+.cc_status_cache/
+.stage8_5_status_temp/
+.stage8_5_status_cache/
 
 # --- P0 cleanup: generated audit reports (not source) ---
 project_audit/
