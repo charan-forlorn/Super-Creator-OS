@@ -64,14 +64,16 @@ def _run_pipeline(prompt: str) -> dict[str, Any]:
     return run_pipeline(prompt)
 
 
-def _artifact_record(path: Path, root: Path) -> dict[str, Any] | None:
+def _artifact_record(path: Path, root: Path, job_id: str, run_id: str) -> dict[str, Any] | None:
     if not path.is_file() or not _inside(path.resolve(), root):
         return None
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     return {
-        "kind": path.suffix.lower().lstrip(".") or "file",
+        "kind": path.suffix.lower().lstrip("."),
         "role": "primary_output",
         "path": str(path.resolve()),
+        "job_id": job_id,
+        "run_id": run_id,
         "bytes": path.stat().st_size,
         "sha256": digest,
     }
@@ -109,6 +111,8 @@ def run_bridge(request: dict[str, Any], *, dry_run: bool) -> dict[str, Any]:
             "provenance": {"execution": "dry_run", "reason": "DRY_RUN_NO_EXECUTION"},
         }
     raw = _run_pipeline(request["goal_text"])
+    pipeline_status = raw.get("status")
+    run_id = raw.get("run_id", "")
     artifacts: list[dict[str, Any]] = []
     output = raw.get("video_path")
     if output:
@@ -137,11 +141,10 @@ def run_bridge(request: dict[str, Any], *, dry_run: bool) -> dict[str, Any]:
         export_root.mkdir(parents=True, exist_ok=True)
         export_path = export_root / f"{request['job_id']}-{source_path.name}"
         export_path.write_bytes(source_path.read_bytes())
-        record = _artifact_record(export_path, root)
+        record = _artifact_record(export_path, root, request["job_id"], run_id)
         assert record is not None
         record["source_path"] = str(source_path)
         artifacts.append(record)
-    pipeline_status = raw.get("status")
     qa = raw.get("qa_report") or {"status": "UNKNOWN"}
     status = "SUCCEEDED" if pipeline_status == "success" and artifacts else "FAILED"
     return {
@@ -158,6 +161,7 @@ def run_bridge(request: dict[str, Any], *, dry_run: bool) -> dict[str, Any]:
         "provenance": {
             "execution": "local",
             "pipeline_status": pipeline_status,
+            "run_id": run_id,
             "contract_digest": hashlib.sha256(_canon(request).encode()).hexdigest(),
         },
     }

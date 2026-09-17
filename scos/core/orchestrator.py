@@ -27,6 +27,7 @@ def _run_id(input_prompt: str) -> str:
 def run_pipeline(input_prompt: str) -> dict:
     state = PipelineState(input_prompt=input_prompt)
     run_id = _run_id(input_prompt)
+    status = "failed"
 
     agents = {
         "script": ScriptAgent(),
@@ -61,9 +62,14 @@ def run_pipeline(input_prompt: str) -> dict:
         state.record("render", "success")
 
         state.qa_report = agents["qa"].run({"edit_timeline": state.edit_timeline})
-        state.record("qa", "success")
+        qa_passed = bool(state.qa_report and state.qa_report.get("passed"))
+        state.record("qa", "passed" if qa_passed else "failed")
 
-        status = "success"
+        if not qa_passed:
+            state.record("pipeline", "blocked", error="QA_FAILED")
+            status = "failed"
+        else:
+            status = "success"
 
     except Exception as exc:  # noqa: BLE001 - top-level pipeline error boundary
         failed_stage = STAGES[len(state.execution_trace)]
@@ -86,4 +92,5 @@ def run_pipeline(input_prompt: str) -> dict:
         "video_path": result["video_path"],
         "qa_report": result["qa_report"],
         "execution_trace": result["execution_trace"],
+        "run_id": run_id,
     }

@@ -16,9 +16,10 @@ class QAAgent:
         sync_ok = all(c["start"] < c["end"] for c in clips)
         duration_ok = edit_timeline["total_duration"] > 0
 
+        passed = sync_ok and duration_ok and not missing_assets
         return {
             "sync": sync_ok,
             "duration": duration_ok,
             "missing_assets": missing_assets,
-            "passed": sync_ok and duration_ok,
+            "passed": passed,
         }
