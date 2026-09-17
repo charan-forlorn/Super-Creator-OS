@@ -67,6 +67,7 @@ work/edit/
 
 # --- SCOS pipeline runtime artifacts (render output, reports, run-id dirs) ---
 scos/work/
+scos/memory/runs.json
 
 # --- P0 cleanup: generated audit reports (not source) ---
 project_audit/
