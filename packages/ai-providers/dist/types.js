@@ -28,4 +28,3 @@ Rules:
 - For trim_clip, params.newInPoint is the new source in-point in seconds.
 - Never invent clip ids; use the provided selection/target.
 - Output JSON only. No prose, no code fences.`;
-//# sourceMappingURL=types.js.map

@@ -1,9 +1,9 @@
 import { parseAiPlan, AiPlanValidationError, type AiEditPlan } from "@haios/ai-core";
 import {
-  AIProvider,
-  ProviderRequest,
-  ProviderResponse,
-  ProviderKind,
+  type AIProvider,
+  type ProviderRequest,
+  type ProviderResponse,
+  type ProviderKind,
   ProviderUnavailableError,
   AI_PLAN_SYSTEM_PROMPT,
 } from "./types.js";
@@ -126,6 +126,7 @@ export class OllamaProvider implements AIProvider {
           prompt: `${AI_PLAN_SYSTEM_PROMPT}\n\nUser: ${req.instruction}\nContext: ${JSON.stringify(req.context)}`,
           stream: false,
           format: "json",
+          think: false,
         }),
         signal: req.signal,
       });
