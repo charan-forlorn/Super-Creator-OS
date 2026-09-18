@@ -1,27 +1,31 @@
 {
-    "schema_version":  "SCOS_HAIOS_AI_GENERATION_QUALIFICATION_BINDING_R1",
-    "observed_at":  "2026-09-18T12:39:45.9640021Z",
-    "capability":  "generate_text",
-    "source_repo":  "C:\\Workspace\\hermes-ai-operating-system",
-    "source_commit":  "491e22a0c04f8837e94ac388bdd06c077a3b0d6d",
-    "source_path":  "IMPLEMENTATION_BLUEPRINT.md",
-    "source_sha256":  "C7C17D1B50D36A6769C7B904B35F3742B1B9B99D54D6CA9DEC5F999257C12A3C",
-    "qualification_claim":  "Stage 3 AI Generation Qualification CLOSED",
-    "models":  {
-                   "qwen3:4b":  {
-                                    "qualification":  "QUALIFIED",
-                                    "digest":  "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7"
-                                },
-                   "qwen3:14b":  {
-                                     "qualification":  "QUALIFIED",
-                                     "digest":  "bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8"
-                                 }
-               },
-    "reconciliation":  {
-                           "reconciled_from":  "b1504f9492bb68d5fbe091cf8e58190e143cd588",
-                           "drift_scope":  "execution-safety primitives + registry",
-                           "ai_generation_scope_changed":  false,
-                           "focused_verification":  "44 passed",
-                           "stale_gate_observed":  "OPEN_STALE_QUALIFICATION"
-                       }
+  "schema_version": "SCOS_HAIOS_AI_GENERATION_QUALIFICATION_BINDING_R1",
+  "observed_at": "2026-09-18T12:39:45.9640021Z",
+  "capability": "generate_text",
+  "source_repo": "C:\\Workspace\\hermes-ai-operating-system",
+  "source_commit": "2a4847c573d41616d2b54ea6805dff573c3722de",
+  "source_path": "IMPLEMENTATION_BLUEPRINT.md",
+  "source_sha256": "C7C17D1B50D36A6769C7B904B35F3742B1B9B99D54D6CA9DEC5F999257C12A3C",
+  "qualification_claim": "Stage 3 AI Generation Qualification CLOSED",
+  "models": {
+    "qwen3:4b": {
+      "qualification": "QUALIFIED",
+      "digest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7"
+    },
+    "qwen3:14b": {
+      "qualification": "QUALIFIED",
+      "digest": "bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8"
+    }
+  },
+  "reconciliation": {
+    "reconciled_from": "b1504f9492bb68d5fbe091cf8e58190e143cd588",
+    "drift_scope": "execution-safety primitives + registry",
+    "ai_generation_scope_changed": false,
+    "focused_verification": "44 passed",
+    "stale_gate_observed": "OPEN_STALE_QUALIFICATION",
+    "refreshed_at": "2026-09-18T15:46:00Z",
+    "source_head": "2a4847c573d41616d2b54ea6805dff573c3722de",
+    "source_sha256_verified": "c7c17d1b50d36a6769c7b904b35f3742b1b9b99d54d6ca9dec5f999257c12a3c",
+    "stale_gate_resolution": "SOURCE_BYTES_UNCHANGED_REFRESHED_TO_CURRENT_HAIOS_HEAD"
+  }
 }
