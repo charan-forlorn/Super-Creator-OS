@@ -119,6 +119,7 @@ export class OllamaProvider {
                     prompt: `${AI_PLAN_SYSTEM_PROMPT}\n\nUser: ${req.instruction}\nContext: ${JSON.stringify(req.context)}`,
                     stream: false,
                     format: "json",
+                    think: false,
                 }),
                 signal: req.signal,
             });
@@ -187,4 +188,3 @@ export class OpenAICompatibleProvider {
         };
     }
 }
-//# sourceMappingURL=providers.js.map

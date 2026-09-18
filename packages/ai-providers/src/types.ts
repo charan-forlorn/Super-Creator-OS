@@ -59,5 +59,6 @@ Rules:
 - For split_clip, params.t is seconds from the clip start and must satisfy 0 < t < clip duration.
 - For move_clip, params.newStart is the new timeline start in seconds.
 - For trim_clip, params.newInPoint is the new source in-point in seconds.
+- For change_aspect_ratio, params.ratio must be exactly "1920x1080", "1080x1920", or "1080x1080".
 - Never invent clip ids; use the provided selection/target.
 - Output JSON only. No prose, no code fences.`;

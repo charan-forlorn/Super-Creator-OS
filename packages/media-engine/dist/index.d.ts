@@ -164,3 +164,4 @@ export interface PreviewCompatInput {
 export declare function previewNeedsProxy(input: PreviewCompatInput): boolean;
 export { stableHash, normalizeCodec, proxyCacheKey, thumbnailCacheKey, cacheFileName, cachePath, type CacheKind, } from "./cacheKey.js";
 export { PureMediaCache, describeProxy, describeThumbnail, type CacheState, type CacheEntry, type CacheRecord, } from "./cache.js";
+export { compareRuntimeIdentity, type RuntimeIdentity, type RuntimeIdentityComparison, type RuntimeResolution, type RuntimeToolIdentity, type RuntimeToolKind } from "./runtimeIdentity.js";

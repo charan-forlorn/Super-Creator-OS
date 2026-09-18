@@ -139,3 +139,4 @@ export function previewNeedsProxy(input) {
 /* ----------------------------- R2.2 cache ----------------------------- */
 export { stableHash, normalizeCodec, proxyCacheKey, thumbnailCacheKey, cacheFileName, cachePath, } from "./cacheKey.js";
 export { PureMediaCache, describeProxy, describeThumbnail, } from "./cache.js";
+export { compareRuntimeIdentity } from "./runtimeIdentity.js";

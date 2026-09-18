@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "SCOS_GOVERNED_PRODUCTION_LOOP_R1",
+  "loopRunId": "de0c6cf5-0b83-409f-b8a9-c22eea3b4cf8",
+  "routeDecisionId": "9abe81b4-ac2b-4cd1-94c0-d1c6548c1f5a",
+  "observedAt": "2026-09-18T08:16:47.575Z",
+  "routeDecision": {
+    "kind": "ROUTED",
+    "capability": "generate_text",
+    "candidate": {
+      "capability": "generate_text",
+      "providerId": "ollama",
+      "modelId": "qwen3:14b",
+      "modelVersion": "bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8",
+      "capabilityId": "scos.ai.generate_text.ollama.qwen3-14b",
+      "capabilityVersion": "r1",
+      "capabilityKind": "ai_generation",
+      "authorityScope": "plan_generation_only",
+      "costClass": "local_zero_inference_cost",
+      "availability": "READY",
+      "currentness": "CURRENT",
+      "health": "HEALTHY",
+      "qualification": "QUALIFIED",
+      "licence": "ALLOWED",
+      "hardware": "FIT",
+      "evidenceComplete": true,
+      "priority": 100
+    },
+    "routeDecisionId": "9abe81b4-ac2b-4cd1-94c0-d1c6548c1f5a",
+    "loopRunId": "de0c6cf5-0b83-409f-b8a9-c22eea3b4cf8",
+    "evidenceRefs": [
+      "C:\\Workspace\\hermes-ai-operating-system",
+      "b1504f9492bb68d5fbe091cf8e58190e143cd588",
+      "IMPLEMENTATION_BLUEPRINT.md",
+      "C7C17D1B50D36A6769C7B904B35F3742B1B9B99D54D6CA9DEC5F999257C12A3C",
+      "ollama-machine-probe:de0c6cf5-0b83-409f-b8a9-c22eea3b4cf8",
+      "ollama-machine-probe:de0c6cf5-0b83-409f-b8a9-c22eea3b4cf8"
+    ]
+  },
+  "qualification": {
+    "sourceRepo": "C:\\Workspace\\hermes-ai-operating-system",
+    "sourceCommit": "b1504f9492bb68d5fbe091cf8e58190e143cd588",
+    "sourcePath": "IMPLEMENTATION_BLUEPRINT.md",
+    "sourceSha256": "C7C17D1B50D36A6769C7B904B35F3742B1B9B99D54D6CA9DEC5F999257C12A3C",
+    "modelDigest": "bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8"
+  },
+  "telemetry": {
+    "schemaVersion": "SCOS_PRODUCTION_EXECUTION_TELEMETRY_R1",
+    "loopRunId": "de0c6cf5-0b83-409f-b8a9-c22eea3b4cf8",
+    "routeDecisionId": "9abe81b4-ac2b-4cd1-94c0-d1c6548c1f5a",
+    "observedAt": "2026-09-18T08:16:47.575Z",
+    "startedAt": "2026-09-18T08:16:47.603Z",
+    "completedAt": "2026-09-18T08:17:11.526Z",
+    "durationMs": 23923,
+    "capabilityId": "scos.ai.generate_text.ollama.qwen3-14b",
+    "providerId": "ollama",
+    "modelId": "qwen3:14b",
+    "modelVersion": "bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8",
+    "status": "COMPLETED",
+    "generationStatus": "COMPLETED",
+    "executionStatus": "COMPLETED",
+    "executedCommandTypes": [
+      "project.changeAspect"
+    ],
+    "projectBeforeSha256": "5ec21ca763dbe6a44d55b24796037b36a89e4770a8fb0c8ebe3c9e5baac78a88",
+    "projectAfterSha256": "f40086698883cdac24504f35c078245dcdc8ccd7e7be418b84e2740d6018e330",
+    "executionDurationMs": 1,
+    "responseBytes": 277,
+    "responseSha256": "6956ea123b028ba14a24686a7e73936caafb8fe17d6a2414ecade3654b3d49da",
+    "requestSha256": "13071e6657d22e3c9cb800d483c18b4637801a2a34a184b7e69d85a61dc74bc4",
+    "fallbackUsed": false,
+    "evidenceRefs": [
+      "C:\\Workspace\\hermes-ai-operating-system",
+      "b1504f9492bb68d5fbe091cf8e58190e143cd588",
+      "IMPLEMENTATION_BLUEPRINT.md",
+      "C7C17D1B50D36A6769C7B904B35F3742B1B9B99D54D6CA9DEC5F999257C12A3C",
+      "ollama-machine-probe:de0c6cf5-0b83-409f-b8a9-c22eea3b4cf8",
+      "ollama-machine-probe:de0c6cf5-0b83-409f-b8a9-c22eea3b4cf8"
+    ]
+  },
+  "verification": {
+    "status": "PASS",
+    "planSchemaValidated": true,
+    "operationCount": 1
+  },
+  "evidenceSha256": "d7e27429d90d9c844d552c3fe2e80f61a6376bce0d9522f63c27b17f95a6331f"
+}

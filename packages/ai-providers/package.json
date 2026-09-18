@@ -1,20 +1,37 @@
 {
   "name": "@haios/ai-providers",
   "version": "1.0.0",
-  "description": "HAIOS AI Video Studio — provider-independent AI command providers (Ollama, OpenAI-compat, Hermes seam)",
+  "description": "HAIOS AI Video Studio ΓÇö provider-independent AI command providers (Ollama, OpenAI-compat, Hermes seam)",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./governed": {
+      "types": "./dist/governedProductionLoop.d.ts",
+      "import": "./dist/governedProductionLoop.js"
+    },
+    "./telemetry": {
+      "types": "./dist/productionTelemetry.d.ts",
+      "import": "./dist/productionTelemetry.js"
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@haios/ai-core": "workspace:*"
+    "@haios/ai-core": "workspace:*",
+    "@haios/command-system": "workspace:*",
+    "@haios/project-model": "workspace:*",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/node": "^24.10.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
   }

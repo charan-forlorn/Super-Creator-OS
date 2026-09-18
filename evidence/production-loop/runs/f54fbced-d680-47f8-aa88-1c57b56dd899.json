@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "SCOS_GOVERNED_PRODUCTION_LOOP_R1",
+  "loopRunId": "f54fbced-d680-47f8-aa88-1c57b56dd899",
+  "routeDecisionId": "37eac288-4d14-4634-9d4f-19e73b746753",
+  "observedAt": "2026-09-18T08:15:29.849Z",
+  "routeDecision": {
+    "kind": "ROUTED",
+    "capability": "generate_text",
+    "candidate": {
+      "capability": "generate_text",
+      "providerId": "ollama",
+      "modelId": "qwen3:4b",
+      "modelVersion": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+      "capabilityId": "scos.ai.generate_text.ollama.qwen3-4b",
+      "capabilityVersion": "r1",
+      "capabilityKind": "ai_generation",
+      "authorityScope": "plan_generation_only",
+      "costClass": "local_zero_inference_cost",
+      "availability": "READY",
+      "currentness": "CURRENT",
+      "health": "HEALTHY",
+      "qualification": "QUALIFIED",
+      "licence": "ALLOWED",
+      "hardware": "FIT",
+      "evidenceComplete": true,
+      "priority": 100
+    },
+    "routeDecisionId": "37eac288-4d14-4634-9d4f-19e73b746753",
+    "loopRunId": "f54fbced-d680-47f8-aa88-1c57b56dd899",
+    "evidenceRefs": [
+      "C:\\Workspace\\hermes-ai-operating-system",
+      "b1504f9492bb68d5fbe091cf8e58190e143cd588",
+      "IMPLEMENTATION_BLUEPRINT.md",
+      "C7C17D1B50D36A6769C7B904B35F3742B1B9B99D54D6CA9DEC5F999257C12A3C",
+      "ollama-machine-probe:f54fbced-d680-47f8-aa88-1c57b56dd899",
+      "ollama-machine-probe:f54fbced-d680-47f8-aa88-1c57b56dd899"
+    ]
+  },
+  "qualification": {
+    "sourceRepo": "C:\\Workspace\\hermes-ai-operating-system",
+    "sourceCommit": "b1504f9492bb68d5fbe091cf8e58190e143cd588",
+    "sourcePath": "IMPLEMENTATION_BLUEPRINT.md",
+    "sourceSha256": "C7C17D1B50D36A6769C7B904B35F3742B1B9B99D54D6CA9DEC5F999257C12A3C",
+    "modelDigest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7"
+  },
+  "telemetry": {
+    "schemaVersion": "SCOS_PRODUCTION_EXECUTION_TELEMETRY_R1",
+    "loopRunId": "f54fbced-d680-47f8-aa88-1c57b56dd899",
+    "routeDecisionId": "37eac288-4d14-4634-9d4f-19e73b746753",
+    "observedAt": "2026-09-18T08:15:29.849Z",
+    "startedAt": "2026-09-18T08:15:29.879Z",
+    "completedAt": "2026-09-18T08:15:36.654Z",
+    "durationMs": 6775,
+    "capabilityId": "scos.ai.generate_text.ollama.qwen3-4b",
+    "providerId": "ollama",
+    "modelId": "qwen3:4b",
+    "modelVersion": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+    "status": "FAILED",
+    "generationStatus": "COMPLETED",
+    "executionStatus": "FAILED",
+    "projectBeforeSha256": "4a57f3a4341a7921fd52f3f06c2272fefff7bbee80b6c1ce073915b90ab0ae64",
+    "executionDurationMs": 1,
+    "responseBytes": 281,
+    "responseSha256": "853f01e859a016a6725ef51623c1a07a5e89f238faf47f4a79d3bb2bd4b8437b",
+    "requestSha256": "13071e6657d22e3c9cb800d483c18b4637801a2a34a184b7e69d85a61dc74bc4",
+    "fallbackUsed": false,
+    "error": "governed execution failed: Command 'project.changeAspect' rejected: payload validation failed: [\n  {\n    \"expected\": \"'1920x1080' | '1080x1920' | '1080x1080'\",\n    \"received\": \"undefined\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"ratio\"\n    ],\n    \"message\": \"Required\"\n  }\n]",
+    "evidenceRefs": [
+      "C:\\Workspace\\hermes-ai-operating-system",
+      "b1504f9492bb68d5fbe091cf8e58190e143cd588",
+      "IMPLEMENTATION_BLUEPRINT.md",
+      "C7C17D1B50D36A6769C7B904B35F3742B1B9B99D54D6CA9DEC5F999257C12A3C",
+      "ollama-machine-probe:f54fbced-d680-47f8-aa88-1c57b56dd899",
+      "ollama-machine-probe:f54fbced-d680-47f8-aa88-1c57b56dd899"
+    ]
+  },
+  "verification": {
+    "status": "FAIL",
+    "planSchemaValidated": true,
+    "operationCount": 1,
+    "reason": "Command 'project.changeAspect' rejected: payload validation failed: [\n  {\n    \"expected\": \"'1920x1080' | '1080x1920' | '1080x1080'\",\n    \"received\": \"undefined\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"ratio\"\n    ],\n    \"message\": \"Required\"\n  }\n]"
+  },
+  "evidenceSha256": "8db0a7c219b983bc5cc8a15698153afe57fe8920003ad1be58a23c6d673fcbf0"
+}
