@@ -1,0 +1,17 @@
+{
+    "schema_version":  "SCOS_REAL_TELEMETRY_QUALIFICATION_CONTENT_R1",
+    "content_id":  "ai-automation-short-v1",
+    "niche":  "AI Automation / Developer Productivity",
+    "format":  "TikTok vertical 9:16",
+    "duration_seconds":  20,
+    "style":  "short-form tech/AI automation explainer with playful hook",
+    "source_reference":  "TikTok style reference: https://www.tiktok.com/@not_jaran/video/7651984043914939666",
+    "excluded":  "gaming",
+    "generation_loop_id":  "7cac80d7-1624-4715-b8a0-e829a505c96c",
+    "route_decision_id":  "827ead00-9c61-42f4-97cd-f0508c0ece1f",
+    "generation_evidence":  "evidence/production-loop/runs/7cac80d7-1624-4715-b8a0-e829a505c96c.json",
+    "external_publish":  "NOT_PERFORMED",
+    "human_publish_gate":  "OPEN",
+    "telemetry_join_key":  "loop_run_id",
+    "status":  "PREPARED_FOR_HUMAN_PUBLISH_GATE"
+}

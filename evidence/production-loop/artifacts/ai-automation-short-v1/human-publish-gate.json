@@ -1,0 +1,17 @@
+{
+    "schema_version":  "SCOS_HUMAN_PUBLISH_GATE_R1",
+    "status":  "OPEN",
+    "content_id":  "ai-automation-short-v1",
+    "artifact_id":  "scos-qual-artifact-aca02029eac3532c",
+    "artifact_sha256":  "aca02029eac3532c3e81c396e25fefd9ed6407bb42a43f775d46fa14817a0683",
+    "platform":  "tiktok",
+    "format":  "9:16",
+    "duration_seconds":  20,
+    "topic":  "AI automation / developer productivity",
+    "style":  "short-form tech/AI automation explainer with playful hook",
+    "source_style_reference":  "https://www.tiktok.com/@not_jaran/video/7651984043914939666",
+    "external_side_effect":  "PUBLISH_VIDEO",
+    "operator_action":  "Human must explicitly review and publish the prepared artifact in TikTok",
+    "after_publish_required":  "Record TikTok video/post ID and published_at, then ingest real observed telemetry; do not fabricate",
+    "not_authorized_by_automation":  true
+}

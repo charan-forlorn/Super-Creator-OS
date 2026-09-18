@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "SCOS_GOVERNED_PRODUCTION_LOOP_R1",
+  "loopRunId": "f6ff926d-2824-4d21-90c1-dd6c198274fe",
+  "routeDecisionId": "0464d5da-43e8-4dd5-8d9b-22120fea54c3",
+  "observedAt": "2026-09-18T12:40:28.539Z",
+  "routeDecision": {
+    "kind": "ROUTED",
+    "capability": "generate_text",
+    "candidate": {
+      "capability": "generate_text",
+      "providerId": "ollama",
+      "modelId": "qwen3:4b",
+      "modelVersion": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+      "capabilityId": "scos.ai.generate_text.ollama.qwen3-4b",
+      "capabilityVersion": "r1",
+      "capabilityKind": "ai_generation",
+      "authorityScope": "plan_generation_only",
+      "costClass": "local_zero_inference_cost",
+      "availability": "READY",
+      "currentness": "CURRENT",
+      "health": "HEALTHY",
+      "qualification": "QUALIFIED",
+      "licence": "ALLOWED",
+      "hardware": "FIT",
+      "evidenceComplete": true,
+      "priority": 0,
+      "observedSuccessRate": 1,
+      "observedLatencyMs": 8594.6
+    },
+    "routeDecisionId": "0464d5da-43e8-4dd5-8d9b-22120fea54c3",
+    "loopRunId": "f6ff926d-2824-4d21-90c1-dd6c198274fe",
+    "evidenceRefs": [
+      "C:\\Workspace\\hermes-ai-operating-system",
+      "491e22a0c04f8837e94ac388bdd06c077a3b0d6d",
+      "IMPLEMENTATION_BLUEPRINT.md",
+      "C7C17D1B50D36A6769C7B904B35F3742B1B9B99D54D6CA9DEC5F999257C12A3C",
+      "ollama-machine-probe:f6ff926d-2824-4d21-90c1-dd6c198274fe",
+      "ollama-machine-probe:f6ff926d-2824-4d21-90c1-dd6c198274fe"
+    ]
+  },
+  "qualification": {
+    "sourceRepo": "C:\\Workspace\\hermes-ai-operating-system",
+    "sourceCommit": "491e22a0c04f8837e94ac388bdd06c077a3b0d6d",
+    "sourcePath": "IMPLEMENTATION_BLUEPRINT.md",
+    "sourceSha256": "C7C17D1B50D36A6769C7B904B35F3742B1B9B99D54D6CA9DEC5F999257C12A3C",
+    "modelDigest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7"
+  },
+  "telemetry": {
+    "schemaVersion": "SCOS_PRODUCTION_EXECUTION_TELEMETRY_R1",
+    "loopRunId": "f6ff926d-2824-4d21-90c1-dd6c198274fe",
+    "routeDecisionId": "0464d5da-43e8-4dd5-8d9b-22120fea54c3",
+    "observedAt": "2026-09-18T12:40:28.539Z",
+    "startedAt": "2026-09-18T12:40:28.600Z",
+    "completedAt": "2026-09-18T12:40:41.238Z",
+    "durationMs": 12638,
+    "capabilityId": "scos.ai.generate_text.ollama.qwen3-4b",
+    "providerId": "ollama",
+    "modelId": "qwen3:4b",
+    "modelVersion": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+    "status": "FAILED",
+    "generationStatus": "COMPLETED",
+    "executionStatus": "FAILED",
+    "projectBeforeSha256": "7f94dfdee20f901db3c75653c349adf5582e21632b9d7b449a2aef1e6873b9f9",
+    "executionDurationMs": 1,
+    "responseBytes": 2146,
+    "responseSha256": "688691d280bccf2535dc350ead51ecc003cdef13c08b1669d1b0574031e83354",
+    "contractRevision": "21600d46ee33e5bd1505fc3be97f2ff57ac9ce2ad6dcabc3fdf213984a2829f3",
+    "requestSha256": "e80fcfbe4a9e2da45ce572be93636f9faa9d6fbf87708785860543079b818d5a",
+    "fallbackUsed": false,
+    "error": "governed execution failed: Command 'caption.place' rejected: payload validation failed: [\n  {\n    \"code\": \"invalid_type\",\n    \"expected\": \"number\",\n    \"received\": \"string\",\n    \"path\": [\n      \"duration\"\n    ],\n    \"message\": \"Expected number, received string\"\n  }\n]",
+    "evidenceRefs": [
+      "C:\\Workspace\\hermes-ai-operating-system",
+      "491e22a0c04f8837e94ac388bdd06c077a3b0d6d",
+      "IMPLEMENTATION_BLUEPRINT.md",
+      "C7C17D1B50D36A6769C7B904B35F3742B1B9B99D54D6CA9DEC5F999257C12A3C",
+      "ollama-machine-probe:f6ff926d-2824-4d21-90c1-dd6c198274fe",
+      "ollama-machine-probe:f6ff926d-2824-4d21-90c1-dd6c198274fe"
+    ]
+  },
+  "verification": {
+    "status": "FAIL",
+    "planSchemaValidated": true,
+    "operationCount": 7,
+    "reason": "Command 'caption.place' rejected: payload validation failed: [\n  {\n    \"code\": \"invalid_type\",\n    \"expected\": \"number\",\n    \"received\": \"string\",\n    \"path\": [\n      \"duration\"\n    ],\n    \"message\": \"Expected number, received string\"\n  }\n]"
+  },
+  "evidenceSha256": "0221ac5bb7e7dd014205ac6f50d98bf8b218a138878df56bfcc0bc35a6342a38"
+}

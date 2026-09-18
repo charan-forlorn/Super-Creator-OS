@@ -1,0 +1,30 @@
+{
+    "schema_version":  "SCOS_REAL_TELEMETRY_ARTIFACT_REGISTRATION_R1",
+    "artifact_id":  "scos-qual-artifact-aca02029eac3532c",
+    "content_id":  "ai-automation-short-v1",
+    "artifact_path":  "evidence/production-loop/artifacts/ai-automation-short-v1/ai-automation-short-v1.mp4",
+    "artifact_sha256":  "aca02029eac3532c3e81c396e25fefd9ed6407bb42a43f775d46fa14817a0683",
+    "size_bytes":  275070,
+    "media":  {
+                  "container":  "mp4",
+                  "video_codec":  "h264",
+                  "audio_codec":  "aac",
+                  "width":  1080,
+                  "height":  1920,
+                  "fps":  30,
+                  "duration_seconds":  20
+              },
+    "provenance":  {
+                       "loop_run_id":  "7cac80d7-1624-4715-b8a0-e829a505c96c",
+                       "route_decision_id":  "827ead00-9c61-42f4-97cd-f0508c0ece1f",
+                       "generation_evidence":  "evidence/production-loop/runs/7cac80d7-1624-4715-b8a0-e829a505c96c.json",
+                       "generation_evidence_sha256":  "bb6e7a6a072e1af2fd1519e4f495a45d2d07b2543ff792742dd93811e8279a77"
+                   },
+    "niche":  "AI Automation / Developer Productivity",
+    "format":  "TikTok vertical 9:16",
+    "registration_status":  "LOCAL_REGISTERED",
+    "external_publish":  "NOT_PERFORMED",
+    "human_publish_gate":  "OPEN",
+    "authority_scope":  "prepare_only_no_external_publish",
+    "registered_at":  "2026-09-18T12:44:32.8634704Z"
+}
