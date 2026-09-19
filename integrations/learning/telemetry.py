@@ -99,6 +99,16 @@ def append_telemetry(entry: dict, path: str | os.PathLike | None = None) -> tupl
                    for r in store):
                 return False, "duplicate (loop_run_id+platform+collected_at) — aborted"
 
+            new_evidence = entry.get("observation_evidence") or {}
+            if entry.get("source") == "api" and new_evidence:
+                for prior in store:
+                    if prior.get("loop_run_id") != entry.get("loop_run_id"):
+                        continue
+                    prior_evidence = prior.get("observation_evidence") or {}
+                    for field in ("graph_fingerprint", "artifact_sha256"):
+                        if prior_evidence.get(field) and prior_evidence.get(field) != new_evidence.get(field):
+                            return False, f"observation evidence conflict for {field} — aborted"
+
             if p.exists():
                 bdir = p.parent / "_telemetry_backups"
                 bdir.mkdir(parents=True, exist_ok=True)
@@ -155,6 +165,11 @@ def join_causal_chain(db_path: str | os.PathLike | None = None,
             "predicted_retention_score": rec.get("retention_score"),
             "retention_signals": rec.get("retention_signals"),
             "observed": by_run.get(run_id, []),
+            "observed_evidence": [
+                r.get("observation_evidence")
+                for r in by_run.get(run_id, [])
+                if r.get("observation_evidence")
+            ],
             "has_observed": run_id in by_run,
         })
     return out
