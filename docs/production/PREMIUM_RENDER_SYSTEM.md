@@ -30,9 +30,20 @@ Brief
        - black-frame / frozen-frame advisory
        - audio clipping / near-silence
        - loudness / subtitles
+  -> Render Cache / Incremental Reuse
+       - Remotion stage keyed by composition + props + source-tree fingerprint + render profile
+       - final master keyed by input SHA + audio/captions + render profile + FFmpeg identity
+       - platform delivery keyed by master SHA + destination profile + resolved encoder + FFmpeg identity
+       - every cache hit re-materializes from a checksum-sealed artifact and re-runs current QC
+  -> Hardware-aware Finishing
+       - local NVENC capability detection
+       - CPU/GPU policy is explicit per render profile
+       - GPU is used for compatible social/ad finishing and delivery when available
+       - master profiles can remain CPU-bound for stable archival output
   -> Platform Delivery Render
        - destination-specific geometry / duration / bitrate / file-size rules
        - delivery provenance linking back to master SHA-256
+       - delivery rendering reuses the shared cache and hardware policy; no parallel delivery subsystem
   -> Provenance + Learning Handoff
        - graph fingerprint
        - master + delivery checksums
@@ -44,6 +55,35 @@ Brief
 Remotion is the primary renderer for animated UI, typography, interface mockups, timing-driven motion,
 and deterministic React compositions. FFmpeg remains the finishing engine. The legacy video-use backend
 is retained for EDL-compatible production and is not duplicated.
+
+## Incremental rendering and hardware policy
+
+Derived render artifacts are stored in the ignored local render cache. Cache keys include the bytes and
+configuration that materially affect the stage, rather than only an output filename. Cache hits are never
+blindly trusted: the artifact checksum is verified, the artifact is materialized atomically, and the
+current QC contract is re-applied.
+
+Hardware selection is capability-driven rather than host-name-driven. render_acceleration may be
+cpu, auto, or gpu. auto uses NVENC when the local FFmpeg build exposes it; gpu fails closed when
+NVENC is unavailable. CPU-bound master profiles remain available for stable archival output, while
+social/ad finishing and destination delivery may use NVENC to reduce render latency.
+
+## Brand, asset index, and creative variants
+
+Brand Kit is resolved from the authoritative Control Center store at the canonical render boundary. Brand
+colors, fonts, display name, CTA label, and fingerprint are compiled into the Remotion props. Caption
+typography and the safe footer are brand-aware. Logo references remain provenance data until the asset
+registry can resolve a real local logo file; no synthetic logo substitute is generated.
+
+Local asset indexing operates through the existing AssetRegistry rather than a second asset database.
+The indexer is incremental, checksum-based, understands audio/video/image/font media types, consumes
+optional rights sidecars, preserves explicit rights evidence, and never downloads from a source.
+Remote acquisition remains a separate explicit operator-controlled step.
+
+Creative variants are generated from the same ProductionGraph. A bounded variant spec can override
+creative scene fields without changing scene timing or rights boundaries. Each variant receives a
+stable variant_id that becomes part of the graph fingerprint and naturally separates cache entries.
+Variant generation creates artifacts only; no performance winner is inferred.
 
 ## Audio strategy
 The source timeline stores voice, music, SFX, and ambience independently. The final mix uses voice

@@ -10,7 +10,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scos.premium_media.brand import BrandKitError, resolve_brand_profile
+from scos.premium_media.brand import (
+    BrandKitError,
+    brand_profile_to_props,
+    resolve_brand_profile,
+)
 from scos.premium_media.creative_graph import graph_from_props
 from scos.premium_media.safe_zone import LayoutBox, validate_layout
 from scos.premium_media.models import AudioRole, AudioStem, PremiumRenderProfile
@@ -60,7 +64,7 @@ def main() -> int:
 
     profile = load_profile(args.profile)
     source_path = args.graph or args.props
-    raw_props = json.loads(source_path.read_text(encoding="utf-8"))
+    raw_props = json.loads(source_path.read_text(encoding="utf-8-sig"))
     graph = graph_from_props(raw_props)
     try:
         brand = resolve_brand_profile(ROOT, graph.brand_kit_id)
@@ -73,6 +77,8 @@ def main() -> int:
         boxes=(
             LayoutBox("primary_content", 70, 180, profile.width - 70, 1650),
             LayoutBox("caption_region", 78, 1450, profile.width - 78, 1750),
+            LayoutBox("header_region", 70, 118, profile.width - 70, 300),
+            LayoutBox("footer_region", 78, 1760, profile.width - 78, 1816),
         ),
     )
     if safe_errors:
@@ -80,19 +86,7 @@ def main() -> int:
 
     props = graph.to_remotion_props()
     if brand is not None:
-        props["brand"] = {
-            "brand_kit_id": brand.brand_kit_id,
-            "name": brand.name,
-            "colors": {
-                "primary": brand.primary,
-                "secondary": brand.secondary,
-                "accent": brand.accent,
-                "neutrals": list(brand.neutrals),
-            },
-            "fonts": {"heading": brand.heading_font, "body": brand.body_font},
-            "logo_asset_ref": brand.logo_asset_ref,
-            "cta": {"label": brand.cta_label, "target": brand.cta_target},
-        }
+        props["brand"] = brand_profile_to_props(brand)
     if "duration_s" not in props:
         props["duration_s"] = 30.0
 

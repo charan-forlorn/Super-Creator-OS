@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 
@@ -70,6 +70,7 @@ class ProductionGraph:
     assets: tuple[AssetNode, ...] = ()
     audio: tuple[AudioNode, ...] = ()
     brand_kit_id: str | None = None
+    variant_id: str | None = None
     style_profile_id: str | None = None
     master_profile_id: str = "master_vertical_2160"
     delivery_profile_ids: tuple[str, ...] = ()
@@ -85,6 +86,7 @@ class ProductionGraph:
             "assets": [a.__dict__ for a in self.assets],
             "audio": [a.__dict__ for a in self.audio],
             "brand_kit_id": self.brand_kit_id,
+            "variant_id": self.variant_id,
             "style_profile_id": self.style_profile_id,
             "master_profile_id": self.master_profile_id,
             "delivery_profile_ids": self.delivery_profile_ids,
@@ -115,6 +117,7 @@ class ProductionGraph:
                 "project_id": self.brief.project_id,
                 "loop_run_id": self.brief.loop_run_id,
                 "brand_kit_id": self.brand_kit_id,
+                "variant_id": self.variant_id,
                 "style_profile_id": self.style_profile_id,
                 "master_profile_id": self.master_profile_id,
                 "delivery_profile_ids": list(self.delivery_profile_ids),
@@ -147,7 +150,65 @@ def graph_from_props(props: dict[str, Any]) -> ProductionGraph:
     captions = tuple(CaptionNode(int(c.get("startMs", 0)), int(c.get("endMs", 0)), str(c.get("text", "")), confidence=c.get("confidence")) for c in props.get("captions", ()))
     meta = props.get("production_graph", {})
     return ProductionGraph(brief=brief, scenes=scenes, captions=captions,
-                           brand_kit_id=meta.get("brand_kit_id"), style_profile_id=meta.get("style_profile_id"),
+                           brand_kit_id=meta.get("brand_kit_id"), variant_id=meta.get("variant_id"),
+                           style_profile_id=meta.get("style_profile_id"),
                            master_profile_id=str(meta.get("master_profile_id") or "master_vertical_2160"),
                            delivery_profile_ids=tuple(meta.get("delivery_profile_ids", ())),
                            render_extras={k: props[k] for k in ("musicSrc", "sfx") if k in props})
+
+
+@dataclass(frozen=True)
+class CreativeVariantSpec:
+    variant_id: str
+    scene_overrides: dict[str, dict[str, Any]] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+_VARIANT_FIELDS = frozenset({"title", "eyebrow", "headline", "body", "tags", "accent"})
+
+
+def apply_creative_variant(
+    graph: ProductionGraph,
+    spec: CreativeVariantSpec,
+) -> ProductionGraph:
+    if not spec.variant_id or not spec.variant_id.strip():
+        raise ValueError("variant_id is required")
+    known = {scene.scene_id for scene in graph.scenes}
+    unknown = set(spec.scene_overrides) - known
+    if unknown:
+        raise ValueError(f"unknown scene override ids: {sorted(unknown)}")
+
+    scenes: list[SceneNode] = []
+    for scene in graph.scenes:
+        updates = spec.scene_overrides.get(scene.scene_id, {})
+        invalid = set(updates) - _VARIANT_FIELDS
+        if invalid:
+            raise ValueError(f"unsupported variant fields: {sorted(invalid)}")
+        scenes.append(replace(scene, **updates))
+
+    extras = dict(graph.render_extras)
+    extras["creative_variant"] = {
+        "variant_id": spec.variant_id,
+        "metadata": dict(spec.metadata),
+    }
+    return replace(
+        graph,
+        scenes=tuple(scenes),
+        variant_id=spec.variant_id,
+        render_extras=extras,
+    )
+
+
+def generate_creative_variants(
+    graph: ProductionGraph,
+    specs: tuple[CreativeVariantSpec, ...],
+    *,
+    max_variants: int = 8,
+) -> tuple[ProductionGraph, ...]:
+    if len(specs) > max_variants:
+        raise ValueError(f"variant count {len(specs)} exceeds max_variants {max_variants}")
+
+    ids = [spec.variant_id for spec in specs]
+    if len(ids) != len(set(ids)):
+        raise ValueError("variant_id values must be unique")
+    return tuple(apply_creative_variant(graph, spec) for spec in specs)

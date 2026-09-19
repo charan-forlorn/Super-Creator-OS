@@ -52,8 +52,39 @@ class BrandKitError(ValueError):
     pass
 
 
+def repository_root(start: Path) -> Path:
+    current = start.resolve()
+    for candidate in (current, *current.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return current
+
+
 def canonical_store_path(repo_root: Path) -> Path:
     return (repo_root / "memory" / "runtime" / "control-center" / "brand-kit-v1.json").resolve()
+
+
+def brand_profile_to_props(profile: BrandProfile) -> dict[str, Any]:
+    return {
+        "brand_kit_id": profile.brand_kit_id,
+        "fingerprint": profile.fingerprint(),
+        "name": profile.name,
+        "colors": {
+            "primary": profile.primary,
+            "secondary": profile.secondary,
+            "accent": profile.accent,
+            "neutrals": list(profile.neutrals),
+        },
+        "fonts": {
+            "heading": profile.heading_font,
+            "body": profile.body_font,
+        },
+        "logo_asset_ref": profile.logo_asset_ref,
+        "cta": {
+            "label": profile.cta_label,
+            "target": profile.cta_target,
+        },
+    }
 
 
 def load_brand_profiles(repo_root: Path) -> tuple[str, tuple[BrandProfile, ...]]:

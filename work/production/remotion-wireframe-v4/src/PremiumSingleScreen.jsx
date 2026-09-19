@@ -12,6 +12,11 @@ const COLORS = {
   line: '#26362a',
 };
 
+function withAlpha(color, alpha, fallback) {
+  if (typeof color === 'string' && /^#[0-9a-fA-F]{6}$/.test(color)) return color + alpha;
+  return color || fallback;
+}
+
 const DEFAULT_STATES = [
   {start: 0, end: 3, title: 'Today', eyebrow: 'Focus', headline: 'Make the next step obvious.', body: 'One clear action beats ten open tabs.', tags: ['FOCUS', 'TODAY'], accent: '#b7ef83'},
   {start: 3, end: 7, title: 'Inbox', eyebrow: 'Automation', headline: 'Your workflow is ready.', body: 'Review, approve, and let the system execute.', tags: ['READY', 'AUTOMATION'], accent: '#8de7aa'},
@@ -24,7 +29,7 @@ function currentState(states, time) {
   return states.find((s) => time >= s.start && time < s.end) || states[states.length - 1];
 }
 
-function CaptionOverlay({captions, accent}) {
+function CaptionOverlay({captions, accent, textColor, fontFamily}) {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   if (!captions || !captions.length) return null;
@@ -46,11 +51,11 @@ function CaptionOverlay({captions, accent}) {
         maxWidth: 900, padding: '18px 26px', borderRadius: 24,
         background: 'rgba(3,8,4,.86)', border: '1px solid rgba(255,255,255,.10)',
         boxShadow: '0 18px 50px rgba(0,0,0,.30)', textAlign: 'center',
-        fontFamily: 'Tahoma, Arial, sans-serif', fontSize: 54, lineHeight: 1.13,
-        fontWeight: 800, color: COLORS.text,
+        fontFamily: fontFamily || 'Tahoma, Arial, sans-serif', fontSize: 54, lineHeight: 1.13,
+        fontWeight: 800, color: textColor || COLORS.text,
       }}>
         {page.tokens.map((token, idx) => (
-          <span key={idx} style={{color: idx <= active ? (accent || COLORS.accent) : COLORS.text}}>
+          <span key={idx} style={{color: idx <= active ? (accent || COLORS.accent) : (textColor || COLORS.text)}}>
             {token.text}{' '}
           </span>
         ))}
@@ -71,34 +76,43 @@ export const PremiumSingleScreen = ({states = DEFAULT_STATES, captions = [], mus
   const brandAccent = brand?.colors?.accent || state.accent || COLORS.accent;
   const headingFont = brand?.fonts?.heading || 'Tahoma, Arial, sans-serif';
   const bodyFont = brand?.fonts?.body || 'Tahoma, Arial, sans-serif';
-  const brandText = brand?.colors?.primary || COLORS.text;
+  const brandText = brand?.colors?.neutrals?.[0] || brand?.colors?.primary || COLORS.text;
+  const brandMuted = brand?.colors?.neutrals?.[1] || COLORS.muted;
+  const brandShell = brand?.colors?.primary || COLORS.bg;
+  const brandPanel = brand?.colors?.secondary || COLORS.panel;
+  const brandLine = brand?.colors?.neutrals?.[2] || COLORS.line;
+  const brandAccentStroke = withAlpha(brandAccent, '55', brandAccent);
+  const brandLineStroke = withAlpha(brandLine, '55', brandLine);
+  const brandAccentGlow = withAlpha(brandAccent, '14', 'rgba(122,190,120,.13)');
+  const brandName = brand?.name || 'RESULT';
+  const brandCta = brand?.cta?.label || '';
 
   return (
-    <AbsoluteFill style={{background: COLORS.bg, color: brandText, fontFamily: bodyFont, overflow: 'hidden'}}>
-      <div style={{position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 22%, rgba(122,190,120,.13), transparent 34%)'}}/>
+    <AbsoluteFill style={{background: brandShell, color: brandText, fontFamily: bodyFont, overflow: 'hidden'}}>
+      <div style={{position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 22%, ' + brandAccentGlow + ', transparent 34%)'}}/>
       <div style={{
         position: 'absolute', inset: 24, borderRadius: 42,
-        background: 'linear-gradient(160deg, #0c170e, #07100a 62%, #09130b)',
-        border: '1px solid rgba(255,255,255,.07)', boxShadow: '0 28px 90px rgba(0,0,0,.42)',
+        background: brandShell,
+        border: '1px solid ' + brandLineStroke, boxShadow: '0 28px 90px rgba(0,0,0,.42)',
         overflow: 'hidden',
       }}>
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, height: 118,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 46px', borderBottom: '1px solid rgba(255,255,255,.06)',
+          padding: '0 46px', borderBottom: '1px solid ' + brandLineStroke,
         }}>
-          <div style={{fontSize: 26, color: COLORS.muted, letterSpacing: 1}}>RESULT</div>
+          <div style={{fontSize: 26, color: brandMuted, letterSpacing: 1}}>{brandName}</div>
           <div style={{
             padding: '8px 14px', borderRadius: 16,
-            border: '1px solid rgba(183,239,131,.30)', color: COLORS.accent,
+            border: '1px solid ' + brandAccentStroke, color: brandAccent,
             fontSize: 16, fontWeight: 800,
           }}>LIVE</div>
         </div>
 
         <div style={{
           position: 'absolute', left: 46, right: 46, top: 156, bottom: 270,
-          borderRadius: 34, background: COLORS.panel,
-          border: '1px solid rgba(255,255,255,.06)', boxShadow: '0 14px 45px rgba(0,0,0,.22)',
+          borderRadius: 34, background: brandPanel,
+          border: '1px solid ' + brandLineStroke, boxShadow: '0 14px 45px rgba(0,0,0,.22)',
           padding: 34,
         }}>
           <div style={{
@@ -106,13 +120,13 @@ export const PremiumSingleScreen = ({states = DEFAULT_STATES, captions = [], mus
             transform: 'translateY(' + ((1 - enter) * 18) + 'px) scale(' + (0.985 + enter * 0.015) + ')',
             height: '100%', display: 'flex', flexDirection: 'column',
           }}>
-            <div style={{fontSize: 18, color: state.accent || COLORS.accent, fontWeight: 800, letterSpacing: 1.2}}>
+            <div style={{fontSize: 18, color: brandAccent, fontWeight: 800, letterSpacing: 1.2}}>
               <span style={{color: brandAccent}}>{state.eyebrow}</span>
             </div>
             <div style={{marginTop: 14, fontSize: 56, lineHeight: 1.03, fontWeight: 900, letterSpacing: -1.4, fontFamily: headingFont}}>
               {state.headline}
             </div>
-            <div style={{marginTop: 18, maxWidth: 780, fontSize: 24, lineHeight: 1.45, color: COLORS.muted, fontFamily: bodyFont}}>
+            <div style={{marginTop: 18, maxWidth: 780, fontSize: 24, lineHeight: 1.45, color: brandMuted, fontFamily: bodyFont}}>
               {state.body}
             </div>
 
@@ -120,8 +134,8 @@ export const PremiumSingleScreen = ({states = DEFAULT_STATES, captions = [], mus
               {(state.tags || []).map((tag) => (
                 <div key={tag} style={{
                   padding: '8px 14px', borderRadius: 18,
-                  background: COLORS.panel2,
-                  border: '1px solid ' + (state.accent || COLORS.line) + '38',
+                  background: brandShell,
+                  border: '1px solid ' + brandAccentStroke,
                   color: brandAccent, fontSize: 14, fontWeight: 800,
                 }}>{tag}</div>
               ))}
@@ -130,12 +144,12 @@ export const PremiumSingleScreen = ({states = DEFAULT_STATES, captions = [], mus
             <div style={{marginTop: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16}}>
               {[['01', 'Clarity', 'The hierarchy is obvious.'], ['02', 'Motion', 'Transitions have a reason.']].map(([n, t, d]) => (
                 <div key={n} style={{
-                  padding: 20, borderRadius: 22, background: '#0d180f',
-                  border: '1px solid rgba(255,255,255,.05)',
+                  padding: 20, borderRadius: 22, background: brandShell,
+                  border: '1px solid ' + brandLineStroke,
                 }}>
-                  <div style={{fontSize: 14, color: COLORS.muted}}>{n}</div>
+                  <div style={{fontSize: 14, color: brandMuted}}>{n}</div>
                   <div style={{marginTop: 5, fontSize: 22, fontWeight: 800}}>{t}</div>
-                  <div style={{marginTop: 4, fontSize: 15, lineHeight: 1.4, color: COLORS.muted}}>{d}</div>
+                  <div style={{marginTop: 4, fontSize: 15, lineHeight: 1.4, color: brandMuted}}>{d}</div>
                 </div>
               ))}
             </div>
@@ -143,15 +157,15 @@ export const PremiumSingleScreen = ({states = DEFAULT_STATES, captions = [], mus
         </div>
 
         <div style={{position: 'absolute', left: 46, right: 46, bottom: 112, display: 'flex', alignItems: 'center', gap: 16}}>
-          <div style={{fontSize: 16, color: COLORS.muted}}>0:{String(Math.floor(time)).padStart(2, '0')}</div>
-          <div style={{flex: 1, height: 5, borderRadius: 5, background: '#1b281e', overflow: 'hidden'}}>
-            <div style={{height: '100%', width: (progress * 100) + '%', background: state.accent || COLORS.accent}}/>
+          <div style={{fontSize: 16, color: brandMuted}}>0:{String(Math.floor(time)).padStart(2, '0')}</div>
+          <div style={{flex: 1, height: 5, borderRadius: 5, background: brandLine, overflow: 'hidden'}}>
+            <div style={{height: '100%', width: (progress * 100) + '%', background: brandAccent}}/>
           </div>
-          <div style={{fontSize: 16, color: COLORS.muted}}>{String(state.title || 'Result').toUpperCase()}</div>
+          <div style={{fontSize: 16, color: brandMuted}}>{String(state.title || 'Result').toUpperCase()}</div>
         </div>
       </div>
 
-      <CaptionOverlay captions={captions}/>
+      <CaptionOverlay captions={captions} accent={brandAccent} textColor={brandText} fontFamily={bodyFont}/>
 
       {musicSrc ? <Audio src={staticFile(musicSrc)} volume={0.18} loop/> : null}
       {(sfx || []).map((fx) => (
@@ -160,8 +174,15 @@ export const PremiumSingleScreen = ({states = DEFAULT_STATES, captions = [], mus
         </Sequence>
       ))}
 
-      <div style={{position: 'absolute', left: 46, right: 46, bottom: 36, textAlign: 'center', color: 'rgba(255,255,255,.34)', fontSize: 12, letterSpacing: 2}}>
-        {stateIndex + 1}/{states.length} · SINGLE SCREEN PRODUCTION
+      <div style={{position: 'absolute', left: 46, right: 46, bottom: 104, display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: brandMuted, fontSize: 12, letterSpacing: 1.4}}>
+        <div>{brandName} · {stateIndex + 1}/{states.length}</div>
+        {brandCta ? (
+          <div style={{padding: '8px 14px', borderRadius: 16, border: '1px solid ' + brandAccentStroke, color: brandAccent, fontWeight: 800}}>
+            {brandCta}
+          </div>
+        ) : (
+          <div>SINGLE SCREEN PRODUCTION</div>
+        )}
       </div>
     </AbsoluteFill>
   );

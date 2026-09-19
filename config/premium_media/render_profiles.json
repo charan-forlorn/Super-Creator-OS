@@ -19,7 +19,10 @@
       "single_screen": true,
       "burn_in_subtitles": true,
       "faststart": true,
-      "for_ad": false
+      "for_ad": false,
+      "render_acceleration": "cpu",
+      "nvenc_preset": "p5",
+      "nvenc_cq": 18
     },
     "social_vertical_1080": {
       "name": "social_vertical_1080",
@@ -39,7 +42,10 @@
       "single_screen": true,
       "burn_in_subtitles": true,
       "faststart": true,
-      "for_ad": false
+      "for_ad": false,
+      "render_acceleration": "auto",
+      "nvenc_preset": "p5",
+      "nvenc_cq": 19
     },
     "ad_vertical_1080": {
       "name": "ad_vertical_1080",
@@ -59,7 +65,10 @@
       "single_screen": true,
       "burn_in_subtitles": true,
       "faststart": true,
-      "for_ad": true
+      "for_ad": true,
+      "render_acceleration": "auto",
+      "nvenc_preset": "p5",
+      "nvenc_cq": 18
     },
     "master_vertical_2160": {
       "name": "master_vertical_2160",
@@ -79,7 +88,10 @@
       "single_screen": true,
       "burn_in_subtitles": true,
       "faststart": true,
-      "for_ad": false
+      "for_ad": false,
+      "render_acceleration": "cpu",
+      "nvenc_preset": "p5",
+      "nvenc_cq": 18
     }
   }
 }

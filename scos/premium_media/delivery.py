@@ -22,6 +22,8 @@ class DeliveryProfile:
     require_audio: bool = True
     require_916: bool = False
     safe_zone_required: bool = True
+    render_acceleration: str = "auto"
+    nvenc_preset: str = "p5"
     source_urls: tuple[str, ...] = ()
     evidence_note: str = ""
 
@@ -47,12 +49,14 @@ class DeliveryProfile:
 MASTER_VERTICAL = DeliveryProfile(
     profile_id="master_vertical_1080", platform="master", purpose="master",
     width=1080, height=1920, fps=30, require_audio=True, safe_zone_required=True,
+    render_acceleration="cpu",
     evidence_note="Platform-neutral production master; destination-specific delivery requirements are applied later.",
 )
 
 MASTER_ARCHIVE_VERTICAL = DeliveryProfile(
     profile_id="master_vertical_2160", platform="master", purpose="archive-master",
     width=2160, height=3840, fps=30, require_audio=True, safe_zone_required=True,
+    render_acceleration="cpu",
     evidence_note="Optional high-resolution archival master target; not a platform delivery artifact.",
 )
 
@@ -121,6 +125,8 @@ def delivery_manifest(profile_ids: list[str] | tuple[str, ...]) -> dict[str, Any
                 "require_audio": p.require_audio,
                 "require_916": p.require_916,
                 "safe_zone_required": p.safe_zone_required,
+                "render_acceleration": p.render_acceleration,
+                "nvenc_preset": p.nvenc_preset,
                 "source_urls": list(p.source_urls),
                 "evidence_note": p.evidence_note,
             }

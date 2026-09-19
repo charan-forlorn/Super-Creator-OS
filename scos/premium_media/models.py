@@ -124,6 +124,9 @@ class PremiumRenderProfile:
     burn_in_subtitles: bool = True
     faststart: bool = True
     for_ad: bool = False
+    render_acceleration: str = "cpu"
+    nvenc_preset: str = "p5"
+    nvenc_cq: int | None = None
 
 
 @dataclass(frozen=True)

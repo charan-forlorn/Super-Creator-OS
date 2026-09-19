@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -15,13 +16,31 @@ from scos.premium_media.models import (
 )
 from scos.premium_media.rights import RightsError, validate_asset_for_publish
 from scos.premium_media.subtitles import SubtitleError, parse_srt, to_ass, wrap_caption
-from scos.premium_media.asset_intelligence import AssetQuery, rank_assets, select_best_asset
-from scos.premium_media.brand import BrandKitError, resolve_brand_profile
-from scos.premium_media.creative_graph import graph_from_props
+from scos.premium_media.asset_intelligence import (
+    AssetQuery,
+    LocalAssetIndexer,
+    rank_assets,
+    select_best_asset,
+)
+from scos.premium_media.brand import (
+    BrandKitError,
+    brand_profile_to_props,
+    repository_root,
+    resolve_brand_profile,
+)
+from scos.premium_media.creative_graph import (
+    CreativeVariantSpec,
+    apply_creative_variant,
+    generate_creative_variants,
+    graph_from_props,
+)
 from scos.premium_media.delivery import DELIVERY_PROFILES, MASTER_VERTICAL, get_delivery_profile
 # asset models imported above
 from scos.premium_media.safe_zone import LayoutBox, validate_layout
 from scos.premium_media.intake import ingest_local
+from scos.premium_media.rights import AssetRegistry
+from scos.premium_media.canonical_backend import PremiumRenderBackend
+from scos.render.base import RenderProfile, RenderRequest
 
 
 def test_srt_round_trip_and_wrap():
@@ -196,9 +215,155 @@ def test_brand_bridge_is_fail_closed_and_reads_authoritative_shape(tmp_path):
     profile = resolve_brand_profile(tmp_path, "bkb-demo")
     assert profile is not None
     assert profile.accent == "#B7EF83"
-    assert profile.fingerprint()
+    props = brand_profile_to_props(profile)
+    assert props["fingerprint"] == profile.fingerprint()
+    assert props["colors"]["accent"] == "#B7EF83"
+    assert props["fonts"]["heading"] == "Tahoma"
+    assert props["cta"]["label"] == "Learn"
+    (tmp_path / ".git").mkdir()
+    assert repository_root(tmp_path / "memory") == tmp_path
     try:
         resolve_brand_profile(tmp_path, "missing")
         assert False
     except BrandKitError:
         pass
+
+
+def test_canonical_backend_injects_authoritative_brand_props(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    project_dir = repo / "work" / "remotion"
+    project_dir.mkdir(parents=True)
+    (repo / ".git").mkdir()
+    store = repo / "memory" / "runtime" / "control-center" / "brand-kit-v1.json"
+    store.parent.mkdir(parents=True)
+    store.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "store_kind": "scos.brand_kit.v1",
+            "record_count": 1,
+            "records": [{
+                "brand_kit_id": "bkb-demo",
+                "schema_version": 1,
+                "name": "Demo",
+                "colors": {
+                    "primary": "#000000",
+                    "secondary": "#101010",
+                    "accent": "#B7EF83",
+                    "neutrals": ["#FFFFFF", "#8A8A8A", "#26362A"],
+                },
+                "fonts": {"heading": "Tahoma", "body": "Arial"},
+                "logo": {"asset_ref": "local-logo", "kind": "local-ref"},
+                "contact": {"name": "x", "email": "x@example.com", "socials": []},
+                "basic_cta": {"label": "Learn", "target": "internal"},
+            }],
+        }),
+        encoding="utf-8",
+    )
+    captured = {}
+
+    def fake_render(self, job):
+        captured.update(job.props)
+        job.output_path.parent.mkdir(parents=True, exist_ok=True)
+        job.output_path.write_bytes(b"rendered")
+        return job.output_path
+
+    monkeypatch.setattr(
+        "scos.premium_media.canonical_backend.RenderRouter.render_remotion",
+        fake_render,
+    )
+    monkeypatch.setattr(
+        "scos.premium_media.canonical_backend.finalize_video",
+        lambda *args, **kwargs: SimpleNamespace(
+            probe=SimpleNamespace(duration_s=1.0, width=1080, height=1920, fps=30.0)
+        ),
+    )
+
+    request = RenderRequest(
+        run_id="brand-test",
+        clips=[],
+        output_path=tmp_path / "out.mp4",
+        work_dir=tmp_path / "work",
+        profile=RenderProfile(width=1080, height=1920),
+        metadata={
+            "premium": {
+                "profile": PremiumRenderProfile(name="brand", platform="test").__dict__,
+                "project_dir": str(project_dir),
+                "composition_id": "PremiumSingleScreen",
+                "props": {
+                    "duration_s": 1,
+                    "states": [{"start": 0, "end": 1, "headline": "Hello"}],
+                    "production_graph": {"brand_kit_id": "bkb-demo"},
+                },
+            }
+        },
+    )
+    result = PremiumRenderBackend().render(request)
+    assert result.success is True
+    assert captured["brand"]["fingerprint"]
+    assert captured["brand"]["colors"]["accent"] == "#B7EF83"
+    assert captured["brand"]["fonts"]["heading"] == "Tahoma"
+    assert captured["brand"]["cta"]["label"] == "Learn"
+
+
+def test_local_asset_index_is_incremental_and_rights_aware(tmp_path):
+    root = tmp_path / "assets"
+    root.mkdir()
+    a = root / "focus.wav"
+    b = root / "focus-copy.wav"
+    a.write_bytes(b"same-audio")
+    b.write_bytes(b"same-audio")
+    rights = {
+        "source_url": "local://license",
+        "license_name": "Commercial",
+        "rights_class": "commercial_cleared",
+        "commercial_ok": True,
+        "allowed_platforms": ["tiktok"],
+    }
+    (root / "focus.wav.rights.json").write_text(json.dumps(rights), encoding="utf-8")
+
+    registry = AssetRegistry(tmp_path / "registry.json")
+    indexer = LocalAssetIndexer(registry)
+    first = indexer.refresh((root,))
+    assert first.scanned == 2
+    assert first.indexed == 1
+    assert first.deduplicated == 1
+    assert first.rights_sidecars == 1
+    asset = registry.load()[0]
+    assert asset.rights is not None
+    assert asset.rights.commercial_ok is True
+
+    second = indexer.refresh((root,))
+    assert second.reused == 1
+    assert second.deduplicated == 1
+
+    a.write_bytes(b"changed-audio")
+    third = indexer.refresh((root,))
+    assert third.indexed == 1
+
+
+def test_creative_variants_are_bounded_deterministic_and_cache_distinct():
+    graph = graph_from_props({
+        "project_id": "p1",
+        "duration_s": 4,
+        "states": [
+            {"start": 0, "end": 2, "headline": "Original", "body": "Body"},
+            {"start": 2, "end": 4, "headline": "Second", "body": "Body"},
+        ],
+    })
+    specs = (
+        CreativeVariantSpec(
+            variant_id="hook-a",
+            scene_overrides={"scene-000": {"headline": "Stronger hook"}},
+        ),
+        CreativeVariantSpec(
+            variant_id="hook-b",
+            scene_overrides={"scene-000": {"headline": "Sharper hook"}},
+        ),
+    )
+    variants = generate_creative_variants(graph, specs)
+    assert [v.variant_id for v in variants] == ["hook-a", "hook-b"]
+    assert variants[0].scenes[0].headline == "Stronger hook"
+    assert variants[0].fingerprint() != variants[1].fingerprint()
+    assert apply_creative_variant(graph, specs[0]).to_remotion_props()["production_graph"]["variant_id"] == "hook-a"
+    with pytest.raises(ValueError):
+        generate_creative_variants(graph, specs, max_variants=1)

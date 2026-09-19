@@ -9,6 +9,7 @@ from pathlib import Path
 
 from scos.render.base import RenderBackend, RenderError, RenderRequest, RenderResult
 
+from .brand import BrandKitError, brand_profile_to_props, repository_root, resolve_brand_profile
 from .models import AudioRole, AudioStem, PremiumRenderProfile, SubtitleCue
 from .pipeline import finalize_video
 from .render_router import RenderJob, RenderRouter, RenderRouterError
@@ -29,6 +30,15 @@ class PremiumRenderBackend(RenderBackend):
             props = dict(cfg["props"])
         except (KeyError, TypeError, ValueError) as exc:
             raise RenderError(f"invalid premium render metadata: {exc}") from exc
+
+        meta = props.get("production_graph", {})
+        brand_id = meta.get("brand_kit_id") if isinstance(meta, dict) else None
+        try:
+            brand = resolve_brand_profile(repository_root(project_dir), brand_id)
+        except BrandKitError as exc:
+            raise RenderError(f"brand kit resolution failed: {exc}") from exc
+        if brand is not None:
+            props["brand"] = brand_profile_to_props(brand)
         if request.profile.width != profile.width or request.profile.height != profile.height:
             raise RenderError("canonical RenderProfile geometry does not match premium delivery profile")
         safe_errors = validate_layout(
@@ -37,6 +47,8 @@ class PremiumRenderBackend(RenderBackend):
             boxes=(
                 LayoutBox("primary_content", 70, 180, profile.width - 70, 1650),
                 LayoutBox("caption_region", 78, 1450, profile.width - 78, 1750),
+                LayoutBox("header_region", 70, 118, profile.width - 70, 300),
+                LayoutBox("footer_region", 78, 1760, profile.width - 78, 1816),
             ),
         )
         if safe_errors:
@@ -76,6 +88,10 @@ class PremiumRenderBackend(RenderBackend):
             report = finalize_video(
                 rendered, request.output_path, profile,
                 audio_stems=stems, subtitles=cues,
+                production_metadata={
+                    "brand_kit_id": brand.brand_kit_id if brand is not None else None,
+                    "brand_fingerprint": brand.fingerprint() if brand is not None else None,
+                },
             )
         except Exception as exc:
             raise RenderError(str(exc)) from exc

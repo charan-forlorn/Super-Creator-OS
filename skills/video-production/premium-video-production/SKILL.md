@@ -46,8 +46,22 @@ prefer @remotion/captions. Support Thai and English text without assuming Latin-
 
 ## Evidence
 Every final render keeps a provenance JSON with output SHA-256, source SHA-256, profile, audio stems,
-subtitle count, and publish gate state. No external publish is performed by this skill.
+subtitle count, cache identity when reused, and publish gate state. No external publish is performed by this skill.
 
+## Incremental render and hardware policy
+- Use the shared content-addressed render cache before creating another Remotion render, final master, or platform delivery.
+- Cache keys must include materially relevant source bytes/configuration, not output filenames alone.
+- Cache hits must verify the sealed SHA-256 artifact and re-run current QC before reuse.
+- render_acceleration is explicit: cpu, auto, or gpu.
+- auto uses locally detected NVENC for social/ad finishing and delivery when available; gpu fails closed when requested hardware is absent.
+- CPU-bound master profiles remain valid for archival/reproducible output. Do not create a second hardware-routing subsystem.
+
+## Brand / Asset / Variant progression
+- Brand state is resolved from the authoritative local Control Center store at the canonical render boundary.
+- Colors, fonts, display name, CTA label, fingerprint, caption typography, and safe footer are render-aware; logo files are not synthesized when a local asset cannot yet be resolved.
+- Local asset indexing reuses AssetRegistry and is checksum-based/incremental; optional rights sidecars are explicit and no network download occurs.
+- Creative variants reuse ProductionGraph and are bounded, timing-safe, rights-safe mutation specs. variant_id is part of the graph fingerprint and cache identity.
+- Performance telemetry stays NOT_OBSERVED until real observations are joined; variant generation does not infer a winner.
 
 ## Canonical architecture boundaries
 - Premium Media must enter SCOS through the canonical `scos.render.RenderBackend` contract; do not create a second orchestration/render contract.

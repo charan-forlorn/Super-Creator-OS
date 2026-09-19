@@ -12,6 +12,13 @@ from pathlib import Path
 
 from .models import PremiumRenderProfile, RenderBackendKind
 from .qc import QCError, validate_render
+from .render_cache import (
+    RenderCache,
+    RenderCacheError,
+    cache_key,
+    fingerprint_value,
+    source_tree_fingerprint,
+)
 
 
 class RenderRouterError(RuntimeError):
@@ -80,8 +87,27 @@ class RemotionBackend:
         return output
 
 
+def _cache_relevant_props(props: dict) -> dict:
+    """Remove provenance-only graph identity that must not invalidate pixel reuse."""
+    payload = json.loads(json.dumps(props, ensure_ascii=False))
+    graph = payload.get("production_graph")
+    if isinstance(graph, dict):
+        graph.pop("loop_run_id", None)
+        graph.pop("fingerprint", None)
+    return payload
+
+
 class RenderRouter:
-    """Select renderer by capability, with one-screen as the default commercial shape."""
+    """Select and execute the canonical renderer with content-addressed reuse."""
+
+    def __init__(
+        self,
+        *,
+        cache: RenderCache | None = None,
+        cache_enabled: bool = True,
+    ) -> None:
+        self.cache = cache
+        self.cache_enabled = cache_enabled
 
     def select(self, *, single_screen: bool = True, requires_vfx: bool = False,
                legacy_edl: bool = False) -> RenderBackendKind:
@@ -92,16 +118,56 @@ class RenderRouter:
         return RenderBackendKind.FFMPEG
 
     def render_remotion(self, job: RenderJob) -> Path:
-        output = RemotionBackend().render(job)
+        output = job.output_path.resolve()
+        cache = self.cache or RenderCache.for_project(job.project_dir)
+        cache_payload = {
+            "schema": "SCOS_REMOTION_STAGE_R1",
+            "composition_id": job.composition_id,
+            "profile": job.profile.__dict__,
+            "source_tree_fingerprint": source_tree_fingerprint(job.project_dir),
+            "props": fingerprint_value(_cache_relevant_props(job.props), base_dir=job.project_dir),
+        }
+        key = cache_key(cache_payload)
+
+        if self.cache_enabled:
+            hit = cache.lookup("remotion", key)
+            if hit is not None:
+                cache.materialize(hit, output)
+                report = validate_render(
+                    output,
+                    job.profile,
+                    expected_duration_s=job.props.get("duration_s"),
+                    require_audio=False,
+                )
+                if not report.passed:
+                    raise RenderRouterError("cached render failed current QC: " + "; ".join(report.errors))
+                return output
+
+        rendered = RemotionBackend().render(job)
         report = validate_render(
-            output,
+            rendered,
             job.profile,
             expected_duration_s=job.props.get("duration_s"),
             require_audio=False,
         )
         if not report.passed:
             raise QCError("; ".join(report.errors))
-        return output
+        if self.cache_enabled:
+            try:
+                cache.store(
+                    "remotion",
+                    key,
+                    rendered,
+                    metadata={
+                        "composition_id": job.composition_id,
+                        "profile": job.profile.__dict__,
+                        "source_tree_fingerprint": cache_payload["source_tree_fingerprint"],
+                    },
+                )
+            except RenderCacheError as exc:
+                # Cache is derived state; keep a verified render usable when cache I/O fails.
+                print(f"[premium-cache] remotion stage not cached: {exc}")
+        return rendered
 
 
 def write_render_job(job: RenderJob, path: str | Path) -> Path:
