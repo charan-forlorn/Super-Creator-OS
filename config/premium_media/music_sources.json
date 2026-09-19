@@ -1,0 +1,60 @@
+{
+  "schema_version": "SCOS_PREMIUM_MUSIC_SOURCES_R1",
+  "selection_policy": {
+    "default_mode": "rights_first",
+    "real_song_support": true,
+    "auto_download_streaming_tracks": false,
+    "ad_use_requires": ["commercial_license", "platform_scope", "territory_scope", "term_scope", "project_or_subscription_evidence"]
+  },
+  "providers": [
+    {
+      "id": "jamendo_licensing",
+      "url": "https://licensing.jamendo.com/",
+      "mode": "licensed_catalog",
+      "ad_capable": true,
+      "notes": "Online and commercial licensing options; license certificate is stored with the selected track."
+    },
+    {
+      "id": "epidemic_sound",
+      "url": "https://www.epidemicsound.com/pricing-and-plans/",
+      "mode": "licensed_catalog",
+      "ad_capable": true,
+      "notes": "Plan-dependent rights. Business/professional ad use must be explicitly covered by the account/license."
+    },
+    {
+      "id": "artlist",
+      "url": "https://help.artlist.io/hc/en-us/articles/29559573229725-Artlist-s-Music-and-SFX-plans-explained",
+      "mode": "licensed_catalog",
+      "ad_capable": true,
+      "notes": "Use Pro/Team scope for commercial/client/advertising work; Social plan is not the commercial default."
+    },
+    {
+      "id": "musicbed",
+      "url": "https://www.musicbed.com/music-for-advertising",
+      "mode": "rights_managed_catalog",
+      "ad_capable": true,
+      "notes": "Rights-managed advertising collection; preserve the purchased license/evidence."
+    },
+    {
+      "id": "mixkit_music",
+      "url": "https://mixkit.co/license/modal/musicFree/",
+      "mode": "free_catalog",
+      "ad_capable": true,
+      "notes": "Free license allows social media and online marketing ads, but excludes some media such as TV/radio and video games."
+    },
+    {
+      "id": "pixabay_music",
+      "url": "https://pixabay.com/service/license-summary/",
+      "mode": "free_catalog",
+      "ad_capable": true,
+      "notes": "Commercial video use is generally allowed as part of a larger creative work; item-specific third-party rights must still be checked."
+    },
+    {
+      "id": "user_owned_real_song",
+      "url": "local-license-record",
+      "mode": "licensed_local_asset",
+      "ad_capable": true,
+      "notes": "Supports genuine Thai or international songs when the user provides the audio and a valid license. Famous streaming tracks are never scraped or ripped automatically."
+    }
+  ]
+}

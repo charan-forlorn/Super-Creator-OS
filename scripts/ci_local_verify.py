@@ -93,9 +93,21 @@ else:
     _TSC_BIN = "node_modules/.bin/tsc"
 
 # Process-local media contract (Cohort 8C §6).
+# Prefer the historical Scoop shim when present; otherwise use the local
+# executable resolved from PATH by the operator environment. The resolved
+# binaries are still validated as absolute regular files and exercised with
+# -version before any child gate is started.
 _MEDIA_SHIM_DIR = Path("C:/Users/chara/scoop/shims")
 _MEDIA_FFMPEG = _MEDIA_SHIM_DIR / "ffmpeg.exe"
 _MEDIA_FFPROBE = _MEDIA_SHIM_DIR / "ffprobe.exe"
+if not _MEDIA_FFMPEG.is_file():
+    _PATH_FFMPEG = shutil.which("ffmpeg")
+    if _PATH_FFMPEG:
+        _MEDIA_FFMPEG = Path(_PATH_FFMPEG).resolve()
+if not _MEDIA_FFPROBE.is_file():
+    _PATH_FFPROBE = shutil.which("ffprobe")
+    if _PATH_FFPROBE:
+        _MEDIA_FFPROBE = Path(_PATH_FFPROBE).resolve()
 
 # Required warning-as-error guards (Cohort 8C §7). Never blanket ``-W error``.
 WARNING_GUARDS: tuple[str, str] = (

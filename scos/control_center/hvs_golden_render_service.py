@@ -442,8 +442,9 @@ def _audio_analysis(
         data = pcm.read_bytes()
         import struct
 
-        samples = struct.unpack("<%dh" % (len(data) // 4), data)
-        # f32le -> reinterpret as float via int view (approx; safe for peak/mean)
+        # f32le samples are unpacked directly below; the old intermediate
+        # int16 unpack was both unused and size-incompatible for arbitrary byte lengths.
+        # Keep the analysis bounded and operate on the actual float32 stream.
         floats = []
         for i in range(0, len(data) - 3, 4):
             floats.append(struct.unpack_from("<f", data, i)[0])

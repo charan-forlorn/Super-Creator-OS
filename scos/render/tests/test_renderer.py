@@ -170,6 +170,16 @@ def test_integration_render():
             check("deterministic duration across runs", abs(g1[2] - g2[2]) < 0.05)
 
 
+def test_canonical_premium_route_fails_closed_without_premium_contract():
+    print("\n[4.5] canonical premium route — missing premium contract fails closed")
+    try:
+        ffmpeg_engine.render({"run_id": "premium-test", "backend": "premium", "premium": None})
+        raised = False
+    except RenderError:
+        raised = True
+    check("premium route missing contract -> RenderError", raised)
+
+
 def test_integration_missing_asset():
     print("\n[5] integration — missing asset raises RenderError (honest fail)")
     with tempfile.TemporaryDirectory() as td:
@@ -193,6 +203,7 @@ def main():
     test_write_edl()
     test_honest_failure_validation()
     test_integration_render()
+    test_canonical_premium_route_fails_closed_without_premium_contract()
     test_integration_missing_asset()
     print("\n" + "=" * 60)
     print(f" RESULT: {_PASS} passed, {_FAIL} failed")

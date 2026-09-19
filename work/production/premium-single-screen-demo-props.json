@@ -1,0 +1,160 @@
+{
+  "duration_s": 30,
+  "states": [
+    {
+      "start": 0,
+      "end": 5,
+      "title": "Hook",
+      "eyebrow": "PRODUCTION",
+      "headline": "Make the first second count.",
+      "body": "A premium edit begins with clarity, not clutter.",
+      "tags": [
+        "HOOK",
+        "ONE SCREEN"
+      ],
+      "accent": "#b7ef83"
+    },
+    {
+      "start": 5,
+      "end": 10,
+      "title": "Story",
+      "eyebrow": "STRUCTURE",
+      "headline": "Show one idea at a time.",
+      "body": "Hierarchy creates attention without noise.",
+      "tags": [
+        "STORY",
+        "PACE"
+      ],
+      "accent": "#8de7aa"
+    },
+    {
+      "start": 10,
+      "end": 15,
+      "title": "Voice",
+      "eyebrow": "NARRATION",
+      "headline": "Thai and English stay crisp.",
+      "body": "Clean speech, controlled music, readable captions.",
+      "tags": [
+        "VOICE",
+        "TH / EN"
+      ],
+      "accent": "#84d9ff"
+    },
+    {
+      "start": 15,
+      "end": 20,
+      "title": "Sound",
+      "eyebrow": "SOUND DESIGN",
+      "headline": "Every sound has a reason.",
+      "body": "Use hits, swells and transitions to reinforce motion.",
+      "tags": [
+        "SFX",
+        "MIX"
+      ],
+      "accent": "#f0c97d"
+    },
+    {
+      "start": 20,
+      "end": 25,
+      "title": "Captions",
+      "eyebrow": "ACCESSIBILITY",
+      "headline": "Words land with the frame.",
+      "body": "Timed captions support comprehension and retention.",
+      "tags": [
+        "CAPTIONS",
+        "TIMING"
+      ],
+      "accent": "#d8a7ff"
+    },
+    {
+      "start": 25,
+      "end": 30,
+      "title": "Ad",
+      "eyebrow": "DELIVERY",
+      "headline": "Ready for a real campaign.",
+      "body": "Rights, mix, captions and technical QC stay together.",
+      "tags": [
+        "AD",
+        "QC"
+      ],
+      "accent": "#ff9e9e"
+    }
+  ],
+  "captions": [
+    {
+      "text": "สร้างวิดีโอให้คม ชัด และดูแพง",
+      "startMs": 900,
+      "endMs": 2400,
+      "timestampMs": null,
+      "confidence": 1
+    },
+    {
+      "text": "Build one screen. Build one clear idea.",
+      "startMs": 5600,
+      "endMs": 7600,
+      "timestampMs": null,
+      "confidence": 1
+    },
+    {
+      "text": "Thai and English voice stay crisp.",
+      "startMs": 10600,
+      "endMs": 12800,
+      "timestampMs": null,
+      "confidence": 1
+    },
+    {
+      "text": "Sound design should support the cut.",
+      "startMs": 15600,
+      "endMs": 17800,
+      "timestampMs": null,
+      "confidence": 1
+    },
+    {
+      "text": "Captions land with the frame.",
+      "startMs": 20600,
+      "endMs": 22600,
+      "timestampMs": null,
+      "confidence": 1
+    },
+    {
+      "text": "Rights and QC stay attached to the render.",
+      "startMs": 25600,
+      "endMs": 27900,
+      "timestampMs": null,
+      "confidence": 1
+    }
+  ],
+  "musicSrc": null,
+  "sfx": [
+    {
+      "src": "sfx/whoosh.wav",
+      "startFrame": 0,
+      "volume": 0.18
+    },
+    {
+      "src": "sfx/mouseClick.wav",
+      "startFrame": 150,
+      "volume": 0.14
+    },
+    {
+      "src": "sfx/uiSwitch.wav",
+      "startFrame": 300,
+      "volume": 0.12
+    },
+    {
+      "src": "sfx/ding.wav",
+      "startFrame": 450,
+      "volume": 0.12
+    },
+    {
+      "src": "sfx/whoosh.wav",
+      "startFrame": 600,
+      "volume": 0.18
+    },
+    {
+      "src": "sfx/uiSwitch.wav",
+      "startFrame": 750,
+      "volume": 0.12
+    }
+  ]
+}

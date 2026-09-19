@@ -348,12 +348,27 @@ def _read_latest_commit(root: Path) -> str | None:
         return None
     head = head.strip()
     if head.startswith("ref: "):
-        ref_path = git_dir / head[5:].strip()
+        ref_name = head[5:].strip()
+        ref_path = git_dir / ref_name
         ref_text = _read_text(ref_path)
+
+        # Linked worktrees keep branch refs and packed-refs in the common git
+        # directory, not inside the per-worktree gitdir. Resolve that directory
+        # explicitly before failing closed.
+        common_git_dir = git_dir
+        commondir = _read_text(git_dir / "commondir")
+        if commondir:
+            common_candidate = (git_dir / commondir.strip()).resolve()
+            if common_candidate.is_dir():
+                common_git_dir = common_candidate
+        if not ref_text:
+            ref_text = _read_text(common_git_dir / ref_name)
         if ref_text:
             return _normalize_commit_sha(ref_text.strip())
+
         packed = _read_text(git_dir / "packed-refs") or ""
-        ref_name = head[5:].strip()
+        if common_git_dir != git_dir:
+            packed += "\n" + (_read_text(common_git_dir / "packed-refs") or "")
         for line in packed.splitlines():
             if line.startswith("#") or not line.strip():
                 continue
