@@ -11,6 +11,12 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .motion import PremiumMotionGraph, with_fingerprint
+from .audio_reactivity import AudioReactiveAnalysis
+from .compositing import CompositeSpec
+from .lookdev import LookProfile
+from .scene3d import ProductScene
+from .shot_intelligence import StoryboardPlan
+from .typography import TypographyPlan
 
 
 @dataclass(frozen=True)
@@ -78,6 +84,12 @@ class ProductionGraph:
     delivery_profile_ids: tuple[str, ...] = ()
     render_extras: dict[str, Any] = field(default_factory=dict)
     motion_graph: PremiumMotionGraph | None = None
+    audio_reactivity: AudioReactiveAnalysis | None = None
+    compositing: CompositeSpec | None = None
+    typography: TypographyPlan | None = None
+    look_profile: LookProfile | None = None
+    product_scene: ProductScene | None = None
+    storyboard: StoryboardPlan | None = None
     graph_version: str = "SCOS_PRODUCTION_GRAPH_R1"
 
     def fingerprint(self) -> str:
@@ -95,6 +107,12 @@ class ProductionGraph:
             "delivery_profile_ids": self.delivery_profile_ids,
             "render_extras": self.render_extras,
             "motion_graph": with_fingerprint(self.motion_graph) if self.motion_graph else None,
+            "audio_reactivity": self.audio_reactivity.to_props() if self.audio_reactivity else None,
+            "compositing": self.compositing.to_props() if self.compositing else None,
+            "typography": self.typography.to_props() if self.typography else None,
+            "look_profile": self.look_profile.__dict__ if self.look_profile else None,
+            "product_scene": self.product_scene.to_props() if self.product_scene else None,
+            "storyboard": self.storyboard.to_props() if self.storyboard else None,
         }
         raw = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -126,6 +144,12 @@ class ProductionGraph:
                 "master_profile_id": self.master_profile_id,
                 "delivery_profile_ids": list(self.delivery_profile_ids),
                 "motion_graph": with_fingerprint(self.motion_graph) if self.motion_graph else None,
+                "audio_reactivity": self.audio_reactivity.to_props() if self.audio_reactivity else None,
+                "compositing": self.compositing.to_props() if self.compositing else None,
+                "typography": self.typography.to_props() if self.typography else None,
+                "look_profile": self.look_profile.__dict__ if self.look_profile else None,
+                "product_scene": self.product_scene.to_props() if self.product_scene else None,
+                "storyboard": self.storyboard.to_props() if self.storyboard else None,
             },
         })
         return props

@@ -1,4 +1,12 @@
 """SCOS Premium Media production system."""
+from .compositing import CompositeSpec, MaskSpec
+from .transitions import TransitionRuntimeSpec, compile_transition_filter
+from .audio_reactivity import AudioReactiveAnalysis, EnergyEvent, analyze_audio
+from .typography import TypographyPlan, TypographyStyle, WordCue
+from .lookdev import LookProfile
+from .scene3d import Camera3D, DepthLayer, ProductScene
+from .shot_intelligence import ShotPlanSpec, StoryboardPlan, plan_storyboard, storyboard_to_motion_shell
+from .benchmark import BenchmarkCase, BenchmarkResult, benchmark_case, benchmark_suite
 from .motion import (
     AnimatedNumber,
     Camera2D,
