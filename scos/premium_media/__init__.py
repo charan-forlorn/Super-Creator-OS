@@ -1,4 +1,16 @@
 """SCOS Premium Media production system."""
+from .motion import (
+    AnimatedNumber,
+    Camera2D,
+    EffectStack,
+    Keyframe,
+    MotionLayer,
+    PremiumMotionGraph,
+    PremiumShot,
+    ShotTransition,
+    Transform2D,
+    with_fingerprint,
+)
 from .models import (
     AssetRights,
     AudioRole,

@@ -10,6 +10,8 @@ import json
 from dataclasses import dataclass, field, replace
 from typing import Any
 
+from .motion import PremiumMotionGraph, with_fingerprint
+
 
 @dataclass(frozen=True)
 class CreativeBrief:
@@ -75,6 +77,7 @@ class ProductionGraph:
     master_profile_id: str = "master_vertical_2160"
     delivery_profile_ids: tuple[str, ...] = ()
     render_extras: dict[str, Any] = field(default_factory=dict)
+    motion_graph: PremiumMotionGraph | None = None
     graph_version: str = "SCOS_PRODUCTION_GRAPH_R1"
 
     def fingerprint(self) -> str:
@@ -91,6 +94,7 @@ class ProductionGraph:
             "master_profile_id": self.master_profile_id,
             "delivery_profile_ids": self.delivery_profile_ids,
             "render_extras": self.render_extras,
+            "motion_graph": with_fingerprint(self.motion_graph) if self.motion_graph else None,
         }
         raw = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -121,6 +125,7 @@ class ProductionGraph:
                 "style_profile_id": self.style_profile_id,
                 "master_profile_id": self.master_profile_id,
                 "delivery_profile_ids": list(self.delivery_profile_ids),
+                "motion_graph": with_fingerprint(self.motion_graph) if self.motion_graph else None,
             },
         })
         return props
