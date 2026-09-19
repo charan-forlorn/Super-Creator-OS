@@ -64,7 +64,7 @@ function CaptionOverlay({captions, accent, textColor, fontFamily}) {
   );
 }
 
-export const PremiumSingleScreen = ({states = DEFAULT_STATES, captions = [], musicSrc, sfx = [], brand}) => {
+export const PremiumSingleScreen = ({states = DEFAULT_STATES, captions = [], musicSrc, sfx = [], brand, production_graph}) => {
   const frame = useCurrentFrame();
   const {fps, durationInFrames} = useVideoConfig();
   const time = frame / fps;
@@ -86,6 +86,10 @@ export const PremiumSingleScreen = ({states = DEFAULT_STATES, captions = [], mus
   const brandAccentGlow = withAlpha(brandAccent, '14', 'rgba(122,190,120,.13)');
   const brandName = brand?.name || 'RESULT';
   const brandCta = brand?.cta?.label || '';
+
+  if (production_graph?.motion_graph?.shots?.length) {
+    return <MotionGraphRuntime productionGraph={production_graph} captions={captions} brand={brand} />;
+  }
 
   return (
     <AbsoluteFill style={{background: brandShell, color: brandText, fontFamily: bodyFont, overflow: 'hidden'}}>
@@ -187,3 +191,204 @@ export const PremiumSingleScreen = ({states = DEFAULT_STATES, captions = [], mus
     </AbsoluteFill>
   );
 };
+
+const runtimeEase = (name, t) => {
+  if (name === 'ease_in') return t * t;
+  if (name === 'ease_out') return 1 - (1 - t) * (1 - t);
+  if (name === 'ease_in_out') return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  if (name === 'sharp') return t * t * (3 - 2 * t);
+  return t;
+};
+
+function animatedValue(spec, time, fallback = 0) {
+  if (!spec) return fallback;
+  const base = Number.isFinite(spec.value) ? spec.value : fallback;
+  const frames = spec.keyframes || [];
+  if (!frames.length) return base;
+  if (time <= frames[0].time_s) return frames[0].value;
+  for (let i = 1; i < frames.length; i += 1) {
+    const a = frames[i - 1];
+    const b = frames[i];
+    if (time <= b.time_s) {
+      const raw = (time - a.time_s) / Math.max(1e-6, b.time_s - a.time_s);
+      const t = runtimeEase(b.easing || 'linear', Math.max(0, Math.min(1, raw)));
+      return a.value + (b.value - a.value) * t;
+    }
+  }
+  return frames[frames.length - 1].value;
+}
+
+function transitionFactor(transition, localTime, shotDuration, entering) {
+  if (!transition || transition.type === 'cut' || transition.duration_s <= 0) return {opacity: 1, x: 0, y: 0, scale: 1};
+  const d = transition.duration_s;
+  const t = entering ? Math.max(0, Math.min(1, localTime / d)) : Math.max(0, Math.min(1, (shotDuration - localTime) / d));
+  const eased = runtimeEase(transition.easing || 'ease_in_out', t);
+  if (transition.type === 'slide') return {opacity: eased, x: entering ? (1 - eased) * 100 : 0, y: 0, scale: 1};
+  if (transition.type === 'zoom') return {opacity: eased, x: 0, y: 0, scale: 0.96 + 0.04 * eased};
+  if (transition.type === 'whip') return {opacity: eased, x: entering ? (1 - eased) * 180 : 0, y: 0, scale: 1.03 - 0.03 * eased};
+  if (transition.type === 'dip_black' || transition.type === 'dip_white') return {opacity: eased, x: 0, y: 0, scale: 1};
+  return {opacity: eased, x: 0, y: 0, scale: 1};
+}
+
+function layerContent(layer, accent, textColor, fontFamily) {
+  const common = {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 48,
+    boxSizing: 'border-box',
+    whiteSpace: 'pre-wrap',
+  };
+  if (layer.kind === 'text' || layer.kind === 'caption') {
+    return <div style={{...common, color: textColor, fontFamily, fontWeight: 800, fontSize: 64, textAlign: 'center'}}>{layer.text}</div>;
+  }
+  if (layer.kind === 'shape' || layer.kind === 'overlay') {
+    return <div style={{...common, background: accent, opacity: layer.kind === 'overlay' ? 0.18 : 0.72}} />;
+  }
+  if (layer.kind === 'particle') {
+    return <div style={{...common, color: accent, fontSize: 20, letterSpacing: 18}}>· · · · ·</div>;
+  }
+  if (layer.kind === 'media' && layer.asset_id && !/[A-Za-z]:[\\/]/.test(layer.asset_id) && !layer.asset_id.startsWith('/')) {
+    return <img src={staticFile(layer.asset_id)} style={{position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover'}} />;
+  }
+  return <div style={{...common, color: '#7f8c82', fontSize: 18}}>MEDIA LAYER</div>;
+}
+
+function MotionLayerView({layer, time, accent, textColor, fontFamily, reactiveStrength, globalComposite}) {
+  const local = Math.max(0, time - layer.start_s);
+  const transform = layer.transform || {};
+  const x = animatedValue(transform.x, local, 0);
+  const y = animatedValue(transform.y, local, 0);
+  const scale = animatedValue(transform.scale, local, 1);
+  const rotation = animatedValue(transform.rotation_deg, local, 0);
+  const opacity = animatedValue(transform.opacity, local, 1);
+  const effects = layer.effects || {};
+  const blur = animatedValue(effects.blur_px, local, 0);
+  const brightness = animatedValue(effects.brightness, local, 0);
+  const contrast = animatedValue(effects.contrast, local, 1);
+  const saturation = animatedValue(effects.saturation, local, 1);
+  const glow = animatedValue(effects.glow, local, 0) + reactiveStrength * 10;
+  const mask = globalComposite?.mask || null;
+  const filters = [
+    blur > 0 ? 'blur(' + blur + 'px)' : '',
+    'brightness(' + (1 + brightness) + ')',
+    'contrast(' + contrast + ')',
+    'saturate(' + saturation + ')',
+  ].filter(Boolean).join(' ');
+  const clipPath = mask?.kind === 'ellipse' ? 'ellipse(48% 48% at 50% 50%)' : mask?.kind === 'rectangle' ? 'inset(2% round 24px)' : undefined;
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: layer.z_index || 0,
+      transform: 'translate(' + x + 'px,' + y + 'px) rotate(' + rotation + 'deg) scale(' + scale + ')',
+      opacity: Math.max(0, Math.min(1, opacity * (globalComposite?.opacity ?? 1))),
+      filter: filters || 'none',
+      mixBlendMode: layer.blend_mode || globalComposite?.blend_mode || 'normal',
+      clipPath,
+      boxShadow: glow > 0 ? '0 0 ' + Math.round(glow) + 'px ' + accent : 'none',
+      transformOrigin: 'center',
+      overflow: 'hidden',
+    }}>
+      {layerContent(layer, accent, textColor, fontFamily)}
+    </div>
+  );
+}
+
+function KineticTypography({plan, time, accent, textColor, fontFamily}) {
+  const words = plan?.words || [];
+  if (!words.length) return null;
+  return (
+    <div style={{position: 'absolute', left: 80, right: 80, bottom: 150, display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 12, fontFamily, fontWeight: 800, fontSize: 54}}>
+      {words.map((word, index) => {
+        const active = time >= word.start_s && time < word.end_s;
+        const emph = word.emphasis || 0;
+        return <span key={index} style={{
+          color: active ? accent : textColor,
+          transform: 'translateY(' + (active ? -8 : 0) + 'px) scale(' + (1 + emph * 0.06 + (active ? 0.04 : 0)) + ')',
+          opacity: time >= word.start_s ? 1 : 0.45,
+          transition: 'transform 80ms linear',
+        }}>{word.text}</span>;
+      })}
+    </div>
+  );
+}
+
+function ProductDepthRuntime({scene, accent}) {
+  const layers = scene?.layers || [];
+  if (!layers.length) return null;
+  return (
+    <div style={{position: 'absolute', inset: 0, perspective: 1200, pointerEvents: 'none'}}>
+      {layers.map((layer, index) => {
+        const depth = Number(layer.z || 0);
+        return <div key={layer.layer_id} style={{
+          position: 'absolute',
+          left: 10 + index * 3 + '%',
+          top: 18 + index * 4 + '%',
+          width: Math.max(160, 58 - index * 6) + '%',
+          height: Math.max(130, 52 - index * 4) + '%',
+          borderRadius: 28,
+          border: '1px solid ' + accent + '55',
+          background: index === layers.length - 1 ? accent + '18' : 'rgba(255,255,255,.035)',
+          transform: 'translateZ(' + Math.max(-500, Math.min(500, -depth * 0.35)) + 'px) scale(' + (layer.scale || 1) + ')',
+          boxShadow: '0 30px 80px rgba(0,0,0,.28)',
+        }} />;
+      })}
+    </div>
+  );
+}
+
+function MotionGraphRuntime({productionGraph, captions, brand}) {
+  const frame = useCurrentFrame();
+  const {fps, width, height} = useVideoConfig();
+  const time = frame / fps;
+  const graph = productionGraph.motion_graph;
+  const shots = graph.shots || [];
+  const shot = shots.find((s) => time >= s.start_s && time < s.end_s) || shots[shots.length - 1];
+  const local = Math.max(0, time - shot.start_s);
+  const shotDuration = Math.max(0.001, shot.end_s - shot.start_s);
+  const accent = brand?.colors?.accent || '#B7EF83';
+  const textColor = brand?.colors?.primary || '#F5F7F3';
+  const fontFamily = brand?.fonts?.heading || 'Tahoma, Arial, sans-serif';
+  const camera = shot.camera || {};
+  const cx = animatedValue(camera.x, local, 0);
+  const cy = animatedValue(camera.y, local, 0);
+  const zoom = animatedValue(camera.zoom, local, 1);
+  const cro = animatedValue(camera.rotation_deg, local, 0);
+  const enter = transitionFactor(shot.transition_in, local, shotDuration, true);
+  const exit = transitionFactor(shot.transition_out, local, shotDuration, false);
+  const combinedOpacity = Math.min(enter.opacity, exit.opacity);
+  const energyEvents = productionGraph.audio_reactivity?.events || [];
+  const currentEvent = energyEvents.filter((event) => time >= event.time_s).slice(-1)[0];
+  const reactiveStrength = currentEvent ? Math.min(1, Math.max(0, currentEvent.strength - 0.65)) : 0;
+  const composite = productionGraph.compositing || {opacity: 1, blend_mode: 'normal', mask: null};
+  const shellStyle = {
+    position: 'absolute', left: '50%', top: '50%',
+    width: width, height: height,
+    marginLeft: -width / 2, marginTop: -height / 2,
+    transform: 'translate(' + (cx + enter.x + exit.x) + 'px,' + (cy + enter.y + exit.y) + 'px) rotate(' + cro + 'deg) scale(' + (zoom * enter.scale * exit.scale) + ')',
+    opacity: combinedOpacity,
+    transformOrigin: 'center',
+  };
+  return (
+    <AbsoluteFill style={{background: productionGraph.look_profile?.profile_id ? '#070b08' : '#07100A', overflow: 'hidden'}}>
+      <div style={{...shellStyle, background: '#08100A', borderRadius: 36, overflow: 'hidden'}}>
+        <div style={{position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 30%, ' + accent + '12, transparent 46%)'}} />
+        <div style={{position: 'absolute', inset: 32, border: '1px solid ' + accent + '44', borderRadius: 28, mixBlendMode: composite.blend_mode || 'normal', opacity: composite.opacity ?? 1}} />
+        {shot.layers.map((layer) => (
+          <MotionLayerView key={layer.layer_id} layer={layer} time={time} accent={accent} textColor={textColor} fontFamily={fontFamily} reactiveStrength={reactiveStrength} globalComposite={composite} />
+        ))}
+        <ProductDepthRuntime scene={productionGraph.product_scene} accent={accent} />
+        <div style={{position: 'absolute', left: 48, right: 48, top: 48, display: 'flex', justifyContent: 'space-between', color: accent, fontFamily, fontWeight: 800, letterSpacing: 1.5}}>
+          <span>{shot.purpose?.toUpperCase() || 'SHOT'}</span><span>{shot.shot_id}</span>
+        </div>
+        <div style={{position: 'absolute', left: 48, right: 48, bottom: 48, height: 6, background: 'rgba(255,255,255,.10)', borderRadius: 8}}>
+          <div style={{height: 6, width: ((local / shotDuration) * 100) + '%', background: accent, borderRadius: 8}} />
+        </div>
+      </div>
+      <KineticTypography plan={productionGraph.typography} time={time} accent={accent} textColor={textColor} fontFamily={fontFamily} />
+      <CaptionOverlay captions={captions} accent={accent} textColor={textColor} fontFamily={fontFamily} />
+      {productionGraph.audio_reactivity ? <div style={{position: 'absolute', right: 44, top: 44, width: 10 + reactiveStrength * 26, height: 10 + reactiveStrength * 26, borderRadius: 999, background: accent, boxShadow: '0 0 ' + Math.round(16 + reactiveStrength * 28) + 'px ' + accent, opacity: 0.35}}/> : null}
+    </AbsoluteFill>
+  );
+}

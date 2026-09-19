@@ -86,3 +86,31 @@ Real production telemetry: not fabricated by benchmark or render smoke.
 
 R2-R8 capability foundations are implemented and verified.
 Remaining depth work is runtime quality expansion inside the same contracts: stronger compositing primitives, real platform style profiles, real audio assets, word-level caption timing from authoritative transcripts, richer 2.5D/3D rendering adapters, and production observations feeding R8 evaluation.
+
+## Pixel-proven Remotion runtime
+
+Canonical renderer: work/production/remotion-wireframe-v4
+Composition: PremiumSingleScreen
+
+The runtime now consumes the canonical ProductionGraph premium fields for:
+- keyframed 2D transform
+- camera zoom/position/rotation
+- shot transitions (cut/slide/zoom/whip)
+- per-layer opacity/effects/compositing
+- kinetic word-level typography
+- audio-reactive energy event binding
+- 2.5D depth-layer presentation
+- brand typography/colors
+
+Render smoke:
+- 180/180 frames rendered
+- 1080x1920
+- 30 fps
+- 6.000 s
+- H.264
+- output: C:\Workspace\_premium-e2e-r2r8\motion_runtime.mp4
+- SHA-256: bcf573592d5489232e0a37e71be69aa924a599ed3d7a918ca74ed57a34ca2ea8
+
+This is a pixel-render verification of the canonical Remotion composition, not merely a schema test.
+
+R3 distinction: audio-reactive decoding is verified from real decoded audio bytes; the smoke render injects a deterministic test event to verify renderer binding. No real performance telemetry is fabricated.
