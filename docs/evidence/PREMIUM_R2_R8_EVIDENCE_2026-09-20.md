@@ -1,4 +1,4 @@
-# Premium Media R2-R8 End-to-End Evidence — 2026-09-20
+# Premium Media R2-R8 End-to-End Evidence â€” 2026-09-20
 
 ## Implementation
 
@@ -39,7 +39,7 @@ R7 Evidence-backed shot intelligence:
 R8 Benchmark harness:
 - repeatable benchmark cases
 - capability coverage result
-- benchmark dossier covering 6 categories × 10 premium references
+- benchmark dossier covering 6 categories Ã— 10 premium references
 
 ## Verification
 
@@ -116,7 +116,7 @@ This is a pixel-render verification of the canonical Remotion composition, not m
 R3 distinction: audio-reactive decoding is verified from real decoded audio bytes; the smoke render injects a deterministic test event to verify renderer binding. No real performance telemetry is fabricated.
 
 
-## R2 / R3 / R6 closure — 2026-09-20
+## R2 / R3 / R6 closure â€” 2026-09-20
 
 ### R2 compositing runtime
 - Added renderer-facing alpha/luma source masks with relative-asset validation.
@@ -153,7 +153,7 @@ R3 distinction: audio-reactive decoding is verified from real decoded audio byte
 - Full-SCOS regression: **3022 passed, 21 skipped, 21 deselected**; compileall PASS; git diff --check PASS. Final commit sealing follows this verification.
 
 
-## R9 AI Video Director / Provider Routing — 2026-09-20
+## R9 AI Video Director / Provider Routing â€” 2026-09-20
 - Research-backed director/provider architecture added without introducing a second orchestration graph.
 - 10 strategic provider capability profiles are represented in `video_generation.py`.
 - Storyboard -> ShotGenerationSpec -> ProviderDecision -> GenerationPlan is deterministic and fingerprinted.
@@ -162,3 +162,41 @@ R3 distinction: audio-reactive decoding is verified from real decoded audio byte
 - Successful task transitions require a validated `GenerationArtifact`.
 - Mock director smoke: 4-shot 15s ad plan routed deterministically to `bytedance_seedance` with fingerprint `653dfa414a5fcccce8b9b92c42705a84f4520ec41e3b231c6a89ab33d088ca61`.
 - Provider API execution is intentionally not claimed until provider credentials and bounded execution adapters are configured.
+
+## R10 AI Video Execution Plane â€” 2026-09-20
+
+### Runtime closure
+- Added `scos/premium_media/video_generation_runtime.py`.
+- Concrete adapter boundaries exist for Seedance 2.0, Google Veo 3.1, and Runway Gen-4.5.
+- Provider selection is re-negotiated against adapter constraints at execution time; a capability-plan route that cannot execute is rejected/falls back rather than producing a false-green submission.
+- Local reference bytes are hash-verified before packaging.
+- Task journal writes are atomic and include plan/spec/provider/idempotency identity.
+- Provider tasks reconcile through submitted -> running -> succeeded/failed using the existing fail-closed GenerationTask state machine.
+- Successful artifacts are SHA-256 sealed and represented as GenerationArtifact records.
+- A boundary-frame similarity proxy is recorded for continuity keys and can fail the task closed.
+- Failed tasks can retry against a configured fallback provider within a bounded attempt count.
+- `write_generation_clip_manifest()` produces the renderer-facing `SCOS_GENERATED_CLIP_MANIFEST_R1` only when every planned shot has a succeeded sealed artifact.
+
+### Verification
+- Runtime execution tests: **8 passed**.
+- Full Premium Media suite after R10: **51 passed**.
+- `python -m compileall -q scos`: PASS.
+- Live provider credentials detected on machine: **none configured** for GEMINI_API_KEY, LAS_API_KEY, RUNWAYML_API_SECRET.
+- Consequently, no live vendor generation is claimed by this evidence.
+- Human Publish Gate: **NOT_APPROVED**.
+- External Publish: **NOT_PERFORMED**.
+
+### Remaining Top-3 frontier
+The next highest-value work is render-side clip ingestion/assembly into the canonical Remotion composition, richer semantic continuity/object identity QC, provider cost/latency telemetry, multi-provider A/B evaluation, and real credentialed provider smoke runs when credentials are deliberately configured.
+
+## R10 Final Verification Seal — 2026-09-20
+
+- `python -m compileall -q scos`: PASS.
+- Runtime execution suite: **8 passed**.
+- Full Premium Media suite: **51 passed**.
+- Full SCOS regression: **3037 passed, 21 skipped, 21 deselected** in **211.01s**.
+- `git diff --check`: PASS.
+- Provider configuration truth: **none configured** for `GEMINI_API_KEY`, `LAS_API_KEY`, `RUNWAYML_API_SECRET`.
+- `default_provider_adapters().configured()` returned `()`.
+- `write_generation_clip_manifest` is package-exported and importable.
+- No live vendor generation or external publication was performed.

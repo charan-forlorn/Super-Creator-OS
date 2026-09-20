@@ -1,4 +1,4 @@
-# AI Video Platform Architecture Teardown + SCOS Upgrade — 2026-09-20
+# AI Video Platform Architecture Teardown + SCOS Upgrade â€” 2026-09-20
 
 ## Scope
 
@@ -311,3 +311,29 @@ Current market/usage references:
 - Vercel AI Gateway video model usage: https://vercel.com/ai-gateway/leaderboards/video/models
 - Parallax 2026 AI video comparison: https://parallax.kr/en/blog/most-popular-ai-video-generators-2026
 - OpenAI Sora discontinuation notice: https://help.openai.com/en/articles/20001152-what-to-know-about-the-sora-discontinuation
+
+## R10 Governed AI Video Execution Plane â€” 2026-09-20
+
+R10 closes the next architecture gap identified by the Top-3 teardown: SCOS now has a concrete provider execution boundary instead of stopping at capability routing.
+
+Implemented in `scos/premium_media/video_generation_runtime.py`:
+
+- provider adapter protocol with concrete Seedance 2.0, Veo 3.1, and Runway Gen-4.5 adapters
+- execution-time capability negotiation that rejects routes failing provider-specific duration, ratio, mode, or reference constraints
+- reference byte sealing with SHA-256 validation and provider-specific packaging
+- environment-only credential lookup; credentials are never written into plan/journal/evidence artifacts
+- asynchronous submit/poll/reconcile lifecycle mapped into the existing GenerationTask state machine
+- durable atomic JSON task journal and deterministic idempotency keys
+- artifact download, byte sealing, optional media probing, and evidence sealing
+- deterministic boundary-frame continuity QC as an explicit proxy metric; failed continuity is fail-closed
+- bounded fallback-provider retry
+- renderer-facing generated clip manifest `SCOS_GENERATED_CLIP_MANIFEST_R1`
+- no external publish path; Human Publish Gate remains NOT_APPROVED
+
+Provider execution was not live-tested because machine-truth currently reports no configured `GEMINI_API_KEY`, `LAS_API_KEY`, or `RUNWAYML_API_SECRET`. The adapter layer is therefore verified with deterministic/fake transports and contract tests, while live vendor execution remains an explicit capability boundary.
+
+This moves the SCOS flow toward:
+
+Creative objective -> Director -> GenerationPlan -> execution negotiation -> async provider task -> sealed clip -> continuity/QC -> generated-clip manifest -> canonical ProductionGraph/Remotion -> FFmpeg delivery -> provenance.
+
+R10 does not claim parity of generated visual quality with any proprietary Top-3 provider. It establishes the production-control architecture required to use those models as interchangeable generation backends.
