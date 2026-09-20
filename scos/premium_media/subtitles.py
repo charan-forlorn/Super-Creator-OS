@@ -98,6 +98,20 @@ def wrap_caption(text: str, *, max_chars: int = 26) -> str:
 def to_ass(cues: list[SubtitleCue], *, style: SubtitleStyle | None = None) -> str:
     style = style or SubtitleStyle()
     validate_cues(cues)
+    position_map = {
+        "bottom_left": 1,
+        "bottom_center": 2,
+        "bottom_right": 3,
+        "center_left": 4,
+        "center": 5,
+        "center_right": 6,
+        "top_left": 7,
+        "top_center": 8,
+        "top_right": 9,
+    }
+    alignment = position_map.get(style.position)
+    if alignment is None:
+        raise SubtitleError(f"unsupported subtitle position: {style.position!r}")
     header = [
         "[Script Info]",
         "ScriptType: v4.00+",
@@ -111,7 +125,7 @@ def to_ass(cues: list[SubtitleCue], *, style: SubtitleStyle | None = None) -> st
         "Alignment,MarginL,MarginR,MarginV,Encoding",
         f"Style: Premium,{style.font_family},{style.font_size_px},{style.primary_color},"
         f"{style.primary_color},{style.outline_color},&H80000000,-1,0,0,0,100,100,0,0,1,"
-        f"{style.outline_px},{style.shadow_px},2,80,80,{style.margin_v},1",
+        f"{style.outline_px},{style.shadow_px},{alignment},80,80,{style.margin_v},1",
         "",
         "[Events]",
         "Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text",

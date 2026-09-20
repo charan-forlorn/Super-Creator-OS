@@ -89,7 +89,7 @@ export const PremiumSingleScreen = ({states = DEFAULT_STATES, captions = [], mus
   const brandCta = brand?.cta?.label || '';
 
   if (production_graph?.motion_graph?.shots?.length) {
-    return <MotionGraphRuntime productionGraph={production_graph} captions={captions} brand={brand} />;
+    return <MotionGraphRuntime productionGraph={production_graph} captions={captions} musicSrc={musicSrc} sfx={sfx} brand={brand} />;
   }
 
   return (
@@ -236,7 +236,7 @@ function transitionFactor(transition, localTime, shotDuration, entering) {
   if (transition.type === 'slide') return {opacity: eased, x: entering ? (1 - eased) * 100 : 0, y: 0, scale: 1};
   if (transition.type === 'zoom') return {opacity: eased, x: 0, y: 0, scale: 0.96 + 0.04 * eased};
   if (transition.type === 'whip') return {opacity: eased, x: entering ? (1 - eased) * 180 : 0, y: 0, scale: 1.03 - 0.03 * eased};
-  if (transition.type === 'dip_black' || transition.type === 'dip_white') return {opacity: eased, x: 0, y: 0, scale: 1};
+  if (transition.type === 'dip_to_black' || transition.type === 'dip_to_white') return {opacity: eased, x: 0, y: 0, scale: 1};
   return {opacity: eased, x: 0, y: 0, scale: 1};
 }
 
@@ -312,6 +312,9 @@ function MotionLayerView({layer, time, accent, textColor, fontFamily, reactiveSt
   const contrast = animatedValue(effects.contrast, local, 1);
   const saturation = animatedValue(effects.saturation, local, 1);
   const glow = animatedValue(effects.glow, local, 0) + reactiveStrength * 10 + Number(globalComposite?.glow || 0) * 8;
+  const vignette = Math.max(0, Math.min(1, animatedValue(effects.vignette, local, 0)));
+  const grain = Math.max(0, Math.min(1, animatedValue(effects.grain, local, 0)));
+  const reactiveScale = 1 + reactiveStrength * 0.03;
   const globalBlur = Number(globalComposite?.blur_px || 0);
   const mask = globalComposite?.mask || null;
   const maskStyle = compositeMaskStyle(mask);
@@ -325,7 +328,7 @@ function MotionLayerView({layer, time, accent, textColor, fontFamily, reactiveSt
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: layer.z_index || 0,
-      transform: 'translate(' + x + 'px,' + y + 'px) rotate(' + rotation + 'deg) scale(' + scale + ')',
+      transform: 'translate(' + x + 'px,' + y + 'px) rotate(' + rotation + 'deg) scale(' + (scale * reactiveScale) + ')',
       opacity: Math.max(0, Math.min(1, opacity * (globalComposite?.opacity ?? 1))),
       filter: filters || 'none',
       mixBlendMode: runtimeBlendMode(layer.blend_mode || globalComposite?.blend_mode || 'normal'),
@@ -335,6 +338,8 @@ function MotionLayerView({layer, time, accent, textColor, fontFamily, reactiveSt
       ...maskStyle,
     }}>
       {layerContent(layer, accent, textColor, fontFamily)}
+      {vignette > 0 ? <div style={{position: 'absolute', inset: 0, background: 'radial-gradient(circle at center, transparent 35%, rgba(0,0,0,' + (vignette * 0.82) + ') 100%)', pointerEvents: 'none'}} /> : null}
+      {grain > 0 ? <div style={{position: 'absolute', inset: 0, opacity: grain * 0.22, mixBlendMode: 'overlay', backgroundImage: 'radial-gradient(circle at 17% 23%, rgba(255,255,255,.7) 0 1px, transparent 1.5px), radial-gradient(circle at 73% 61%, rgba(0,0,0,.7) 0 1px, transparent 1.5px)', backgroundSize: '13px 13px, 17px 17px', pointerEvents: 'none'}} /> : null}
       {colorMix > 0 ? <div style={{position: 'absolute', inset: 0, background: accent, opacity: colorMix, mixBlendMode: 'color', pointerEvents: 'none'}} /> : null}
     </div>
   );
@@ -383,7 +388,7 @@ function ProductDepthRuntime({scene, accent}) {
   );
 }
 
-function MotionGraphRuntime({productionGraph, captions, brand}) {
+function MotionGraphRuntime({productionGraph, captions, musicSrc, sfx, brand}) {
   const frame = useCurrentFrame();
   const {fps, width, height} = useVideoConfig();
   const time = frame / fps;
@@ -404,6 +409,10 @@ function MotionGraphRuntime({productionGraph, captions, brand}) {
   const enter = transitionFactor(shot.transition_in, local, shotDuration, true);
   const exit = transitionFactor(shot.transition_out, local, shotDuration, false);
   const combinedOpacity = Math.min(enter.opacity, exit.opacity);
+  const transitionType = (shot.transition_out?.type === 'dip_to_black' || shot.transition_out?.type === 'dip_to_white')
+    ? shot.transition_out.type
+    : ((shot.transition_in?.type === 'dip_to_black' || shot.transition_in?.type === 'dip_to_white') ? shot.transition_in.type : null);
+  const transitionDipOpacity = transitionType ? 1 - combinedOpacity : 0;
   const energyEvents = productionGraph.audio_reactivity?.events || [];
   const beatEvents = productionGraph.audio_reactivity?.beats || [];
   const currentEvent = energyEvents.filter((event) => time >= event.time_s).slice(-1)[0];
@@ -455,12 +464,19 @@ function MotionGraphRuntime({productionGraph, captions, brand}) {
         <div style={{position: 'absolute', left: 48, right: 48, bottom: 48, height: 6, background: 'rgba(255,255,255,.10)', borderRadius: 8}}>
           <div style={{height: 6, width: ((local / shotDuration) * 100) + '%', background: accent, borderRadius: 8}} />
         </div>
+        {transitionDipOpacity > 0 ? <div style={{position: 'absolute', inset: 0, background: transitionType === 'dip_to_white' ? '#ffffff' : '#000000', opacity: transitionDipOpacity, pointerEvents: 'none'}} /> : null}
       </div>
       <KineticTypography plan={productionGraph.typography} time={time} accent={accent} textColor={textColor} fontFamily={fontFamily} />
       <CaptionOverlay captions={captions} accent={accent} textColor={textColor} fontFamily={fontFamily} />
       {productionGraph.audio_reactivity ? (
         <div style={{position: 'absolute', right: 44, top: 44, width: 10 + reactiveStrength * 32, height: 10 + reactiveStrength * 32, borderRadius: 999, background: accent, boxShadow: '0 0 ' + Math.round(16 + reactiveStrength * 36) + 'px ' + accent, opacity: 0.35 + beatPulse * 0.35}}/>
       ) : null}
+      {musicSrc ? <Audio src={staticFile(musicSrc)} volume={0.18} loop /> : null}
+      {(sfx || []).map((fx) => (
+        <Sequence key={(fx.src || '') + '-' + (fx.startFrame || 0)} from={fx.startFrame || 0} layout="none">
+          <Audio src={staticFile(fx.src)} volume={fx.volume ?? 0.28} />
+        </Sequence>
+      ))}
     </AbsoluteFill>
   );
 }

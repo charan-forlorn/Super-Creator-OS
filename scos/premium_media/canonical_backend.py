@@ -41,14 +41,19 @@ class PremiumRenderBackend(RenderBackend):
             props["brand"] = brand_profile_to_props(brand)
         if request.profile.width != profile.width or request.profile.height != profile.height:
             raise RenderError("canonical RenderProfile geometry does not match premium delivery profile")
+        props.setdefault("width", profile.width)
+        props.setdefault("height", profile.height)
+        props.setdefault("fps", profile.fps)
+        left = profile.width * 0.065
+        right = profile.width * 0.935
         safe_errors = validate_layout(
             width=profile.width,
             height=profile.height,
             boxes=(
-                LayoutBox("primary_content", 70, 180, profile.width - 70, 1650),
-                LayoutBox("caption_region", 78, 1450, profile.width - 78, 1750),
-                LayoutBox("header_region", 70, 118, profile.width - 70, 300),
-                LayoutBox("footer_region", 78, 1760, profile.width - 78, 1816),
+                LayoutBox("primary_content", left, profile.height * 0.094, right, profile.height * 0.859),
+                LayoutBox("caption_region", profile.width * 0.072, profile.height * 0.755, profile.width * 0.928, profile.height * 0.912),
+                LayoutBox("header_region", left, profile.height * 0.061, right, profile.height * 0.156),
+                LayoutBox("footer_region", profile.width * 0.072, profile.height * 0.917, profile.width * 0.928, profile.height * 0.946),
             ),
         )
         if safe_errors:
@@ -91,6 +96,7 @@ class PremiumRenderBackend(RenderBackend):
                 production_metadata={
                     "brand_kit_id": brand.brand_kit_id if brand is not None else None,
                     "brand_fingerprint": brand.fingerprint() if brand is not None else None,
+                    "render_geometry": {"width": profile.width, "height": profile.height, "fps": profile.fps},
                 },
             )
         except Exception as exc:
