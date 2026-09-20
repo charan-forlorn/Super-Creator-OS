@@ -153,3 +153,21 @@ R7 — deterministic storyboard planner + conversion into canonical PremiumMotio
 R8 — repeatable benchmark harness + 60-reference benchmark dossier verified.
 
 The system deliberately distinguishes capability-contract verification from pixel/render verification and from real production telemetry. No performance outcome is inferred from the benchmark corpus.
+
+
+## R9 — AI Video Director / Provider Routing — 2026-09-20
+
+Competitive architecture analysis was performed against a current strategic reference set of 10 AI video platforms, with public product/API documentation and open-source implementations used where available. The analysis found that the biggest architectural differentiator is not a single generation model but a director layer around models: multimodal references, shot-level controls, capability-aware routing, asynchronous generation tasks, continuity, artifact sealing, and final render integration.
+
+SCOS now implements the deterministic orchestration contract for that layer:
+- ReferenceAsset and continuity keys
+- ProviderProfile / ProviderRegistry capability routing
+- ShotGenerationSpec
+- GenerationPlan with fingerprint
+- director-prompt compilation
+- storyboard -> generation plan compiler
+- GenerationTask async lifecycle with retry/cancel/fail-closed transitions
+- GenerationArtifact validation
+- GenerationPlan roundtrip into ProductionGraph
+
+The router includes capability profiles for current Veo, Seedance, Runway, Kling, Luma, Firefly, Hailuo, Pika, Grok, and HeyGen production lanes. These are capability contracts, not claims that live provider API credentials are configured.

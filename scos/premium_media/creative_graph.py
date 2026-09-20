@@ -17,6 +17,7 @@ from .lookdev import LookProfile
 from .scene3d import ProductScene
 from .shot_intelligence import StoryboardPlan
 from .typography import TypographyPlan
+from .video_generation import GenerationPlan, generation_plan_from_props
 
 
 @dataclass(frozen=True)
@@ -90,6 +91,7 @@ class ProductionGraph:
     look_profile: LookProfile | None = None
     product_scene: ProductScene | None = None
     storyboard: StoryboardPlan | None = None
+    generation_plan: GenerationPlan | None = None
     graph_version: str = "SCOS_PRODUCTION_GRAPH_R1"
 
     def fingerprint(self) -> str:
@@ -113,6 +115,7 @@ class ProductionGraph:
             "look_profile": self.look_profile.__dict__ if self.look_profile else None,
             "product_scene": self.product_scene.to_props() if self.product_scene else None,
             "storyboard": self.storyboard.to_props() if self.storyboard else None,
+            "generation_plan": self.generation_plan.to_props() if self.generation_plan else None,
         }
         raw = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -150,6 +153,7 @@ class ProductionGraph:
                 "look_profile": self.look_profile.__dict__ if self.look_profile else None,
                 "product_scene": self.product_scene.to_props() if self.product_scene else None,
                 "storyboard": self.storyboard.to_props() if self.storyboard else None,
+                "generation_plan": self.generation_plan.to_props() if self.generation_plan else None,
             },
         })
         return props
@@ -183,7 +187,11 @@ def graph_from_props(props: dict[str, Any]) -> ProductionGraph:
                            style_profile_id=meta.get("style_profile_id"),
                            master_profile_id=str(meta.get("master_profile_id") or "master_vertical_2160"),
                            delivery_profile_ids=tuple(meta.get("delivery_profile_ids", ())),
-                           render_extras={k: props[k] for k in ("musicSrc", "sfx") if k in props})
+                           render_extras={k: props[k] for k in ("musicSrc", "sfx") if k in props},
+                           generation_plan=(
+                               generation_plan_from_props(meta["generation_plan"])
+                               if meta.get("generation_plan") else None
+                           ))
 
 
 @dataclass(frozen=True)

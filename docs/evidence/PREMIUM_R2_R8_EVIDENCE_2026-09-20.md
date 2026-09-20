@@ -43,8 +43,8 @@ R8 Benchmark harness:
 
 ## Verification
 
-- Premium Media package: **36 passed in 0.70s**
-- Full SCOS regression: **3022 passed, 21 skipped, 21 deselected in 252.21s**
+- Premium Media package: **43 passed in 0.62s**
+- Full SCOS regression: **3029 passed, 21 skipped, 21 deselected in 203.14s**
 - Python compileall: PASS
 - git diff --check: PASS
 
@@ -151,3 +151,14 @@ R3 distinction: audio-reactive decoding is verified from real decoded audio byte
 - Premium Media package: **10 passed** for the expanded R2/R3/R6 regression subset.
 - Remotion composition discovery: PASS; PremiumSingleScreen remains 1080x1920 @ 30 fps.
 - Full-SCOS regression: **3022 passed, 21 skipped, 21 deselected**; compileall PASS; git diff --check PASS. Final commit sealing follows this verification.
+
+
+## R9 AI Video Director / Provider Routing — 2026-09-20
+- Research-backed director/provider architecture added without introducing a second orchestration graph.
+- 10 strategic provider capability profiles are represented in `video_generation.py`.
+- Storyboard -> ShotGenerationSpec -> ProviderDecision -> GenerationPlan is deterministic and fingerprinted.
+- Multimodal references, continuity keys, camera/motion/style constraints, native-audio requirements, and edit/extension modes are part of the contract.
+- `GenerationTask` state machine is fail-closed with explicit submitted/running/succeeded/failed/cancelled transitions and retry semantics.
+- Successful task transitions require a validated `GenerationArtifact`.
+- Mock director smoke: 4-shot 15s ad plan routed deterministically to `bytedance_seedance` with fingerprint `653dfa414a5fcccce8b9b92c42705a84f4520ec41e3b231c6a89ab33d088ca61`.
+- Provider API execution is intentionally not claimed until provider credentials and bounded execution adapters are configured.
