@@ -13,7 +13,7 @@ export const RemotionRoot = () => (
       fps={30}
       width={1080}
       height={1920}
-      defaultProps={{states: undefined, captions: [], musicSrc: undefined, sfx: []}}
+      defaultProps={{states: undefined, captions: [], musicSrc: undefined, sfx: [], production_graph: undefined}}
     />
   </>
 );

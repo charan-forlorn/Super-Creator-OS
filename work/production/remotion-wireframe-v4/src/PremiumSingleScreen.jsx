@@ -1,5 +1,5 @@
 import React, {useMemo} from 'react';
-import {AbsoluteFill, Audio, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Audio, Sequence, Video, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {createTikTokStyleCaptions} from '@remotion/captions';
 import {True3DScene} from './True3DScene';
 
@@ -392,6 +392,7 @@ function MotionGraphRuntime({productionGraph, captions, brand}) {
   const shot = shots.find((s) => time >= s.start_s && time < s.end_s) || shots[shots.length - 1];
   const local = Math.max(0, time - shot.start_s);
   const shotDuration = Math.max(0.001, shot.end_s - shot.start_s);
+  const generatedClip = (productionGraph.generated_clips || []).find((clip) => clip.shot_id === shot.shot_id) || null;
   const accent = brand?.colors?.accent || '#B7EF83';
   const textColor = brand?.colors?.primary || '#F5F7F3';
   const fontFamily = brand?.fonts?.heading || 'Tahoma, Arial, sans-serif';
@@ -425,6 +426,20 @@ function MotionGraphRuntime({productionGraph, captions, brand}) {
   return (
     <AbsoluteFill style={{background: productionGraph.look_profile?.profile_id ? '#070b08' : '#07100A', overflow: 'hidden'}}>
       <div style={{...shellStyle, background: '#08100A', borderRadius: 36, overflow: 'hidden'}}>
+        {generatedClip ? (
+          <Sequence
+            from={Math.round(shot.start_s * fps)}
+            durationInFrames={Math.max(1, Math.round(shotDuration * fps))}
+            layout="none"
+          >
+            <Video
+              src={staticFile(generatedClip.src)}
+              muted={false}
+              volume={1}
+              style={{position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover'}}
+            />
+          </Sequence>
+        ) : null}
         <div style={{position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 30%, ' + accent + '12, transparent 46%)'}} />
         <div style={{position: 'absolute', inset: 32, border: '1px solid ' + accent + '44', borderRadius: 28, mixBlendMode: runtimeBlendMode(composite.blend_mode || 'normal'), opacity: composite.opacity ?? 1}} />
         {shot.layers.map((layer) => (

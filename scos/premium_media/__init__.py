@@ -38,6 +38,7 @@ from .video_generation_runtime import (
     VideoGenerationOrchestrator,
     VideoProviderError,
     default_provider_adapters,
+    stage_generated_clips,
     write_generation_clip_manifest,
 )
 from .motion import (
@@ -81,6 +82,7 @@ from .brand import (
 from .canonical_backend import PremiumRenderBackend
 from .creative_graph import (
     AssetNode,
+    GeneratedClipRef,
     AudioNode,
     CaptionNode,
     CreativeBrief,
@@ -99,3 +101,20 @@ from .render_cache import CacheHit, RenderCache, RenderCacheError, cache_key
 from .safe_zone import BASELINE_SAFE_ZONE, LayoutBox, SafeZoneProfile, validate_layout
 from .qc import QCReport, validate_render
 from .rights import AssetRegistry, RightsError
+
+from .semantic_qc import VisualIdentityReport, visual_identity_check
+from .telemetry import (
+    GenerationTelemetryEvent,
+    JsonlTelemetrySink,
+    ProviderEvaluation,
+    ProviderEvaluationCandidate,
+    evaluate_provider_candidates,
+    observed_latency,
+)
+from .live_execution import (
+    LiveExecutionAuthorityError,
+    LiveExecutionReadiness,
+    ProviderReadiness,
+    assess_live_readiness,
+    require_explicit_live_authority,
+)

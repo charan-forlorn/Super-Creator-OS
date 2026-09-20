@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol
 
 from .qc import probe_media
+from .telemetry import GenerationTelemetryEvent, JsonlTelemetrySink, now, observed_latency
 from .video_generation import GenerationArtifact, GenerationPlan, GenerationTask, ProviderDecision, ReferenceAsset, ShotGenerationSpec
 
 
@@ -191,6 +192,8 @@ class GoogleVeoAdapter(BaseHttpVideoAdapter):
         errors = []
         if duration not in {4, 6, 8}:
             errors.append("Veo duration must be 4/6/8 seconds")
+        if spec.references and duration != 8:
+            errors.append("Veo reference-image generation requires 8 seconds")
         if spec.aspect_ratio not in {"9:16", "16:9"}:
             errors.append("Veo aspect ratio must be 9:16 or 16:9")
         if sum(r.kind in {"character", "style"} for r in spec.references) > 3:
@@ -332,7 +335,8 @@ class RunwayGen45Adapter(BaseHttpVideoAdapter):
         image = next((r for r in packed_references if r.kind in {"scene", "first_frame"}), None)
         if image and image.local_path and not image.provider_uri.startswith(("http://", "https://", "runway://")):
             raise ProviderContractError("Runway local references require an upload-enabled adapter path; refusing implicit unsafe upload")
-        payload: dict[str, Any] = {"model": self.model_id, "promptText": prompt, "ratio": spec.aspect_ratio, "duration": int(round(spec.end_s - spec.start_s))}
+        ratio = {"16:9": "1280:768", "9:16": "768:1280"}[spec.aspect_ratio]
+        payload: dict[str, Any] = {"model": self.model_id, "promptText": prompt, "ratio": ratio, "duration": int(round(spec.end_s - spec.start_s))}
         if image:
             payload["promptImage"] = image.provider_uri
         data = self.http.json("POST", f"{self.base_url}/image_to_video", headers={"authorization": f"Bearer {self.key()}", "x-runway-version": self.api_version, "x-scoss-idempotency-key": idempotency_key}, payload=payload)
@@ -418,6 +422,55 @@ def continuity_check(previous: Path, current: Path, *, threshold: float = 0.35) 
     return ContinuityReport(score >= threshold, score, threshold, "pixel-boundary similarity proxy")
 
 
+
+def stage_generated_clips(
+    manifest_path: Path,
+    remotion_public_dir: Path,
+    *,
+    subdir: str = "generated-clips",
+) -> tuple[dict[str, Any], ...]:
+    """Copy sealed generated clips into Remotion public/ with hash-addressed names."""
+    if not manifest_path.is_file():
+        raise ProviderContractError(f"generated clip manifest missing: {manifest_path}")
+    raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if raw.get("schema_version") != "SCOS_GENERATED_CLIP_MANIFEST_R1":
+        raise ProviderContractError("unsupported generated clip manifest schema")
+    destination_root = remotion_public_dir / subdir
+    destination_root.mkdir(parents=True, exist_ok=True)
+    staged: list[dict[str, Any]] = []
+    for entry in raw.get("shots", []):
+        artifact = entry.get("artifact") or {}
+        source = Path(str(artifact.get("uri", "")))
+        expected_sha = str(artifact.get("sha256", ""))
+        if not source.is_file() or source.stat().st_size <= 0:
+            raise ProviderContractError(f"generated artifact missing: {source}")
+        actual_sha = _sha256_file(source)
+        if actual_sha != expected_sha:
+            raise ProviderContractError(f"generated artifact sha256 mismatch: {source}")
+        target_name = f"{entry['shot_id']}-{expected_sha[:16]}.mp4"
+        target = destination_root / target_name
+        if not target.exists() or _sha256_file(target) != expected_sha:
+            temp = target.with_name(f".{target.name}.{uuid.uuid4().hex}.tmp")
+            temp.write_bytes(source.read_bytes())
+            if _sha256_file(temp) != expected_sha:
+                temp.unlink(missing_ok=True)
+                raise ProviderContractError(f"staged generated artifact hash mismatch: {target}")
+            temp.replace(target)
+        staged.append({
+            "shot_id": entry["shot_id"],
+            "src": f"{subdir}/{target_name}",
+            "sha256": expected_sha,
+            "provider_id": entry.get("provider_id"),
+            "model_id": entry.get("model_id"),
+            "task_id": entry.get("task_id"),
+            "duration_s": artifact.get("duration_s"),
+            "width": artifact.get("width"),
+            "height": artifact.get("height"),
+            "continuity_keys": entry.get("continuity_keys", []),
+        })
+    return tuple(staged)
+
+
 def write_generation_clip_manifest(
     plan: GenerationPlan,
     tasks: tuple[GenerationTask, ...],
@@ -475,6 +528,8 @@ class JournalRow:
     continuity_keys: tuple[str, ...] = ()
     continuity_report: ContinuityReport | None = None
     evidence_sha256: str | None = None
+    submitted_at: float | None = None
+    completed_at: float | None = None
 
     def to_json(self) -> dict[str, Any]:
         data = {
@@ -486,6 +541,8 @@ class JournalRow:
             "output_path": self.output_path,
             "continuity_keys": list(self.continuity_keys),
             "evidence_sha256": self.evidence_sha256,
+            "submitted_at": self.submitted_at,
+            "completed_at": self.completed_at,
         }
         if self.continuity_report:
             data["continuity_report"] = self.continuity_report.__dict__
@@ -523,8 +580,9 @@ class TaskJournal:
 
 
 class VideoGenerationOrchestrator:
-    def __init__(self, *, adapters: ProviderAdapterRegistry, journal: TaskJournal, packager: ReferencePackager | None = None) -> None:
+    def __init__(self, *, adapters: ProviderAdapterRegistry, journal: TaskJournal, packager: ReferencePackager | None = None, telemetry_sink: JsonlTelemetrySink | None = None) -> None:
         self.adapters, self.journal, self.packager = adapters, journal, packager or ReferencePackager()
+        self.telemetry_sink = telemetry_sink
 
     @staticmethod
     def _idempotency_key(plan: GenerationPlan, spec: ShotGenerationSpec, provider_id: str, attempt: int) -> str:
@@ -556,7 +614,22 @@ class VideoGenerationOrchestrator:
             sub = adapter.submit(spec, prompt=self._prompt(plan.objective, spec), packed_references=refs, idempotency_key=key)
             task = GenerationTask(task_id, spec.shot_id, provider_id, adapter.model_id, state="queued", attempt=attempt).transition("submitted", provider_task_id=sub.provider_task_id)
             output = output_dir / (f"{spec.shot_id}.attempt{attempt}.mp4" if attempt else f"{spec.shot_id}.mp4")
-            row = JournalRow(task, key, _stable_hash(spec.to_props()), provider_id, adapter.model_id, str(output), spec.continuity_keys)
+            submitted_at = now()
+            row = JournalRow(
+                task, key, _stable_hash(spec.to_props()), provider_id, adapter.model_id,
+                str(output), spec.continuity_keys, submitted_at=submitted_at
+            )
+            if self.telemetry_sink:
+                self.telemetry_sink.append(GenerationTelemetryEvent(
+                    schema_version="SCOS_GENERATION_TELEMETRY_R1",
+                    observed_at=submitted_at,
+                    task_id=task.task_id,
+                    shot_id=task.shot_id,
+                    provider_id=task.provider_id,
+                    model_id=task.model_id,
+                    attempt=task.attempt,
+                    state="submitted",
+                ))
             self.journal.write(row)
             tasks.append(task)
         return tuple(tasks)
@@ -609,8 +682,24 @@ class VideoGenerationOrchestrator:
                 results.append(task)
                 continue
             if poll.state == "failed":
+                completed_at = now()
                 task = task.transition("failed", error_code=poll.error_code or "provider_error", error_message=poll.error_message or "provider task failed")
-                self.journal.write(replace(row, task=task))
+                updated = replace(row, task=task, completed_at=completed_at)
+                self.journal.write(updated)
+                if self.telemetry_sink:
+                    self.telemetry_sink.append(GenerationTelemetryEvent(
+                        schema_version="SCOS_GENERATION_TELEMETRY_R1",
+                        observed_at=completed_at,
+                        task_id=task.task_id,
+                        shot_id=task.shot_id,
+                        provider_id=task.provider_id,
+                        model_id=task.model_id,
+                        attempt=task.attempt,
+                        state="failed",
+                        latency_s=observed_latency(row.submitted_at, completed_at),
+                        qc_passed=False,
+                        metadata={"error_code": task.error_code},
+                    ))
                 results.append(task)
                 continue
             if poll.state != "succeeded" or not poll.artifact_uri:
@@ -628,9 +717,28 @@ class VideoGenerationOrchestrator:
                 task = task.transition("succeeded", artifact=artifact)
                 for key in row.continuity_keys:
                     prior[key] = destination
-            updated = replace(row, task=task, continuity_report=continuity)
+            completed_at = now()
+            updated = replace(row, task=task, continuity_report=continuity, completed_at=completed_at)
             evidence = self._evidence(updated, task, artifact, poll.artifact_uri, output_dir)
-            self.journal.write(replace(updated, evidence_sha256=evidence))
+            final_row = replace(updated, evidence_sha256=evidence)
+            self.journal.write(final_row)
+            if self.telemetry_sink:
+                self.telemetry_sink.append(GenerationTelemetryEvent(
+                    schema_version="SCOS_GENERATION_TELEMETRY_R1",
+                    observed_at=completed_at,
+                    task_id=task.task_id,
+                    shot_id=task.shot_id,
+                    provider_id=task.provider_id,
+                    model_id=task.model_id,
+                    attempt=task.attempt,
+                    state=task.state,
+                    latency_s=observed_latency(row.submitted_at, completed_at),
+                    qc_passed=(task.state == "succeeded"),
+                    metadata={
+                        "artifact_sha256": artifact.sha256,
+                        "continuity_score": continuity.score if continuity else None,
+                    },
+                ))
             results.append(task)
         return tuple(results)
 

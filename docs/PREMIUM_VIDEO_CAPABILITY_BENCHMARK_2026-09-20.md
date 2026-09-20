@@ -190,3 +190,15 @@ R10 verification on 2026-09-20:
 - Premium Media suite: **51 passed**.
 - Full SCOS regression: **3037 passed, 21 skipped, 21 deselected** in **211.01s**.
 - Provider credentials: none configured; live vendor execution remains unclaimed.
+
+## Final R11-R15 Regression Seal — 2026-09-20
+
+- Full SCOS regression: 3045 passed, 21 skipped, 21 deselected in 193.53s.
+- python -m compileall -q scos: PASS.
+- Premium Media suite: 59 passed.
+- R11 Remotion pixel smoke: 180/180 frames, 1080x1920, 30 fps, 6.000 s, H.264.
+- R11 generated-clip assembly SHA-256: e20cb3da7d73988c9d5df3d3026f444875539425d77bf797383299f69f5c6028.
+- Provider credentials remain unconfigured: GEMINI_API_KEY=False, LAS_API_KEY=False, RUNWAYML_API_SECRET=False.
+- No live/paid provider generation was triggered.
+- Human Publish Gate: NOT_APPROVED.
+- External Publish: NOT_PERFORMED.

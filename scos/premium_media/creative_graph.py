@@ -71,6 +71,24 @@ class AssetNode:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+
+@dataclass(frozen=True)
+class GeneratedClipRef:
+    shot_id: str
+    src: str
+    sha256: str
+    provider_id: str = ""
+    model_id: str = ""
+    task_id: str = ""
+    duration_s: float | None = None
+    width: int | None = None
+    height: int | None = None
+    continuity_keys: tuple[str, ...] = ()
+
+    def to_props(self) -> dict[str, Any]:
+        return {**self.__dict__, "continuity_keys": list(self.continuity_keys)}
+
+
 @dataclass(frozen=True)
 class ProductionGraph:
     brief: CreativeBrief
@@ -92,6 +110,7 @@ class ProductionGraph:
     product_scene: ProductScene | None = None
     storyboard: StoryboardPlan | None = None
     generation_plan: GenerationPlan | None = None
+    generated_clips: tuple[GeneratedClipRef, ...] = ()
     graph_version: str = "SCOS_PRODUCTION_GRAPH_R1"
 
     def fingerprint(self) -> str:
@@ -116,6 +135,7 @@ class ProductionGraph:
             "product_scene": self.product_scene.to_props() if self.product_scene else None,
             "storyboard": self.storyboard.to_props() if self.storyboard else None,
             "generation_plan": self.generation_plan.to_props() if self.generation_plan else None,
+            "generated_clips": [c.to_props() for c in self.generated_clips],
         }
         raw = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -140,6 +160,11 @@ class ProductionGraph:
                 "schema_version": self.graph_version,
                 "fingerprint": self.fingerprint(),
                 "project_id": self.brief.project_id,
+                "objective": self.brief.objective,
+                "content_type": self.brief.content_type,
+                "language": self.brief.language,
+                "duration_s": self.brief.duration_s,
+                "platform_targets": list(self.brief.platform_targets),
                 "loop_run_id": self.brief.loop_run_id,
                 "brand_kit_id": self.brand_kit_id,
                 "variant_id": self.variant_id,
@@ -154,20 +179,22 @@ class ProductionGraph:
                 "product_scene": self.product_scene.to_props() if self.product_scene else None,
                 "storyboard": self.storyboard.to_props() if self.storyboard else None,
                 "generation_plan": self.generation_plan.to_props() if self.generation_plan else None,
+                "generated_clips": [c.to_props() for c in self.generated_clips],
             },
         })
         return props
 
 def graph_from_props(props: dict[str, Any]) -> ProductionGraph:
     """Normalize the existing props format into the canonical graph boundary."""
+    meta = props.get("production_graph", {})
     brief = CreativeBrief(
         project_id=str(props.get("production_graph", {}).get("project_id") or props.get("project_id") or "premium-render"),
-        objective=str(props.get("objective") or "create a premium single-screen video"),
-        content_type=str(props.get("content_type") or "short_form"),
-        language=str(props.get("language") or "und"),
-        duration_s=float(props.get("duration_s") or 30.0),
-        platform_targets=tuple(props.get("production_graph", {}).get("delivery_profile_ids", ())),
-        loop_run_id=props.get("production_graph", {}).get("loop_run_id"),
+        objective=str(meta.get("objective") or props.get("objective") or "create a premium single-screen video"),
+        content_type=str(meta.get("content_type") or props.get("content_type") or "short_form"),
+        language=str(meta.get("language") or props.get("language") or "und"),
+        duration_s=float(meta.get("duration_s") or props.get("duration_s") or 30.0),
+        platform_targets=tuple(meta.get("platform_targets", ())),
+        loop_run_id=meta.get("loop_run_id"),
     )
     scenes = tuple(
         SceneNode(
@@ -181,7 +208,6 @@ def graph_from_props(props: dict[str, Any]) -> ProductionGraph:
         for i, s in enumerate(props.get("states", ()))
     )
     captions = tuple(CaptionNode(int(c.get("startMs", 0)), int(c.get("endMs", 0)), str(c.get("text", "")), confidence=c.get("confidence")) for c in props.get("captions", ()))
-    meta = props.get("production_graph", {})
     return ProductionGraph(brief=brief, scenes=scenes, captions=captions,
                            brand_kit_id=meta.get("brand_kit_id"), variant_id=meta.get("variant_id"),
                            style_profile_id=meta.get("style_profile_id"),
@@ -191,6 +217,21 @@ def graph_from_props(props: dict[str, Any]) -> ProductionGraph:
                            generation_plan=(
                                generation_plan_from_props(meta["generation_plan"])
                                if meta.get("generation_plan") else None
+                           ),
+                           generated_clips=tuple(
+                               GeneratedClipRef(
+                                   shot_id=str(c["shot_id"]),
+                                   src=str(c["src"]),
+                                   sha256=str(c["sha256"]),
+                                   provider_id=str(c.get("provider_id") or ""),
+                                   model_id=str(c.get("model_id") or ""),
+                                   task_id=str(c.get("task_id") or ""),
+                                   duration_s=c.get("duration_s"),
+                                   width=c.get("width"),
+                                   height=c.get("height"),
+                                   continuity_keys=tuple(c.get("continuity_keys", ())),
+                               )
+                               for c in meta.get("generated_clips", ())
                            ))
 
 
