@@ -21,9 +21,23 @@ def _write_tone(path):
             sample = int(amp * math.sin(2 * math.pi * 220 * i / rate))
             wf.writeframes(struct.pack("<h", sample))
 
+def _write_click_track(path):
+    rate = 8000
+    duration_s = 6
+    with wave.open(str(path), "wb") as wf:
+        wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(rate)
+        for i in range(rate * duration_s):
+            t = i / rate
+            beat_phase = t % 0.5
+            amp = 28000 if beat_phase < 0.045 else 800
+            sample = int(amp * math.sin(2 * math.pi * 880 * i / rate))
+            wf.writeframes(struct.pack("<h", sample))
+
 def test_r2_compositing_and_transitions_are_bounded():
     spec = CompositeSpec(opacity=.8, blur_px=4, glow=.5, mask=MaskSpec("ellipse", 12, False))
     assert spec.validate() == ()
+    assert MaskSpec("alpha", source_asset_id="masks/alpha.png").validate() == ()
+    assert MaskSpec("luma", source_asset_id="masks/luma.png").to_props()["source_asset_id"] == "masks/luma.png"
     assert TransitionRuntimeSpec("whip", .4, "ease_in_out", "forward").validate("test") == ()
     assert compile_transition_filter(TransitionRuntimeSpec("whip", .4)) == "whip:forward:0.400"
 
@@ -38,6 +52,14 @@ def test_r3_uses_real_audio_bytes(tmp_path):
     assert result.sample_rate == 8000
     assert len(result.rms) > 2
     assert result.events
+
+def test_r3_detects_tempo_and_beats_from_real_bytes(tmp_path):
+    audio = tmp_path / "clicks.wav"; _write_click_track(audio)
+    result = analyze_audio(audio)
+    assert result.beats
+    assert result.bpm is not None
+    assert 118 <= result.bpm <= 122
+    assert result.tempo_confidence > 0.95
 
 def test_r4_typography_word_timing_is_validated():
     plan = TypographyPlan(TypographyStyle("kinetic", size_px=64),
@@ -58,6 +80,8 @@ def test_r6_product_scene_validation():
     scene = ProductScene("phone", camera=Camera3D(z=1200, fov_deg=45),
         layers=(DepthLayer("back", 300, .5), DepthLayer("product", 0, 1.0)))
     assert scene.validate() == ()
+    three_scene = ProductScene("gltf", layers=(DepthLayer("product", 0, asset_id="models/product.glb", asset_kind="gltf"),))
+    assert three_scene.validate() == ()
     assert ProductScene("bad", camera=Camera3D(z=0)).validate()
 
 def test_r7_storyboard_planner_covers_ad_arc():

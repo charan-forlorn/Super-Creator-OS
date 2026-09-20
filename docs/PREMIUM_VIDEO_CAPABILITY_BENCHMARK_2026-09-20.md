@@ -144,11 +144,11 @@ R8 Premium benchmark harness — repeatable render/evaluation of briefs across g
 
 ## R2-R8 implementation status
 
-R2 — Compositing / transitions: contract + canonical Remotion pixel runtime verified.
-R3 — Audio-reactive editorial: real-byte analysis + renderer energy-event binding verified.
+R2 — Compositing / transitions: source alpha/luma masks, global blur/glow/color-mix, browser-compatible blend mapping, and canonical Remotion pixel runtime verified.
+R3 — Audio-reactive editorial: real-byte RMS/onset analysis, deterministic BPM estimation, beat events, and renderer beat-pulse binding verified.
 R4 — Premium typography: word-level runtime rendering verified.
 R5 — Look development: actual FFmpeg finishing path + cache identity verified.
-R6 — 2.5D depth runtime verified; 3D remains a bounded adapter contract, not a claim of full 3D asset rendering.
+R6 — True 3D runtime: Three.js WebGL + GLTFLoader is active inside the canonical Remotion composition; real GLTF pixel render verified.
 R7 — deterministic storyboard planner + conversion into canonical PremiumMotionGraph verified.
 R8 — repeatable benchmark harness + 60-reference benchmark dossier verified.
 

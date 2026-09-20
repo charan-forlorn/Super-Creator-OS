@@ -1,7 +1,7 @@
 """SCOS Premium Media production system."""
 from .compositing import CompositeSpec, MaskSpec
 from .transitions import TransitionRuntimeSpec, compile_transition_filter
-from .audio_reactivity import AudioReactiveAnalysis, EnergyEvent, analyze_audio
+from .audio_reactivity import AudioReactiveAnalysis, BeatEvent, EnergyEvent, analyze_audio
 from .typography import TypographyPlan, TypographyStyle, WordCue
 from .lookdev import LookProfile
 from .scene3d import Camera3D, DepthLayer, ProductScene

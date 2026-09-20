@@ -43,8 +43,8 @@ R8 Benchmark harness:
 
 ## Verification
 
-- Premium Media package: **35 passed**
-- Full SCOS regression: **3021 passed, 21 skipped, 21 deselected**
+- Premium Media package: **36 passed in 0.70s**
+- Full SCOS regression: **3022 passed, 21 skipped, 21 deselected in 252.21s**
 - Python compileall: PASS
 - git diff --check: PASS
 
@@ -114,3 +114,40 @@ Render smoke:
 This is a pixel-render verification of the canonical Remotion composition, not merely a schema test.
 
 R3 distinction: audio-reactive decoding is verified from real decoded audio bytes; the smoke render injects a deterministic test event to verify renderer binding. No real performance telemetry is fabricated.
+
+
+## R2 / R3 / R6 closure — 2026-09-20
+
+### R2 compositing runtime
+- Added renderer-facing alpha/luma source masks with relative-asset validation.
+- Added runtime mask application through Remotion CSS masks; ellipse/rectangle remain deterministic native shape masks.
+- Added global blur/glow/color-mix application to the existing MotionLayer runtime.
+- Normalized SCOS blend names to browser/Remotion-compatible values (add -> plus-lighter, soft_light -> soft-light).
+- Pixel smoke exercised a real luma mask path; 180/180 frames completed.
+
+### R3 beat / tempo runtime
+- Extended real-byte FFmpeg audio analysis with onset/beat events.
+- Added deterministic BPM estimation and tempo confidence from detected beat intervals.
+- Renderer now binds both energy events and beat pulses to visual reactivity.
+- Real WAV closure fixture measured 120.0 BPM, tempo confidence 1.0, 11 detected beats.
+- This is deterministic onset/tempo analysis, not a claim of DAW-grade music understanding.
+
+### R6 true 3D runtime
+- Added three@0.180.0 to the canonical Remotion project.
+- Added True3DScene using Three.js WebGL and GLTFLoader inside the existing PremiumSingleScreen composition.
+- Added GLTF, box, sphere, and plane layer types to the ProductScene contract.
+- Real GLTF asset loading was exercised in the closure render; no parallel renderer was introduced.
+- This closes the previous contract-only boundary; full character rigging, simulation, and advanced material pipelines remain outside scope.
+
+### Closure render evidence
+- Props: C:\Workspace\_premium-e2e-r2r8\premium_closure_props.json
+- Output: C:\Workspace\_premium-e2e-r2r8\premium_closure.mp4
+- 180/180 frames, 1080x1920, 30 fps, 6.000 s, H.264
+- Output size: 1,930,994 bytes
+- SHA-256: D77D8C87670875225F32FC35E7C478A557E4D35EF8FC9EFE118B73ED7355AC1D
+- Extracted frame variance was non-zero at 1.0s, 1.5s, and 2.0s, ruling out a blank-frame false green.
+
+### Post-closure verification
+- Premium Media package: **10 passed** for the expanded R2/R3/R6 regression subset.
+- Remotion composition discovery: PASS; PremiumSingleScreen remains 1080x1920 @ 30 fps.
+- Full-SCOS regression: **3022 passed, 21 skipped, 21 deselected**; compileall PASS; git diff --check PASS. Final commit sealing follows this verification.
