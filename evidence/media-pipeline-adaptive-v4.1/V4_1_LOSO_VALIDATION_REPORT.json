@@ -1,0 +1,474 @@
+{
+  "schema": 1,
+  "phase": "Adaptive SMOOTH+ V4.1 Multi-Class Calibration Corpus",
+  "source_counts_by_class": {
+    "natural_motion_real": 3,
+    "portrait_screen_real": 3,
+    "screen_recording_real": 3
+  },
+  "unique_source_count": 9,
+  "canary_observation_count": 18,
+  "profile_id": "v4.1-99046224c07f932e",
+  "profile_training_sources": 5,
+  "profile_observations": 9,
+  "reference_decision_counts": {
+    "SMOOTH+": 9,
+    "REVIEW": 9
+  },
+  "loso": {
+    "schema": 1,
+    "method": "leave_one_source_out",
+    "minimum_training_sources": 2,
+    "z_review": 4.0,
+    "fold_count": 9,
+    "eligible_fold_count": 9,
+    "positive_cases": 9,
+    "positive_pass": 9,
+    "negative_cases": 9,
+    "negative_pass": 9,
+    "positive_retention": 1.0,
+    "negative_rejection": 1.0,
+    "false_accept_count": 0,
+    "source_level_leakage": false,
+    "global_fallback_fold_count": 7,
+    "safe_fallback_fold_count": 0,
+    "folds": [
+      {
+        "class_label": "natural_motion_real",
+        "held_out_source_sha256": "468e6743c674689a728726bbe4bb4b2a65bd8702a89f021af26a8bb4d450eebd",
+        "held_out_source_path": "C:\\Users\\chara\\Downloads\\scos_calibration_sources\\caminandes\\caminandes_gran_dillama.mp4",
+        "training_source_count": 1,
+        "training_sources": [
+          "5fe4e42a4c6893f40c90d841ac3e638d7b68d31b04d4a91f22b2bb5071d8c2d6"
+        ],
+        "cases": [
+          {
+            "sample_id": "natural-caminandes-1",
+            "reference_decision": "SMOOTH+",
+            "calibrated_decision": "SMOOTH+",
+            "pass": true,
+            "false_accept": false,
+            "false_reject": false,
+            "worst_z": null,
+            "mean_z": null,
+            "quality_score": 0.9386284838968135,
+            "reasons": [
+              "global_calibrated_fallback",
+              "global_quality_fallback"
+            ]
+          },
+          {
+            "sample_id": "natural-caminandes-2",
+            "reference_decision": "SMOOTH+",
+            "calibrated_decision": "SMOOTH+",
+            "pass": true,
+            "false_accept": false,
+            "false_reject": false,
+            "worst_z": null,
+            "mean_z": null,
+            "quality_score": 1.0,
+            "reasons": [
+              "global_calibrated_fallback",
+              "global_quality_fallback"
+            ]
+          }
+        ],
+        "global_fallback_threshold": 0.325588703471098,
+        "status": "GLOBAL_CALIBRATED_FALLBACK"
+      },
+      {
+        "class_label": "natural_motion_real",
+        "held_out_source_sha256": "5fe4e42a4c6893f40c90d841ac3e638d7b68d31b04d4a91f22b2bb5071d8c2d6",
+        "held_out_source_path": "C:\\Users\\chara\\Downloads\\scos_calibration_sources\\elephantsdream\\elephantsdream_teaser.mp4",
+        "training_source_count": 1,
+        "training_sources": [
+          "468e6743c674689a728726bbe4bb4b2a65bd8702a89f021af26a8bb4d450eebd"
+        ],
+        "cases": [
+          {
+            "sample_id": "natural-elephantsdream-1",
+            "reference_decision": "REVIEW",
+            "calibrated_decision": "REVIEW",
+            "pass": true,
+            "false_accept": false,
+            "false_reject": false,
+            "worst_z": null,
+            "mean_z": null,
+            "quality_score": 0.15399180845758492,
+            "reasons": [
+              "global_calibrated_fallback",
+              "global_quality_fallback"
+            ]
+          },
+          {
+            "sample_id": "natural-elephantsdream-2",
+            "reference_decision": "SMOOTH+",
+            "calibrated_decision": "SMOOTH+",
+            "pass": true,
+            "false_accept": false,
+            "false_reject": false,
+            "worst_z": null,
+            "mean_z": null,
+            "quality_score": 0.497185598484611,
+            "reasons": [
+              "global_calibrated_fallback",
+              "global_quality_fallback"
+            ]
+          }
+        ],
+        "global_fallback_threshold": 0.4793922434992333,
+        "status": "GLOBAL_CALIBRATED_FALLBACK"
+      },
+      {
+        "class_label": "natural_motion_real",
+        "held_out_source_sha256": "ec72dab5494b3ddd6268e5749cf56b6ac11353867bf2113c3a0570b6367288bf",
+        "held_out_source_path": "C:\\Users\\chara\\Downloads\\scos_calibration_sources\\internalpreview\\internal-preview.mp4",
+        "training_source_count": 2,
+        "training_sources": [
+          "468e6743c674689a728726bbe4bb4b2a65bd8702a89f021af26a8bb4d450eebd",
+          "5fe4e42a4c6893f40c90d841ac3e638d7b68d31b04d4a91f22b2bb5071d8c2d6"
+        ],
+        "cases": [
+          {
+            "sample_id": "natural-internal-preview-1",
+            "reference_decision": "REVIEW",
+            "calibrated_decision": "REVIEW",
+            "pass": true,
+            "score": {
+              "class_label": "natural_motion_real",
+              "calibration_z": {
+                "path_excess_median": 0.0,
+                "blend_deviation_median": 0.0,
+                "asymmetry_median": 0.0,
+                "jerk_median": 0.0
+              },
+              "worst_z": 0.0,
+              "mean_z": 0.0,
+              "quality_score": 1.0,
+              "decision": "REVIEW",
+              "reasons": [
+                "insufficient_temporal_samples",
+                "insufficient_valid_temporal_triplets"
+              ]
+            }
+          },
+          {
+            "sample_id": "natural-internal-preview-2",
+            "reference_decision": "REVIEW",
+            "calibrated_decision": "REVIEW",
+            "pass": true,
+            "score": {
+              "class_label": "natural_motion_real",
+              "calibration_z": {
+                "path_excess_median": 0.0,
+                "blend_deviation_median": 0.0,
+                "asymmetry_median": 0.0,
+                "jerk_median": 0.0
+              },
+              "worst_z": 0.0,
+              "mean_z": 0.0,
+              "quality_score": 1.0,
+              "decision": "REVIEW",
+              "reasons": [
+                "insufficient_temporal_samples",
+                "insufficient_valid_temporal_triplets"
+              ]
+            }
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "class_label": "portrait_screen_real",
+        "held_out_source_sha256": "5a3c5e03a3716d1debcc02c20019007c8e801788eac266b5e97fa5391a2c8d75",
+        "held_out_source_path": "C:\\Users\\chara\\Downloads\\Download_single_screen_remix.mp4",
+        "training_source_count": 1,
+        "training_sources": [
+          "e9f005c0976692bb6c10c43212599b774ba052a320d83f0f4c99c33b4f47342d"
+        ],
+        "cases": [
+          {
+            "sample_id": "portrait-download-remix-1",
+            "reference_decision": "SMOOTH+",
+            "calibrated_decision": "SMOOTH+",
+            "pass": true,
+            "false_accept": false,
+            "false_reject": false,
+            "worst_z": null,
+            "mean_z": null,
+            "quality_score": 1.0,
+            "reasons": [
+              "global_calibrated_fallback",
+              "global_quality_fallback"
+            ]
+          },
+          {
+            "sample_id": "portrait-download-remix-2",
+            "reference_decision": "SMOOTH+",
+            "calibrated_decision": "SMOOTH+",
+            "pass": true,
+            "false_accept": false,
+            "false_reject": false,
+            "worst_z": null,
+            "mean_z": null,
+            "quality_score": 0.9556101821565149,
+            "reasons": [
+              "global_calibrated_fallback",
+              "global_quality_fallback"
+            ]
+          }
+        ],
+        "global_fallback_threshold": 0.325588703471098,
+        "status": "GLOBAL_CALIBRATED_FALLBACK"
+      },
+      {
+        "class_label": "portrait_screen_real",
+        "held_out_source_sha256": "c17a0019b764f2a9697037a51c55d3a1428b70bbbf334ce24896c092429c3740",
+        "held_out_source_path": "C:\\Users\\chara\\Downloads\\SCOS_single_screen_phone.mp4",
+        "training_source_count": 2,
+        "training_sources": [
+          "5a3c5e03a3716d1debcc02c20019007c8e801788eac266b5e97fa5391a2c8d75",
+          "e9f005c0976692bb6c10c43212599b774ba052a320d83f0f4c99c33b4f47342d"
+        ],
+        "cases": [
+          {
+            "sample_id": "portrait-phone-1",
+            "reference_decision": "REVIEW",
+            "calibrated_decision": "REVIEW",
+            "pass": true,
+            "score": {
+              "class_label": "portrait_screen_real",
+              "calibration_z": {
+                "path_excess_median": 0.0,
+                "blend_deviation_median": 0.0,
+                "asymmetry_median": 0.0,
+                "jerk_median": 0.0
+              },
+              "worst_z": 0.0,
+              "mean_z": 0.0,
+              "quality_score": 1.0,
+              "decision": "REVIEW",
+              "reasons": [
+                "insufficient_temporal_samples",
+                "insufficient_valid_temporal_triplets"
+              ]
+            }
+          },
+          {
+            "sample_id": "portrait-phone-2",
+            "reference_decision": "REVIEW",
+            "calibrated_decision": "REVIEW",
+            "pass": true,
+            "score": {
+              "class_label": "portrait_screen_real",
+              "calibration_z": {
+                "path_excess_median": 0.0,
+                "blend_deviation_median": 0.0,
+                "asymmetry_median": 0.0,
+                "jerk_median": 0.0
+              },
+              "worst_z": 0.0,
+              "mean_z": 0.0,
+              "quality_score": 1.0,
+              "decision": "REVIEW",
+              "reasons": [
+                "insufficient_temporal_samples",
+                "insufficient_valid_temporal_triplets"
+              ]
+            }
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "class_label": "portrait_screen_real",
+        "held_out_source_sha256": "e9f005c0976692bb6c10c43212599b774ba052a320d83f0f4c99c33b4f47342d",
+        "held_out_source_path": "C:\\Users\\chara\\Downloads\\Download_single_screen_remix_REMASTERED_1080x1920.mp4",
+        "training_source_count": 1,
+        "training_sources": [
+          "5a3c5e03a3716d1debcc02c20019007c8e801788eac266b5e97fa5391a2c8d75"
+        ],
+        "cases": [
+          {
+            "sample_id": "portrait-remaster-1",
+            "reference_decision": "SMOOTH+",
+            "calibrated_decision": "SMOOTH+",
+            "pass": true,
+            "false_accept": false,
+            "false_reject": false,
+            "worst_z": null,
+            "mean_z": null,
+            "quality_score": 1.0,
+            "reasons": [
+              "global_calibrated_fallback",
+              "global_quality_fallback"
+            ]
+          },
+          {
+            "sample_id": "portrait-remaster-2",
+            "reference_decision": "SMOOTH+",
+            "calibrated_decision": "SMOOTH+",
+            "pass": true,
+            "false_accept": false,
+            "false_reject": false,
+            "worst_z": null,
+            "mean_z": null,
+            "quality_score": 1.0,
+            "reasons": [
+              "global_calibrated_fallback",
+              "global_quality_fallback"
+            ]
+          }
+        ],
+        "global_fallback_threshold": 0.325588703471098,
+        "status": "GLOBAL_CALIBRATED_FALLBACK"
+      },
+      {
+        "class_label": "screen_recording_real",
+        "held_out_source_sha256": "59070bfd7195f40a17532d67d7bb1c82473ee0c4ddbf73f815db6dee6dc37ef7",
+        "held_out_source_path": "C:\\Users\\chara\\OneDrive\\Videos\\การบันทึกหน้าจอ\\การบันทึกหน้าจอ 2026-09-27 091454.mp4",
+        "training_source_count": 1,
+        "training_sources": [
+          "c139cb2146b739512a0b9c72e6793b287f64d4cdf46d7054ae99b93736c0244f"
+        ],
+        "cases": [
+          {
+            "sample_id": "screen-recording-main-1",
+            "reference_decision": "REVIEW",
+            "calibrated_decision": "REVIEW",
+            "pass": true,
+            "false_accept": false,
+            "false_reject": false,
+            "worst_z": null,
+            "mean_z": null,
+            "quality_score": 0.02015600310165311,
+            "reasons": [
+              "global_calibrated_fallback",
+              "global_quality_fallback"
+            ]
+          },
+          {
+            "sample_id": "screen-recording-main-2",
+            "reference_decision": "REVIEW",
+            "calibrated_decision": "REVIEW",
+            "pass": true,
+            "false_accept": false,
+            "false_reject": false,
+            "worst_z": null,
+            "mean_z": null,
+            "quality_score": 0.0180978234418791,
+            "reasons": [
+              "global_calibrated_fallback",
+              "global_quality_fallback"
+            ]
+          }
+        ],
+        "global_fallback_threshold": 0.325588703471098,
+        "status": "GLOBAL_CALIBRATED_FALLBACK"
+      },
+      {
+        "class_label": "screen_recording_real",
+        "held_out_source_sha256": "70d670419a300d96d29b225fcc27441d85a08b300eaa6462b4d34b468fc5d21d",
+        "held_out_source_path": "C:\\Users\\chara\\Downloads\\SCOS_single_screen_desktop.mp4",
+        "training_source_count": 1,
+        "training_sources": [
+          "c139cb2146b739512a0b9c72e6793b287f64d4cdf46d7054ae99b93736c0244f"
+        ],
+        "cases": [
+          {
+            "sample_id": "screen-desktop-1",
+            "reference_decision": "REVIEW",
+            "calibrated_decision": "REVIEW",
+            "pass": true,
+            "false_accept": false,
+            "false_reject": false,
+            "worst_z": null,
+            "mean_z": null,
+            "quality_score": 0.0,
+            "reasons": [
+              "global_calibrated_fallback",
+              "insufficient_valid_temporal_triplets"
+            ]
+          },
+          {
+            "sample_id": "screen-desktop-2",
+            "reference_decision": "REVIEW",
+            "calibrated_decision": "REVIEW",
+            "pass": true,
+            "false_accept": false,
+            "false_reject": false,
+            "worst_z": null,
+            "mean_z": null,
+            "quality_score": 0.0,
+            "reasons": [
+              "global_calibrated_fallback",
+              "insufficient_valid_temporal_triplets"
+            ]
+          }
+        ],
+        "global_fallback_threshold": 0.325588703471098,
+        "status": "GLOBAL_CALIBRATED_FALLBACK"
+      },
+      {
+        "class_label": "screen_recording_real",
+        "held_out_source_sha256": "c139cb2146b739512a0b9c72e6793b287f64d4cdf46d7054ae99b93736c0244f",
+        "held_out_source_path": "C:\\Users\\chara\\Downloads\\Download.mp4",
+        "training_source_count": 0,
+        "training_sources": [],
+        "cases": [
+          {
+            "sample_id": "screen-download-1",
+            "reference_decision": "SMOOTH+",
+            "calibrated_decision": "SMOOTH+",
+            "pass": true,
+            "false_accept": false,
+            "false_reject": false,
+            "worst_z": null,
+            "mean_z": null,
+            "quality_score": 1.0,
+            "reasons": [
+              "global_calibrated_fallback",
+              "global_quality_fallback"
+            ]
+          },
+          {
+            "sample_id": "screen-download-2",
+            "reference_decision": "SMOOTH+",
+            "calibrated_decision": "SMOOTH+",
+            "pass": true,
+            "false_accept": false,
+            "false_reject": false,
+            "worst_z": null,
+            "mean_z": null,
+            "quality_score": 1.0,
+            "reasons": [
+              "global_calibrated_fallback",
+              "global_quality_fallback"
+            ]
+          }
+        ],
+        "global_fallback_threshold": 0.325588703471098,
+        "status": "GLOBAL_CALIBRATED_FALLBACK"
+      }
+    ],
+    "safety_objective": "zero_false_accept_and_zero_source_leakage",
+    "overall": "PASS"
+  },
+  "safety": {
+    "source_sha_verification": "PASS",
+    "minimum_sources_per_class": 3,
+    "training_sources_per_fold": 2,
+    "automatic_promotion": "DISABLED",
+    "v4_calibration_authority": "OFFLINE_REVIEW_ONLY"
+  },
+  "limitations": [
+    "The screen_recording_real and portrait_screen_real classes are screen/UI families; they should not be interpreted as natural-scene calibration.",
+    "Natural motion uses three independent open Blender movie sources.",
+    "LOSO evaluates generalization against V3 reference decisions; it is not human MOS ground truth.",
+    "V4.1 must not override V3 safety gates."
+  ],
+  "research_basis": [
+    "Vimeo-90K was designed for temporal frame interpolation and covers varied scenes/actions.",
+    "Recent VFI quality work reports that generic PSNR/SSIM can miss interpolation-specific temporal artifacts."
+  ]
+}

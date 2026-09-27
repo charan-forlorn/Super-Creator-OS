@@ -1,0 +1,20 @@
+{
+  "window_start": 39.8,
+  "window_end": 40.8,
+  "canary_start": 40.1,
+  "canary_end": 40.5,
+  "sample_count": 0,
+  "valid_triple_ratio": 0.0,
+  "source_baseline": {},
+  "candidate_metrics": {},
+  "robust_z": {},
+  "calibration_z": {},
+  "quality_score": 0.0,
+  "decision": "REVIEW",
+  "reasons": [
+    "insufficient_temporal_samples"
+  ],
+  "source_id": "screen-desktop",
+  "class_label": "screen_recording_real",
+  "motion_score": 0.007205446716398001
+}

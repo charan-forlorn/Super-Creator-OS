@@ -1,0 +1,43 @@
+{
+  "window_start": 16.0,
+  "window_end": 17.0,
+  "canary_start": 16.3,
+  "canary_end": 16.7,
+  "sample_count": 11,
+  "valid_triple_ratio": 1.0,
+  "source_baseline": {
+    "path_excess_median": 0.3888535797595978,
+    "path_excess_p95": 0.4945557117462158,
+    "asymmetry_median": 0.11739461123943329,
+    "asymmetry_p95": 0.9072267413139343,
+    "blend_deviation_median": 0.6188560724258423,
+    "blend_deviation_p95": 0.6603196263313293,
+    "jerk_median": 0.003116725943982601,
+    "jerk_p95": 0.016081329435110092
+  },
+  "candidate_metrics": {
+    "path_excess_median": 0.2773776054382324,
+    "path_excess_p95": 0.33101844787597656,
+    "asymmetry_median": 0.0391189269721508,
+    "asymmetry_p95": 0.07762035727500916,
+    "blend_deviation_median": 0.4705863893032074,
+    "blend_deviation_p95": 0.5199021100997925,
+    "jerk_median": 0.0004883836954832077,
+    "jerk_p95": 0.0010961778461933136
+  },
+  "robust_z": {
+    "path_excess": 0.0,
+    "asymmetry": 0.0,
+    "blend_deviation": 0.0,
+    "jerk": 0.0
+  },
+  "calibration_z": {},
+  "quality_score": 1.0,
+  "decision": "SMOOTH+",
+  "reasons": [
+    "canary_temporally_coherent"
+  ],
+  "source_id": "portrait-remaster",
+  "class_label": "portrait_screen_real",
+  "motion_score": 0.07615722715854645
+}

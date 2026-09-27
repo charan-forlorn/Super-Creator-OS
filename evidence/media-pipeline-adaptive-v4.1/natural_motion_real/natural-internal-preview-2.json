@@ -1,0 +1,17 @@
+{
+  "window_start": 16.83,
+  "window_end": 17.83,
+  "canary_start": 17.13,
+  "canary_end": 17.53,
+  "sample_count": 0,
+  "valid_triple_ratio": 0.0,
+  "source_baseline": {},
+  "candidate_metrics": {},
+  "robust_z": {},
+  "calibration_z": {},
+  "quality_score": 0.0,
+  "decision": "REVIEW",
+  "reasons": [
+    "insufficient_temporal_samples"
+  ]
+}

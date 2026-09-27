@@ -1,0 +1,119 @@
+{
+  "schema": 2,
+  "profile_id": "v4.1-99046224c07f932e",
+  "metric_keys": [
+    "path_excess_median",
+    "blend_deviation_median",
+    "asymmetry_median",
+    "jerk_median"
+  ],
+  "class_profiles": {
+    "natural_motion_real": {
+      "observation_count": 3,
+      "training_source_count": 2,
+      "z_review": 4.0,
+      "metrics": {
+        "path_excess_median": {
+          "median": 0.06763188540935516,
+          "scale": 0.018919779746979472,
+          "p95": 0.18364844918251036,
+          "max": 0.19653917849063873
+        },
+        "blend_deviation_median": {
+          "median": 0.3794266879558563,
+          "scale": 0.03794266879558564,
+          "p95": 0.3860243588685989,
+          "max": 0.38675743341445923
+        },
+        "asymmetry_median": {
+          "median": 0.15823377668857574,
+          "scale": 0.03141607687175274,
+          "p95": 0.19982427060604094,
+          "max": 0.20444543659687042
+        },
+        "jerk_median": {
+          "median": 0.0005854438059031963,
+          "scale": 0.0001,
+          "p95": 0.0011192683596163988,
+          "max": 0.0011785821989178658
+        }
+      }
+    },
+    "portrait_screen_real": {
+      "observation_count": 4,
+      "training_source_count": 2,
+      "z_review": 4.0,
+      "metrics": {
+        "path_excess_median": {
+          "median": 0.2662278562784195,
+          "scale": 0.04329841122793392,
+          "p95": 0.29835691303014755,
+          "max": 0.302059143781662
+        },
+        "blend_deviation_median": {
+          "median": 0.4797385483980179,
+          "scale": 0.047973854839801794,
+          "p95": 0.4977441310882568,
+          "max": 0.49930649995803833
+        },
+        "asymmetry_median": {
+          "median": 0.08924083225429058,
+          "scale": 0.08729559211470186,
+          "p95": 0.17587193846702573,
+          "max": 0.18231473863124847
+        },
+        "jerk_median": {
+          "median": 0.0009640391799621284,
+          "scale": 0.000534244992351194,
+          "p95": 0.0013300875609274954,
+          "max": 0.001334790838882327
+        }
+      }
+    },
+    "screen_recording_real": {
+      "observation_count": 2,
+      "training_source_count": 1,
+      "z_review": 4.0,
+      "metrics": {
+        "path_excess_median": {
+          "median": 0.30492009222507477,
+          "scale": 0.030492009222507478,
+          "p95": 0.31106609255075457,
+          "max": 0.3117489814758301
+        },
+        "blend_deviation_median": {
+          "median": 0.5113640427589417,
+          "scale": 0.051136404275894165,
+          "p95": 0.5115038931369782,
+          "max": 0.5115194320678711
+        },
+        "asymmetry_median": {
+          "median": 0.02662794105708599,
+          "scale": 0.012213024820759892,
+          "p95": 0.03404175620526075,
+          "max": 0.03486551344394684
+        },
+        "jerk_median": {
+          "median": 0.000986101571470499,
+          "scale": 0.0002910094982944429,
+          "p95": 0.0011627564672380686,
+          "max": 0.0011823847889900208
+        }
+      }
+    }
+  },
+  "observation_count": 9,
+  "source_count": 5,
+  "class_source_counts": {
+    "natural_motion_real": 2,
+    "portrait_screen_real": 2,
+    "screen_recording_real": 1
+  },
+  "training_source_sha256s": [
+    "468e6743c674689a728726bbe4bb4b2a65bd8702a89f021af26a8bb4d450eebd",
+    "5a3c5e03a3716d1debcc02c20019007c8e801788eac266b5e97fa5391a2c8d75",
+    "5fe4e42a4c6893f40c90d841ac3e638d7b68d31b04d4a91f22b2bb5071d8c2d6",
+    "c139cb2146b739512a0b9c72e6793b287f64d4cdf46d7054ae99b93736c0244f",
+    "e9f005c0976692bb6c10c43212599b774ba052a320d83f0f4c99c33b4f47342d"
+  ]
+}

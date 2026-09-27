@@ -1,0 +1,43 @@
+{
+  "window_start": 16.0,
+  "window_end": 17.0,
+  "canary_start": 16.3,
+  "canary_end": 16.7,
+  "sample_count": 9,
+  "valid_triple_ratio": 0.8181818181818182,
+  "source_baseline": {
+    "path_excess_median": 0.4142158329486847,
+    "path_excess_p95": 0.477168470621109,
+    "asymmetry_median": 0.2207099199295044,
+    "asymmetry_p95": 0.9702832698822021,
+    "blend_deviation_median": 0.6338220834732056,
+    "blend_deviation_p95": 0.6521297097206116,
+    "jerk_median": 0.008380437269806862,
+    "jerk_p95": 0.03007322922348976
+  },
+  "candidate_metrics": {
+    "path_excess_median": 0.3117489814758301,
+    "path_excess_p95": 0.36582520604133606,
+    "asymmetry_median": 0.03486551344394684,
+    "asymmetry_p95": 0.053551122546195984,
+    "blend_deviation_median": 0.5115194320678711,
+    "blend_deviation_p95": 0.5556560158729553,
+    "jerk_median": 0.0007898183539509773,
+    "jerk_p95": 0.0013108480488881469
+  },
+  "robust_z": {
+    "path_excess": 0.0,
+    "asymmetry": 0.0,
+    "blend_deviation": 0.0,
+    "jerk": 0.0
+  },
+  "calibration_z": {},
+  "quality_score": 1.0,
+  "decision": "SMOOTH+",
+  "reasons": [
+    "canary_temporally_coherent"
+  ],
+  "source_id": "screen-download",
+  "class_label": "screen_recording_real",
+  "motion_score": 0.09618470817804337
+}

@@ -1,0 +1,40 @@
+{
+  "window_start": 14.8,
+  "window_end": 15.8,
+  "canary_start": 15.1,
+  "canary_end": 15.5,
+  "sample_count": 11,
+  "valid_triple_ratio": 1.1,
+  "source_baseline": {
+    "path_excess_median": 0.13475753366947174,
+    "path_excess_p95": 0.14005565643310547,
+    "asymmetry_median": 0.02004292979836464,
+    "asymmetry_p95": 0.6120771169662476,
+    "blend_deviation_median": 0.3172246813774109,
+    "blend_deviation_p95": 0.4273904860019684,
+    "jerk_median": 0.0001970999874174595,
+    "jerk_p95": 0.0036638067103922367
+  },
+  "candidate_metrics": {
+    "path_excess_median": 0.08114201575517654,
+    "path_excess_p95": 0.0927850604057312,
+    "asymmetry_median": 0.3129711151123047,
+    "asymmetry_p95": 0.6386412382125854,
+    "blend_deviation_median": 0.3277052342891693,
+    "blend_deviation_p95": 0.4131888151168823,
+    "jerk_median": 0.0012743056286126375,
+    "jerk_p95": 0.0018341843970119953
+  },
+  "robust_z": {
+    "path_excess": 0.0,
+    "asymmetry": 16.17282410098624,
+    "blend_deviation": 0.13215305777912562,
+    "jerk": 5.6704304948290725
+  },
+  "calibration_z": {},
+  "quality_score": 0.15399180845758492,
+  "decision": "REVIEW",
+  "reasons": [
+    "temporal_quality_outlier"
+  ]
+}

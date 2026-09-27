@@ -1,0 +1,146 @@
+[
+  {
+    "sample_id": "screen-main-1",
+    "class": "screen_recording_real",
+    "decision": "REVIEW",
+    "valid_triple_ratio": 0.2727272727272727,
+    "quality_score": 0.12185740760610381,
+    "motion_score": 0.20144526660442352
+  },
+  {
+    "sample_id": "screen-main-2",
+    "class": "screen_recording_real",
+    "decision": "REVIEW",
+    "valid_triple_ratio": 0.45454545454545453,
+    "quality_score": 0.2974180567260922,
+    "motion_score": 0.060657989233732224
+  },
+  {
+    "sample_id": "screen-desktop-1",
+    "class": "screen_recording_real",
+    "decision": "REVIEW",
+    "valid_triple_ratio": 0.0,
+    "quality_score": 0.0,
+    "motion_score": 0.007205446716398001
+  },
+  {
+    "sample_id": "screen-desktop-2",
+    "class": "screen_recording_real",
+    "decision": "REVIEW",
+    "valid_triple_ratio": 0.0,
+    "quality_score": 0.0,
+    "motion_score": 0.007073040120303631
+  },
+  {
+    "sample_id": "screen-download-1",
+    "class": "screen_recording_real",
+    "decision": "SMOOTH+",
+    "valid_triple_ratio": 0.8181818181818182,
+    "quality_score": 1.0,
+    "motion_score": 0.09790404140949249
+  },
+  {
+    "sample_id": "screen-download-2",
+    "class": "screen_recording_real",
+    "decision": "SMOOTH+",
+    "valid_triple_ratio": 0.8181818181818182,
+    "quality_score": 1.0,
+    "motion_score": 0.09618470817804337
+  },
+  {
+    "sample_id": "portrait-phone-1",
+    "class": "portrait_screen_real",
+    "decision": "REVIEW",
+    "valid_triple_ratio": 0.0,
+    "quality_score": 0.0,
+    "motion_score": 0.006918668746948242
+  },
+  {
+    "sample_id": "portrait-phone-2",
+    "class": "portrait_screen_real",
+    "decision": "REVIEW",
+    "valid_triple_ratio": 0.0,
+    "quality_score": 0.0,
+    "motion_score": 0.006503866519778967
+  },
+  {
+    "sample_id": "portrait-remix-1",
+    "class": "portrait_screen_real",
+    "decision": "SMOOTH+",
+    "valid_triple_ratio": 0.9090909090909091,
+    "quality_score": 1.0,
+    "motion_score": 0.09157175570726395
+  },
+  {
+    "sample_id": "portrait-remix-2",
+    "class": "portrait_screen_real",
+    "decision": "SMOOTH+",
+    "valid_triple_ratio": 1.0,
+    "quality_score": 1.0,
+    "motion_score": 0.08679243177175522
+  },
+  {
+    "sample_id": "portrait-remaster-1",
+    "class": "portrait_screen_real",
+    "decision": "SMOOTH+",
+    "valid_triple_ratio": 0.9090909090909091,
+    "quality_score": 1.0,
+    "motion_score": 0.0802464410662651
+  },
+  {
+    "sample_id": "portrait-remaster-2",
+    "class": "portrait_screen_real",
+    "decision": "SMOOTH+",
+    "valid_triple_ratio": 1.0,
+    "quality_score": 1.0,
+    "motion_score": 0.07615722715854645
+  },
+  {
+    "sample_id": "caminandes-1",
+    "class": "natural_motion_real",
+    "decision": "REVIEW",
+    "valid_triple_ratio": 0.36363636363636365,
+    "quality_score": 1.0,
+    "motion_score": 0.2437008172273636
+  },
+  {
+    "sample_id": "caminandes-2",
+    "class": "natural_motion_real",
+    "decision": "SMOOTH+",
+    "valid_triple_ratio": 1.0,
+    "quality_score": 0.9691358071890944,
+    "motion_score": 0.23284490406513214
+  },
+  {
+    "sample_id": "elephantsdream-1",
+    "class": "natural_motion_real",
+    "decision": "SMOOTH+",
+    "valid_triple_ratio": 1.0,
+    "quality_score": 1.0,
+    "motion_score": 0.05891144275665283
+  },
+  {
+    "sample_id": "elephantsdream-2",
+    "class": "natural_motion_real",
+    "decision": "REVIEW",
+    "valid_triple_ratio": 1.0,
+    "quality_score": 0.09620694945025868,
+    "motion_score": 0.04718780145049095
+  },
+  {
+    "sample_id": "internal-preview-1",
+    "class": "natural_motion_real",
+    "decision": "REVIEW",
+    "valid_triple_ratio": 0.0,
+    "quality_score": 0.0,
+    "motion_score": 0.0573345348238945
+  },
+  {
+    "sample_id": "internal-preview-2",
+    "class": "natural_motion_real",
+    "decision": "REVIEW",
+    "valid_triple_ratio": 0.2727272727272727,
+    "quality_score": 0.021771614900395985,
+    "motion_score": 0.04437727853655815
+  }
+]

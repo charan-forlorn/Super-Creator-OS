@@ -1,0 +1,375 @@
+{
+  "schema": 1,
+  "purpose": "V4.1 multi-class corpus expansion",
+  "source_unit": "unique CFR source file identified by SHA-256",
+  "classes": {
+    "natural_motion_real": {
+      "source_count": 3,
+      "source_sha256s": [
+        "468e6743c674689a728726bbe4bb4b2a65bd8702a89f021af26a8bb4d450eebd",
+        "5fe4e42a4c6893f40c90d841ac3e638d7b68d31b04d4a91f22b2bb5071d8c2d6",
+        "ec72dab5494b3ddd6268e5749cf56b6ac11353867bf2113c3a0570b6367288bf"
+      ]
+    },
+    "portrait_screen_real": {
+      "source_count": 3,
+      "source_sha256s": [
+        "5a3c5e03a3716d1debcc02c20019007c8e801788eac266b5e97fa5391a2c8d75",
+        "c17a0019b764f2a9697037a51c55d3a1428b70bbbf334ce24896c092429c3740",
+        "e9f005c0976692bb6c10c43212599b774ba052a320d83f0f4c99c33b4f47342d"
+      ]
+    },
+    "screen_recording_real": {
+      "source_count": 3,
+      "source_sha256s": [
+        "59070bfd7195f40a17532d67d7bb1c82473ee0c4ddbf73f815db6dee6dc37ef7",
+        "70d670419a300d96d29b225fcc27441d85a08b300eaa6462b4d34b468fc5d21d",
+        "c139cb2146b739512a0b9c72e6793b287f64d4cdf46d7054ae99b93736c0244f"
+      ]
+    }
+  },
+  "samples": [
+    {
+      "sample_id": "screen-recording-main-1",
+      "class_label": "screen_recording_real",
+      "source_path": "C:\\Users\\chara\\OneDrive\\Videos\\การบันทึกหน้าจอ\\การบันทึกหน้าจอ 2026-09-27 091454.mp4",
+      "source_sha256": "59070bfd7195f40a17532d67d7bb1c82473ee0c4ddbf73f815db6dee6dc37ef7",
+      "source_family_id": "59070bfd7195f40a17532d67d7bb1c82473ee0c4ddbf73f815db6dee6dc37ef7",
+      "canary_index": 1,
+      "window_start": 11.29666,
+      "window_end": 12.29666,
+      "reference_decision": "REVIEW",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\screen_recording_real\\screen-recording-main-1.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 30.0,
+        "duration_s": 57.7333,
+        "width": 2560,
+        "height": 1528
+      }
+    },
+    {
+      "sample_id": "screen-recording-main-2",
+      "class_label": "screen_recording_real",
+      "source_path": "C:\\Users\\chara\\OneDrive\\Videos\\การบันทึกหน้าจอ\\การบันทึกหน้าจอ 2026-09-27 091454.mp4",
+      "source_sha256": "59070bfd7195f40a17532d67d7bb1c82473ee0c4ddbf73f815db6dee6dc37ef7",
+      "source_family_id": "59070bfd7195f40a17532d67d7bb1c82473ee0c4ddbf73f815db6dee6dc37ef7",
+      "canary_index": 2,
+      "window_start": 33.88998,
+      "window_end": 34.88998,
+      "reference_decision": "REVIEW",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\screen_recording_real\\screen-recording-main-2.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 30.0,
+        "duration_s": 57.7333,
+        "width": 2560,
+        "height": 1528
+      }
+    },
+    {
+      "sample_id": "screen-desktop-1",
+      "class_label": "screen_recording_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\SCOS_single_screen_desktop.mp4",
+      "source_sha256": "70d670419a300d96d29b225fcc27441d85a08b300eaa6462b4d34b468fc5d21d",
+      "source_family_id": "70d670419a300d96d29b225fcc27441d85a08b300eaa6462b4d34b468fc5d21d",
+      "canary_index": 1,
+      "window_start": 10.95,
+      "window_end": 11.95,
+      "reference_decision": "REVIEW",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\screen_recording_real\\screen-desktop-1.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 30.0,
+        "duration_s": 56.0,
+        "width": 1920,
+        "height": 1080
+      }
+    },
+    {
+      "sample_id": "screen-desktop-2",
+      "class_label": "screen_recording_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\SCOS_single_screen_desktop.mp4",
+      "source_sha256": "70d670419a300d96d29b225fcc27441d85a08b300eaa6462b4d34b468fc5d21d",
+      "source_family_id": "70d670419a300d96d29b225fcc27441d85a08b300eaa6462b4d34b468fc5d21d",
+      "canary_index": 2,
+      "window_start": 32.85,
+      "window_end": 33.85,
+      "reference_decision": "REVIEW",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\screen_recording_real\\screen-desktop-2.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 30.0,
+        "duration_s": 56.0,
+        "width": 1920,
+        "height": 1080
+      }
+    },
+    {
+      "sample_id": "screen-download-1",
+      "class_label": "screen_recording_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\Download.mp4",
+      "source_sha256": "c139cb2146b739512a0b9c72e6793b287f64d4cdf46d7054ae99b93736c0244f",
+      "source_family_id": "c139cb2146b739512a0b9c72e6793b287f64d4cdf46d7054ae99b93736c0244f",
+      "canary_index": 1,
+      "window_start": 11.003333,
+      "window_end": 12.003333,
+      "reference_decision": "SMOOTH+",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\screen_recording_real\\screen-download-1.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 30.0,
+        "duration_s": 56.266667,
+        "width": 576,
+        "height": 922
+      }
+    },
+    {
+      "sample_id": "screen-download-2",
+      "class_label": "screen_recording_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\Download.mp4",
+      "source_sha256": "c139cb2146b739512a0b9c72e6793b287f64d4cdf46d7054ae99b93736c0244f",
+      "source_family_id": "c139cb2146b739512a0b9c72e6793b287f64d4cdf46d7054ae99b93736c0244f",
+      "canary_index": 2,
+      "window_start": 33.01,
+      "window_end": 34.01,
+      "reference_decision": "SMOOTH+",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\screen_recording_real\\screen-download-2.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 30.0,
+        "duration_s": 56.266667,
+        "width": 576,
+        "height": 922
+      }
+    },
+    {
+      "sample_id": "portrait-remaster-1",
+      "class_label": "portrait_screen_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\Download_single_screen_remix_REMASTERED_1080x1920.mp4",
+      "source_sha256": "e9f005c0976692bb6c10c43212599b774ba052a320d83f0f4c99c33b4f47342d",
+      "source_family_id": "e9f005c0976692bb6c10c43212599b774ba052a320d83f0f4c99c33b4f47342d",
+      "canary_index": 1,
+      "window_start": 11.003333,
+      "window_end": 12.003333,
+      "reference_decision": "SMOOTH+",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\portrait_screen_real\\portrait-remaster-1.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 30.0,
+        "duration_s": 56.266667,
+        "width": 1080,
+        "height": 1920
+      }
+    },
+    {
+      "sample_id": "portrait-remaster-2",
+      "class_label": "portrait_screen_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\Download_single_screen_remix_REMASTERED_1080x1920.mp4",
+      "source_sha256": "e9f005c0976692bb6c10c43212599b774ba052a320d83f0f4c99c33b4f47342d",
+      "source_family_id": "e9f005c0976692bb6c10c43212599b774ba052a320d83f0f4c99c33b4f47342d",
+      "canary_index": 2,
+      "window_start": 33.01,
+      "window_end": 34.01,
+      "reference_decision": "SMOOTH+",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\portrait_screen_real\\portrait-remaster-2.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 30.0,
+        "duration_s": 56.266667,
+        "width": 1080,
+        "height": 1920
+      }
+    },
+    {
+      "sample_id": "portrait-download-remix-1",
+      "class_label": "portrait_screen_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\Download_single_screen_remix.mp4",
+      "source_sha256": "5a3c5e03a3716d1debcc02c20019007c8e801788eac266b5e97fa5391a2c8d75",
+      "source_family_id": "5a3c5e03a3716d1debcc02c20019007c8e801788eac266b5e97fa5391a2c8d75",
+      "canary_index": 1,
+      "window_start": 11.003333,
+      "window_end": 12.003333,
+      "reference_decision": "SMOOTH+",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\portrait_screen_real\\portrait-download-remix-1.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 30.0,
+        "duration_s": 56.266667,
+        "width": 576,
+        "height": 922
+      }
+    },
+    {
+      "sample_id": "portrait-download-remix-2",
+      "class_label": "portrait_screen_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\Download_single_screen_remix.mp4",
+      "source_sha256": "5a3c5e03a3716d1debcc02c20019007c8e801788eac266b5e97fa5391a2c8d75",
+      "source_family_id": "5a3c5e03a3716d1debcc02c20019007c8e801788eac266b5e97fa5391a2c8d75",
+      "canary_index": 2,
+      "window_start": 33.01,
+      "window_end": 34.01,
+      "reference_decision": "SMOOTH+",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\portrait_screen_real\\portrait-download-remix-2.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 30.0,
+        "duration_s": 56.266667,
+        "width": 576,
+        "height": 922
+      }
+    },
+    {
+      "sample_id": "portrait-phone-1",
+      "class_label": "portrait_screen_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\SCOS_single_screen_phone.mp4",
+      "source_sha256": "c17a0019b764f2a9697037a51c55d3a1428b70bbbf334ce24896c092429c3740",
+      "source_family_id": "c17a0019b764f2a9697037a51c55d3a1428b70bbbf334ce24896c092429c3740",
+      "canary_index": 1,
+      "window_start": 10.95,
+      "window_end": 11.95,
+      "reference_decision": "REVIEW",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\portrait_screen_real\\portrait-phone-1.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 30.0,
+        "duration_s": 56.0,
+        "width": 1080,
+        "height": 1920
+      }
+    },
+    {
+      "sample_id": "portrait-phone-2",
+      "class_label": "portrait_screen_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\SCOS_single_screen_phone.mp4",
+      "source_sha256": "c17a0019b764f2a9697037a51c55d3a1428b70bbbf334ce24896c092429c3740",
+      "source_family_id": "c17a0019b764f2a9697037a51c55d3a1428b70bbbf334ce24896c092429c3740",
+      "canary_index": 2,
+      "window_start": 32.85,
+      "window_end": 33.85,
+      "reference_decision": "REVIEW",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\portrait_screen_real\\portrait-phone-2.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 30.0,
+        "duration_s": 56.0,
+        "width": 1080,
+        "height": 1920
+      }
+    },
+    {
+      "sample_id": "natural-caminandes-1",
+      "class_label": "natural_motion_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\scos_calibration_sources\\caminandes\\caminandes_gran_dillama.mp4",
+      "source_sha256": "468e6743c674689a728726bbe4bb4b2a65bd8702a89f021af26a8bb4d450eebd",
+      "source_family_id": "468e6743c674689a728726bbe4bb4b2a65bd8702a89f021af26a8bb4d450eebd",
+      "canary_index": 1,
+      "window_start": 28.958333,
+      "window_end": 29.958333,
+      "reference_decision": "SMOOTH+",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\natural_motion_real\\natural-caminandes-1.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 24.0,
+        "duration_s": 146.041667,
+        "width": 1920,
+        "height": 1080
+      }
+    },
+    {
+      "sample_id": "natural-caminandes-2",
+      "class_label": "natural_motion_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\scos_calibration_sources\\caminandes\\caminandes_gran_dillama.mp4",
+      "source_sha256": "468e6743c674689a728726bbe4bb4b2a65bd8702a89f021af26a8bb4d450eebd",
+      "source_family_id": "468e6743c674689a728726bbe4bb4b2a65bd8702a89f021af26a8bb4d450eebd",
+      "canary_index": 2,
+      "window_start": 86.875,
+      "window_end": 87.875,
+      "reference_decision": "SMOOTH+",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\natural_motion_real\\natural-caminandes-2.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 24.0,
+        "duration_s": 146.041667,
+        "width": 1920,
+        "height": 1080
+      }
+    },
+    {
+      "sample_id": "natural-elephantsdream-1",
+      "class_label": "natural_motion_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\scos_calibration_sources\\elephantsdream\\elephantsdream_teaser.mp4",
+      "source_sha256": "5fe4e42a4c6893f40c90d841ac3e638d7b68d31b04d4a91f22b2bb5071d8c2d6",
+      "source_family_id": "5fe4e42a4c6893f40c90d841ac3e638d7b68d31b04d4a91f22b2bb5071d8c2d6",
+      "canary_index": 1,
+      "window_start": 14.8,
+      "window_end": 15.8,
+      "reference_decision": "REVIEW",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\natural_motion_real\\natural-elephantsdream-1.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 24.0,
+        "duration_s": 75.25,
+        "width": 960,
+        "height": 540
+      }
+    },
+    {
+      "sample_id": "natural-elephantsdream-2",
+      "class_label": "natural_motion_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\scos_calibration_sources\\elephantsdream\\elephantsdream_teaser.mp4",
+      "source_sha256": "5fe4e42a4c6893f40c90d841ac3e638d7b68d31b04d4a91f22b2bb5071d8c2d6",
+      "source_family_id": "5fe4e42a4c6893f40c90d841ac3e638d7b68d31b04d4a91f22b2bb5071d8c2d6",
+      "canary_index": 2,
+      "window_start": 44.4,
+      "window_end": 45.4,
+      "reference_decision": "SMOOTH+",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\natural_motion_real\\natural-elephantsdream-2.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 24.0,
+        "duration_s": 75.25,
+        "width": 960,
+        "height": 540
+      }
+    },
+    {
+      "sample_id": "natural-internal-preview-1",
+      "class_label": "natural_motion_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\scos_calibration_sources\\internalpreview\\internal-preview.mp4",
+      "source_sha256": "ec72dab5494b3ddd6268e5749cf56b6ac11353867bf2113c3a0570b6367288bf",
+      "source_family_id": "ec72dab5494b3ddd6268e5749cf56b6ac11353867bf2113c3a0570b6367288bf",
+      "canary_index": 1,
+      "window_start": 5.61,
+      "window_end": 6.61,
+      "reference_decision": "REVIEW",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\natural_motion_real\\natural-internal-preview-1.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 10.0,
+        "duration_s": 29.3,
+        "width": 1400,
+        "height": 1000
+      }
+    },
+    {
+      "sample_id": "natural-internal-preview-2",
+      "class_label": "natural_motion_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\scos_calibration_sources\\internalpreview\\internal-preview.mp4",
+      "source_sha256": "ec72dab5494b3ddd6268e5749cf56b6ac11353867bf2113c3a0570b6367288bf",
+      "source_family_id": "ec72dab5494b3ddd6268e5749cf56b6ac11353867bf2113c3a0570b6367288bf",
+      "canary_index": 2,
+      "window_start": 16.83,
+      "window_end": 17.83,
+      "reference_decision": "REVIEW",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\natural_motion_real\\natural-internal-preview-2.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 10.0,
+        "duration_s": 29.3,
+        "width": 1400,
+        "height": 1000
+      }
+    }
+  ]
+}
