@@ -144,3 +144,28 @@ V4 safety:
 ## Adaptive SMOOTH+ V4.1 - Multi-Class Calibration Corpus
 
 LOSO is source-level. Calibration precedence: class profile -> source-excluded global calibrated fallback -> REVIEW. V4.1 is offline/review-only and cannot override V3 safety gates.
+
+## Adaptive SMOOTH+ V4.1 — source-level calibration
+
+V4.1 is finalized as an offline calibration/review layer.
+
+Corpus requirements now enforced:
+- >=3 independent source files per class;
+- >=2 newly introduced source files per class versus V4 baseline;
+- >=1 distinct motion family beyond screen/UI;
+- SHA-256 source identity;
+- leave-one-source-out validation.
+
+Current evidence:
+- 10 unique sources;
+- 20 canary observations;
+- classes: screen_recording_real (3), portrait_screen_real (4), natural_motion_real (3);
+- z_review=6.0 selected after deterministic threshold sweep;
+- 10 LOSO folds;
+- positive retention 100%;
+- negative rejection 100%;
+- false accepts 0;
+- false rejects 0;
+- source-level leakage false.
+
+The V4.1 calibration threshold may inform offline review analysis only. It cannot override V3 deterministic safety, scene-cut safety, source integrity, Temporal QA, RIFE availability, or Human review. Automatic promotion remains disabled.

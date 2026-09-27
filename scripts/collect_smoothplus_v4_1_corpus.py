@@ -13,17 +13,17 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 SOURCES = [
     # Existing V4 source + two genuinely new files.
-    ("screen_recording_real", "screen-recording-main", r"C:\Users\chara\OneDrive\Videos\การบันทึกหน้าจอ\การบันทึกหน้าจอ 2026-09-27 091454.mp4"),
+    ("screen_recording_real", "screen-recording-main", r"C:\Users\chara\OneDrive\Videos\à¸à¸²à¸£à¸šà¸±à¸™à¸—à¸¶à¸à¸«à¸™à¹‰à¸²à¸ˆà¸­\à¸à¸²à¸£à¸šà¸±à¸™à¸—à¸¶à¸à¸«à¸™à¹‰à¸²à¸ˆà¸­ 2026-09-27 091454.mp4"),
     ("screen_recording_real", "screen-desktop", r"C:\Users\chara\Downloads\SCOS_single_screen_desktop.mp4"),
     ("screen_recording_real", "screen-download", r"C:\Users\chara\Downloads\Download.mp4"),
 
     # Existing V4 source + two genuinely new files.
-    ("portrait_screen_real", "portrait-remaster", r"C:\Users\chara\Downloads\Download_single_screen_remix_REMASTERED_1080x1920.mp4"),
-    ("portrait_screen_real", "portrait-download-remix", r"C:\Users\chara\Downloads\Download_single_screen_remix.mp4"),
-    ("portrait_screen_real", "portrait-phone", r"C:\Users\chara\Downloads\SCOS_single_screen_phone.mp4"),
+    ("portrait_visual_real", "portrait-remaster", r"C:\Users\chara\Downloads\Download_single_screen_remix_REMASTERED_1080x1920.mp4"),
+    ("portrait_visual_real", "portrait-download-remix", r"C:\Users\chara\Downloads\Download_single_screen_remix.mp4"),
+    ("portrait_visual_real", "portrait-phone", r"C:\Users\chara\Downloads\SCOS_single_screen_phone.mp4"),
 
     # New motion family: natural/animated continuous motion.
-    ("natural_motion_real", "natural-caminandes", r"C:\Users\chara\Downloads\scos_calibration_sources\caminandes\caminandes_gran_dillama.mp4"),
+    ("portrait_visual_real", "portrait-northern-viking", r"C:\Users\chara\Downloads\scos_calibration_sources\portrait_visual\northern_viking_vertical.mp4"),
     ("natural_motion_real", "natural-elephantsdream", r"C:\Users\chara\Downloads\scos_calibration_sources\elephantsdream\elephantsdream_teaser.mp4"),
     ("natural_motion_real", "natural-internal-preview", r"C:\Users\chara\Downloads\scos_calibration_sources\internalpreview\internal-preview.mp4"),
 ]

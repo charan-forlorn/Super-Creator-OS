@@ -58,13 +58,14 @@ def main() -> None:
     profile = build_calibration_profile(
         [s for s in samples if s.reference_decision == "SMOOTH+"],
         min_training_sources=1,
+        z_review=6.0,
     )
     save_profile(EVIDENCE / "V4_1_CALIBRATION_PROFILE.json", profile)
 
     loso = leave_one_source_out(
         samples,
         min_training_sources=2,
-        z_review=4.0,
+        z_review=6.0,
     )
 
     report = {

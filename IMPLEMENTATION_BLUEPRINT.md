@@ -202,3 +202,41 @@ Policy:
 ## Adaptive SMOOTH+ V4.1 - Multi-Class Calibration Corpus - 2026-09-27
 
 9 sources / 3 classes / 18 canaries / LOSO 100% positive retention / 100% negative rejection / 0 false accepts / 0 source leakage. Automatic promotion remains disabled.
+
+## Adaptive SMOOTH+ V4.1 — 2026-09-28 FINALIZED
+
+V4.1 source-level generalization is complete.
+
+Verified corpus:
+- screen_recording_real: 3 sources, 2 new vs V4
+- portrait_screen_real: 4 sources, 2 new vs V4
+- natural_motion_real: 3 sources, 3 new vs V4
+- total: 10 unique sources / 20 canary observations
+- source identity: SHA-256
+- different motion family: natural_motion_real
+
+LOSO:
+- 10 held-out source folds
+- 20 observations
+- z_review=6.0
+- positive retention=100%
+- negative rejection=100%
+- false accepts=0
+- false rejects=0
+- source-level leakage=false
+- overall=PASS
+
+Threshold selection:
+A deterministic sweep of z_review 4.0 through 10.0 found a stable plateau from 5.5 upward with 100% positive retention, 100% negative rejection, and zero false accepts. V4.1 records 6.0 as the operational offline calibration threshold.
+
+Safety:
+- V3 deterministic safety remains authoritative.
+- V4.1 is offline/review-only.
+- Automatic promotion remains disabled.
+- Jev/TypeSafe is not execution authority.
+- V4.1 cannot override scene-boundary, temporal QA, RIFE availability, source integrity, or other deterministic safety gates.
+
+Regression:
+- V4.1 focused tests: 11 passed.
+- Full SCOS regression: 2868 passed, 21 skipped, 21 deselected.
+- compileall: PASS.

@@ -12,11 +12,15 @@
       ]
     },
     "portrait_screen_real": {
-      "source_count": 3,
+      "source_count": 4,
       "source_sha256s": [
         "5a3c5e03a3716d1debcc02c20019007c8e801788eac266b5e97fa5391a2c8d75",
         "c17a0019b764f2a9697037a51c55d3a1428b70bbbf334ce24896c092429c3740",
+        "d6b4b110c89595ed17feee5047585cf7df1b4fc36fc54f41e952da4fbca29d55",
         "e9f005c0976692bb6c10c43212599b774ba052a320d83f0f4c99c33b4f47342d"
+      ],
+      "source_added_v4_1": [
+        "d6b4b110c89595ed17feee5047585cf7df1b4fc36fc54f41e952da4fbca29d55"
       ]
     },
     "screen_recording_real": {
@@ -370,6 +374,50 @@
         "width": 1400,
         "height": 1000
       }
+    },
+    {
+      "sample_id": "portrait-northern-viking-1",
+      "class_label": "portrait_screen_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\scos_calibration_sources\\portrait_visual\\northern_viking_vertical.mp4",
+      "source_sha256": "d6b4b110c89595ed17feee5047585cf7df1b4fc36fc54f41e952da4fbca29d55",
+      "source_family_id": "d6b4b110c89595ed17feee5047585cf7df1b4fc36fc54f41e952da4fbca29d55",
+      "canary_index": 1,
+      "window_start": 8.0,
+      "window_end": 9.0,
+      "reference_decision": "SMOOTH+",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\portrait_screen_real\\portrait-northern-viking-1.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 29.97002997002997,
+        "duration_s": 33.1331,
+        "width": 1080,
+        "height": 1920
+      },
+      "source_kind": "public_domain",
+      "source_uri": "https://d34w7g4gy10iej.cloudfront.net/video/2608/DOD_111916285/DOD_111916285.mp4",
+      "license": "Public Domain (NASA/DVIDS source)"
+    },
+    {
+      "sample_id": "portrait-northern-viking-2",
+      "class_label": "portrait_screen_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\scos_calibration_sources\\portrait_visual\\northern_viking_vertical.mp4",
+      "source_sha256": "d6b4b110c89595ed17feee5047585cf7df1b4fc36fc54f41e952da4fbca29d55",
+      "source_family_id": "d6b4b110c89595ed17feee5047585cf7df1b4fc36fc54f41e952da4fbca29d55",
+      "canary_index": 2,
+      "window_start": 23.0,
+      "window_end": 24.0,
+      "reference_decision": "SMOOTH+",
+      "evidence_path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v4.1\\portrait_screen_real\\portrait-northern-viking-2.json",
+      "source_probe": {
+        "cfr": true,
+        "fps": 29.97002997002997,
+        "duration_s": 33.1331,
+        "width": 1080,
+        "height": 1920
+      },
+      "source_kind": "public_domain",
+      "source_uri": "https://d34w7g4gy10iej.cloudfront.net/video/2608/DOD_111916285/DOD_111916285.mp4",
+      "license": "Public Domain (NASA/DVIDS source)"
     }
   ]
 }

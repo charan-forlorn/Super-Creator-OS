@@ -142,5 +142,15 @@
     "valid_triple_ratio": 0.2727272727272727,
     "quality_score": 0.021771614900395985,
     "motion_score": 0.04437727853655815
+  },
+  {
+    "sample_id": "portrait-northern-viking-1",
+    "class": "portrait_screen_real",
+    "decision": "SMOOTH+"
+  },
+  {
+    "sample_id": "portrait-northern-viking-2",
+    "class": "portrait_screen_real",
+    "decision": "SMOOTH+"
   }
 ]

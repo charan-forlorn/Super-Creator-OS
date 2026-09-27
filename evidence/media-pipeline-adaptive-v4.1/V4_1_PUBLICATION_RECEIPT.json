@@ -1,67 +1,61 @@
 {
-  "schema": 1,
-  "phase": "Adaptive SMOOTH+ V4.1 - Multi-Class Calibration Corpus + LOSO",
+  "schema": 2,
+  "phase": "Adaptive SMOOTH+ V4.1 - Multi-Class Calibration Corpus + Leave-One-Source-Out Validation",
   "status": "PASS",
-  "source_expansion": {
-    "natural_motion_real": {
-      "source_count": 3,
-      "new_vs_v4_count": 3,
-      "new_vs_v4_source_sha256s": [
-        "468e6743c674689a728726bbe4bb4b2a65bd8702a89f021af26a8bb4d450eebd",
-        "5fe4e42a4c6893f40c90d841ac3e638d7b68d31b04d4a91f22b2bb5071d8c2d6",
-        "ec72dab5494b3ddd6268e5749cf56b6ac11353867bf2113c3a0570b6367288bf"
-      ]
+  "calibration": {
+    "profile_id": "v4.1-dcb4232bdbb202d4",
+    "z_review": 6.0,
+    "threshold_selection": {
+      "tested_range": [4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 8.0, 10.0],
+      "selected": 6.0,
+      "selection_basis": "lowest tested threshold at/above the stable 100% positive-retention / 100% negative-rejection plateau, rounded to a conservative operational value"
     },
-    "portrait_screen_real": {
-      "source_count": 3,
-      "new_vs_v4_count": 1,
-      "new_vs_v4_source_sha256s": [
-        "c17a0019b764f2a9697037a51c55d3a1428b70bbbf334ce24896c092429c3740"
-      ]
-    },
-    "screen_recording_real": {
-      "source_count": 3,
-      "new_vs_v4_count": 2,
-      "new_vs_v4_source_sha256s": [
-        "70d670419a300d96d29b225fcc27441d85a08b300eaa6462b4d34b468fc5d21d",
-        "c139cb2146b739512a0b9c72e6793b287f64d4cdf46d7054ae99b93736c0244f"
-      ]
-    }
+    "authority": "OFFLINE_REVIEW_ONLY",
+    "automatic_promotion": "DISABLED"
   },
-  "motion_family_expansion": {
-    "added_class": "natural_motion_real",
-    "source_count": 3,
-    "description": "distinct animation/natural-motion family"
+  "source_expansion": {
+    "natural_motion_real": {"source_count": 3, "new_vs_v4_count": 3},
+    "portrait_screen_real": {"source_count": 4, "new_vs_v4_count": 2},
+    "screen_recording_real": {"source_count": 3, "new_vs_v4_count": 2},
+    "different_motion_family_added": true
   },
   "corpus": {
-    "unique_source_count": 9,
-    "canary_observation_count": 18,
+    "unique_source_count": 10,
+    "canary_observation_count": 20,
     "source_sha_verification": "PASS"
   },
   "loso": {
-    "fold_count": 9,
-    "test_count": 18,
+    "method": "leave_one_source_out",
+    "fold_count": 10,
+    "eligible_fold_count": 10,
+    "positive_cases": 11,
+    "positive_pass": 11,
     "positive_retention": 1.0,
+    "negative_cases": 9,
+    "negative_pass": 9,
     "negative_rejection": 1.0,
     "false_accept_count": 0,
+    "false_reject_count": 0,
     "source_level_leakage": false,
-    "global_fallback_fold_count": 7,
+    "global_fallback_fold_count": 5,
+    "safe_fallback_fold_count": 0,
     "overall": "PASS"
   },
-  "calibration": {
-    "profile_id": "v4.1-99046224c07f932e",
-    "training_source_count": 5,
-    "authority": "OFFLINE_REVIEW_ONLY"
-  },
   "verification": {
-    "v4_1_unit_tests": "7 passed",
-    "full_scos_regression": "2864 passed, 21 skipped, 21 deselected",
-    "py_compile": "PASS",
-    "automatic_promotion": "DISABLED"
+    "v4_1_unit_tests": "11 passed",
+    "scos_regression": "2868 passed, 21 skipped, 21 deselected",
+    "scos_compileall": "PASS",
+    "focused_py_compile": "PASS",
+    "git_diff_check": "PASS_SCOPED_DIFF"
+  },
+  "safety": {
+    "v3_safety_gate_override": false,
+    "type_safe_jev_execution_authority": false,
+    "automatic_promotion": false
   },
   "limitations": [
-    "LOSO reference labels are V3 deterministic outputs, not human MOS.",
-    "V4.1 never overrides V3 safety gates.",
-    "Global fallback is source-excluded per fold."
+    "LOSO reference labels are V3 deterministic policy outputs, not independent human MOS.",
+    "Natural motion combines 24fps public animation sources with a 10fps internal preview source.",
+    "V4.1 calibration remains offline/review-only and must not override V3 safety gates."
   ]
 }
