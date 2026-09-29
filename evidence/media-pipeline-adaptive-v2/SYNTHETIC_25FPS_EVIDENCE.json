@@ -1,0 +1,38 @@
+{
+  "ad_boundary": null,
+  "cadence": {
+    "cfr": true,
+    "distinct_frames_estimate": 50,
+    "duplicate_ratio": 0.0,
+    "expected_frames": 50,
+    "sampled_pts_monotonic": true,
+    "source_fps": 25.0
+  },
+  "scene_boundaries": [],
+  "silences": [],
+  "source": {
+    "audio_channels": 1,
+    "audio_codec": "aac",
+    "audio_sample_rate": 48000,
+    "cfr": true,
+    "color_transfer": "",
+    "duration_s": 2.0,
+    "fps": 25.0,
+    "frames": 50,
+    "has_audio": true,
+    "height": 360,
+    "path": "C:\\Workspace\\super-creator-os\\evidence\\media-pipeline-adaptive-v2\\_synthetic_25fps.mp4",
+    "pixel_format": "yuv420p",
+    "video_codec": "h264",
+    "width": 640
+  },
+  "source_sha256": "1afaa7a7aa6b085b1f04051bd8d271c64e5b726098fdc413cf697b885463152b",
+  "subtitles": {
+    "confidence": null,
+    "note": "Providers available: ASR=True, OCR=True; no verified cue source yet.",
+    "path": null,
+    "source": "auto",
+    "status": "UNKNOWN"
+  },
+  "warnings": []
+}

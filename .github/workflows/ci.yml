@@ -9,12 +9,10 @@ name: CI
 # (-m "not integration") and the Explicit Integration population
 # (-m integration, certified hermetic HVS double).
 #
-# Cohort 9D adds the Control Center frontend gate set (typecheck, lint,
-# frontend tests, production build, browser acceptance) plus the structural
-# browser-acceptance / mock-truth enforcement gate, in the SAME order and with
-# the SAME semantics as scripts/ci_local_verify.py. The local verifier is the
-# authoritative parity reference; CI must reproduce it gate-for-gate. No
-# continue-on-error, no CI-only or local-only bypass.
+# Cohort 9D legacy local frontend gates were retired after the Control Center
+# presentation surface moved to the governed Floot Mission Control capability.
+# CI retains the backend/currentness truth contract plus the certified pytest
+# populations. No continue-on-error, no CI-only or local-only bypass.
 
 on:
   push:
@@ -57,34 +55,7 @@ jobs:
       - name: Security scan baseline
         run: python scripts/security_scan_baseline.py
 
-      - name: Control Center — install Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: "npm"
-          cache-dependency-path: apps/control-center/package-lock.json
-
-      - name: Control Center — install frontend dependencies
-        working-directory: apps/control-center
-        run: npm ci
-
-      - name: Control Center — typecheck
-        working-directory: apps/control-center
-        run: node ./node_modules/typescript/bin/tsc --noEmit --incremental false
-
-      - name: Control Center — lint
-        working-directory: apps/control-center
-        run: npm run lint
-
-      - name: Control Center — frontend tests
-        working-directory: apps/control-center
-        run: npx vitest run --no-file-parallelism
-
-      - name: Control Center — production build
-        working-directory: apps/control-center
-        run: npm run build
-
-      - name: Control Center — browser acceptance (structural truth gate)
+      - name: Control Center backend truth contract
         run: python scripts/control_center_truth_gate.py
 
       - name: Certified Standard population

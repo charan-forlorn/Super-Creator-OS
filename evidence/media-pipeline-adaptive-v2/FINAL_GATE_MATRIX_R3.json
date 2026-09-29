@@ -1,0 +1,38 @@
+﻿{
+    "phase":  "SCOS Adaptive SMOOTH+ V2 R3 final gate matrix",
+    "timestamp":  "2026-09-27T18:30:54.8863111+07:00",
+    "overall":  "PASS_WITH_PROMOTION_DISABLED",
+    "promotion":  "REVIEW",
+    "gates":  {
+                  "reconcile":  "PASS",
+                  "focused_tests":  "PASS — 33 passed",
+                  "compile":  "PASS",
+                  "scos_regression":  "PASS — 2852 passed, 21 skipped, 21 deselected",
+                  "dynamic_fps":  "PASS — synthetic 25fps probe",
+                  "segment_audio":  "PASS — internal-gap synthetic composition",
+                  "scene_cut_safety":  "PASS",
+                  "temporal_qa":  "PASS",
+                  "benchmark":  "PASS_WITH_LIMITS",
+                  "visual_spotcheck":  "PASS — R3 contact sheet sampled",
+                  "capcut":  "PASS — 0 errors / 0 warnings after derived-only caption timing repair",
+                  "hermes":  "PASS — gateway running, project trusted, repo-local scos-media-pipeline skill visible in project-context Hermes read-only smoke, Adaptive CLI recognized, automatic promotion guard confirmed",
+                  "typesafe_jev":  "UNAVAILABLE — TYPESAFE_API_KEY absent",
+                  "automatic_promotion":  "DISABLED — REVIEW"
+              },
+    "key_metrics":  {
+                        "adaptive_time_s":  59.00978829999076,
+                        "full_time_s":  202.7015568,
+                        "speedup":  3.4350497203873505,
+                        "rife_workload_reduction":  0.7811278830382427,
+                        "ssim_adaptive":  null,
+                        "ssim_full":  null,
+                        "ssim_preserve":  0.997488,
+                        "vmaf_adaptive":  null,
+                        "vmaf_full":  null,
+                        "artifact_spike_adaptive":  null,
+                        "artifact_spike_full":  null,
+                        "motion_continuity_adaptive":  null,
+                        "motion_continuity_full":  null,
+                        "duplicate_drift_adaptive":  null
+                    }
+}

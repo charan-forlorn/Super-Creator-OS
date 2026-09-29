@@ -1,0 +1,1 @@
+Use only exact Cloudflare MCP tools now enabled: mcp__cloudflare__get_accounts. Read-only. Call with per_page=100. Return compact JSON containing account id and name only. Do not expose secrets.

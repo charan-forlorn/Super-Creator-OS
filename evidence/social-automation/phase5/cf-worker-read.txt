@@ -1,0 +1,1 @@
+Read-only. Call exact Cloudflare tool mcp__cloudflare__get_accounts_workers_workers_by_worker_id with account_id=cb98ff5a98ddb6c0f09450505be7c3f5 and worker_id=d2dc373c2eb94164a376affc57cdf68d. Return compact JSON with worker name, deployed_on, subdomain.enabled, subdomain.url, previews_enabled. Do not mutate.

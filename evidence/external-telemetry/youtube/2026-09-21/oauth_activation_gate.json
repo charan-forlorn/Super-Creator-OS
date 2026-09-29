@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-09-21T02:44:13.3775448+07:00",
+  "status": "HUMAN_AUTHORIZATION_REQUIRED",
+  "oauth_flow": {
+    "flow": "OAuth 2.0 installed application + PKCE + loopback",
+    "client_source": "C:\\Users\\chara\\Downloads\\gooale API.txt",
+    "auth_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
+    "token_endpoint": "https://oauth2.googleapis.com/token",
+    "required_scopes": [
+      "https://www.googleapis.com/auth/youtube.readonly",
+      "https://www.googleapis.com/auth/yt-analytics.readonly"
+    ]
+  },
+  "security": {
+    "refresh_token_store": "C:\\Users\\chara\\AppData\\Local\\SCOS\\credentials\\youtube_analytics.dpapi",
+    "storage_protection": "Windows DPAPI CurrentUser",
+    "secure_store_exists_before_consent": false,
+    "token_value_written_to_source": false,
+    "token_value_written_to_evidence": false
+  },
+  "verification": {
+    "oauth_and_store_tests": "14 assertions passed",
+    "youtube_api_adapter_tests": "7 assertions passed",
+    "py_compile": "PASS",
+    "git_diff_check": "PASS"
+  },
+  "governance": {
+    "publish_or_dispatch_performed": false,
+    "human_approval_inferred": false,
+    "current_gate": "Google user consent is required before credential materialization"
+  }
+}

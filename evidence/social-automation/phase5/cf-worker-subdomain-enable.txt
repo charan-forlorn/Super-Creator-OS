@@ -1,0 +1,1 @@
+Use exact tool mcp__cloudflare__post_accounts_workers_scripts_subdomain. account_id=cb98ff5a98ddb6c0f09450505be7c3f5. script_name=brightbean-social-edge-20260928. body JSON string={"enabled":true,"previews_enabled":false}. Return only compact result or exact API error. No other mutations.

@@ -1,0 +1,68 @@
+Create and deploy the BrightBean public edge Worker using exact Cloudflare MCP tools. Do not use tool_search. Do not use any other tool names.
+
+Account ID: cb98ff5a98ddb6c0f09450505be7c3f5
+Worker script name: brightbean-social-edge-20260928
+Workers subdomain: charan254311
+
+VPC service binding:
+- binding variable: BRIGHTBEAN
+- type: vpc_service
+- service_id: 01a0e4c6-ae62-74e0-8cbf-4df204bec536
+
+Worker source:
+export default {
+  async fetch(request, env) {
+    try {
+      const incoming = new URL(request.url);
+      const target = new URL("http://brightbean-edge" + incoming.pathname + incoming.search);
+      const headers = new Headers(request.headers);
+      headers.set("x-forwarded-proto", "https");
+      headers.set("x-forwarded-host", incoming.host);
+      headers.set("host", "brightbean-edge");
+      const init = { method: request.method, headers };
+      if (request.method !== "GET" && request.method !== "HEAD") init.body = request.body;
+      const upstream = await env.BRIGHTBEAN.fetch(new Request(target, init));
+      const response = new Response(upstream.body, upstream);
+      response.headers.set("x-brightbean-edge", "workers-vpc");
+      return response;
+    } catch (error) {
+      return new Response("BrightBean edge unavailable", { status: 503 });
+    }
+  }
+};
+
+Step 1: call mcp__cloudflare__post_accounts_workers_scripts_versions.
+Use script_name=brightbean-social-edge-20260928.
+Use content_type exactly:
+multipart/form-data; boundary=----HermesBrightBean20260928
+Build raw multipart body with CRLF and exactly two parts:
+Part 1 metadata:
+Content-Disposition: form-data; name="metadata"
+Content-Type: application/json
+
+metadata JSON:
+{"main_module":"worker.mjs","bindings":[{"name":"BRIGHTBEAN","type":"vpc_service","service_id":"01a0e4c6-ae62-74e0-8cbf-4df204bec536"}],"compatibility_date":"2026-09-28","annotations":{"workers/message":"BrightBean stable public edge via Workers VPC","workers/tag":"brightbean-vpc-edge-20260928"}}
+
+Part 2 module:
+Content-Disposition: form-data; name="worker.mjs"; filename="worker.mjs"
+Content-Type: application/javascript+module
+
+the Worker source above
+
+Close with:
+------HermesBrightBean20260928--
+
+Return the created version_id. If upload validation fails, stop and return the exact error; do not improvise.
+
+Step 2: call mcp__cloudflare__post_accounts_workers_scripts_deployments with:
+script_name=brightbean-social-edge-20260928
+body={"strategy":"percentage","versions":[{"percentage":100,"version_id":"<VERSION_ID>"}]}
+Return deployment id.
+
+Step 3: call mcp__cloudflare__post_accounts_workers_scripts_subdomain with:
+script_name=brightbean-social-edge-20260928
+body={"enabled":true,"previews_enabled":false}
+
+Step 4: call mcp__cloudflare__get_accounts_workers_scripts_subdomain with script_name=brightbean-social-edge-20260928 and return enabled/previews_enabled.
+
+Do not print secrets. Do not create DNS records. Do not modify the existing named tunnel or any Woodpecker route.

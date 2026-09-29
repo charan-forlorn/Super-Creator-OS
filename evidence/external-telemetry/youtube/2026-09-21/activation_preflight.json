@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "status": "BLOCKED",
+  "platform": "youtube_shorts",
+  "adapter": "integrations/learning/youtube_api_telemetry.py",
+  "activation_cli": "scripts/scos_external_telemetry.py",
+  "checked_at": "2026-09-20T18:26:31Z",
+  "reason": "YOUTUBE_ANALYTICS_AUTH_REQUIRED",
+  "machine_truth": {
+    "youtube_google_env_keys_present": [],
+    "gcloud_application_default_credentials_present": false,
+    "youtube_credentials_dir_present": false,
+    "youtube_config_dir_present": false,
+    "memory_telemetry_json_present": false
+  },
+  "network_request_attempted": false,
+  "publish_or_dispatch_performed": false,
+  "human_approval_inferred": false,
+  "predicted_metrics_ingested": false,
+  "next_required_external_prerequisites": [
+    "Human-controlled YouTube publication of a real SCOS artifact",
+    "Authorized YouTube Analytics access token",
+    "Real mapping from platform video_id to SCOS loop_run_id"
+  ],
+  "verification": {
+    "youtube_api_adapter_tests": "7 passed",
+    "py_compile": "PASS",
+    "cli_auth_fail_closed_preflight": "PASS",
+    "git_diff_check": "PASS"
+  }
+}

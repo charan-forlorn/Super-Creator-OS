@@ -1,0 +1,273 @@
+{
+  "source": {
+    "path": "C:\\Users\\chara\\OneDrive\\Videos\\การบันทึกหน้าจอ\\การบันทึกหน้าจอ 2026-09-27 091454.mp4",
+    "sha256": "59070BFD7195F40A17532D67D7BB1C82473EE0C4DDBF73F815DB6DEE6DC37EF7",
+    "fps": 30.0,
+    "duration_s": 57.7333,
+    "reference_start_s": 18.263437,
+    "reference_duration_s": 31.982146
+  },
+  "modes": {
+    "PRESERVE": {
+      "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\SCOS_Round_P3_FINAL.mp4",
+      "sha256": "16C88BEF082B9E9664AD0421C17F17E5177A2DCBF607169BDBF2FEA0F113303F",
+      "probe": {
+        "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\SCOS_Round_P3_FINAL.mp4",
+        "duration_s": 32.0,
+        "width": 2560,
+        "height": 1528,
+        "fps": 30.0,
+        "frames": 960,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "color_transfer": "",
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 2,
+        "has_audio": true,
+        "cfr": true
+      },
+      "temporal_qa": {
+        "status": "PASS",
+        "checks": {
+          "output_fps": {
+            "pass": true,
+            "value": 30.0,
+            "target": 30.0
+          },
+          "cfr": {
+            "pass": true,
+            "frames": 960,
+            "video_duration": 32.0,
+            "source_probe_cfr": true
+          },
+          "target_fps": {
+            "pass": true,
+            "actual": 30.0,
+            "expected": 30.0
+          },
+          "pts_monotonic": {
+            "pass": true,
+            "frames_checked": 960
+          },
+          "av_duration_delta": {
+            "pass": true,
+            "video": 32.0,
+            "audio": 31.982,
+            "delta": 0.018000000000000682
+          },
+          "duplicate_ratio_drift_normalized": {
+            "pass": true,
+            "target_fps": 30.0,
+            "source": 0.4751732101616628,
+            "output_at_source_fps": 0.5083333333333333,
+            "delta": 0.0331601231716705
+          }
+        },
+        "warnings": [],
+        "encoder_contract": {
+          "fps": 30.0,
+          "frames": 960,
+          "duration_s": 32.0,
+          "codec": "h264",
+          "size": [
+            2560,
+            1528
+          ]
+        }
+      },
+      "ssim_all_vs_kept_source": 0.997488,
+      "ssim_subtitle_roi_proxy": 0.997378,
+      "vmaf": {
+        "available": true,
+        "value": 97.236146,
+        "filter_rc": 0
+      },
+      "motion": {
+        "motion_mean": 0.005010032782501686,
+        "motion_std": 0.011546826546751043,
+        "motion_jerk": 0.007924547578143122,
+        "artifact_spike_rate_proxy": 0.15657620041753653,
+        "temporal_motion_continuity_proxy": 0.38738368459657563
+      },
+      "processing_time_s": 3.18425
+    },
+    "FULL_SMOOTH+": {
+      "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\SCOS_SMOOTHPLUS_CANDIDATE.mp4",
+      "sha256": "3636574722B24446BB6620DC299D7091197AE43DA0F7C9183CB316B18ECF9C88",
+      "probe": {
+        "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\SCOS_SMOOTHPLUS_CANDIDATE.mp4",
+        "duration_s": 31.982,
+        "width": 2560,
+        "height": 1528,
+        "fps": 60.0,
+        "frames": 1918,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "color_transfer": "iec61966-2-1",
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 2,
+        "has_audio": true,
+        "cfr": true
+      },
+      "temporal_qa": {
+        "status": "PASS",
+        "checks": {
+          "output_fps": {
+            "pass": true,
+            "value": 60.0,
+            "target": 60.0
+          },
+          "cfr": {
+            "pass": true,
+            "frames": 1918,
+            "video_duration": 31.966667,
+            "source_probe_cfr": true
+          },
+          "target_fps": {
+            "pass": true,
+            "actual": 60.0,
+            "expected": 60.0
+          },
+          "pts_monotonic": {
+            "pass": true,
+            "frames_checked": 1918
+          },
+          "av_duration_delta": {
+            "pass": true,
+            "video": 31.966667,
+            "audio": 31.982,
+            "delta": 0.015332999999998265
+          },
+          "duplicate_ratio_drift_normalized": {
+            "pass": true,
+            "target_fps": 30.0,
+            "source": 0.4751732101616628,
+            "output_at_source_fps": 0.5057351407716371,
+            "delta": 0.030561930609974253
+          }
+        },
+        "warnings": [],
+        "encoder_contract": {
+          "fps": 60.0,
+          "frames": 1918,
+          "duration_s": 31.966667,
+          "codec": "h264",
+          "size": [
+            2560,
+            1528
+          ]
+        }
+      },
+      "ssim_all_vs_kept_source": 0.995184,
+      "ssim_subtitle_roi_proxy": 0.994758,
+      "vmaf": {
+        "available": true,
+        "value": 95.518445,
+        "filter_rc": 0
+      },
+      "motion": {
+        "motion_mean": 0.002820582833420275,
+        "motion_std": 0.007020474595634531,
+        "motion_jerk": 0.0023366224942264657,
+        "artifact_spike_rate_proxy": 0.3168058455114823,
+        "temporal_motion_continuity_proxy": 0.5470086307532717
+      },
+      "processing_time_s": 202.7015568
+    },
+    "ADAPTIVE_SMOOTH+": {
+      "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\SCOS_SMOOTHPLUS_ADAPTIVE_V2_CANDIDATE.mp4",
+      "sha256": "78792D3C6C88A740FE474523FA0A261DCBB73CA87C765952B06E6B87FD619428",
+      "probe": {
+        "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\SCOS_SMOOTHPLUS_ADAPTIVE_V2_CANDIDATE.mp4",
+        "duration_s": 32.0,
+        "width": 2560,
+        "height": 1528,
+        "fps": 60.0,
+        "frames": 1920,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "color_transfer": "",
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 2,
+        "has_audio": true,
+        "cfr": true
+      },
+      "temporal_qa": {
+        "status": "PASS",
+        "checks": {
+          "output_fps": {
+            "pass": true,
+            "value": 60.0,
+            "target": 60.0
+          },
+          "cfr": {
+            "pass": true,
+            "frames": 1920,
+            "video_duration": 32.0,
+            "source_probe_cfr": true
+          },
+          "target_fps": {
+            "pass": true,
+            "actual": 60.0,
+            "expected": 60.0
+          },
+          "pts_monotonic": {
+            "pass": true,
+            "frames_checked": 1920
+          },
+          "av_duration_delta": {
+            "pass": true,
+            "video": 32.0,
+            "audio": 31.982,
+            "delta": 0.018000000000000682
+          },
+          "duplicate_ratio_drift_normalized": {
+            "pass": true,
+            "target_fps": 30.0,
+            "source": 0.4751732101616628,
+            "output_at_source_fps": 0.5083333333333333,
+            "delta": 0.0331601231716705
+          }
+        },
+        "warnings": [],
+        "encoder_contract": {
+          "fps": 60.0,
+          "frames": 1920,
+          "duration_s": 32.0,
+          "codec": "h264",
+          "size": [
+            2560,
+            1528
+          ]
+        }
+      },
+      "ssim_all_vs_kept_source": 0.99693,
+      "ssim_subtitle_roi_proxy": 0.996809,
+      "vmaf": {
+        "available": true,
+        "value": 96.91249,
+        "filter_rc": 0
+      },
+      "motion": {
+        "motion_mean": 0.0026821373029572693,
+        "motion_std": 0.007582922266236621,
+        "motion_jerk": 0.0036943286096372857,
+        "artifact_spike_rate_proxy": 0.44525547445255476,
+        "temporal_motion_continuity_proxy": 0.42072154359280367
+      },
+      "processing_time_s": 58.95447239999339
+    }
+  },
+  "comparison": {
+    "rife_workload_reduction": 0.7811278830382427,
+    "full_to_adaptive_speedup": 3.438272764527746,
+    "adaptive_time_s": 58.95447239999339,
+    "full_time_s": 202.7015568,
+    "quality_ssim_delta_adaptive_minus_full": 0.0017460000000000253,
+    "quality_ssim_retention_vs_preserve": -0.0005580000000000584,
+    "automatic_promotion": false
+  }
+}

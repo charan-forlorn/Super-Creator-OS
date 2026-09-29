@@ -1,0 +1,82 @@
+{
+  "ad_boundary": {
+    "confidence": 0.849,
+    "content_end": 50.245583,
+    "reason": "late scene boundary follows a sustained broad silence; earliest post-intro sustained silence selected as content end",
+    "trigger_scene_time": 56.066667
+  },
+  "cadence": {
+    "cfr": true,
+    "distinct_frames_estimate": 909,
+    "duplicate_ratio": 0.4751732101616628,
+    "expected_frames": 1732,
+    "sampled_pts_monotonic": true,
+    "source_fps": 30.0
+  },
+  "scene_boundaries": [
+    {
+      "evidence": "scene_change",
+      "threshold": 0.3,
+      "time": 31.166667
+    },
+    {
+      "evidence": "scene_change",
+      "threshold": 0.3,
+      "time": 56.066667
+    }
+  ],
+  "silences": [
+    {
+      "duration": 18.263437,
+      "end": 18.263437,
+      "kind": "silence",
+      "start": 0.0
+    },
+    {
+      "duration": 2.5933750000000018,
+      "end": 55.544354,
+      "kind": "silence",
+      "start": 52.950979
+    },
+    {
+      "duration": 0.5934790000000021,
+      "end": 56.4015,
+      "kind": "silence",
+      "start": 55.808021
+    },
+    {
+      "duration": 1.9741459999999975,
+      "end": 52.219729,
+      "kind": "broad_silence",
+      "start": 50.245583
+    }
+  ],
+  "source": {
+    "audio_channels": 2,
+    "audio_codec": "aac",
+    "audio_sample_rate": 48000,
+    "cfr": true,
+    "color_transfer": "",
+    "duration_s": 57.7333,
+    "fps": 30.0,
+    "frames": 1732,
+    "has_audio": true,
+    "height": 1528,
+    "path": "C:\\Users\\chara\\OneDrive\\Videos\\การบันทึกหน้าจอ\\การบันทึกหน้าจอ 2026-09-27 091454.mp4",
+    "pixel_format": "yuv420p",
+    "video_codec": "h264",
+    "width": 2560
+  },
+  "source_sha256": "59070bfd7195f40a17532d67d7bb1c82473ee0c4ddbf73f815db6dee6dc37ef7",
+  "subtitles": {
+    "confidence": 1.0,
+    "note": "Caller supplied subtitle sidecar",
+    "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\Final_Captions.srt",
+    "source": "srt",
+    "status": "VERIFIED"
+  },
+  "warnings": [
+    "High duplicate-frame cadence detected; preserve source cadence or consider bounded interpolation.",
+    "Potential advert boundary at 50.246s with scene trigger 56.067s."
+  ]
+}

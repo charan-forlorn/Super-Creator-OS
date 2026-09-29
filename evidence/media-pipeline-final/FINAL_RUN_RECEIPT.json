@@ -1,0 +1,77 @@
+{
+  "date": "2026-09-27",
+  "source": "C:\\Users\\chara\\OneDrive\\Videos\\การบันทึกหน้าจอ\\การบันทึกหน้าจอ 2026-09-27 091454.mp4",
+  "source_duration_s": 57.7333,
+  "source_fps": 30.0,
+  "source_frames": 1732,
+  "source_duplicate_ratio_estimate": 0.4751732101616628,
+  "ad_boundary_s": 50.245583,
+  "kept_ranges": [[18.263437,50.245583]],
+  "final_duration_s": 32.0,
+  "final_profile": "nvenc_p3_hq",
+  "render_seconds": 3.1842512999937753,
+  "cpu_baseline_seconds": 7.588551299999381,
+  "fast_nvenc_seconds": 2.3593611999967834,
+  "balanced_speedup_vs_cpu": 2.3826049881,
+  "fast_speedup_vs_cpu": 3.2162902817,
+  "p3_ssim_all": 0.998652,
+  "temporal_qa": {
+    "status": "PASS",
+    "fps": 30.0,
+    "frames": 960,
+    "pts_monotonic": true,
+    "av_duration_delta_s": 0.018,
+    "duplicate_ratio_source": 0.4751732101616628,
+    "duplicate_ratio_output": 0.5083333333333333,
+    "duplicate_ratio_delta": 0.0331601231716705
+  },
+  "subtitle": {
+    "source": "verified_srt",
+    "cues": 7,
+    "file": "C:\\Users\\chara\\Downloads\\video_edit_test\\Final_Captions.srt"
+  },
+  "capcut": {
+    "version": "9.6.0",
+    "draft": "C:\\Users\\chara\\AppData\\Local\\CapCut\\User Data\\Projects\\com.lveditor.draft\\AI_Edit_SCOS_P3_FINAL",
+    "lint_errors": 0,
+    "lint_warnings": 0
+  },
+  "hermes": {
+    "skill": "scos-media-pipeline",
+    "registered": true,
+    "enabled": true,
+    "live_one_shot_smoke": "BLOCKED_NO_PROGRESS_STALE_GATEWAY_STATE",
+    "gateway": "not running; stale gateway_state.json reported by Hermes"
+  },
+  "tests": {
+    "media_control_focused": 8,
+    "render_regression": 15,
+    "compileall": "PASS"
+  },
+  "artifacts": {
+    "p3": {
+      "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\SCOS_Round_P3_FINAL.mp4",
+      "sha256": "16C88BEF082B9E9664AD0421C17F17E5177A2DCBF607169BDBF2FEA0F113303F"
+    },
+    "fast": {
+      "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\SCOS_Round_Fast_FINAL.mp4",
+      "sha256": "2DFDE302D12BA01F990B9E768F5560639AFFE26DE3C13F6D01DBCEF0FDD79413"
+    },
+    "srt": {
+      "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\Final_Captions.srt",
+      "sha256": "AA3C29F9FDD42D7C4C91285BEFE70E316B7B977947A94FB967716475C227FF08"
+    },
+    "evidence": {
+      "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\scos_media_evidence_v4.json",
+      "sha256": "4F93B2423C5DDF133921E4B0F9F37DA97D9158A4E665CE5B72641D17470C3182"
+    },
+    "plan": {
+      "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\scos_edit_plan_p3.json",
+      "sha256": "91D440501C9D5935B92317D6F9F1A73DC37C255BD0A86B6D69032527A4B3BB8F"
+    },
+    "blueprint": {
+      "path": "C:\\Workspace\\super-creator-os\\IMPLEMENTATION_BLUEPRINT.md",
+      "sha256": "3F6F56B3E305A1994C9535DFF44878619A58E91B2B53000E0D3CAD07F8BC6FDA"
+    }
+  }
+}

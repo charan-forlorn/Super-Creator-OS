@@ -22,7 +22,9 @@ import logging
 import subprocess
 from pathlib import Path
 
-from scos.render.base import RenderClip, RenderProfile, RenderRequest, RenderError
+from scos.render.base import CAMERA_MOTIONS, RenderClip, RenderProfile, RenderRequest, RenderError
+from scos.render.hardware import EncoderPlan, choose_encoder
+from scos.render.render_cache import RenderCache
 
 log = logging.getLogger("scos.render.edl_bridge")
 
@@ -53,7 +55,65 @@ def _validate_clip_inputs(clip: RenderClip) -> None:
         raise RenderError(f"scene {clip.scene_id}: non-positive duration {clip.duration_s}")
 
 
-def build_scene_clip(clip: RenderClip, profile: RenderProfile, out_path: Path) -> None:
+def _motion_vf(clip: RenderClip, width: int, height: int, fps: int) -> str:
+    """Build a deterministic Flow-inspired camera move for a still asset."""
+    if clip.motion not in CAMERA_MOTIONS:
+        raise RenderError(f"scene {clip.scene_id}: unsupported camera motion '{clip.motion}'")
+    if not 0.0 <= clip.motion_strength <= 0.5:
+        raise RenderError(f"scene {clip.scene_id}: motion_strength must be within [0, 0.5]")
+    if clip.motion == "static":
+        return (
+            f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1"
+        )
+
+    frames = max(1, round(clip.duration_s * fps))
+    progress = f"on/{max(frames - 1, 1)}"
+    strength_value = float(clip.motion_strength)
+    strength = f"{strength_value:.6f}"
+    if clip.motion == "push_in":
+        zoom = f"1+{strength}*{progress}"
+        x = "(iw-iw/zoom)/2"
+        y = "(ih-ih/zoom)/2"
+    elif clip.motion == "pull_out":
+        zoom = f"1+{strength}*(1-{progress})"
+        x = "(iw-iw/zoom)/2"
+        y = "(ih-ih/zoom)/2"
+    elif clip.motion == "drift_left":
+        zoom = f"1+{strength_value * 0.5:.6f}"
+        x = f"(iw-iw/zoom)*(1-{progress})"
+        y = "(ih-ih/zoom)/2"
+    elif clip.motion == "drift_right":
+        zoom = f"1+{strength_value * 0.5:.6f}"
+        x = f"(iw-iw/zoom)*{progress}"
+        y = "(ih-ih/zoom)/2"
+    elif clip.motion == "drift_up":
+        zoom = f"1+{strength_value * 0.5:.6f}"
+        x = "(iw-iw/zoom)/2"
+        y = f"(ih-ih/zoom)*(1-{progress})"
+    else:  # drift_down
+        zoom = f"1+{strength_value * 0.5:.6f}"
+        x = "(iw-iw/zoom)/2"
+        y = f"(ih-ih/zoom)*{progress}"
+
+    # Fill the vertical canvas with a softened copy, then center the source
+    # as a foreground plate. The zoompan operates on the finished shot.
+    return (
+        f"split=2[bgsrc][fgsrc];"
+        f"[bgsrc]scale={width}:{height}:force_original_aspect_ratio=increase,"
+        f"crop={width}:{height},gblur=sigma=12,eq=brightness=-0.06:saturation=0.90[bg];"
+        f"[fgsrc]scale={width}:{height}:force_original_aspect_ratio=decrease[fg];"
+        f"[bg][fg]overlay=(W-w)/2:(H-h)/2,"
+        f"zoompan=z='{zoom}':x='{x}':y='{y}':d={frames}:s={width}x{height}:fps={fps},setsar=1"
+    )
+
+
+def build_scene_clip(
+    clip: RenderClip,
+    profile: RenderProfile,
+    out_path: Path,
+    encoder: EncoderPlan | None = None,
+) -> None:
     """Render one (still [+ voiceover]) into a canvas-sized clip of exact duration.
 
     The still is letterboxed (scale+pad) to the profile canvas. Audio is the scene
@@ -64,25 +124,25 @@ def build_scene_clip(clip: RenderClip, profile: RenderProfile, out_path: Path) -
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     w, h = profile.width, profile.height
-    vf = (
-        f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
-        f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1"
-    )
+    vf = _motion_vf(clip, w, h, profile.fps)
     dur = f"{clip.duration_s:.3f}"
 
     cmd = ["ffmpeg", "-y", "-hide_banner", "-nostats", "-loglevel", "error",
-           "-loop", "1", "-i", str(clip.visual_path)]
+           "-framerate", "1", "-loop", "1", "-i", str(clip.visual_path)]
     if clip.audio_path is not None:
         cmd += ["-i", str(clip.audio_path)]
     else:
         cmd += ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"]
 
+    encoder = encoder or choose_encoder()
     cmd += [
         "-map", "0:v:0", "-map", "1:a:0",
         "-t", dur,                       # -t (not -shortest) — image loops forever
         "-vf", vf,
         "-r", str(profile.fps),
-        "-c:v", "libx264", "-crf", str(profile.intermediate_crf), "-pix_fmt", "yuv420p",
+        *("-c:v", encoder.ffmpeg_encoder),
+        *encoder.args,
+        "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         "-movflags", "+faststart",
         str(out_path),
@@ -133,7 +193,12 @@ def write_edl(
     return edl_path
 
 
-def prepare_render_inputs(request: RenderRequest) -> Path:
+def prepare_render_inputs(
+    request: RenderRequest,
+    *,
+    cache: RenderCache | None = None,
+    encoder: EncoderPlan | None = None,
+) -> Path:
     """Build every scene clip and the EDL. Returns the EDL path for the engine.
 
     Raises RenderError if there are no clips or any scene fails to build.
@@ -143,12 +208,35 @@ def prepare_render_inputs(request: RenderRequest) -> Path:
 
     clips_dir = request.work_dir / "clips"
     clips_dir.mkdir(parents=True, exist_ok=True)
+    cache = cache
+    encoder = encoder or choose_encoder()
 
     specs: list[tuple[str, Path, float]] = []
     for i, clip in enumerate(request.clips):
         source_id = f"seg_{i:02d}"
         clip_path = clips_dir / f"{source_id}.mp4"
-        build_scene_clip(clip, request.profile, clip_path)
+        if cache is not None:
+            fingerprint = cache.clip_fingerprint(
+                clip, request.profile, encoder.signature
+            )
+            cached = cache.lookup_scene(fingerprint)
+            if cached is not None:
+                cache.materialize(cached, clip_path)
+            else:
+                build_scene_clip(clip, request.profile, clip_path, encoder)
+                cache.store(
+                    kind="scene",
+                    key=fingerprint,
+                    source=clip_path,
+                    fingerprint=fingerprint,
+                    metadata={
+                        "scene_id": clip.scene_id,
+                        "encoder": encoder.signature,
+                        "profile": request.profile.resolution,
+                    },
+                )
+        else:
+            build_scene_clip(clip, request.profile, clip_path, encoder)
         specs.append((source_id, clip_path, clip.duration_s))
 
     edl_path = request.work_dir / "edl.json"

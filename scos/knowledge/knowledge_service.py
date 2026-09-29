@@ -22,11 +22,18 @@ Determinism: identical KnowledgeIndex in -> identical view JSON out, every call.
 
 from __future__ import annotations
 
-from insight_engine import KnowledgeInsightEngine
-from query_engine import KnowledgeQueryEngine
-import insight_models as im  # isinstance dispatch only
-import query_models as qm  # isinstance dispatch only
-import knowledge_view_models as vm
+try:
+    from .insight_engine import KnowledgeInsightEngine
+    from .query_engine import KnowledgeQueryEngine
+    from . import insight_models as im  # isinstance dispatch only
+    from . import query_models as qm  # isinstance dispatch only
+    from . import knowledge_view_models as vm
+except ImportError:  # pragma: no cover - supports this repo's plain-script tests
+    from insight_engine import KnowledgeInsightEngine
+    from query_engine import KnowledgeQueryEngine
+    import insight_models as im  # isinstance dispatch only
+    import query_models as qm  # isinstance dispatch only
+    import knowledge_view_models as vm
 
 
 class KnowledgeService:

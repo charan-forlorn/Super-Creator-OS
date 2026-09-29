@@ -1,0 +1,12 @@
+Use authenticated Cloudflare MCP only. Do not inspect local files and do not modify anything.
+Cloudflare's current API documents the read-only endpoint:
+GET /accounts/cb98ff5a98ddb6c0f09450505be7c3f5/workers/subdomain
+I need the actual account result.
+Procedure:
+1) Use tool_search for exact capability "Cloudflare API Code Executor execute".
+2) Read the returned exact tool details.
+3) Call only the exact returned execute tool name.
+4) In its code, run:
+async () => await cloudflare.request({method:"GET", path:"/accounts/cb98ff5a98ddb6c0f09450505be7c3f5/workers/subdomain"})
+5) Return only the response status/result (do not expose credentials).
+If execute is unavailable, state that exact blocker.

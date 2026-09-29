@@ -1,0 +1,9 @@
+Call only mcp__cloudflare__post_accounts_workers_scripts_versions. Do not call any other Cloudflare tool. account_id=cb98ff5a98ddb6c0f09450505be7c3f5. script_name=brightbean-social-edge-20260928. content_type=multipart/form-data; boundary=----BBVPC20260928. body is raw multipart/form-data with CRLF separators:
+-- boundary line is ----BBVPC20260928
+Part metadata: Content-Disposition: form-data; name="metadata"; Content-Type: application/json
+metadata JSON: {"main_module":"worker.mjs","bindings":[{"type":"vpc_service","name":"BRIGHTBEAN","service_id":"01a0e4c6-ae62-74e0-8cbf-4df204bec536"}],"compatibility_date":"2026-09-28","annotations":{"workers/message":"BrightBean VPC edge","workers/tag":"bb-vpc-20260928"}}
+Part worker.mjs: Content-Disposition: form-data; name="worker.mjs"; filename="worker.mjs"; Content-Type: application/javascript+module
+Worker source:
+export default { async fetch(request, env) { try { const u=new URL(request.url); const h=new Headers(request.headers); h.set("host","brightbean-edge"); h.set("x-forwarded-proto","https"); h.set("x-forwarded-host",u.host); const init={method:request.method,headers:h}; if(request.method!=="GET"&&request.method!=="HEAD") init.body=request.body; const r=await env.BRIGHTBEAN.fetch(new Request("http://brightbean-edge"+u.pathname+u.search,init)); return new Response(r.body,r); } catch(e) { return new Response("BrightBean edge unavailable",{status:503}); } } };
+End multipart with ----BBVPC20260928--.
+Return only the created version_id or exact API error.

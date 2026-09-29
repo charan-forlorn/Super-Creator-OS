@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "status": "HUMAN_ACTION_REQUIRED",
+  "problem": "redirect_uri_mismatch",
+  "machine_truth": {
+    "old_oauth_process_terminated": true,
+    "bare_client_id_detected": true,
+    "secure_store_exists": false
+  },
+  "root_cause": "The supplied file contains a bare OAuth client ID, so SCOS cannot know whether the client is Desktop or Web or which redirect URI is authorized. A guessed loopback redirect caused Google error 400 redirect_uri_mismatch.",
+  "fix_implemented": {
+    "oauth_cli_requires_client_configuration": true,
+    "supports_downloaded_installed_client_json": true,
+    "supports_downloaded_web_client_json": true,
+    "unknown_client_type_fails_closed": true
+  },
+  "required_human_action": [
+    "Open Google Cloud Console -> Google Auth Platform -> Clients",
+    "Create or select an OAuth client whose Application type is Desktop app",
+    "Download the OAuth client JSON",
+    "Place the downloaded JSON on the Windows machine",
+    "Run scripts/scos_youtube_oauth.py with --client-file pointing to that JSON"
+  ],
+  "security": {
+    "secret_value_logged": false,
+    "secret_value_written_to_source": false,
+    "publish_or_dispatch_performed": false,
+    "human_approval_inferred": false
+  },
+  "verification": {
+    "oauth_tests": "updated focused suite passed",
+    "py_compile": "PASS",
+    "ambiguous_client_preflight": "PASS"
+  }
+}

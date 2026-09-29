@@ -1,0 +1,65 @@
+{
+  "status": "PASS",
+  "checks": {
+    "output_fps": {
+      "pass": true,
+      "value": 60.0,
+      "target": 60.0
+    },
+    "cfr": {
+      "pass": true,
+      "frames": 1920,
+      "video_duration": 32.0,
+      "source_probe_cfr": true
+    },
+    "target_fps": {
+      "pass": true,
+      "actual": 60.0,
+      "expected": 60.0
+    },
+    "pts_monotonic": {
+      "pass": true,
+      "frames_checked": 1920
+    },
+    "av_duration_delta": {
+      "pass": true,
+      "video": 32.0,
+      "audio": 31.982,
+      "delta": 0.018000000000000682
+    },
+    "edited_timeline_duration": {
+      "pass": true,
+      "expected": 31.982146000000004,
+      "actual": 32.0,
+      "delta": 0.017853999999996262
+    },
+    "adaptive_route_integrity": {
+      "pass": true,
+      "smooth_seconds": 2.0,
+      "keep_seconds": 31.982146000000004,
+      "smooth_fraction": 0.0625348905605021,
+      "non_overlapping": true,
+      "scene_cuts": [
+        31.166667
+      ]
+    },
+    "duplicate_ratio_drift_normalized": {
+      "pass": true,
+      "target_fps": 30.0,
+      "source": 0.4751732101616628,
+      "output_at_source_fps": 0.5083333333333333,
+      "delta": 0.0331601231716705
+    }
+  },
+  "warnings": [],
+  "encoder_contract": {
+    "fps": 60.0,
+    "frames": 1920,
+    "duration_s": 32.0,
+    "codec": "h264",
+    "size": [
+      2560,
+      1528
+    ]
+  }
+}

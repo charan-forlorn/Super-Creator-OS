@@ -1,0 +1,11 @@
+Use only the authenticated Cloudflare MCP.
+Do not inspect local files.
+Do not modify resources.
+Task: determine whether this account can use a free stable Cloudflare workers.dev hostname without a custom zone.
+Procedure:
+1) Use tool_search with query exactly: "Cloudflare workers.dev subdomain account".
+2) Read the returned tool details.
+3) Call ONLY the exact Cloudflare tool name returned by that search, never guess a name.
+4) If that result points to another exact tool needed to read the account's workers.dev/subdomain capability, use tool_search again and then call the exact returned tool.
+5) Return the verified capability or exact blocker.
+No secrets.

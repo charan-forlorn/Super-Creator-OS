@@ -1,0 +1,646 @@
+{
+  "status": "CANDIDATE",
+  "mode": "adaptive",
+  "output": "C:\\Users\\chara\\Downloads\\video_edit_test\\SCOS_SMOOTHPLUS_ADAPTIVE_V2_CANDIDATE.mp4",
+  "source_fps": 30.0,
+  "target_fps": 60.0,
+  "requested_smooth_spans": [
+    [
+      32.166667,
+      37.166667
+    ],
+    [
+      38.166667,
+      39.166667
+    ],
+    [
+      43.166667,
+      44.166667
+    ]
+  ],
+  "effective_smooth_seconds": 7.0,
+  "keep_seconds": 31.982146000000004,
+  "interpolation_fraction": 0.21887211696175732,
+  "fallback_count": 0,
+  "rife_reports": [
+    {
+      "output": "C:\\Users\\chara\\AppData\\Local\\Temp\\scos-smoothplus-v2-70nku8vs\\rife_000.mp4",
+      "input_frames": 150,
+      "output_frames": 300,
+      "input_fps": 30.0,
+      "output_fps": 60.0,
+      "elapsed_s": 35.781667799994466,
+      "model": "C:\\Workspace\\super-creator-os\\tools\\rife\\rife-ncnn-vulkan-20221029-windows\\rife-ncnn-vulkan-20221029-windows\\rife-v4.6",
+      "gpu": 0,
+      "threads": "2:4:4"
+    },
+    {
+      "output": "C:\\Users\\chara\\AppData\\Local\\Temp\\scos-smoothplus-v2-70nku8vs\\rife_001.mp4",
+      "input_frames": 30,
+      "output_frames": 60,
+      "input_fps": 30.0,
+      "output_fps": 60.0,
+      "elapsed_s": 8.961450700000569,
+      "model": "C:\\Workspace\\super-creator-os\\tools\\rife\\rife-ncnn-vulkan-20221029-windows\\rife-ncnn-vulkan-20221029-windows\\rife-v4.6",
+      "gpu": 0,
+      "threads": "2:4:4"
+    },
+    {
+      "output": "C:\\Users\\chara\\AppData\\Local\\Temp\\scos-smoothplus-v2-70nku8vs\\rife_002.mp4",
+      "input_frames": 30,
+      "output_frames": 60,
+      "input_fps": 30.0,
+      "output_fps": 60.0,
+      "elapsed_s": 8.901446999996551,
+      "model": "C:\\Workspace\\super-creator-os\\tools\\rife\\rife-ncnn-vulkan-20221029-windows\\rife-ncnn-vulkan-20221029-windows\\rife-v4.6",
+      "gpu": 0,
+      "threads": "2:4:4"
+    }
+  ],
+  "composition": {
+    "output": "C:\\Users\\chara\\Downloads\\video_edit_test\\SCOS_SMOOTHPLUS_ADAPTIVE_V2_CANDIDATE.mp4",
+    "elapsed_s": 5.309906900001806,
+    "target_fps": 60.0,
+    "timeline_parts": [
+      {
+        "start": 18.263437,
+        "end": 32.166667,
+        "mode": "PRESERVE",
+        "file": null
+      },
+      {
+        "start": 32.166667,
+        "end": 37.166667,
+        "mode": "SMOOTH+",
+        "file": "C:\\Users\\chara\\AppData\\Local\\Temp\\scos-smoothplus-v2-70nku8vs\\rife_000.mp4"
+      },
+      {
+        "start": 37.166667,
+        "end": 38.166667,
+        "mode": "PRESERVE",
+        "file": null
+      },
+      {
+        "start": 38.166667,
+        "end": 39.166667,
+        "mode": "SMOOTH+",
+        "file": "C:\\Users\\chara\\AppData\\Local\\Temp\\scos-smoothplus-v2-70nku8vs\\rife_001.mp4"
+      },
+      {
+        "start": 39.166667,
+        "end": 43.166667,
+        "mode": "PRESERVE",
+        "file": null
+      },
+      {
+        "start": 43.166667,
+        "end": 44.166667,
+        "mode": "SMOOTH+",
+        "file": "C:\\Users\\chara\\AppData\\Local\\Temp\\scos-smoothplus-v2-70nku8vs\\rife_002.mp4"
+      },
+      {
+        "start": 44.166667,
+        "end": 50.245583,
+        "mode": "PRESERVE",
+        "file": null
+      }
+    ],
+    "audio_timeline_mode": "source_segment_trim_concat"
+  },
+  "automatic_promotion": false,
+  "adaptive_plan": {
+    "source_fps": 30.0,
+    "target_fps": 60.0,
+    "window_s": 1.0,
+    "windows": [
+      {
+        "start": 18.263437,
+        "end": 19.263437,
+        "scene_segment": 0,
+        "frame_count": 30,
+        "duplicate_ratio": 0.3448275862068966,
+        "motion_energy": 0.002418661609758846,
+        "temporal_inconsistency": 0.7598054268949165,
+        "scene_cut_proximity_s": 11.90323,
+        "interpolation_risk": 0.07598054269865417,
+        "score": 0.33997630525337263,
+        "decision": "PRESERVE",
+        "reasons": [
+          "duplicate_signal_below_floor"
+        ]
+      },
+      {
+        "start": 19.263437,
+        "end": 20.263437,
+        "scene_segment": 0,
+        "frame_count": 30,
+        "duplicate_ratio": 0.3793103448275862,
+        "motion_energy": 0.00216380895030426,
+        "temporal_inconsistency": 0.9001473676120152,
+        "scene_cut_proximity_s": 10.90323,
+        "interpolation_risk": 0.09001473682890403,
+        "score": 0.352686707806633,
+        "decision": "PRESERVE",
+        "reasons": [
+          "duplicate_signal_below_floor"
+        ]
+      },
+      {
+        "start": 20.263437,
+        "end": 21.263437,
+        "scene_segment": 0,
+        "frame_count": 30,
+        "duplicate_ratio": 0.4827586206896552,
+        "motion_energy": 0.002097842010367365,
+        "temporal_inconsistency": 1.0306289007373584,
+        "scene_cut_proximity_s": 9.90323,
+        "interpolation_risk": 0.10306289057399344,
+        "score": 0.39662880119554617,
+        "decision": "PRESERVE",
+        "reasons": [
+          "motion_energy_below_floor"
+        ]
+      },
+      {
+        "start": 21.263437,
+        "end": 22.263437,
+        "scene_segment": 0,
+        "frame_count": 30,
+        "duplicate_ratio": 0.4482758620689655,
+        "motion_energy": 0.0025950921406637365,
+        "temporal_inconsistency": 2.426946947116748,
+        "scene_cut_proximity_s": 8.90323,
+        "interpolation_risk": 0.2437015563680754,
+        "score": 0.353766938404062,
+        "decision": "PRESERVE",
+        "reasons": [
+          "duplicate_signal_below_floor"
+        ]
+      },
+      {
+        "start": 22.263437,
+        "end": 23.263437,
+        "scene_segment": 0,
+        "frame_count": 30,
+        "duplicate_ratio": 0.5172413793103449,
+        "motion_energy": 0.0017069683027665088,
+        "temporal_inconsistency": 1.076786565467745,
+        "scene_cut_proximity_s": 7.903230000000001,
+        "interpolation_risk": 0.10767868385991503,
+        "score": 0.4112228839176722,
+        "decision": "PRESERVE",
+        "reasons": [
+          "motion_energy_below_floor"
+        ]
+      },
+      {
+        "start": 23.263437,
+        "end": 24.263437,
+        "scene_segment": 0,
+        "frame_count": 30,
+        "duplicate_ratio": 0.41379310344827586,
+        "motion_energy": 0.00182335245520622,
+        "temporal_inconsistency": 0.9881956873484751,
+        "scene_cut_proximity_s": 6.903230000000001,
+        "interpolation_risk": 0.09881977055317512,
+        "score": 0.3664429424410891,
+        "decision": "PRESERVE",
+        "reasons": [
+          "duplicate_signal_below_floor"
+        ]
+      },
+      {
+        "start": 24.263437,
+        "end": 25.263437,
+        "scene_segment": 0,
+        "frame_count": 30,
+        "duplicate_ratio": 0.41379310344827586,
+        "motion_energy": 0.0017591308703797611,
+        "temporal_inconsistency": 0.9220131720330839,
+        "scene_cut_proximity_s": 5.903230000000001,
+        "interpolation_risk": 0.09220280845025297,
+        "score": 0.36776633486167354,
+        "decision": "PRESERVE",
+        "reasons": [
+          "duplicate_signal_below_floor"
+        ]
+      },
+      {
+        "start": 25.263437,
+        "end": 26.263437,
+        "scene_segment": 0,
+        "frame_count": 30,
+        "duplicate_ratio": 0.4827586206896552,
+        "motion_energy": 0.0018374627598884386,
+        "temporal_inconsistency": 1.0282952275119541,
+        "scene_cut_proximity_s": 4.903230000000001,
+        "interpolation_risk": 0.10284054165852627,
+        "score": 0.3966732709786396,
+        "decision": "PRESERVE",
+        "reasons": [
+          "motion_energy_below_floor"
+        ]
+      },
+      {
+        "start": 26.263437,
+        "end": 27.263437,
+        "scene_segment": 0,
+        "frame_count": 30,
+        "duplicate_ratio": 0.5172413793103449,
+        "motion_energy": 0.0020623076367759746,
+        "temporal_inconsistency": 1.2025681817244924,
+        "scene_cut_proximity_s": 3.9032300000000006,
+        "interpolation_risk": 0.12033823749686595,
+        "score": 0.408690973190282,
+        "decision": "PRESERVE",
+        "reasons": [
+          "motion_energy_below_floor"
+        ]
+      },
+      {
+        "start": 27.263437,
+        "end": 28.263437,
+        "scene_segment": 0,
+        "frame_count": 30,
+        "duplicate_ratio": 0.41379310344827586,
+        "motion_energy": 0.0019759488745210727,
+        "temporal_inconsistency": 0.9250004968322285,
+        "scene_cut_proximity_s": 2.9032300000000006,
+        "interpolation_risk": 0.093101661638875,
+        "score": 0.3675865642239492,
+        "decision": "PRESERVE",
+        "reasons": [
+          "duplicate_signal_below_floor"
+        ]
+      },
+      {
+        "start": 28.263437,
+        "end": 29.263437,
+        "scene_segment": 0,
+        "frame_count": 30,
+        "duplicate_ratio": 0.27586206896551724,
+        "motion_energy": 0.002683011378042596,
+        "temporal_inconsistency": 0.7711096443644182,
+        "scene_cut_proximity_s": 1.9032300000000006,
+        "interpolation_risk": 0.08349407645875867,
+        "score": 0.3089462682677877,
+        "decision": "PRESERVE",
+        "reasons": [
+          "duplicate_signal_below_floor"
+        ]
+      },
+      {
+        "start": 29.263437,
+        "end": 31.166667,
+        "scene_segment": 0,
+        "frame_count": 57,
+        "duplicate_ratio": 0.5357142857142857,
+        "motion_energy": 0.00165110526632528,
+        "temporal_inconsistency": 1.1181189479847071,
+        "scene_cut_proximity_s": 0.0,
+        "interpolation_risk": 0.3118118947984707,
+        "score": 0.37870904961173446,
+        "decision": "PRESERVE",
+        "reasons": [
+          "near_scene_boundary"
+        ]
+      },
+      {
+        "start": 31.166667,
+        "end": 32.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.5172413793103449,
+        "motion_energy": 0.006550029404721659,
+        "temporal_inconsistency": 1.209944468001899,
+        "scene_cut_proximity_s": 0.0,
+        "interpolation_risk": 0.36387711108547804,
+        "score": 0.3933363818055615,
+        "decision": "PRESERVE",
+        "reasons": [
+          "near_scene_boundary"
+        ]
+      },
+      {
+        "start": 32.166667,
+        "end": 33.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.5517241379310345,
+        "motion_energy": 0.010228806590883481,
+        "temporal_inconsistency": 1.228285987856167,
+        "scene_cut_proximity_s": 0.9999999999999964,
+        "interpolation_risk": 0.23173007815994098,
+        "score": 0.4655788418913119,
+        "decision": "SMOOTH+",
+        "reasons": [
+          "deterministic_smoothness_evidence"
+        ]
+      },
+      {
+        "start": 33.166667,
+        "end": 34.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.4827586206896552,
+        "motion_energy": 0.01213011017086432,
+        "temporal_inconsistency": 1.1077143342852975,
+        "scene_cut_proximity_s": 1.9999999999999964,
+        "interpolation_risk": 0.2164004336036635,
+        "score": 0.4532680822320242,
+        "decision": "SMOOTH+",
+        "reasons": [
+          "deterministic_smoothness_evidence"
+        ]
+      },
+      {
+        "start": 34.166667,
+        "end": 35.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.5517241379310345,
+        "motion_energy": 0.014296509641931483,
+        "temporal_inconsistency": 1.2330123440109184,
+        "scene_cut_proximity_s": 2.9999999999999964,
+        "interpolation_risk": 0.2487012045745232,
+        "score": 0.49568334761702604,
+        "decision": "SMOOTH+",
+        "reasons": [
+          "deterministic_smoothness_evidence"
+        ]
+      },
+      {
+        "start": 35.166667,
+        "end": 36.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.5517241379310345,
+        "motion_energy": 0.014713968651397341,
+        "temporal_inconsistency": 1.1923767430313033,
+        "scene_cut_proximity_s": 3.9999999999999964,
+        "interpolation_risk": 0.2486291407846827,
+        "score": 0.4991356581000071,
+        "decision": "SMOOTH+",
+        "reasons": [
+          "deterministic_smoothness_evidence"
+        ]
+      },
+      {
+        "start": 36.166667,
+        "end": 37.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.4827586206896552,
+        "motion_energy": 0.014930599574599954,
+        "temporal_inconsistency": 1.0651325350110084,
+        "scene_cut_proximity_s": 4.9999999999999964,
+        "interpolation_risk": 0.2381404466298764,
+        "score": 0.4719829335398986,
+        "decision": "SMOOTH+",
+        "reasons": [
+          "deterministic_smoothness_evidence"
+        ]
+      },
+      {
+        "start": 37.166667,
+        "end": 38.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.4482758620689655,
+        "motion_energy": 0.0121274514205826,
+        "temporal_inconsistency": 1.059177821935401,
+        "scene_cut_proximity_s": 5.9999999999999964,
+        "interpolation_risk": 0.20785673195982657,
+        "score": 0.4394376855909259,
+        "decision": "PRESERVE",
+        "reasons": [
+          "duplicate_signal_below_floor"
+        ]
+      },
+      {
+        "start": 38.166667,
+        "end": 39.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.5172413793103449,
+        "motion_energy": 0.007205175847278567,
+        "temporal_inconsistency": 1.0988206635430757,
+        "scene_cut_proximity_s": 6.9999999999999964,
+        "interpolation_risk": 0.1597017416312362,
+        "score": 0.4395667793409962,
+        "decision": "SMOOTH+",
+        "reasons": [
+          "deterministic_smoothness_evidence"
+        ]
+      },
+      {
+        "start": 39.166667,
+        "end": 40.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.41379310344827586,
+        "motion_energy": 0.006915979529383592,
+        "temporal_inconsistency": 0.983747135189445,
+        "scene_cut_proximity_s": 7.9999999999999964,
+        "interpolation_risk": 0.14513216633709983,
+        "score": 0.39354735352628667,
+        "decision": "PRESERVE",
+        "reasons": [
+          "duplicate_signal_below_floor"
+        ]
+      },
+      {
+        "start": 40.166667,
+        "end": 41.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.4482758620689655,
+        "motion_energy": 0.006008201188162045,
+        "temporal_inconsistency": 1.0003283735755681,
+        "scene_cut_proximity_s": 8.999999999999996,
+        "interpolation_risk": 0.1371785000429156,
+        "score": 0.40317950653084467,
+        "decision": "PRESERVE",
+        "reasons": [
+          "duplicate_signal_below_floor"
+        ]
+      },
+      {
+        "start": 41.166667,
+        "end": 42.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.41379310344827586,
+        "motion_energy": 0.004244208414328375,
+        "temporal_inconsistency": 1.0640803936566496,
+        "scene_cut_proximity_s": 9.999999999999996,
+        "interpolation_risk": 0.12487612887078436,
+        "score": 0.3755957400720362,
+        "decision": "PRESERVE",
+        "reasons": [
+          "duplicate_signal_below_floor"
+        ]
+      },
+      {
+        "start": 42.166667,
+        "end": 43.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.4827586206896552,
+        "motion_energy": 0.003732163483209375,
+        "temporal_inconsistency": 1.124503227037342,
+        "scene_cut_proximity_s": 10.999999999999996,
+        "interpolation_risk": 0.125496759640564,
+        "score": 0.4022892560674857,
+        "decision": "REVIEW",
+        "reasons": [
+          "evidence_ambiguous"
+        ]
+      },
+      {
+        "start": 43.166667,
+        "end": 44.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.5862068965517241,
+        "motion_energy": 0.00664694173287131,
+        "temporal_inconsistency": 3.195799078782373,
+        "scene_cut_proximity_s": 11.999999999999996,
+        "interpolation_risk": 0.363488702704425,
+        "score": 0.42524664776633103,
+        "decision": "SMOOTH+",
+        "reasons": [
+          "deterministic_smoothness_evidence"
+        ]
+      },
+      {
+        "start": 44.166667,
+        "end": 45.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.5517241379310345,
+        "motion_energy": 0.0020434696867252648,
+        "temporal_inconsistency": 1.2072539048786792,
+        "scene_cut_proximity_s": 12.999999999999996,
+        "interpolation_risk": 0.12072539048888974,
+        "score": 0.4241307839711876,
+        "decision": "PRESERVE",
+        "reasons": [
+          "motion_energy_below_floor"
+        ]
+      },
+      {
+        "start": 45.166667,
+        "end": 46.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.6206896551724138,
+        "motion_energy": 0.0016956884226391705,
+        "temporal_inconsistency": 1.340815562526748,
+        "scene_cut_proximity_s": 13.999999999999996,
+        "interpolation_risk": 0.13408155625281307,
+        "score": 0.4524940335770236,
+        "decision": "PRESERVE",
+        "reasons": [
+          "motion_energy_below_floor"
+        ]
+      },
+      {
+        "start": 46.166667,
+        "end": 47.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.5172413793103449,
+        "motion_energy": 0.00129464191387762,
+        "temporal_inconsistency": 1.096144221471309,
+        "scene_cut_proximity_s": 14.999999999999996,
+        "interpolation_risk": 0.10961442214714961,
+        "score": 0.4108357362602253,
+        "decision": "PRESERVE",
+        "reasons": [
+          "motion_energy_below_floor"
+        ]
+      },
+      {
+        "start": 47.166667,
+        "end": 48.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.5172413793103449,
+        "motion_energy": 0.0010401898277270676,
+        "temporal_inconsistency": 1.112581752635633,
+        "scene_cut_proximity_s": 15.999999999999996,
+        "interpolation_risk": 0.11125817526356582,
+        "score": 0.41050698563694205,
+        "decision": "PRESERVE",
+        "reasons": [
+          "motion_energy_below_floor"
+        ]
+      },
+      {
+        "start": 48.166667,
+        "end": 49.166667,
+        "scene_segment": 1,
+        "frame_count": 30,
+        "duplicate_ratio": 0.5517241379310345,
+        "motion_energy": 0.00045684284848997067,
+        "temporal_inconsistency": 0.5646893378343849,
+        "scene_cut_proximity_s": 16.999999999999996,
+        "interpolation_risk": 0.05646893378343883,
+        "score": 0.43698207531227773,
+        "decision": "PRESERVE",
+        "reasons": [
+          "motion_energy_below_floor"
+        ]
+      },
+      {
+        "start": 49.166667,
+        "end": 50.245583,
+        "scene_segment": 1,
+        "frame_count": 32,
+        "duplicate_ratio": 0.5161290322580645,
+        "motion_energy": 0.004502714938461943,
+        "temporal_inconsistency": 4.5322325998010236,
+        "scene_cut_proximity_s": 17.999999999999996,
+        "interpolation_risk": 0.3712052169954794,
+        "score": 0.37450996766907274,
+        "decision": "REVIEW",
+        "reasons": [
+          "interpolation_risk_high"
+        ]
+      }
+    ],
+    "smooth_spans": [
+      [
+        32.166667,
+        37.166667
+      ],
+      [
+        38.166667,
+        39.166667
+      ],
+      [
+        43.166667,
+        44.166667
+      ]
+    ],
+    "summary": {
+      "window_count": 31,
+      "decision_counts": {
+        "PRESERVE": 22,
+        "SMOOTH+": 7,
+        "REVIEW": 2
+      },
+      "keep_duration_s": 31.982146000000004,
+      "smooth_duration_s": 7.0,
+      "smooth_fraction": 0.21887211696175732,
+      "scene_cuts": [
+        31.166667
+      ],
+      "rife_interpolation_reduction": 0.7811278830382427
+    }
+  },
+  "rife_available": true,
+  "rife_unavailable_fallback": false,
+  "promotion_gate": "REVIEW"
+}

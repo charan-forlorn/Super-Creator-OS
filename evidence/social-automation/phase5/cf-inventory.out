@@ -1,0 +1,5 @@
+⚠ A previous `hermes update` pulled new code but did not restart running gateways.
+  Gateways may still be serving pre-update modules (mixed sys.modules).
+  Run `hermes update` or `hermes gateway restart`.
+hermes: '/goal' is not a `hermes` command.
+Run `hermes --help` to see all commands.

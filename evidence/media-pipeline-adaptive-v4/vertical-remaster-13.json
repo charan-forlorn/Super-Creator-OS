@@ -1,0 +1,40 @@
+{
+  "window_start": 13.2,
+  "window_end": 14.2,
+  "canary_start": 13.5,
+  "canary_end": 13.9,
+  "sample_count": 7,
+  "valid_triple_ratio": 0.7,
+  "source_baseline": {
+    "path_excess_median": 0.0016376900020986795,
+    "path_excess_p95": 0.011506451293826103,
+    "asymmetry_median": 0.7888151407241821,
+    "asymmetry_p95": 0.9837188124656677,
+    "blend_deviation_median": 0.42422062158584595,
+    "blend_deviation_p95": 0.5030642747879028,
+    "jerk_median": 0.00786951370537281,
+    "jerk_p95": 0.09336213767528534
+  },
+  "candidate_metrics": {
+    "path_excess_median": 0.0014000076334923506,
+    "path_excess_p95": 0.020646944642066956,
+    "asymmetry_median": 0.11466654390096664,
+    "asymmetry_p95": 0.7479074001312256,
+    "blend_deviation_median": 0.081148162484169,
+    "blend_deviation_p95": 0.42495501041412354,
+    "jerk_median": 0.0010502762161195278,
+    "jerk_p95": 0.008571368642151356
+  },
+  "robust_z": {
+    "path_excess": 0.0,
+    "asymmetry": 0.0,
+    "blend_deviation": 0.0,
+    "jerk": 0.0
+  },
+  "calibration_z": {},
+  "quality_score": 1.0,
+  "decision": "SMOOTH+",
+  "reasons": [
+    "canary_temporally_coherent"
+  ]
+}

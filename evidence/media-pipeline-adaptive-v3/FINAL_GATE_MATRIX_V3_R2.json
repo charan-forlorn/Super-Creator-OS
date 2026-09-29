@@ -1,0 +1,176 @@
+{
+  "phase": "SCOS Adaptive SMOOTH+ V3 R2 final gate matrix",
+  "timestamp": "2026-09-27T20:15:10+0700",
+  "overall": "PASS_WITH_PROMOTION_DISABLED",
+  "promotion": "REVIEW",
+  "gates": {
+    "v3_tests": "PASS - 4 passed",
+    "v2_rife_regression": "PASS - targeted V2/RIFE suite previously green; V3 import/compile green",
+    "render": "PASS - V3 R2 candidate rendered",
+    "temporal_qa": "PASS",
+    "benchmark": "PASS_WITH_LIMITS",
+    "inserted_frame_canary": "PASS - 3 canaries executed; 2 accepted, 1 rejected",
+    "scene_cut_safety": "PASS",
+    "dynamic_fps": "PASS",
+    "segment_audio": "PASS",
+    "capcut": "PASS - 0 errors / 0 warnings",
+    "automatic_promotion": "DISABLED - REVIEW"
+  },
+  "key_metrics": {
+    "v3_render_time_s": 23.111200499995903,
+    "full_render_time_s": 202.7015568,
+    "full_to_v3_speedup": 8.770706515225633,
+    "rife_workload_reduction": 0.9374651094394979,
+    "v3_ssim": 0.997516,
+    "v3_vmaf": 97.23087,
+    "v3_subtitle_ssim": 0.997415,
+    "v3_artifact_spike_proxy": 0.45307612095933264,
+    "v3_temporal_motion_continuity_proxy": 0.34887193274054773,
+    "v3_quality_vs_preserve_ssim_delta": 2.799999999991698e-05
+  },
+  "quality_canary": [
+    {
+      "window_start": 32.166667,
+      "window_end": 37.166667,
+      "canary_start": 34.466667,
+      "canary_end": 34.866667,
+      "sample_count": 5,
+      "valid_triple_ratio": 0.5,
+      "source_baseline": {
+        "path_excess_median": 0.001242124242708087,
+        "path_excess_p95": 0.14162883162498474,
+        "asymmetry_median": 0.9986611604690552,
+        "asymmetry_p95": 0.9998490810394287,
+        "blend_deviation_median": 0.5000108480453491,
+        "blend_deviation_p95": 0.5002144575119019,
+        "jerk_median": 0.03543396294116974,
+        "jerk_p95": 0.042758066207170486
+      },
+      "candidate_metrics": {
+        "path_excess_median": 0.13830478489398956,
+        "path_excess_p95": 0.21382439136505127,
+        "asymmetry_median": 0.003114745020866394,
+        "asymmetry_p95": 0.019815124571323395,
+        "blend_deviation_median": 0.2963223457336426,
+        "blend_deviation_p95": 0.3650045096874237,
+        "jerk_median": 0.00011010095477104187,
+        "jerk_p95": 0.00046746135922148824
+      },
+      "robust_z": {
+        "path_excess": 114.01230858417101,
+        "asymmetry": 0.0,
+        "blend_deviation": 0.0,
+        "jerk": 0.0
+      },
+      "calibration_z": {
+        "path_excess_median": 6.902710613166207,
+        "blend_deviation_median": 2.833423193189757,
+        "asymmetry_median": 0.0,
+        "jerk_median": 0.0
+      },
+      "quality_score": 0.29120275445694377,
+      "decision": "REVIEW",
+      "reasons": [
+        "temporal_quality_outlier",
+        "cross_window_temporal_outlier"
+      ]
+    },
+    {
+      "window_start": 38.166667,
+      "window_end": 39.166667,
+      "canary_start": 38.466667,
+      "canary_end": 38.866667,
+      "sample_count": 4,
+      "valid_triple_ratio": 0.4,
+      "source_baseline": {
+        "path_excess_median": 0.0030648247338831425,
+        "path_excess_p95": 0.007954759523272514,
+        "asymmetry_median": 0.996760368347168,
+        "asymmetry_p95": 0.9979622960090637,
+        "blend_deviation_median": 0.5004144906997681,
+        "blend_deviation_p95": 0.5009644627571106,
+        "jerk_median": 0.01695523038506508,
+        "jerk_p95": 0.02338174730539322
+      },
+      "candidate_metrics": {
+        "path_excess_median": 0.04425469785928726,
+        "path_excess_p95": 0.06919107586145401,
+        "asymmetry_median": 0.01417479757219553,
+        "asymmetry_p95": 0.025073084980249405,
+        "blend_deviation_median": 0.17345470190048218,
+        "blend_deviation_p95": 0.21499904990196228,
+        "jerk_median": 0.0002703741192817688,
+        "jerk_p95": 0.00042198720620945096
+      },
+      "robust_z": {
+        "path_excess": 25.303798633840646,
+        "asymmetry": 0.0,
+        "blend_deviation": 0.0,
+        "jerk": 0.0
+      },
+      "calibration_z": {
+        "path_excess_median": 0.0,
+        "blend_deviation_median": 0.0,
+        "asymmetry_median": 0.0,
+        "jerk_median": 1.0442244820296764
+      },
+      "quality_score": 0.7929861199179808,
+      "decision": "SMOOTH+",
+      "reasons": [
+        "temporal_quality_outlier",
+        "within_observed_canary_distribution"
+      ]
+    },
+    {
+      "window_start": 43.166667,
+      "window_end": 44.166667,
+      "canary_start": 43.466667,
+      "canary_end": 43.866667,
+      "sample_count": 5,
+      "valid_triple_ratio": 0.5,
+      "source_baseline": {
+        "path_excess_median": 0.004729999229311943,
+        "path_excess_p95": 0.036708615720272064,
+        "asymmetry_median": 0.9943485260009766,
+        "asymmetry_p95": 0.9984276294708252,
+        "blend_deviation_median": 0.5011047720909119,
+        "blend_deviation_p95": 0.5034677982330322,
+        "jerk_median": 0.007498946972191334,
+        "jerk_p95": 0.009414682164788246
+      },
+      "candidate_metrics": {
+        "path_excess_median": 0.035064697265625,
+        "path_excess_p95": 0.04607658088207245,
+        "asymmetry_median": 0.026034345850348473,
+        "asymmetry_p95": 0.06548179686069489,
+        "blend_deviation_median": 0.1644722819328308,
+        "blend_deviation_p95": 0.20736435055732727,
+        "jerk_median": 0.00016595167107880116,
+        "jerk_p95": 0.0003122831112705171
+      },
+      "robust_z": {
+        "path_excess": 20.862648680114383,
+        "asymmetry": 0.0,
+        "blend_deviation": 0.0,
+        "jerk": 0.0
+      },
+      "calibration_z": {
+        "path_excess_median": 0.0,
+        "blend_deviation_median": 0.0,
+        "asymmetry_median": 0.7232475332334141,
+        "jerk_median": 0.0
+      },
+      "quality_score": 0.8468749460737458,
+      "decision": "SMOOTH+",
+      "reasons": [
+        "temporal_quality_outlier",
+        "within_observed_canary_distribution"
+      ]
+    }
+  ],
+  "notes": [
+    "V3 is a conservative gate above V2: one 5-second V2 span was rejected by cross-window temporal canary calibration; two 1-second spans were accepted.",
+    "SSIM/VMAF benchmark remains source-FPS aligned; inserted frames are additionally assessed by the dedicated canary triplet metrics.",
+    "Artifact-spike and temporal-motion-continuity proxies remain REVIEW-level signals, so automatic promotion stays disabled."
+  ]
+}

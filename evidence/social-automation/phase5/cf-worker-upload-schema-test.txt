@@ -1,0 +1,1 @@
+Do NOT mutate Cloudflare. Call exact tool mcp__cloudflare__put_accounts_workers_scripts_by_script_name with only account_id=cb98ff5a98ddb6c0f09450505be7c3f5 and script_name=brightbean-proxy. If the tool returns validation for missing required fields, return that validation error and nothing else. Do not retry and do not upload.

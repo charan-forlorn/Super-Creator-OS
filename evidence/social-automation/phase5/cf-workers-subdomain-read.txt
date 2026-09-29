@@ -1,0 +1,1 @@
+Use exact Cloudflare MCP tool mcp__cloudflare__get_accounts_workers_subdomain. Read-only. Call with account_id=cb98ff5a98ddb6c0f09450505be7c3f5. Return only the JSON result. No mutation and no secrets.

@@ -96,10 +96,11 @@ back door through which Development Framework code reaches the runtime.
 - Importing Development Framework Layer code (playbooks, agent
   orchestration) into the operator runtime path.
 
-**Example modules:** `scos/control_center/command_runner.py`,
-`command_models.py`, `event_log.py`, `command_queue.py`,
-`operator_approval.py`, `command_validation.py`,
-`apps/control-center/components/*`.
+**Example modules:** `scos/control_center/command_runner.py`, `command_models.py`, `event_log.py`, `command_queue.py`, `operator_approval.py`, and `command_validation.py`. Presentation surfaces may live externally when they consume the explicit contracts.
+
+## Floot Mission Control Boundary
+
+Floot Mission Control is an application-surface capability. It may present HAIOS/SCOS read models, Skills, Runs, Evidence, Systems, and Human decision context, but it must not become Hermes, a governance authority, canonical state, telemetry authority, provenance authority, or evidence-sealing authority. Human approvals remain durable HAIOS records and are never represented by a Floot-local boolean.
 
 ## Explicit Rules
 

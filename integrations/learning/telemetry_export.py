@@ -12,7 +12,10 @@ import json
 from pathlib import Path
 from typing import Iterable
 
-import telemetry_capture as TC
+try:
+    import telemetry_capture as TC
+except ModuleNotFoundError:
+    from . import telemetry_capture as TC
 
 FIELD_ALIASES = {
     "loop_run_id": ("loop_run_id", "loopRunId", "run_id"),
@@ -76,16 +79,39 @@ def _load_rows(path: Path) -> list[dict]:
 
 def import_export(path: str | Path, *, telemetry_path=None, db_path=None,
                   source: str = "manual") -> dict:
-    """Normalize and capture all rows; stop safely on first rejected row."""
+    """Normalize/validate every row before writing any row, then capture all rows."""
     if source not in {"manual", "api"}:
         raise ValueError("source must be manual or api")
     rows = _load_rows(Path(path))
-    results = []
+    normalized_rows = []
+    preflight_errors = []
     for index, raw in enumerate(rows):
         if not isinstance(raw, dict):
-            return {"ok": False, "failed_row": index, "errors": ["row is not an object"],
-                    "imported": results}
-        normalized = normalize_export_row(raw, source=source)
+            preflight_errors.append({"row": index, "errors": ["row is not an object"]})
+            continue
+        try:
+            normalized = normalize_export_row(raw, source=source)
+        except (TypeError, ValueError) as exc:
+            preflight_errors.append({"row": index, "errors": [f"normalization failed: {type(exc).__name__}: {exc}"]})
+            continue
+        errors = TC.validate_capture(normalized)
+        if errors:
+            preflight_errors.append({"row": index, "errors": errors})
+        normalized_rows.append(normalized)
+    if preflight_errors:
+        first = preflight_errors[0]
+        return {
+            "ok": False,
+            "stage": "preflight",
+            "failed_row": first["row"],
+            "errors": first["errors"],
+            "failed_rows": preflight_errors,
+            "rows_seen": len(rows),
+            "rows_imported": 0,
+        }
+
+    results = []
+    for index, normalized in enumerate(normalized_rows):
         result = TC.capture(normalized, telemetry_path=telemetry_path, db_path=db_path)
         results.append(result)
         if not result.get("ok"):

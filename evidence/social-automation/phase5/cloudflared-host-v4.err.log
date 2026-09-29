@@ -1,0 +1,58 @@
+2026-09-28T12:57:34Z INF Starting tunnel tunnelID=08a4e3a2-48fa-4464-8688-a79dac8a6773
+2026-09-28T12:57:34Z INF Cannot determine default configuration path. No file [config.yml config.yaml] in [~/.cloudflared ~/.cloudflare-warp ~/cloudflare-warp]
+2026-09-28T12:57:34Z INF Version 2026.8.3 (Checksum 83e726ed18ea78c5ad5213c4c3a3a27051393950d2bc8ed4de69bec12d14eaae)
+2026-09-28T12:57:34Z INF GOOS: windows, GOVersion: go1.26.4, GoArch: amd64
+2026-09-28T12:57:34Z INF Settings: map[edge-ip-version:4 no-autoupdate:true p:quic protocol:quic token-file:C:\ProgramData\cloudflared\token]
+2026-09-28T12:57:34Z INF cloudflared will not automatically update on Windows systems.
+2026-09-28T12:57:34Z INF Generated Connector ID: 6df71be3-2e4d-48c1-807d-93851947c41b
+2026-09-28T12:57:34Z WRN No ingress rules were defined in provided config (if any) nor from the cli, cloudflared will return 503 for all incoming HTTP requests
+2026-09-28T12:57:34Z INF Initial protocol quic
+2026-09-28T12:57:34Z INF ICMP proxy will use 192.168.1.104 as source for IPv4
+2026-09-28T12:57:34Z INF ICMP proxy will use 2405:9800:b521:2fd9:fac9:2b18:aba6:eeda in zone Wi-Fi as source for IPv6
+2026-09-28T12:57:34Z INF ICMP proxy will use 192.168.1.104 as source for IPv4
+2026-09-28T12:57:34Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.200.63
+2026-09-28T12:57:34Z INF ICMP proxy will use 2405:9800:b521:2fd9:fac9:2b18:aba6:eeda in zone Wi-Fi as source for IPv6
+2026-09-28T12:57:34Z INF Starting metrics server on 127.0.0.1:20242/metrics
+2026-09-28T12:57:34Z INF +-------------------------------------------------------------------------------------+
+2026-09-28T12:57:34Z INF |                               CONNECTIVITY PRE-CHECKS                               |
+2026-09-28T12:57:34Z INF +-------------------------------------------------------------------------------------+
+2026-09-28T12:57:34Z INF |  COMPONENT         TARGET                     STATUS  DETAILS                       |
+2026-09-28T12:57:34Z INF |  DNS Resolution    region1.v2.argotunnel.com  PASS    DNS Resolved successfully     |
+2026-09-28T12:57:34Z INF |  DNS Resolution    region2.v2.argotunnel.com  PASS    DNS Resolved successfully     |
+2026-09-28T12:57:34Z INF |  UDP Connectivity  region1.v2.argotunnel.com  PASS    QUIC connection successful    |
+2026-09-28T12:57:34Z INF |  UDP Connectivity  region2.v2.argotunnel.com  PASS    QUIC connection successful    |
+2026-09-28T12:57:34Z INF |  TCP Connectivity  region1.v2.argotunnel.com  PASS    HTTP/2 connection successful  |
+2026-09-28T12:57:34Z INF |  TCP Connectivity  region2.v2.argotunnel.com  PASS    HTTP/2 connection successful  |
+2026-09-28T12:57:34Z INF |  Cloudflare API    api.cloudflare.com:443     PASS    API is reachable              |
+2026-09-28T12:57:34Z INF |                                                                                     |
+2026-09-28T12:57:34Z INF |  SUMMARY: Environment is healthy. cloudflared will use 'quic' as primary protocol.  |
+2026-09-28T12:57:34Z INF +-------------------------------------------------------------------------------------+
+2026-09-28T12:57:34Z INF precheck component="DNS Resolution" details="DNS Resolved successfully" run_id=fde8364c-c4b5-4116-944e-66597013bb5e status=pass target=region1.v2.argotunnel.com
+2026-09-28T12:57:34Z INF precheck component="DNS Resolution" details="DNS Resolved successfully" run_id=fde8364c-c4b5-4116-944e-66597013bb5e status=pass target=region2.v2.argotunnel.com
+2026-09-28T12:57:34Z INF precheck component="UDP Connectivity" details="QUIC connection successful" run_id=fde8364c-c4b5-4116-944e-66597013bb5e status=pass target=region1.v2.argotunnel.com
+2026-09-28T12:57:34Z INF precheck component="UDP Connectivity" details="QUIC connection successful" run_id=fde8364c-c4b5-4116-944e-66597013bb5e status=pass target=region2.v2.argotunnel.com
+2026-09-28T12:57:34Z INF precheck component="TCP Connectivity" details="HTTP/2 connection successful" run_id=fde8364c-c4b5-4116-944e-66597013bb5e status=pass target=region1.v2.argotunnel.com
+2026-09-28T12:57:34Z INF precheck component="TCP Connectivity" details="HTTP/2 connection successful" run_id=fde8364c-c4b5-4116-944e-66597013bb5e status=pass target=region2.v2.argotunnel.com
+2026-09-28T12:57:34Z INF precheck component="Cloudflare API" details="API is reachable" run_id=fde8364c-c4b5-4116-944e-66597013bb5e status=pass target=api.cloudflare.com:443
+2026-09-28T12:57:34Z INF precheck complete hard_fail=false run_id=fde8364c-c4b5-4116-944e-66597013bb5e suggested_protocol=quic
+2026-09-28T12:57:34Z INF Registered tunnel connection connIndex=0 connection=c05e5afa-f31b-421d-bc0d-9cd8c8f185b2 event=0 ip=198.41.200.63 location=sin22 protocol=quic
+2026-09-28T12:57:34Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=1 event=0 ip=198.41.192.47
+2026-09-28T12:57:34Z INF cloudflared does not support loading the system root certificate pool on Windows. Please use --origin-ca-pool <PATH> to specify the path to the certificate pool
+2026-09-28T12:57:34Z INF Updated to new configuration config="{\"ingress\":[{\"hostname\":\"*\",\"path\":\"/*\",\"service\":\"http://brightbean-edge:80\"},{\"service\":\"http_status:404\"}],\"warp-routing\":{\"enabled\":false}}" version=1
+2026-09-28T12:57:35Z INF Registered tunnel connection connIndex=1 connection=ad89190e-04c8-4a31-842d-95330f4d7523 event=0 ip=198.41.192.47 location=bkk07 protocol=quic
+2026-09-28T12:57:35Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=2 event=0 ip=198.41.200.13
+2026-09-28T12:57:36Z INF Registered tunnel connection connIndex=2 connection=daec065a-8937-42e6-96a1-3f158edbe07c event=0 ip=198.41.200.13 location=sin11 protocol=quic
+2026-09-28T12:57:36Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=3 event=0 ip=198.41.192.37
+2026-09-28T12:57:37Z INF Registered tunnel connection connIndex=3 connection=4838441e-f4b8-4497-8465-28fae4338970 event=0 ip=198.41.192.37 location=bkk09 protocol=quic
+2026-09-28T12:58:04Z ERR  error="unable to dial tcp to origin 172.18.0.6:80: dial tcp 172.18.0.6:80: i/o timeout" connIndex=0 destAddr=172.18.0.6:80 event=2 flowID=3189b10f88000424f31ab3c400000001 originService=warp-routing
+2026-09-28T12:58:04Z ERR Request failed error="unable to dial tcp to origin 172.18.0.6:80: dial tcp 172.18.0.6:80: i/o timeout" connIndex=0 dest=172.18.0.6:80 event=0 ip=198.41.200.63 type=tcp
+2026-09-28T12:58:04Z ERR  error="unable to dial tcp to origin 172.18.0.6:80: dial tcp 172.18.0.6:80: i/o timeout" connIndex=1 destAddr=172.18.0.6:80 event=2 flowID=3189b1104e000094620251e400000001 originService=warp-routing
+2026-09-28T12:58:04Z ERR Request failed error="unable to dial tcp to origin 172.18.0.6:80: dial tcp 172.18.0.6:80: i/o timeout" connIndex=1 dest=172.18.0.6:80 event=0 ip=198.41.192.47 type=tcp
+2026-09-28T12:58:04Z ERR  error="unable to dial tcp to origin 172.18.0.6:80: dial tcp 172.18.0.6:80: i/o timeout" connIndex=1 destAddr=172.18.0.6:80 event=2 flowID=3189b110930000946202521400000001 originService=warp-routing
+2026-09-28T12:58:04Z ERR Request failed error="unable to dial tcp to origin 172.18.0.6:80: dial tcp 172.18.0.6:80: i/o timeout" connIndex=1 dest=172.18.0.6:80 event=0 ip=198.41.192.47 type=tcp
+2026-09-28T12:58:09Z ERR  error="unable to dial tcp to origin 172.18.0.6:80: dial tcp 172.18.0.6:80: i/o timeout" connIndex=0 destAddr=172.18.0.6:80 event=2 flowID=3189b123bd000424f31ab4e400000001 originService=warp-routing
+2026-09-28T12:58:09Z ERR Request failed error="unable to dial tcp to origin 172.18.0.6:80: dial tcp 172.18.0.6:80: i/o timeout" connIndex=0 dest=172.18.0.6:80 event=0 ip=198.41.200.63 type=tcp
+2026-09-28T12:58:09Z ERR  error="unable to dial tcp to origin 172.18.0.6:80: dial tcp 172.18.0.6:80: i/o timeout" connIndex=3 destAddr=172.18.0.6:80 event=2 flowID=3189b1242b000553ae3a730400000001 originService=warp-routing
+2026-09-28T12:58:09Z ERR Request failed error="unable to dial tcp to origin 172.18.0.6:80: dial tcp 172.18.0.6:80: i/o timeout" connIndex=3 dest=172.18.0.6:80 event=0 ip=198.41.192.37 type=tcp
+2026-09-28T12:58:09Z ERR  error="unable to dial tcp to origin 172.18.0.6:80: dial tcp 172.18.0.6:80: i/o timeout" connIndex=1 destAddr=172.18.0.6:80 event=2 flowID=3189b124b80000946202545400000001 originService=warp-routing
+2026-09-28T12:58:09Z ERR Request failed error="unable to dial tcp to origin 172.18.0.6:80: dial tcp 172.18.0.6:80: i/o timeout" connIndex=1 dest=172.18.0.6:80 event=0 ip=198.41.192.47 type=tcp

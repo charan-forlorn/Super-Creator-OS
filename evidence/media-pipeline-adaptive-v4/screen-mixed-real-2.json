@@ -1,0 +1,46 @@
+{
+  "window_start": 43.166667,
+  "window_end": 44.166667,
+  "canary_start": 43.466667,
+  "canary_end": 43.866667,
+  "sample_count": 5,
+  "valid_triple_ratio": 0.5,
+  "source_baseline": {
+    "path_excess_median": 0.004729999229311943,
+    "path_excess_p95": 0.036708615720272064,
+    "asymmetry_median": 0.9943485260009766,
+    "asymmetry_p95": 0.9984276294708252,
+    "blend_deviation_median": 0.5011047720909119,
+    "blend_deviation_p95": 0.5034677982330322,
+    "jerk_median": 0.007498946972191334,
+    "jerk_p95": 0.009414682164788246
+  },
+  "candidate_metrics": {
+    "path_excess_median": 0.035064697265625,
+    "path_excess_p95": 0.04607658088207245,
+    "asymmetry_median": 0.026034345850348473,
+    "asymmetry_p95": 0.06548179686069489,
+    "blend_deviation_median": 0.1644722819328308,
+    "blend_deviation_p95": 0.20736435055732727,
+    "jerk_median": 0.00016595167107880116,
+    "jerk_p95": 0.0003122831112705171
+  },
+  "robust_z": {
+    "path_excess": 20.862648680114383,
+    "asymmetry": 0.0,
+    "blend_deviation": 0.0,
+    "jerk": 0.0
+  },
+  "calibration_z": {
+    "path_excess_median": 0.0,
+    "blend_deviation_median": 0.0,
+    "asymmetry_median": 0.7232475332334141,
+    "jerk_median": 0.0
+  },
+  "quality_score": 0.8468749460737458,
+  "decision": "SMOOTH+",
+  "reasons": [
+    "temporal_quality_outlier",
+    "within_observed_canary_distribution"
+  ]
+}

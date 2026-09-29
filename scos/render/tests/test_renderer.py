@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from unittest import mock
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(_REPO_ROOT))
@@ -27,6 +28,8 @@ from scos.render.base import (  # noqa: E402
 )
 from scos.render import edl_bridge, ffmpeg_engine  # noqa: E402
 from scos.render.video_use_backend import VideoUseBackend  # noqa: E402
+from scos.render.hardware import EncoderPlan  # noqa: E402
+import scos.render.video_use_backend as video_use_backend  # noqa: E402
 
 _PASS, _FAIL = 0, 0
 
@@ -83,7 +86,10 @@ def test_request_mapping():
     fake = _FakeBackend()
     timeline = {"clips": [
         {"scene_id": "scene_00", "start": 0.0, "end": 2.0,
-         "asset_path": "a.png", "audio_path": "a.wav"},
+         "asset_path": "a.png", "audio_path": "a.wav",
+         "motion": "push_in", "motion_strength": 0.12,
+         "camera": "slow dolly-in", "action": "product rotates 8 degrees",
+         "lighting": "soft key", "generation_backend": "deterministic"},
         {"scene_id": "scene_01", "start": 2.0, "end": 3.5,
          "asset_path": "b.png", "audio_path": None},
     ], "total_duration": 3.5}
@@ -93,8 +99,42 @@ def test_request_mapping():
     check("duration derived from end-start", abs(req.clips[0].duration_s - 2.0) < 1e-6
           and abs(req.clips[1].duration_s - 1.5) < 1e-6)
     check("None audio stays None", req.clips[1].audio_path is None)
+    check("motion maps to RenderClip", req.clips[0].motion == "push_in")
+    check("motion strength maps", abs(req.clips[0].motion_strength - 0.12) < 1e-6)
+    check("ShotSpec camera maps", req.clips[0].camera == "slow dolly-in")
+    check("ShotSpec action maps", req.clips[0].action == "product rotates 8 degrees")
+    check("ShotSpec lighting maps", req.clips[0].lighting == "soft key")
+    check("ShotSpec backend maps", req.clips[0].generation_backend == "deterministic")
     check("output path uses run_id", req.output_path.name == "testrun.mp4")
     check("result dict carries video_path", out["video_path"].endswith("testrun.mp4"))
+
+
+def test_engine_receives_final_encoder_options():
+    print("\n[2b] final encoder options cross the SCOS -> video-use process boundary")
+    plan = EncoderPlan(
+        backend_id="nvenc",
+        ffmpeg_encoder="h264_nvenc",
+        args=("-preset", "p4"),
+        hardware=True,
+        accelerator="nvidia",
+        reason="test",
+    )
+    backend = VideoUseBackend(cache_enabled=False, encoder=plan)
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        edl = td / "edl.json"
+        out = td / "out.mp4"
+        edl.write_text("{}")
+        fake = mock.Mock(returncode=0, stdout="", stderr="")
+        with mock.patch.object(video_use_backend.subprocess, "run", return_value=fake) as run:
+            backend._invoke_engine(edl, out, no_loudnorm=True)
+        cmd = run.call_args.args[0]
+        check("--no-loudnorm forwarded", "--no-loudnorm" in cmd)
+        check("final encoder forwarded", cmd[cmd.index("--video-encoder") + 1] == "h264_nvenc")
+        check(
+            "encoder args forwarded",
+            json.loads(cmd[cmd.index("--video-encoder-args-json") + 1]) == ["-preset", "p4"],
+        )
 
 
 def test_write_edl():
@@ -111,6 +151,33 @@ def test_write_edl():
               edl["ranges"][0]["start"] == 0.0 and edl["ranges"][0]["end"] == 2.0)
         check("total_duration_s summed", abs(edl["total_duration_s"] - 3.5) < 1e-6)
         check("grade + overlays present for engine", edl["grade"] == "none" and edl["overlays"] == [])
+
+
+def test_unsupported_generation_backend_fails_closed():
+    print("\n[3b] generative backend request fails closed before deterministic fallback")
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        still = td / "s.png"
+        make_still(still)
+        clip = RenderClip(
+            "gen_scene",
+            still,
+            None,
+            1.0,
+            generation_backend="veo-3.1",
+        )
+        req = RenderRequest(
+            run_id="gen-fail",
+            clips=[clip],
+            output_path=td / "out.mp4",
+            work_dir=td / "work",
+        )
+        try:
+            VideoUseBackend(cache_enabled=False).render(req)
+            raised = False
+        except RenderError as exc:
+            raised = "not registered" in str(exc)
+        check("non-deterministic backend never silently falls back", raised)
 
 
 def test_honest_failure_validation():
@@ -151,7 +218,7 @@ def test_integration_render():
         out = td / "out.mp4"
         req = RenderRequest(run_id="itest", clips=clips, output_path=out,
                             work_dir=td / "work", profile=RenderProfile())
-        res = VideoUseBackend().render(req)
+        res = VideoUseBackend(cache_root=td / "cache").render(req)
         check("render reports success", res.success is True)
         check("output exists & non-empty", out.exists() and out.stat().st_size > 0)
         if out.exists() and out.stat().st_size > 0:
@@ -163,7 +230,7 @@ def test_integration_render():
         out2 = td / "out2.mp4"
         req2 = RenderRequest(run_id="itest2", clips=clips, output_path=out2,
                              work_dir=td / "work2", profile=RenderProfile())
-        VideoUseBackend().render(req2)
+        VideoUseBackend(cache_root=td / "cache").render(req2)
         if out.exists() and out2.exists():
             g1, g2 = ffprobe_geom(out), ffprobe_geom(out2)
             check("deterministic geometry across runs", g1[:2] == g2[:2])
@@ -178,10 +245,20 @@ def test_integration_missing_asset():
         req = RenderRequest(run_id="failtest", clips=clips, output_path=td / "out.mp4",
                             work_dir=td / "work", profile=RenderProfile())
         try:
-            VideoUseBackend().render(req); raised = False
+            VideoUseBackend(cache_root=td / "cache").render(req); raised = False
         except RenderError:
             raised = True
         check("missing visual -> RenderError (no output)", raised)
+
+
+def test_runtime_gpu_encoder_is_accepted_when_probe_passes():
+    print("\n[4b] advertised GPU encoder requires a passing runtime probe")
+    with mock.patch("scos.render.hardware.available_encoders", return_value=frozenset({"h264_nvenc"})):
+        with mock.patch("scos.render.hardware.encoder_runtime_ok", return_value=True):
+            from scos.render.hardware import choose_encoder
+            plan = choose_encoder()
+    check("runtime-probed NVENC selected", plan.ffmpeg_encoder == "h264_nvenc")
+    check("plan marked hardware", plan.hardware is True)
 
 
 def main():
@@ -190,8 +267,11 @@ def main():
     print(" MODULE 2 — REAL FFMPEG RENDERER — TEST SUITE")
     print("=" * 60)
     test_request_mapping()
+    test_engine_receives_final_encoder_options()
     test_write_edl()
+    test_unsupported_generation_backend_fails_closed()
     test_honest_failure_validation()
+    test_runtime_gpu_encoder_is_accepted_when_probe_passes()
     test_integration_render()
     test_integration_missing_asset()
     print("\n" + "=" * 60)

@@ -1,0 +1,13 @@
+{
+  "name": "brightbean-social-edge-hosttest-20260928",
+  "main": "src/worker.mjs",
+  "workers_dev": true,
+  "preview_urls": false,
+  "compatibility_date": "2026-09-01",
+  "vpc_services": [
+    {
+      "binding": "BRIGHTBEAN",
+      "service_id": "01a0e81f-affc-75a0-ad7c-37b987abe5aa"
+    }
+  ]
+}

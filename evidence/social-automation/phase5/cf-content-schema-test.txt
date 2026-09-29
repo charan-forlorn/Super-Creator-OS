@@ -1,0 +1,1 @@
+Do not mutate. Call exact Cloudflare tool mcp__cloudflare__put_accounts_workers_scripts_content with only account_id=cb98ff5a98ddb6c0f09450505be7c3f5 and script_name=brightbean-social-edge-20260928. Return only validation requirements and stop. Do not upload.

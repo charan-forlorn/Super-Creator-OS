@@ -1,0 +1,1 @@
+This folder contains the built output assets for the worker "brightbean-social-edge-20260928" generated at 2026-09-28T02:47:45.651Z.

@@ -64,10 +64,10 @@ _REQUIRED_ARTIFACTS: tuple[tuple[str, str, str, str], ...] = (
     ("7.3", "test", "scos/control_center/tests/test_operator_health_activity.py", "operator_read_models"),
     ("7.3", "contract", "docs/specification/OPERATOR_HEALTH_ACTIVITY_READ_MODELS_CONTRACT.md", "operator_read_models"),
     ("7.3", "cert_doc", "docs/certification/Stage-7.3-plan.md", "operator_read_models"),
-    ("7.4", "frontend", "apps/control-center/lib/operator-read-surface-projection.ts", "ui_projection"),
-    ("7.4", "frontend", "apps/control-center/components/operator-read-surface-panel.tsx", "ui_projection"),
-    ("7.4", "frontend_test", "apps/control-center/tests/operator-read-surface-projection.test.ts", "ui_projection"),
-    ("7.4", "frontend_test", "apps/control-center/tests/operator-read-surface-panel.test.tsx", "ui_projection"),
+    ("7.4", "operator_surface_contract", "docs/architecture/FLOOT_CONTROL_CENTER_RESEARCH_20260919.md", "ui_projection"),
+    ("7.4", "operator_surface_skill", ".skills/scos-mission-control-ui/SKILL.md", "ui_projection"),
+    ("7.4", "legacy_foundation", "docs/architecture/control-center-foundation/legacy-operator-read-surface-types.ts", "ui_projection"),
+    ("7.4", "legacy_foundation", "docs/architecture/control-center-foundation/legacy-operator-read-surface-projection.ts", "ui_projection"),
     ("7.4", "contract", "docs/specification/OPERATOR_READ_SURFACE_UI_PROJECTION_CONTRACT.md", "ui_projection"),
     ("7.4", "cert_doc", "docs/certification/Stage-7.4-plan.md", "ui_projection"),
     ("7.5", "module", "scos/control_center/transport_decision_models.py", "transport_decision"),
@@ -117,15 +117,11 @@ _SAFETY_SCAN_FILES = (
     "scos/control_center/operator_command_views.py",
     "scos/control_center/adapter_activation_preflight_gate.py",
     "scos/control_center/stage7_closure_gate.py",
-    "apps/control-center/lib/operator-read-surface-types.ts",
-    "apps/control-center/lib/operator-read-surface-projection.ts",
-    "apps/control-center/lib/operator-read-surface-mock-data.ts",
-    "apps/control-center/lib/operator-command-view-mock-data.ts",
-    "apps/control-center/components/operator-read-surface-panel.tsx",
-    "apps/control-center/components/operator-health-signal-card.tsx",
-    "apps/control-center/components/operator-activity-feed.tsx",
-    "apps/control-center/components/operator-readiness-summary.tsx",
-    "apps/control-center/components/read-surface-coherence-card.tsx",
+    ".skills/scos-mission-control-ui/SKILL.md",
+    "docs/architecture/FLOOT_CONTROL_CENTER_RESEARCH_20260919.md",
+
+    "docs/architecture/control-center-foundation/legacy-operator-read-surface-types.ts",
+    "docs/architecture/control-center-foundation/legacy-operator-read-surface-projection.ts",
 )
 
 _FORBIDDEN_MARKERS = (
@@ -409,19 +405,14 @@ def _external_check(command_name: str, enabled: bool, category: str, summary: st
     )
 
 
-def _frontend_scripts(root: Path) -> tuple[str, ...]:
-    package_json = root / "apps" / "control-center" / "package.json"
-    text = _read_text(package_json)
-    if text is None:
-        return ()
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return ()
-    scripts = payload.get("scripts", {})
-    if not isinstance(scripts, dict):
-        return ()
-    return tuple(sorted(str(key) for key in scripts))
+def _operator_surface_artifacts(root: Path) -> tuple[str, ...]:
+    paths = (
+        root / ".skills" / "scos-mission-control-ui" / "SKILL.md",
+        root / "docs" / "architecture" / "FLOOT_CONTROL_CENTER_RESEARCH_20260919.md",
+        root / "docs" / "architecture" / "control-center-foundation" / "legacy-operator-read-surface-types.ts",
+        root / "docs" / "architecture" / "control-center-foundation" / "legacy-operator-read-surface-projection.ts",
+    )
+    return tuple(str(path.relative_to(root)).replace("\\", "/") for path in paths if path.is_file())
 
 
 def _is_optional_runtime_warning(warning: str) -> bool:
@@ -552,22 +543,31 @@ def run_stage7_final_closure_gate(
         ),
     )
 
-    frontend_scripts = _frontend_scripts(root)
-    frontend_missing = tuple(script for script in ("lint", "build", "test") if script not in frontend_scripts)
-    if frontend_missing and run_frontend_checks:
-        warnings.append(f"frontend package scripts missing: {list(frontend_missing)}")
+    operator_surface_artifacts = _operator_surface_artifacts(root)
+    missing_operator_surface = tuple(
+        required
+        for required in (
+            ".skills/scos-mission-control-ui/SKILL.md",
+            "docs/architecture/FLOOT_CONTROL_CENTER_RESEARCH_20260919.md",
+        )
+        if required not in operator_surface_artifacts
+    )
+    if missing_operator_surface and run_frontend_checks:
+        warnings.append(f"operator surface artifacts missing: {list(missing_operator_surface)}")
     frontend_check_results = (
         _check(
-            check_name="verify_frontend_package_scripts",
+            check_name="verify_floot_mission_control_surface",
             category="frontend",
-            status="pass" if not frontend_missing else "warning",
-            summary="apps/control-center package scripts are available" if not frontend_missing else "Some frontend scripts are unavailable",
-            references=("apps/control-center/package.json",),
-            metadata=(("scripts", ",".join(frontend_scripts)),),
+            status="pass" if not missing_operator_surface else "warning",
+            summary="Floot Mission Control operator surface contract and skill are available" if not missing_operator_surface else "Floot Mission Control qualification artifacts are incomplete",
+            references=tuple(operator_surface_artifacts),
         ),
-        _external_check("run_frontend_test", run_frontend_checks and "test" in frontend_scripts, "frontend", "pnpm test"),
-        _external_check("run_frontend_lint", run_frontend_checks and "lint" in frontend_scripts, "frontend", "pnpm lint"),
-        _external_check("run_frontend_build", run_frontend_checks and "build" in frontend_scripts, "frontend", "pnpm build"),
+        _external_check(
+            "verify_floot_browser_surface",
+            run_frontend_checks,
+            "frontend",
+            "Floot browser screenshot/visual acceptance",
+        ),
     )
 
     test_results = (

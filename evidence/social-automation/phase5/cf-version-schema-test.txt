@@ -1,0 +1,1 @@
+Do NOT mutate. Call exact tool mcp__cloudflare__post_accounts_workers_scripts_versions with only account_id=cb98ff5a98ddb6c0f09450505be7c3f5 and script_name=brightbean-proxy. If validation occurs before upload, return only the required input fields/schema error. Do not retry.

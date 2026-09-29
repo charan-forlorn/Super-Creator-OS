@@ -1,0 +1,13 @@
+services:
+  cloudflared:
+    command:
+      - tunnel
+      - --no-autoupdate
+      - --quic-disable-pmtu-discovery
+      - --heartbeat-interval
+      - 1s
+      - --heartbeat-count
+      - "5"
+      - run
+      - --token-file
+      - /run/secrets/cloudflare_tunnel_token

@@ -1,0 +1,38 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.14, pytest-8.4.2, pluggy-1.6.0
+django: version: 5.1.15, settings: config.settings.production (from env)
+rootdir: /app
+configfile: pyproject.toml
+plugins: cov-5.0.0, anyio-4.15.1, Faker-40.39.0, django-4.12.0
+collected 516 items
+
+apps/publisher/tests.py ...................                              [  3%]
+apps/publisher/test_failure_notification.py ........                     [  5%]
+apps/publisher/test_first_comment.py ................................... [ 12%]
+....                                                                     [ 12%]
+apps/publisher/test_media_handling.py ......                             [ 13%]
+apps/publisher/test_publish_confirmation.py ........................     [ 18%]
+apps/social_accounts/tests/test_webhook_subscription.py ................ [ 21%]
+......................                                                   [ 25%]
+apps/mcp/tests/test_inbox_tools.py ............................          [ 31%]
+apps/mcp/tests/test_oauth_auth.py ..............                         [ 34%]
+apps/mcp/tests/test_presigned_tools.py ............                      [ 36%]
+apps/mcp/tests/test_rest_parity.py ..............                        [ 39%]
+apps/mcp/tests/test_review_fixes.py ........                             [ 40%]
+apps/mcp/tests/test_transport.py ....................................... [ 48%]
+.........                                                                [ 50%]
+apps/publisher/test_connection_budget.py .......                         [ 51%]
+apps/publisher/test_media_handling.py ....                               [ 52%]
+tests/providers/test_facebook.py ....................................... [ 59%]
+..........................                                               [ 64%]
+tests/providers/test_instagram.py ...................................... [ 72%]
+............................................................             [ 83%]
+tests/providers/test_tiktok.py ......................................... [ 91%]
+.                                                                        [ 91%]
+apps/publisher/tests.py .........................                        [ 96%]
+apps/publisher/test_first_comment.py ...                                 [ 97%]
+apps/publisher/test_media_handling.py ........                           [ 98%]
+apps/social_accounts/tests/test_webhook_subscription.py ......           [100%]
+
+============================= 516 passed in 48.52s =============================
+EXIT_CODE=0

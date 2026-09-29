@@ -18,6 +18,16 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 
+CAMERA_MOTIONS = {
+    "static",
+    "push_in",
+    "pull_out",
+    "drift_left",
+    "drift_right",
+    "drift_up",
+    "drift_down",
+}
+
 
 class RenderError(Exception):
     """Raised on any unrecoverable render failure.
@@ -53,18 +63,77 @@ class RenderProfile:
 
 
 @dataclass(frozen=True)
-class RenderClip:
-    """One scene to place on the output timeline.
+class ShotSpec:
+    """Canonical shot contract shared by deterministic and generative renderers.
 
-    `visual_path` is a still image (.png/.jpg) per the Stage-1 asset model;
-    `audio_path` is the optional voiceover for the scene. `duration_s` is derived
-    from the scene's output-timeline span (end - start).
+    Deterministic rendering consumes the visual/audio/motion fields today.
+    The remaining fields are carried end-to-end for a future generative backend.
     """
 
     scene_id: str
     visual_path: Path
     audio_path: Path | None
     duration_s: float
+    motion: str = "static"
+    motion_strength: float = 0.08
+    camera: str = "locked"
+    action: str = ""
+    environment: str = ""
+    lighting: str = ""
+    style: str = ""
+    prompt: str = ""
+    references: tuple[str, ...] = ()
+    start_frame: Path | None = None
+    end_frame: Path | None = None
+    generation_backend: str = "deterministic"
+    continuity_group: str = ""
+
+    def __post_init__(self) -> None:
+        if self.duration_s <= 0:
+            raise RenderError(f"scene {self.scene_id}: non-positive duration {self.duration_s}")
+        if self.motion not in CAMERA_MOTIONS:
+            raise RenderError(f"scene {self.scene_id}: unsupported camera motion '{self.motion}'")
+        if not 0.0 <= self.motion_strength <= 0.5:
+            raise RenderError(
+                f"scene {self.scene_id}: motion_strength must be within [0, 0.5]"
+            )
+        if not self.generation_backend.strip():
+            raise RenderError(f"scene {self.scene_id}: generation_backend must be non-empty")
+
+
+@dataclass(frozen=True)
+class GeneratedShot:
+    """Result contract returned by a generative video backend."""
+
+    scene_id: str
+    video_path: Path
+    duration_s: float
+    provider: str
+    task_id: str | None = None
+    info: str = ""
+
+
+class GenerativeBackend(ABC):
+    """Provider-neutral generation contract built on the same ShotSpec."""
+
+    @property
+    @abstractmethod
+    def backend_id(self) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def generate(
+        self,
+        shot: ShotSpec,
+        profile: RenderProfile,
+        output_path: Path,
+    ) -> GeneratedShot:
+        """Generate one shot and return a verified local video artifact."""
+        raise NotImplementedError
+
+
+# Backward-compatible name for existing render callers and tests.
+RenderClip = ShotSpec
 
 
 @dataclass
@@ -72,7 +141,7 @@ class RenderRequest:
     """Everything a backend needs to produce one video."""
 
     run_id: str
-    clips: list[RenderClip]
+    clips: list[ShotSpec]
     output_path: Path
     work_dir: Path
     profile: RenderProfile = field(default_factory=RenderProfile)

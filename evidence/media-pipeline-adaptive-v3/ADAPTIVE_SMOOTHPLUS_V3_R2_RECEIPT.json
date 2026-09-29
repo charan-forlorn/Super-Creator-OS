@@ -1,0 +1,313 @@
+{
+  "schema": 1,
+  "phase": "SCOS Adaptive SMOOTH+ V3 - R2 quality-calibrated temporal gate",
+  "timestamp": "2026-09-27T20:03:48+0700",
+  "source": {
+    "path": "C:\\Users\\chara\\OneDrive\\Videos\\การบันทึกหน้าจอ\\การบันทึกหน้าจอ 2026-09-27 091454.mp4",
+    "sha256": "59070BFD7195F40A17532D67D7BB1C82473EE0C4DDBF73F815DB6DEE6DC37EF7",
+    "fps": 30.0,
+    "duration_s": 57.7333,
+    "keep_ranges": [
+      [
+        18.263437,
+        50.245583
+      ]
+    ],
+    "scene_cuts": [
+      31.166667
+    ]
+  },
+  "candidate": {
+    "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\SCOS_SMOOTHPLUS_ADAPTIVE_V3_CANDIDATE_R2.mp4",
+    "sha256": "C59760D522106B1C7114FF9C9E805DF40F921584079340799EE692E90DAE5BB5",
+    "bytes": 50402700,
+    "probe": {
+      "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\SCOS_SMOOTHPLUS_ADAPTIVE_V3_CANDIDATE_R2.mp4",
+      "duration_s": 32.0,
+      "width": 2560,
+      "height": 1528,
+      "fps": 60.0,
+      "frames": 1920,
+      "video_codec": "h264",
+      "pixel_format": "yuv420p",
+      "color_transfer": "",
+      "audio_codec": "aac",
+      "audio_sample_rate": 48000,
+      "audio_channels": 2,
+      "has_audio": true,
+      "cfr": true
+    }
+  },
+  "routing": {
+    "v2_requested_spans": [
+      [
+        32.166667,
+        37.166667
+      ],
+      [
+        38.166667,
+        39.166667
+      ],
+      [
+        43.166667,
+        44.166667
+      ]
+    ],
+    "v3_accepted_spans": [
+      [
+        38.166667,
+        39.166667
+      ],
+      [
+        43.166667,
+        44.166667
+      ]
+    ],
+    "quality_rejected_count": 1,
+    "interpolation_fraction": 0.0625348905605021,
+    "target_fps": 60.0
+  },
+  "quality_gate": {
+    "name": "QUALITY_CALIBRATED_CANARY_V3",
+    "canaries": [
+      {
+        "window_start": 32.166667,
+        "window_end": 37.166667,
+        "canary_start": 34.466667,
+        "canary_end": 34.866667,
+        "sample_count": 5,
+        "valid_triple_ratio": 0.5,
+        "source_baseline": {
+          "path_excess_median": 0.001242124242708087,
+          "path_excess_p95": 0.14162883162498474,
+          "asymmetry_median": 0.9986611604690552,
+          "asymmetry_p95": 0.9998490810394287,
+          "blend_deviation_median": 0.5000108480453491,
+          "blend_deviation_p95": 0.5002144575119019,
+          "jerk_median": 0.03543396294116974,
+          "jerk_p95": 0.042758066207170486
+        },
+        "candidate_metrics": {
+          "path_excess_median": 0.13830478489398956,
+          "path_excess_p95": 0.21382439136505127,
+          "asymmetry_median": 0.003114745020866394,
+          "asymmetry_p95": 0.019815124571323395,
+          "blend_deviation_median": 0.2963223457336426,
+          "blend_deviation_p95": 0.3650045096874237,
+          "jerk_median": 0.00011010095477104187,
+          "jerk_p95": 0.00046746135922148824
+        },
+        "robust_z": {
+          "path_excess": 114.01230858417101,
+          "asymmetry": 0.0,
+          "blend_deviation": 0.0,
+          "jerk": 0.0
+        },
+        "calibration_z": {
+          "path_excess_median": 6.902710613166207,
+          "blend_deviation_median": 2.833423193189757,
+          "asymmetry_median": 0.0,
+          "jerk_median": 0.0
+        },
+        "quality_score": 0.29120275445694377,
+        "decision": "REVIEW",
+        "reasons": [
+          "temporal_quality_outlier",
+          "cross_window_temporal_outlier"
+        ]
+      },
+      {
+        "window_start": 38.166667,
+        "window_end": 39.166667,
+        "canary_start": 38.466667,
+        "canary_end": 38.866667,
+        "sample_count": 4,
+        "valid_triple_ratio": 0.4,
+        "source_baseline": {
+          "path_excess_median": 0.0030648247338831425,
+          "path_excess_p95": 0.007954759523272514,
+          "asymmetry_median": 0.996760368347168,
+          "asymmetry_p95": 0.9979622960090637,
+          "blend_deviation_median": 0.5004144906997681,
+          "blend_deviation_p95": 0.5009644627571106,
+          "jerk_median": 0.01695523038506508,
+          "jerk_p95": 0.02338174730539322
+        },
+        "candidate_metrics": {
+          "path_excess_median": 0.04425469785928726,
+          "path_excess_p95": 0.06919107586145401,
+          "asymmetry_median": 0.01417479757219553,
+          "asymmetry_p95": 0.025073084980249405,
+          "blend_deviation_median": 0.17345470190048218,
+          "blend_deviation_p95": 0.21499904990196228,
+          "jerk_median": 0.0002703741192817688,
+          "jerk_p95": 0.00042198720620945096
+        },
+        "robust_z": {
+          "path_excess": 25.303798633840646,
+          "asymmetry": 0.0,
+          "blend_deviation": 0.0,
+          "jerk": 0.0
+        },
+        "calibration_z": {
+          "path_excess_median": 0.0,
+          "blend_deviation_median": 0.0,
+          "asymmetry_median": 0.0,
+          "jerk_median": 1.0442244820296764
+        },
+        "quality_score": 0.7929861199179808,
+        "decision": "SMOOTH+",
+        "reasons": [
+          "temporal_quality_outlier",
+          "within_observed_canary_distribution"
+        ]
+      },
+      {
+        "window_start": 43.166667,
+        "window_end": 44.166667,
+        "canary_start": 43.466667,
+        "canary_end": 43.866667,
+        "sample_count": 5,
+        "valid_triple_ratio": 0.5,
+        "source_baseline": {
+          "path_excess_median": 0.004729999229311943,
+          "path_excess_p95": 0.036708615720272064,
+          "asymmetry_median": 0.9943485260009766,
+          "asymmetry_p95": 0.9984276294708252,
+          "blend_deviation_median": 0.5011047720909119,
+          "blend_deviation_p95": 0.5034677982330322,
+          "jerk_median": 0.007498946972191334,
+          "jerk_p95": 0.009414682164788246
+        },
+        "candidate_metrics": {
+          "path_excess_median": 0.035064697265625,
+          "path_excess_p95": 0.04607658088207245,
+          "asymmetry_median": 0.026034345850348473,
+          "asymmetry_p95": 0.06548179686069489,
+          "blend_deviation_median": 0.1644722819328308,
+          "blend_deviation_p95": 0.20736435055732727,
+          "jerk_median": 0.00016595167107880116,
+          "jerk_p95": 0.0003122831112705171
+        },
+        "robust_z": {
+          "path_excess": 20.862648680114383,
+          "asymmetry": 0.0,
+          "blend_deviation": 0.0,
+          "jerk": 0.0
+        },
+        "calibration_z": {
+          "path_excess_median": 0.0,
+          "blend_deviation_median": 0.0,
+          "asymmetry_median": 0.7232475332334141,
+          "jerk_median": 0.0
+        },
+        "quality_score": 0.8468749460737458,
+        "decision": "SMOOTH+",
+        "reasons": [
+          "temporal_quality_outlier",
+          "within_observed_canary_distribution"
+        ]
+      }
+    ]
+  },
+  "temporal_qa": {
+    "status": "PASS",
+    "checks": {
+      "output_fps": {
+        "pass": true,
+        "value": 60.0,
+        "target": 60.0
+      },
+      "cfr": {
+        "pass": true,
+        "frames": 1920,
+        "video_duration": 32.0,
+        "source_probe_cfr": true
+      },
+      "target_fps": {
+        "pass": true,
+        "actual": 60.0,
+        "expected": 60.0
+      },
+      "pts_monotonic": {
+        "pass": true,
+        "frames_checked": 1920
+      },
+      "av_duration_delta": {
+        "pass": true,
+        "video": 32.0,
+        "audio": 31.982,
+        "delta": 0.018000000000000682
+      },
+      "edited_timeline_duration": {
+        "pass": true,
+        "expected": 31.982146000000004,
+        "actual": 32.0,
+        "delta": 0.017853999999996262
+      },
+      "adaptive_route_integrity": {
+        "pass": true,
+        "smooth_seconds": 2.0,
+        "keep_seconds": 31.982146000000004,
+        "smooth_fraction": 0.0625348905605021,
+        "non_overlapping": true,
+        "scene_cuts": [
+          31.166667
+        ]
+      },
+      "duplicate_ratio_drift_normalized": {
+        "pass": true,
+        "target_fps": 30.0,
+        "source": 0.4751732101616628,
+        "output_at_source_fps": 0.5083333333333333,
+        "delta": 0.0331601231716705
+      }
+    },
+    "warnings": [],
+    "encoder_contract": {
+      "fps": 60.0,
+      "frames": 1920,
+      "duration_s": 32.0,
+      "codec": "h264",
+      "size": [
+        2560,
+        1528
+      ]
+    }
+  },
+  "promotion_gate": "REVIEW",
+  "automatic_promotion": false,
+  "capcut": {
+    "project_path": "C:\\Users\\chara\\AppData\\Local\\CapCut\\User Data\\Projects\\com.lveditor.draft\\AI_Edit_SCOS_SMOOTHPLUS_ADAPTIVE_V3_R2",
+    "app_version": "9.6.0",
+    "canvas": [
+      2560,
+      1528
+    ],
+    "caption_segments": 7,
+    "derived_caption_repair": {
+      "segment_id": "ed2d7427-74de-43ef-8632-f8033ddc60cb",
+      "old_duration_ms": 400,
+      "new_duration_ms": 445,
+      "canonical_srt_unchanged": true
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 0,
+      "info": 0,
+      "total": 0
+    }
+  },
+  "benchmark": {
+    "rife_workload_reduction": 0.9374651094394979,
+    "full_to_adaptive_speedup": 8.770706515225633,
+    "adaptive_time_s": 23.111200499995903,
+    "full_time_s": 202.7015568,
+    "quality_ssim_delta_adaptive_minus_full": 0.0023320000000000007,
+    "quality_ssim_retention_vs_preserve": 2.799999999991698e-05,
+    "automatic_promotion": false
+  },
+  "final_gate_matrix": "evidence/media-pipeline-adaptive-v3/FINAL_GATE_MATRIX_V3_R2.json",
+  "overall": "PASS_WITH_PROMOTION_DISABLED",
+  "generated_at": "2026-09-27T20:15:22+0700"
+}

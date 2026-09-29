@@ -1,0 +1,1 @@
+Inspect Cloudflare through the authenticated MCP. Read-only. List accounts, zones, and tunnel 08a4e3a2-48fa-4464-8688-a79dac8a6773 including public hostnames and routes. Identify a safe existing hostname for BrightBean. Do not modify anything. Do not expose secrets.

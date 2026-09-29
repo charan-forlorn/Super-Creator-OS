@@ -1,0 +1,22 @@
+services:
+  edge:
+    image: caddy@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+    container_name: brightbean-edge
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18080:80"
+    volumes:
+      - ./Caddyfile.edge:/etc/caddy/Caddyfile:ro
+    depends_on:
+      app:
+        condition: service_started
+    networks:
+      - default
+      - woodpecker-net
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  woodpecker-net:
+    external: true
+    name: woodpecker-net

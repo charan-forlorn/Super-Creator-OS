@@ -9,7 +9,11 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from knowledge_service import KnowledgeService
+try:
+    from ..knowledge.knowledge_service import KnowledgeService
+except ImportError:  # pragma: no cover - supports this repo's plain-script tests
+    from knowledge_service import KnowledgeService
+
 try:
     from .report_models import (
         COMMERCIAL_REPORT_SCHEMA_VERSION,

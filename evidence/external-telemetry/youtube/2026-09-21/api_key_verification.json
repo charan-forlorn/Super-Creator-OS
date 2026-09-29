@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-09-21T02:11:00+07:00",
+  "source_file": "C:\\Users\\chara\\Downloads\\gooale API.txt",
+  "secret_value_persisted_by_scOS": false,
+  "credential_inventory": {
+    "google_api_key_present": true,
+    "google_oauth_client_id_present": true,
+    "google_oauth_client_secret_present": false
+  },
+  "verification": {
+    "google_api_key_format": "VALID_FORMAT_DETECTED",
+    "youtube_data_api": {
+      "endpoint_tested": "youtube.v3.videos.list",
+      "http_status": 403,
+      "status": "PERMISSION_DENIED",
+      "reason": "forbidden",
+      "message": "Requests to this API youtube method youtube.api.v3.V3DataVideoService.List are blocked."
+    },
+    "youtube_analytics_api": {
+      "endpoint_tested": "youtubeanalytics.v2.reports.query",
+      "http_status": 401,
+      "status": "NOT_AUTHORIZED_WITH_API_KEY",
+      "message": "YouTube Analytics API requires OAuth 2.0 authorization."
+    }
+  },
+  "scos_decision": {
+    "save_as_youtube_analytics_access_token": false,
+    "save_as_active_youtube_data_api_key": false,
+    "telemetry_ready": false,
+    "next_required_credential": "OAuth 2.0 authorization with yt-analytics.readonly scope"
+  },
+  "security": {
+    "api_key_value_not_written_to_evidence": true,
+    "api_key_value_not_written_to_source": true,
+    "api_key_value_not_written_to_environment": true
+  }
+}

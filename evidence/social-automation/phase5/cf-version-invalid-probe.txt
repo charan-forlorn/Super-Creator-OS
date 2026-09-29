@@ -1,0 +1,1 @@
+Call only mcp__cloudflare__post_accounts_workers_scripts_versions with account_id=cb98ff5a98ddb6c0f09450505be7c3f5, script_name=brightbean-upload-probe-20260928, content_type=multipart/form-data; boundary=probe, body=abc. Return the exact API validation/error and stop. Do not retry.

@@ -1,0 +1,1 @@
+Use exact Cloudflare MCP tool mcp__cloudflare__get_accounts_connectivity_directory_services. Read-only. Call with account_id=cb98ff5a98ddb6c0f09450505be7c3f5 and per_page=100 if accepted. Return compact JSON of existing VPC service names, ids, types, and host definitions. No mutation and no secrets.

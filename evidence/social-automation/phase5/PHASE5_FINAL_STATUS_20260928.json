@@ -1,0 +1,20 @@
+﻿{
+    "vpc_binding":  "BRIGHTBEAN -\u003e brightbean-edge",
+    "tunnel_replicas":  2,
+    "tunnel_id":  "08a4e3a2-48fa-4464-8688-a79dac8a6773",
+    "timestamp":  "2026-09-28T08:41:34",
+    "public_login":  503,
+    "public_worker":  "https://brightbean-social-edge-20260928.charan254311.workers.dev",
+    "active_version":  "eb2fff11",
+    "temporary_observability_enabled":  false,
+    "public_health":  503,
+    "wrangler_oauth_authorized":  false,
+    "tunnel":  "HAIOS Cloudflare.",
+    "origin_health":  {
+                          "root":  200,
+                          "health":  200,
+                          "login":  200
+                      },
+    "tunnel_status":  "Healthy",
+    "route":  "*/* -\u003e http://brightbean-edge:80"
+}

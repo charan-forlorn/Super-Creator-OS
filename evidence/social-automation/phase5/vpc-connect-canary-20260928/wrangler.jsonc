@@ -1,0 +1,14 @@
+{
+  "name": "brightbean-vpc-connect-canary-20260928",
+  "main": "src/worker.mjs",
+  "workers_dev": true,
+  "preview_urls": false,
+  "compatibility_date": "2026-09-26",
+  "vpc_networks": [
+    {
+      "binding": "PRIVATE_NETWORK",
+      "tunnel_id": "08a4e3a2-48fa-4464-8688-a79dac8a6773",
+      "remote": true
+    }
+  ]
+}

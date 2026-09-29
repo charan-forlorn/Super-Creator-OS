@@ -1,0 +1,7 @@
+﻿SERVICE_ID=01a0e4c6-ae62-74e0-8cbf-4df204bec536
+NAME=brightbean-edge
+TYPE=http
+HOSTNAME=brightbean-edge
+HTTP_PORT=80
+TUNNEL_ID=08a4e3a2-48fa-4464-8688-a79dac8a6773
+CURRENT_EDGE_IP=172.18.0.6

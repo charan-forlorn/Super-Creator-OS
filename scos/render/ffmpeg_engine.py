@@ -18,11 +18,12 @@ from pathlib import Path
 
 from scos.render.base import (
     RenderBackend,
-    RenderClip,
     RenderError,
     RenderProfile,
     RenderRequest,
+    ShotSpec,
 )
+from scos.render.generative_video_backend import GenerativeVideoBackend
 from scos.render.video_use_backend import VideoUseBackend
 
 log = logging.getLogger("scos.render.ffmpeg_engine")
@@ -42,16 +43,29 @@ def _resolve(path_str: str) -> Path:
 def _request_from_timeline(run_id: str, edit_timeline: dict) -> RenderRequest:
     """Map the orchestrator's edit_timeline (stills+audio) into a RenderRequest."""
     clips_in = edit_timeline.get("clips") or []
-    clips: list[RenderClip] = []
+    clips: list[ShotSpec] = []
     for c in clips_in:
         duration = round(float(c["end"]) - float(c["start"]), 3)
         audio = c.get("audio_path")
         clips.append(
-            RenderClip(
+            ShotSpec(
                 scene_id=c.get("scene_id", f"scene_{len(clips):02d}"),
                 visual_path=_resolve(c["asset_path"]),
                 audio_path=_resolve(audio) if audio else None,
                 duration_s=duration,
+                motion=c.get("motion", "static"),
+                motion_strength=float(c.get("motion_strength", 0.08)),
+                camera=c.get("camera", "locked"),
+                action=c.get("action", ""),
+                environment=c.get("environment", ""),
+                lighting=c.get("lighting", ""),
+                style=c.get("style", ""),
+                prompt=c.get("prompt", ""),
+                references=tuple(c.get("references") or ()),
+                start_frame=_resolve(c["start_frame"]) if c.get("start_frame") else None,
+                end_frame=_resolve(c["end_frame"]) if c.get("end_frame") else None,
+                generation_backend=c.get("generation_backend", "deterministic"),
+                continuity_group=c.get("continuity_group", ""),
             )
         )
     return RenderRequest(
@@ -76,9 +90,12 @@ def render(input_data: dict, backend: RenderBackend | None = None) -> dict:
     """
     run_id = input_data["run_id"]
     edit_timeline = input_data["edit_timeline"]
-    backend = backend or VideoUseBackend()
-
     request = _request_from_timeline(run_id, edit_timeline)
+    if backend is None:
+        needs_generation = any(
+            clip.generation_backend != "deterministic" for clip in request.clips
+        )
+        backend = GenerativeVideoBackend() if needs_generation else VideoUseBackend()
     if not request.clips:
         raise RenderError(f"run {run_id}: edit_timeline has no clips to render")
 

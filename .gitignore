@@ -85,16 +85,11 @@ project_audit/
 # Browser-acceptance debug log (generated at runtime, not source).
 debug.log
 # App icon + design-reference assets (binary, not part of the 10C source change).
-apps/control-center/app/icon.svg
-apps/control-center/design-references/
-apps/control-center/public/
 # Local pytest basetemp / temp dirs (permission-denied leftovers from CI runs).
 .pytest-tmp-*/
 # Local runtime store / integrity markers (per-run, not source).
-apps/control-center/memory/
 memory/runtime/
 /tmp-never/frontend-python-shim/
-/apps/control-center/tests/rt-bridge-fixture/
 
 # WebView2 Fixed Version Runtime (official Microsoft binaries, bundled locally to bypass corrupted system Evergreen registration)
 apps/desktop/src-tauri/Microsoft.WebView2.FixedVersionRuntime.*/
@@ -110,3 +105,11 @@ apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/target/release/
 apps/desktop/src-tauri/target/debug/
 apps/desktop/*.tsbuildinfo
+
+# --- Local media-pipeline runtime / model binaries (required locally, never commit) ---
+tools/rife/
+.venv-video-gen/
+scos/work/
+evidence/**/*.mp4
+evidence/**/*.mov
+evidence/**/_synthetic_*.mp4

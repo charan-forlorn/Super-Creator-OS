@@ -1,0 +1,1 @@
+Cloudflare read-only inventory. Use tool_search for exact capability: Cloudflare get_zones List Zones. Do not invent mcp__cloudflare__execute. Inspect the exact deferred tool name returned by tool_search, then call that exact tool with account.id=cb98ff5a98ddb6c0f09450505be7c3f5 and per_page=50. Return only zone name/id pairs. No mutations and no secrets.

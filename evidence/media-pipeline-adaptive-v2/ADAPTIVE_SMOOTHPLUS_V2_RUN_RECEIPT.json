@@ -1,0 +1,147 @@
+{
+  "schema": "SCOS-SMOOTHPLUS-V2-RUN-RECEIPT-1",
+  "run_date": "2026-09-27",
+  "source": {
+    "path": "C:\\Users\\chara\\OneDrive\\Videos\\การบันทึกหน้าจอ\\การบันทึกหน้าจอ 2026-09-27 091454.mp4",
+    "sha256": "59070BFD7195F40A17532D67D7BB1C82473EE0C4DDBF73F815DB6DEE6DC37EF7",
+    "fps": 30.0,
+    "duration_s": 57.7333
+  },
+  "keep_ranges": [
+    [
+      18.263437,
+      50.245583
+    ]
+  ],
+  "scene_cuts": [
+    31.166667,
+    56.066667
+  ],
+  "adaptive_policy": {
+    "window_s": 1.0,
+    "min_window_s": 0.5,
+    "max_window_s": 2.0,
+    "decision_counts": {
+      "PRESERVE": 22,
+      "SMOOTH+": 7,
+      "REVIEW": 2
+    },
+    "selected_spans": [
+      [
+        32.166667,
+        37.166667
+      ],
+      [
+        38.166667,
+        39.166667
+      ],
+      [
+        43.166667,
+        44.166667
+      ]
+    ],
+    "selected_seconds": 7.0,
+    "keep_seconds": 31.982146,
+    "selection_fraction": 0.21887211696175732,
+    "rife_workload_reduction": 0.7811278830382427
+  },
+  "rife": {
+    "model": "rife-v4.6",
+    "binary": "rife-ncnn-vulkan",
+    "gpu": 0,
+    "threads": "2:4:4",
+    "dynamic_source_fps": true
+  },
+  "artifacts": {
+    "preserve": {
+      "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\SCOS_Round_P3_FINAL.mp4",
+      "sha256": "16C88BEF082B9E9664AD0421C17F17E5177A2DCBF607169BDBF2FEA0F113303F"
+    },
+    "full_smoothplus": {
+      "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\SCOS_SMOOTHPLUS_CANDIDATE.mp4",
+      "sha256": "3636574722B24446BB6620DC299D7091197AE43DA0F7C9183CB316B18ECF9C88"
+    },
+    "adaptive_v2": {
+      "path": "C:\\Users\\chara\\Downloads\\video_edit_test\\SCOS_SMOOTHPLUS_ADAPTIVE_V2_CANDIDATE.mp4",
+      "sha256": "78792D3C6C88A740FE474523FA0A261DCBB73CA87C765952B06E6B87FD619428"
+    }
+  },
+  "adaptive_render": {
+    "elapsed_total_s": 58.95447239999339,
+    "rife_seconds": 53.64456549999158,
+    "output_fps": 60.0,
+    "output_frames": 1920,
+    "video_duration_s": 32.0,
+    "audio_duration_s": 31.982,
+    "av_delta_s": 0.018,
+    "automatic_promotion": false
+  },
+  "temporal_qa": {
+    "status": "PASS",
+    "pts_monotonic": true,
+    "cfr60": true,
+    "normalized_duplicate_drift": 0.0331601231716705,
+    "route_integrity": true,
+    "scene_cut_safety": true
+  },
+  "benchmark": {
+    "path": "evidence/media-pipeline-adaptive-v2/SMOOTHPLUS_V2_BENCHMARK_V3.json",
+    "full_time_s": 202.7015568,
+    "adaptive_time_s": 58.95447239999339,
+    "speedup_full_to_adaptive": 3.438272764527746,
+    "adaptive_ssim": 0.99693,
+    "full_ssim": 0.995184,
+    "preserve_ssim": 0.997488,
+    "adaptive_vmaf": 96.91249,
+    "full_vmaf": 95.518445,
+    "preserve_vmaf": 97.236146,
+    "adaptive_artifact_spike_rate_proxy": 0.44525547445255476,
+    "full_artifact_spike_rate_proxy": 0.3168058455114823,
+    "adaptive_temporal_motion_continuity_proxy": 0.42072154359280367,
+    "full_temporal_motion_continuity_proxy": 0.5470086307532717
+  },
+  "capcut": {
+    "project": "C:\\Users\\chara\\AppData\\Local\\CapCut\\User Data\\Projects\\com.lveditor.draft\\AI_Edit_SCOS_SMOOTHPLUS_ADAPTIVE_V2",
+    "lint": {
+      "errors": 0,
+      "warnings": 0,
+      "info": 0,
+      "total": 0
+    },
+    "captions": 7,
+    "derived_only_caption_repair": {
+      "segment_id": "cc115a21-13d2-4c57-8b1b-06cbd26a4ddc",
+      "from_duration_ms": 400,
+      "to_duration_ms": 445,
+      "canonical_srt_modified": false
+    }
+  },
+  "tests": {
+    "adaptive_unit": "6 passed",
+    "render_regression": "18 passed",
+    "media_analysis_regression": "11 passed",
+    "dynamic_fps": "PASS 25fps CFR probe",
+    "audio_segment_mapping": "PASS 2s CFR60 output with segmented audio",
+    "visual_spotcheck": "PASS",
+    "combined_media_regression": "29 passed",
+    "broader_scripts_regression": "FAIL: 115 passed / 13 failed; unrelated CI-parity/security-baseline drift"
+  },
+  "hermes": {
+    "gateway": "RUNNING",
+    "version": "0.21.5+3169.g28e6496",
+    "skill_updated": true,
+    "execution_authority": "orchestrator_only",
+    "project_trusted": true,
+    "read_only_skill_smoke": "PASS",
+    "smoke_policy": "Jev optional advisory only; deterministic safety gates authoritative"
+  },
+  "typesafe_jev": {
+    "api_key_present": false,
+    "status": "UNAVAILABLE",
+    "deterministic_authority": false
+  },
+  "promotion_gate": "REVIEW",
+  "status": "PASS_WITH_PROMOTION_DISABLED",
+  "scope_note": "Benchmark coverage uses the verified 57.7s mixed footage; within it the route exercised low-motion/static regions, a hard scene cut, and mixed-motion windows. No separately validated talking-head or pan footage was introduced solely for this phase.",
+  "promotion_reason": "artifact-spike proxy higher and temporal-motion-continuity proxy lower than full SMOOTH+ on this footage; broader corpus calibration pending"
+}

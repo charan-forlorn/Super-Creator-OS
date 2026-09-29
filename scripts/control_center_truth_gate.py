@@ -1,435 +1,125 @@
-"""Control Center browser-acceptance + mock/truth enforcement gate (Cohort 9D).
+"""SCOS Control Center truth gate — backend/currentness qualification only.
 
-Deterministic, install-free, CI-safe structural verifier for the Control Center
-frontend truth contract. It is the local CI-parity "Browser Acceptance" gate:
-it checks the production read-only surface for regressions that would violate
-the Cohort 9A/9B truth contract or introduce a browser-performed production
-mutation. The full desktop/mobile viewport matrix (real browsers) is executed
-out-of-band by the certifying agent against a production-equivalent build and is
-recorded in the cohort report; this gate is the deterministic, repeatable part
-that CI and the local verifier both run identically.
+The legacy local frontend has been retired. The authoritative Control Center
+backend projection remains in scos/control_center/control_center_snapshot.py.
+This gate verifies that the read-only projection contract is present, produces
+truthful state semantics, and does not leak unsafe fields.
 
-Why static and not a live browser driver:
-- The security scanner (security_scan_baseline.py) scans scripts/*.py only with
-  generic token/network patterns, but the cohort forbids introducing live
-  browser drivers, remote services, or subprocess-based egress into the repo.
-  A pure-stdlib structural gate guarantees zero scanner findings and zero new
-  runtime dependencies while still enforcing the required truth contract:
-    * production routes do not import test/demo fixtures;
-    * valid records map to AVAILABLE_WITH_DATA;
-    * empty records map to EMPTY (never UNAVAILABLE, never fabricated);
-    * unavailable/malformed/stale/untrusted map to UNAVAILABLE (never EMPTY);
-    * demo data is never merged into live truth;
-    * dry-run remains preview-only (mode DRY_RUN, side_effects_performed false);
-    * no browser storage fabricates or persists truth;
-    * no new production mutation route is introduced.
-
-Runtime truth-state behavior is additionally covered by the vitest truth-contract
-and browser-acceptance suites (apps/control-center/tests/*), which execute the
-actual mapping/fail-closed/dry-run logic in jsdom.
-
-Run: .venv\\Scripts\\python.exe scripts\\control_center_truth_gate.py
-Exit: 0 on PASS, 1 on FAIL, 2 on preflight/usage error.
+Exit 0 = PASS, 1 = FAIL, 2 = preflight error.
 """
 
 from __future__ import annotations
 
-import re
+import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
-_FRONTEND_DIR = _ROOT / "apps" / "control-center"
-
-# Truth-bearing production files that must NEVER import mock/demo/fixture data.
-# The prototype shell components (app-shell, prompt-builder, workflow-router-panel)
-# are intentionally exempt: per package.json the Control Center is a "local-first
-# frontend prototype (no backend)" and those shells render illustrative mock data
-# behind disabled controls. They are NOT part of the truth-bearing read-only
-# bridge, so they are not asserted here.
-_TRUTH_PATH_FILES = (
-    "app/page.tsx",
-    "app/projects/page.tsx",
-    "app/evidence/page.tsx",
-    "app/approvals/page.tsx",
-    "app/layout.tsx",
-    "app/api/control-center-snapshot/route.ts",
-    "app/api/operator-dry-run/route.ts",
-    "components/cockpit/cockpit-dashboard.tsx",
-    "components/cockpit/cockpit-routes.tsx",
-    "components/cockpit/cockpit-shell.tsx",
-    "components/operator-dry-run-panel.tsx",
-    "lib/control-center-snapshot.ts",
-    "lib/operator-dry-run.ts",
-)
-
-# Mock/demo/fixture module-name fragments whose import is forbidden in the
-# truth path. Cohort 9A/9B guarantee DEMO is a single separate constant dataset,
-# so the *data* files themselves are allowed to exist; only *importing* them into
-# the truth path is prohibited (no silent leak of demo fixtures into live truth).
-_FORBIDDEN_IMPORT_FRAGMENTS = ("mock-data", "mock_data", "fixture", "demo-data", "demo_data")
-
-# Browser-storage tokens that must never appear in truth-path production files:
-# truth must never be fabricated or persisted through client storage.
-_FORBIDDEN_STORAGE_TOKENS = ("localStorage", "sessionStorage", "navigator.clipboard")
-
-# Reviewed read-only transport routes. No other app/api route may introduce a
-# mutation method (POST/PUT/PATCH/DELETE) — the only allowed production surface
-# is the two reviewed same-origin read-only bridges.
-_REVIEWED_ROUTES = {
-"apps/control-center/app/api/control-center-snapshot/route.ts",
-"apps/control-center/app/api/operator-dry-run/route.ts",
-# Cohort 10I authoritative paid-pilot readiness projection transport.
-# Reviewed safe: GET-only read-only bridge deriving readiness from the
-# Python authority; no mutation, no subprocess, no external egress, no
-# browser storage, no render. Declares runtime = "nodejs" +
-# dynamic = "force-dynamic".
-"apps/control-center/app/api/paid-pilot/readiness/route.ts",
-    # Cohort 10C authoritative project-preparation transport. Reviewed safe:
-    # GET read-only bridge + POST create/approve/preview mutations that
-    # persist to a dedicated local store (memory/runtime/control-center/)
-    # through a locked, atomically-written adapter (mirror of the Python
-    # service). No HVS init, no render, no external network, no
-    # browser storage, no migration of memory/database.json. Declared
-    # runtime = "nodejs" + dynamic = "force-dynamic" (no static caching).
-    "apps/control-center/app/api/project-preparation/route.ts",
-    "apps/control-center/app/api/project-preparation/[projectId]/approve/route.ts",
-    "apps/control-center/app/api/project-preparation/[projectId]/preview/route.ts",
-    # Cohort 10D authoritative HVS materialization transport. Reviewed safe:
-    # GET projection (read-only) + POST authorize/execute/reconcile that
-    # persist to a dedicated local store (memory/runtime/control-center/)
-    # through a locked, atomically-written adapter mirroring the Python
-    # service. No HVS init beyond the controlled local double, no render, no
-    # external network, no browser storage, no migration of
-    # memory/database.json. Declared runtime = "nodejs" + dynamic =
-    # "force-dynamic" (no static caching).
-    "apps/control-center/app/api/hvs-materialization/projection/route.ts",
-    "apps/control-center/app/api/hvs-materialization/authorize/route.ts",
-    "apps/control-center/app/api/hvs-materialization/execute/route.ts",
-    "apps/control-center/app/api/hvs-materialization/reconcile/route.ts",
-    "apps/control-center/app/api/hvs-render/projection/route.ts",
-    "apps/control-center/app/api/hvs-render/authorize/route.ts",
-    "apps/control-center/app/api/hvs-render/execute/route.ts",
-    "apps/control-center/app/api/hvs-render/reconcile/route.ts",
-    # Cohort 10E — reviewed same-origin Brand Kit transport (GET read + POST
-    # upsert, strict ALLOWED_FIELDS, fail-closed). Declares runtime = "nodejs"
-    # + dynamic = "force-dynamic".
-    "apps/control-center/app/api/brand-kit/route.ts",
-    # Cohort 10E — reviewed controlled export stub (fail-closed unless
-    # SCOS_EXPORT_STUB_ENABLED). Declares runtime = "nodejs" + dynamic =
-    # "force-dynamic".
-    "apps/control-center/app/api/hvs-render/export/route.ts",
-    # Cohort 10G — reviewed same-origin golden-render execute transport.
-    # Strict ALLOWED_FIELDS POST server-controlled HVS render bridge; no
-    # external network, no browser storage, no migration of
-    # memory/database.json. Declares runtime = "nodejs" + dynamic =
-    # "force-dynamic" (no static caching).
-    "apps/control-center/app/api/golden-render/execute/route.ts",
-    # Cohort 10H — reviewed same-origin paid-pilot delivery transport. GET
-    # projection (read-only) + POST submitRightsReview/createDeliveryPackage/
-    # approveDelivery/markHandoffReady that persist to the dedicated local HVS
-    # paid-pilot store via the controlled server-side bridge
-    # (lib/paid-pilot-delivery-bridge.ts). No external network, no browser
-    # storage, no migration of memory/database.json. Declares runtime =
-    # "nodejs" + dynamic = "force-dynamic" (no static caching).
-    "apps/control-center/app/api/paid-pilot/delivery/route.ts",
-    "apps/control-center/app/api/paid-pilot/delivery/download/route.ts",
-    # Cohort 10J reviewed guided paid-pilot intake transport. Browser route is
-    # non-authoritative; Python service/CLI remain the writer. Declares
-    # runtime=nodejs + dynamic=force-dynamic; no generic proxy or external egress.
-    "apps/control-center/app/api/paid-pilot/intake/route.ts",
-    # R2.1 packet-admission authority transport. Reviewed safe: POST-only
-    # boundary that accepts ONLY {operation, expected_sha256} from the browser
-    # (no filesystem path); the packet path + every task-owned root are resolved
-    # server-side from trusted environment. Produces a browser-safe projection
-    # (no absolute paths, no raw evidence, no PII). No mutation of evidence,
-    # no render, no external egress. Declares dynamic=force-dynamic.
-    "apps/control-center/app/api/paid-pilot/admission/route.ts",
-    # R2.1 pre-render readiness authority transport. Reviewed safe: POST-only
-    # read-only boundary; the browser submits only external_project_ref, the
-    # server resolves canonical id + task-owned roots from environment. No
-    # render authorization, no renderer invocation, no external egress.
-    # Declares dynamic=force-dynamic.
-    "apps/control-center/app/api/paid-pilot/render-readiness/route.ts",
-    # R2.2 canonical project creation transport. Reviewed safe: POST-only; the
-    # browser submits only {operation, idempotency_key}; all roots + packet path
-    # resolved server-side from trusted environment. Single writer for the
-    # canonical spp-* project (admission record -> identity -> HVS dir ->
-    # materialization). No render authorization, no renderer invocation, no
-    # external egress. Declares dynamic=force-dynamic.
-    "apps/control-center/app/api/paid-pilot/create/route.ts",
+_ALLOWED = {"AVAILABLE_WITH_DATA", "AVAILABLE_EMPTY", "UNAVAILABLE", "DEGRADED", "ERROR"}
+_REQUIRED = {
+    "schema_version",
+    "snapshot_id",
+    "generated_at",
+    "source_mode",
+    "health",
+    "queue_summary",
+    "approval_summary",
+    "project_summary",
+    "evidence_summary",
+    "recent_activity",
+    "degradation_reasons",
 }
 
-
-def _iter_frontend_files():
-    if not _FRONTEND_DIR.is_dir():
-        return
-    for path in sorted(_FRONTEND_DIR.rglob("*")):
-        if not path.is_file():
-            continue
-        if path.suffix not in (".ts", ".tsx", ".js", ".jsx"):
-            continue
-        if any(part in ("node_modules", ".next", ".vercel", "dist", "build", "coverage")
-               for part in path.parts):
-            continue
-        yield path
-
-
-def _rel(path: Path) -> str:
-    return path.relative_to(_ROOT).as_posix()
-
-
-def _import_lines(text: str):
-    """Yield (lineno, line) for import/export-from statements (TS/JS)."""
-    for i, line in enumerate(text.splitlines(), start=1):
-        stripped = line.strip()
-        if stripped.startswith("import ") or stripped.startswith("export ") and "from" in stripped:
-            yield i, stripped
-
-
-def _check_truth_path_mock_isolation(findings: list[tuple]) -> None:
-    """Production truth-path files must not import mock/demo/fixture data."""
-    for rel in _TRUTH_PATH_FILES:
-        path = _FRONTEND_DIR / rel
-        if not path.is_file():
-            findings.append((rel, 0, "truth_path_file_missing", rel))
-            continue
-        text = path.read_text(encoding="utf-8")
-        for lineno, line in _import_lines(text):
-            for frag in _FORBIDDEN_IMPORT_FRAGMENTS:
-                if frag in line:
-                    findings.append((rel, lineno, "truth_path_imports_mock_fixture", frag))
-                    break
-
-
-def _check_route_tree_mock_isolation(findings: list[tuple]) -> None:
-    """Every file under app/ (route tree) must not import mock/demo/fixture data."""
-    for path in _iter_frontend_files():
-        rel = _rel(path)
-        if not rel.startswith("apps/control-center/app/"):
-            continue
-        text = path.read_text(encoding="utf-8")
-        for lineno, line in _import_lines(text):
-            for frag in _FORBIDDEN_IMPORT_FRAGMENTS:
-                if frag in line:
-                    findings.append((rel, lineno, "route_tree_imports_mock_fixture", frag))
-                    break
-
-
-def _check_no_storage_fabrication(findings: list[tuple]) -> None:
-    """Truth-path production files must not fabricate truth via browser storage."""
-    for rel in _TRUTH_PATH_FILES:
-        path = _FRONTEND_DIR / rel
-        if not path.is_file():
-            continue
-        text = path.read_text(encoding="utf-8")
-        # Strip comments/strings-lite: scan whole file; storage tokens are
-        # structural identifiers, unlikely inside prose strings.
-        for token in _FORBIDDEN_STORAGE_TOKENS:
-            if token in text:
-                # Allow the documented exemption: the reviewed dry-run panel may
-                # reference "write_browser_storage" only as a prohibited-action
-                # name inside the dry-run planner output (a string literal), not
-                # as an actual call. We flag real API usage only.
-                if token == "navigator.clipboard" and "write_browser_storage" in text:
-                    continue
-                findings.append((rel, 0, "truth_path_uses_browser_storage", token))
-
-
-def _check_no_new_mutation_route(findings: list[tuple]) -> None:
-    """No app/api route may expose a mutation method beyond the reviewed set."""
-    api_dir = _FRONTEND_DIR / "app" / "api"
-    if not api_dir.is_dir():
-        return
-    for path in sorted(api_dir.rglob("route.ts")):
-        rel = _rel(path)
-        if rel in _REVIEWED_ROUTES:
-            # Reviewed routes are allowed; verify they declare read-only runtime
-            # and dynamic = force-dynamic (no static caching of a read-only bridge).
-            text = path.read_text(encoding="utf-8")
-            if "force-dynamic" not in text:
-                findings.append((rel, 0, "reviewed_route_not_force_dynamic", "force-dynamic"))
-            continue
-        # Any other route file is a regression: only the two reviewed read-only
-        # bridges may exist.
-        findings.append((rel, 0, "unreviewed_api_route_introduced", rel))
-
-
-
-def _check_guided_pilot_intake_authority(findings: list[tuple]) -> None:
-    """Cohort 10J guided intake must preserve Python authority and browser projection."""
-    required = {
-        "scos/control_center/hvs_guided_pilot_intake.py": (
-            "os.replace", "admission-packet.json", "external_action_restrictions", "CREATION_OUTCOME_UNKNOWN",
-        ),
-        "scos/control_center/hvs_guided_pilot_intake_cli.py": (
-            "json.loads", "op=", "sample-asset", "GuidedIntakeStore",
-        ),
-        "apps/control-center/lib/paid-pilot-intake-bridge.ts": (
-            "childProcess.spawn", "hvs_guided_pilot_intake_cli", "setTimeout", "child.kill", "MAX=1_048_576",
-        ),
-        "apps/control-center/lib/paid-pilot-intake-client.ts": (
-            'fetch("/api/paid-pilot/intake"', "REQUEST_FAILED",
-        ),
-        "apps/control-center/app/api/paid-pilot/intake/route.ts": (
-            "const OPS", "invokeIntake", "cache-control",
-        ),
-    }
-    forbidden = {
-        "apps/control-center/lib/paid-pilot-intake-bridge.ts": ("shell:true", "setInterval", "stderr", "Traceback"),
-        "apps/control-center/lib/paid-pilot-intake-client.ts": ("localStorage", "sessionStorage", "http://", "https://"),
-        "apps/control-center/app/api/paid-pilot/intake/route.ts": ("localStorage", "sessionStorage", "stderr", "Traceback"),
-    }
-    for rel, markers in required.items():
-        path = _ROOT / rel
-        if not path.is_file():
-            findings.append((rel, 0, "guided_intake_authority_file_missing", rel))
-            continue
-        text = path.read_text(encoding="utf-8")
-        compact = text.replace(" ", "")
-        for marker in markers:
-            haystack = compact if marker in ("shell:true", "MAX=1_048_576") else text
-            if marker not in haystack:
-                findings.append((rel, 0, "guided_intake_authority_marker_missing", marker))
-        for marker in forbidden.get(rel, ()):
-            if marker in compact or marker in text:
-                findings.append((rel, 0, "guided_intake_forbidden_marker_present", marker))
-
-def _check_r2_pilot_admission_authority(findings: list[tuple]) -> None:
-    """R2.1 packet-admission + render-readiness boundaries must preserve the
-    server-controlled, browser-safe, no-render contract."""
-    required = {
-        "apps/control-center/app/api/paid-pilot/admission/route.ts": (
-            "expected_sha256", "invokeAdmission", "force-dynamic",
-        ),
-        "apps/control-center/lib/paid-pilot-admission-bridge.ts": (
-            "childProcess.spawn", "hvs_pilot_cli", "setTimeout",
-            "child.kill", "invokeAdmission",
-        ),
-        "apps/control-center/app/api/paid-pilot/render-readiness/route.ts": (
-            "external_project_ref", "invokeRenderReadiness", "force-dynamic",
-        ),
-        "apps/control-center/lib/paid-pilot-render-readiness-bridge.ts": (
-            "childProcess.spawn", "hvs_pilot_cli", "setTimeout",
-            "child.kill", "invokeRenderReadiness",
-        ),
-        "apps/control-center/app/api/paid-pilot/create/route.ts": (
-            "idempotency_key", "invokeCreateCanonical", "force-dynamic",
-        ),
-        "apps/control-center/lib/paid-pilot-create-bridge.ts": (
-            "childProcess.spawn", "hvs_pilot_cli", "setTimeout",
-            "child.kill", "invokeCreateCanonical",
-        ),
-        "scos/control_center/hvs_pilot_canonical_create.py": (
-            "def create_canonical_project", "derive_canonical_id", "build_materialization_state",
-        ),
-        "scos/control_center/hvs_pilot_packet_admission.py": (
-            "def admit_packet", "expected_sha256", "PACKET_VALID", "EXTERNAL_ACTION_RESTRICTIONS",
-        ),
-        "scos/control_center/hvs_pilot_render_readiness.py": (
-            "def evaluate_render_readiness", "READY_FOR_RENDER", "NOT_READY", "no render",
-        ),
-    }
-    forbidden = {
-        "apps/control-center/app/api/paid-pilot/admission/route.ts": (
-            "localStorage", "sessionStorage", "stderr", "Traceback",
-        ),
-        "apps/control-center/app/api/paid-pilot/render-readiness/route.ts": (
-            "localStorage", "sessionStorage", "stderr", "Traceback",
-        ),
-        "apps/control-center/lib/paid-pilot-admission-bridge.ts": (
-            "shell:true", "setInterval", "packet_path",
-        ),
-        "apps/control-center/lib/paid-pilot-render-readiness-bridge.ts": (
-            "shell:true", "setInterval",
-        ),
-        "apps/control-center/app/api/paid-pilot/create/route.ts": (
-            "localStorage", "sessionStorage", "stderr", "Traceback",
-        ),
-        "apps/control-center/lib/paid-pilot-create-bridge.ts": (
-            "shell:true", "setInterval", "packet_path",
-        ),
-    }
-    for rel, markers in required.items():
-        path = _ROOT / rel
-        if not path.is_file():
-            findings.append((rel, 0, "r2_pilot_authority_file_missing", rel))
-            continue
-        text = path.read_text(encoding="utf-8")
-        for marker in markers:
-            if marker not in text:
-                findings.append((rel, 0, "r2_pilot_authority_marker_missing", marker))
-    for rel, markers in forbidden.items():
-        path = _ROOT / rel
-        if not path.is_file():
-            continue
-        text = path.read_text(encoding="utf-8")
-        compact = text.replace(" ", "")
-        for marker in markers:
-            if marker in compact or marker in text:
-                findings.append((rel, 0, "r2_pilot_forbidden_marker_present", marker))
-
-
-def _check_dry_run_preview_only(findings: list[tuple]) -> None:
-    """operator-dry-run.ts must keep the preview-only truth markers."""
-    path = _FRONTEND_DIR / "lib" / "operator-dry-run.ts"
-    if not path.is_file():
-        findings.append(("lib/operator-dry-run.ts", 0, "truth_path_file_missing", "lib/operator-dry-run.ts"))
-        return
-    text = path.read_text(encoding="utf-8")
-    if 'mode: "DRY_RUN"' not in text:
-        findings.append(("lib/operator-dry-run.ts", 0, "dry_run_mode_marker_missing", "DRY_RUN"))
-    if "side_effects_performed: false" not in text:
-        findings.append(("lib/operator-dry-run.ts", 0, "dry_run_side_effects_marker_missing", "false"))
-    if "DRY_RUN_PREVIEW_ONLY" not in text or "LIVE_EXECUTION_NOT_ENABLED" not in text:
-        findings.append(("lib/operator-dry-run.ts", 0, "dry_run_warning_markers_missing", "preview"))
-
-
-def _check_snapshot_unavailable_semantics(findings: list[tuple]) -> None:
-    """control-center-snapshot.ts must preserve DEMO separation + UNAVAILABLE fail-closed."""
-    path = _FRONTEND_DIR / "lib" / "control-center-snapshot.ts"
-    if not path.is_file():
-        findings.append(("lib/control-center-snapshot.ts", 0, "truth_path_file_missing", "lib/control-center-snapshot.ts"))
-        return
-    text = path.read_text(encoding="utf-8")
-    if "DEMO_LABEL" not in text:
-        findings.append(("lib/control-center-snapshot.ts", 0, "demo_label_missing", "DEMO_LABEL"))
-    # The live-failure fallback must return UNAVAILABLE (never EMPTY) and the
-    # resolver must reference both the demo dataset and the unavailable fallback
-    # so the two branches stay distinct.
-    if "unavailableFallback" not in text:
-        findings.append(("lib/control-center-snapshot.ts", 0, "unavailable_fallback_missing", "unavailableFallback"))
-    if "DEMO_SNAPSHOT" not in text or "resolveCockpitView" not in text:
-        findings.append(("lib/control-center-snapshot.ts", 0, "demo_live_branch_missing", "resolveCockpitView"))
-
-
 def main() -> int:
-    print("CONTROL CENTER TRUTH GATE — structural browser-acceptance + mock/truth enforcement (Cohort 9D)")
-    if not _FRONTEND_DIR.is_dir():
-        print("PREFETCH FAIL: frontend directory not found: " + str(_FRONTEND_DIR))
+    source = _ROOT / "scos" / "control_center" / "control_center_snapshot.py"
+    if not source.is_file():
+        print("CONTROL CENTER TRUTH GATE: BLOCKED — source projection missing")
         return 2
 
-    findings: list[tuple] = []
-    _check_truth_path_mock_isolation(findings)
-    _check_route_tree_mock_isolation(findings)
-    _check_no_storage_fabrication(findings)
-    _check_no_new_mutation_route(findings)
-    _check_guided_pilot_intake_authority(findings)
-    _check_r2_pilot_admission_authority(findings)
-    _check_dry_run_preview_only(findings)
-    _check_snapshot_unavailable_semantics(findings)
+    text = source.read_text(encoding="utf-8")
+    required_markers = [
+        "SOURCE_MODE = \"LIVE_LOCAL_READ_ONLY\"",
+        "STATUS_AVAILABLE_WITH_DATA",
+        "STATUS_AVAILABLE_EMPTY",
+        "STATUS_UNAVAILABLE",
+        "def build_control_center_snapshot",
+    ]
+    missing = [m for m in required_markers if m not in text]
+    if missing:
+        print("CONTROL CENTER TRUTH GATE: FAIL — missing source markers")
+        for item in missing:
+            print(f"  missing: {item}")
+        return 1
 
-    findings.sort()
-    print(f"  checks       : {len(_TRUTH_PATH_FILES)} truth-path files + app/ route tree")
-    print(f"  findings     : {len(findings)}")
-    for rel, lineno, category, sample in findings:
-        where = f"{rel}:{lineno}" if lineno else rel
-        print(f"  FAIL  {category}  {where}  detail={sample}")
+    try:
+        sys.path.insert(0, str(_ROOT))
+        from scos.control_center.control_center_snapshot import build_control_center_snapshot
 
-    verdict = "PASS" if not findings else "FAIL"
-    print(f"CONTROL CENTER TRUTH GATE: {verdict}")
-    return 0 if not findings else 1
+        checked_at = datetime.now(timezone.utc).isoformat()
+        snapshot = build_control_center_snapshot(
+            repo_root=str(_ROOT),
+            checked_at=checked_at,
+        )
+    except Exception as exc:
+        print(f"CONTROL CENTER TRUTH GATE: FAIL — projection execution error: {type(exc).__name__}")
+        return 1
 
+    missing_keys = sorted(_REQUIRED - set(snapshot))
+    if missing_keys:
+        print("CONTROL CENTER TRUTH GATE: FAIL — required keys missing")
+        for item in missing_keys:
+            print(f"  missing key: {item}")
+        return 1
+
+    if snapshot.get("source_mode") != "LIVE_LOCAL_READ_ONLY":
+        print("CONTROL CENTER TRUTH GATE: FAIL — unexpected source_mode")
+        return 1
+
+    failures = []
+    for section_name in (
+        "health",
+        "queue_summary",
+        "approval_summary",
+        "project_summary",
+        "evidence_summary",
+        "recent_activity",
+    ):
+        section = snapshot.get(section_name)
+        if not isinstance(section, dict):
+            failures.append(f"{section_name}:not_object")
+            continue
+        status = section.get("status")
+        available = section.get("available")
+        data = section.get("data")
+        reason = section.get("reason_code")
+        if status not in _ALLOWED:
+            failures.append(f"{section_name}:invalid_status:{status}")
+        if status == "AVAILABLE_EMPTY" and available is not True:
+            failures.append(f"{section_name}:empty_without_available")
+        if status == "UNAVAILABLE" and data is not None:
+            failures.append(f"{section_name}:unavailable_with_data")
+        if status == "AVAILABLE_EMPTY" and reason not in {"READ_SOURCE_EMPTY", None}:
+            failures.append(f"{section_name}:unexpected_empty_reason:{reason}")
+
+    raw = json.dumps(snapshot, ensure_ascii=False)
+    for forbidden in ("authorization_token", "access_token", "client_secret", "password", "private_key"):
+        if forbidden in raw:
+            failures.append(f"unsafe_field:{forbidden}")
+
+    if failures:
+        print("CONTROL CENTER TRUTH GATE: FAIL")
+        for item in failures:
+            print(f"  {item}")
+        return 1
+
+    print("CONTROL CENTER TRUTH GATE: PASS")
+    print(f"  source_mode : {snapshot['source_mode']}")
+    print(f"  snapshot_id : {snapshot['snapshot_id']}")
+    print(f"  observed_at : {snapshot['generated_at']}")
+    print(f"  schema      : {snapshot['schema_version']}")
+    print(f"  degradation : {snapshot.get('degradation_reasons', [])}")
+    return 0
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

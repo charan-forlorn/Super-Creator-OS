@@ -1,0 +1,7 @@
+Cloudflare-only task. You MUST use only the Cloudflare MCP; do not call GitHub or terminal or inspect files.
+Goal: read the current Workers account subdomain.
+Known account ID: cb98ff5a98ddb6c0f09450505be7c3f5.
+Known Cloudflare API endpoint: GET /accounts/cb98ff5a98ddb6c0f09450505be7c3f5/workers/subdomain.
+Use tool_search for "cloudflare execute". Then use the exact Cloudflare execute tool returned by the search to run:
+async () => await cloudflare.request({method:"GET", path:"/accounts/cb98ff5a98ddb6c0f09450505be7c3f5/workers/subdomain"})
+Return the JSON result only. Do not expose secrets.

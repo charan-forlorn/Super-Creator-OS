@@ -1,0 +1,16 @@
+{
+  "ad_boundary_s": 50.245583,
+  "encoder_profile": "nvenc_p3_hq",
+  "fps_policy": "preserve_source_fps",
+  "interpolation_policy": "adaptive_smooth_plus_v2_candidate",
+  "keep_ranges": [
+    [
+      18.263437,
+      50.245583
+    ]
+  ],
+  "output_timeline": "concatenated",
+  "silence_min_duration_s": 0.5,
+  "silence_threshold_db": -45.0,
+  "subtitle_policy": "srt"
+}

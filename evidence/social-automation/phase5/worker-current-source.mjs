@@ -1,0 +1,1 @@
+﻿https://mcp.cloudflare.com/authorize?response_type=code&client_id=wcta4PE0_II8Ph1x&redirect_uri=http%3A%2F%2F127.0.0.1%3A60937%2Fcallback&state=Z7ef8IRJOnYnEIhxMP5FUDNegwHQgNZ5v64rvPl3sM0&code_challenge=X0adC6uKcg7Jw0WpAn5m1qlPM9ixSO5FYg4IRuo38zQ&code_challenge_method=S256&resource=https%3A%2F%2Fmcp.cloudflare.com%2Fmcp

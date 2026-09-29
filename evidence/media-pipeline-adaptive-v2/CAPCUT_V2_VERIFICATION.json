@@ -1,0 +1,16 @@
+{
+  "project": "C:\\Users\\chara\\AppData\\Local\\CapCut\\User Data\\Projects\\com.lveditor.draft\\AI_Edit_SCOS_SMOOTHPLUS_ADAPTIVE_V2",
+  "lint": {
+    "errors": 0,
+    "warnings": 0,
+    "info": 0,
+    "total": 0
+  },
+  "captions": 7,
+  "derived_only_caption_repair": {
+    "segment_id": "cc115a21-13d2-4c57-8b1b-06cbd26a4ddc",
+    "from_duration_ms": 400,
+    "to_duration_ms": 445,
+    "canonical_srt_modified": false
+  }
+}

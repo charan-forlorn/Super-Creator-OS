@@ -1,0 +1,14 @@
+﻿{
+    "main":  "src.mjs",
+    "name":  "brightbean-social-edge-20260928",
+    "compatibility_date":  "2026-09-28",
+    "vpc_services":  [
+                         {
+                             "binding":  "BRIGHTBEAN",
+                             "service_id":  "01a0e4c6-ae62-74e0-8cbf-4df204bec536"
+                         }
+                     ],
+    "workers_dev":  true,
+    "account_id":  "cb98ff5a98ddb6c0f09450505be7c3f5",
+    "$schema":  "./node_modules/wrangler/config-schema.json"
+}

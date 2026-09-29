@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "report_id": "wan-vace-resource-r1-20260921",
+  "host": {
+    "gpu": "NVIDIA GeForce RTX 5050 Laptop GPU",
+    "driver": "616.92",
+    "physical_vram_mib": 8151,
+    "ram_gib": 16.0,
+    "os_build": "Windows 11 26200"
+  },
+  "pre_change_findings": {
+    "bugchecks": [
+      {"code": "0x133", "time": "2026-09-20T22:51:57"},
+      {"code": "0x133", "time": "2026-09-20T23:04:41"}
+    ],
+    "live_kernel_event": {"code": "0x141", "time": "2026-09-20T23:00:31", "driver": "nvlddmkm.sys", "bucket": "Blackwell_UserOC"},
+    "interpretation": "Windows evidence showed DPC watchdog and NVIDIA live-kernel instability during the earlier high-load generation period."
+  },
+  "resource_policy": {
+    "auto_load_mode_threshold_gb": 12.0,
+    "below_threshold_load_mode": "cpu_offload",
+    "below_threshold_long_edge_px": 480,
+    "dimension_alignment_px": 16,
+    "telemetry_fields": ["load_mode", "total_vram_gb", "effective_width", "effective_height", "peak_vram_mib", "resource_policy_reason"]
+  },
+  "real_backend_validation": {
+    "scene_id": "wan-backend-resource-r1",
+    "load_mode": "cpu_offload",
+    "adaptive_resolution": true,
+    "effective_resolution": "272x480",
+    "fps": 16,
+    "frames": 9,
+    "motion_score": 0.000165,
+    "generation_seconds": 250.91,
+    "worker_peak_allocator_mib": 9016.6,
+    "post_run_status": "PASS"
+  },
+  "host_observation_after_stress": {
+    "gpu_temperature_max_observed_c": 56,
+    "physical_vram_max_observed_mib": 7685,
+    "new_system_crash_events_since_2026-09-21T00:40:00": 0,
+    "worker_left_running": false
+  },
+  "final_artifact": {
+    "path": "scos/work/video/generative_wan_vace_finished_resource_r1.mp4",
+    "sha256": "d9f2dbbaad539b03c288d95ce3d26ccc181124138f4899bd910ede566c7ec945",
+    "resolution": "1080x1920",
+    "video_codec": "h264",
+    "audio_codec": "aac",
+    "duration_s": 0.597,
+    "production_loop_status": "SEALED_WITH_OPEN_TELEMETRY",
+    "evidence_bundle_id": "production-loop-891ec540583fba40"
+  },
+  "verification": {
+    "resource_policy_tests": 5,
+    "render_tests": 16,
+    "production_loop_tests": 5,
+    "telemetry_tests": 5,
+    "e2e_truth": "PASS",
+    "py_compile": "PASS",
+    "git_diff_check": "PASS"
+  },
+  "limits": [
+    "No external platform observation was available.",
+    "No production publish or dispatch was performed.",
+    "Human approval was not inferred."
+  ]
+}

@@ -1,0 +1,1 @@
+Call exact Cloudflare tool mcp__cloudflare__post_accounts_workers_workers. Create Worker with account_id=cb98ff5a98ddb6c0f09450505be7c3f5 and body={"name":"brightbean-social-edge-20260928","logpush":false}. If it already exists, return the existing-worker error only. Return compact JSON with id and name. No other mutations.

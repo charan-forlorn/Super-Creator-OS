@@ -1,0 +1,197 @@
+{
+  "schema": 1,
+  "profile_id": "v4-bc489b00acdafa80",
+  "class_counts": {
+    "screen_mixed_real": 2,
+    "screen_remix_real": 2,
+    "vertical_remaster_real": 2
+  },
+  "source_checks": [
+    {
+      "sample_id": "screen-mixed-real-1",
+      "exists": true,
+      "hash_match": true
+    },
+    {
+      "sample_id": "screen-mixed-real-2",
+      "exists": true,
+      "hash_match": true
+    },
+    {
+      "sample_id": "screen-remix-13",
+      "exists": true,
+      "hash_match": true
+    },
+    {
+      "sample_id": "screen-remix-14",
+      "exists": true,
+      "hash_match": true
+    },
+    {
+      "sample_id": "vertical-remaster-13",
+      "exists": true,
+      "hash_match": true
+    },
+    {
+      "sample_id": "vertical-remaster-14",
+      "exists": true,
+      "hash_match": true
+    }
+  ],
+  "positive_cases": [
+    {
+      "sample": "screen-remix-13.json",
+      "class_label": "screen_remix_real",
+      "expected": "SMOOTH+",
+      "actual": {
+        "class_label": "screen_remix_real",
+        "calibration_z": {
+          "path_excess_median": 0.0,
+          "blend_deviation_median": 0.0,
+          "asymmetry_median": 0.0,
+          "jerk_median": 0.024889831327776304
+        },
+        "worst_z": 0.024889831327776304,
+        "mean_z": 0.006222457831944076,
+        "quality_score": 0.9938160217121855,
+        "decision": "SMOOTH+",
+        "reasons": [
+          "canary_temporally_coherent",
+          "v4_class_within_calibration"
+        ]
+      },
+      "pass": true
+    },
+    {
+      "sample": "screen-remix-14.json",
+      "class_label": "screen_remix_real",
+      "expected": "SMOOTH+",
+      "actual": {
+        "class_label": "screen_remix_real",
+        "calibration_z": {
+          "path_excess_median": 0.6744907594765952,
+          "blend_deviation_median": 0.24313363000194574,
+          "asymmetry_median": 0.028299535308153538,
+          "jerk_median": 0.0
+        },
+        "worst_z": 0.6744907594765952,
+        "mean_z": 0.23648098119667363,
+        "quality_score": 0.8087467702351507,
+        "decision": "SMOOTH+",
+        "reasons": [
+          "canary_temporally_coherent",
+          "v4_class_within_calibration"
+        ]
+      },
+      "pass": true
+    },
+    {
+      "sample": "vertical-remaster-13.json",
+      "class_label": "vertical_remaster_real",
+      "expected": "SMOOTH+",
+      "actual": {
+        "class_label": "vertical_remaster_real",
+        "calibration_z": {
+          "path_excess_median": 0.0,
+          "blend_deviation_median": 0.0,
+          "asymmetry_median": 0.0,
+          "jerk_median": 0.0
+        },
+        "worst_z": 0.0,
+        "mean_z": 0.0,
+        "quality_score": 1.0,
+        "decision": "SMOOTH+",
+        "reasons": [
+          "canary_temporally_coherent",
+          "v4_class_within_calibration"
+        ]
+      },
+      "pass": true
+    },
+    {
+      "sample": "vertical-remaster-14.json",
+      "class_label": "vertical_remaster_real",
+      "expected": "SMOOTH+",
+      "actual": {
+        "class_label": "vertical_remaster_real",
+        "calibration_z": {
+          "path_excess_median": 0.6744907594765952,
+          "blend_deviation_median": 0.4605989152390464,
+          "asymmetry_median": 0.020433238597338407,
+          "jerk_median": 0.1296380626748849
+        },
+        "worst_z": 0.6744907594765952,
+        "mean_z": 0.32129024399696626,
+        "quality_score": 0.756835982512784,
+        "decision": "SMOOTH+",
+        "reasons": [
+          "canary_temporally_coherent",
+          "v4_class_within_calibration"
+        ]
+      },
+      "pass": true
+    }
+  ],
+  "negative_cases": [
+    {
+      "sample": "v3-known-rejected",
+      "expected": "REVIEW",
+      "actual": {
+        "class_label": "screen_mixed_real",
+        "calibration_z": {
+          "path_excess_median": 9.949151747936257,
+          "blend_deviation_median": 3.015062067486331,
+          "asymmetry_median": 0.0,
+          "jerk_median": 0.0
+        },
+        "worst_z": 9.949151747936257,
+        "mean_z": 3.2410534538556472,
+        "quality_score": 0.23579047302289366,
+        "decision": "REVIEW",
+        "reasons": [
+          "temporal_quality_outlier",
+          "cross_window_temporal_outlier",
+          "v4_class_temporal_outlier"
+        ]
+      },
+      "pass": true
+    },
+    {
+      "sample": "vertical-negative",
+      "expected": "REVIEW",
+      "actual": {
+        "class_label": "vertical_remaster_real",
+        "calibration_z": {
+          "path_excess_median": 10.115276384121005,
+          "blend_deviation_median": 9.269945203006575,
+          "asymmetry_median": 13.447620303562442,
+          "jerk_median": 0.4004371519059973
+        },
+        "worst_z": 13.447620303562442,
+        "mean_z": 8.308319760649004,
+        "quality_score": 0.10743077437321266,
+        "decision": "REVIEW",
+        "reasons": [
+          "insufficient_valid_temporal_triplets",
+          "temporal_quality_outlier",
+          "v4_class_temporal_outlier"
+        ]
+      },
+      "pass": true
+    }
+  ],
+  "unknown_class_fail_closed": true,
+  "overall": "PASS",
+  "promotion": "DISABLED_REVIEW",
+  "limitations": [
+    "3 calibration classes",
+    "1 unique source file per class",
+    "local corpus is screen-oriented",
+    "no talking-head source is currently available"
+  ],
+  "research_basis": [
+    "WACV 2025 CLIP-Fusion",
+    "ICCV 2025 TLB-VFI",
+    "WACV 2025 discontinuous-motion VFI"
+  ]
+}

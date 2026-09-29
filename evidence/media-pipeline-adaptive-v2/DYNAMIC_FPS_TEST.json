@@ -1,0 +1,8 @@
+{
+  "synthetic_probe_fps": 25.0,
+  "synthetic_probe_cfr": true,
+  "frame_count": 50,
+  "duration_s": 2.0,
+  "status": "PASS",
+  "policy": "rife_interpolator probes or accepts input_fps dynamically; no global fps=30 extraction remains"
+}

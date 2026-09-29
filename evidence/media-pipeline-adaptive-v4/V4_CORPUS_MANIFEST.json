@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "profile_id": "v4-bc489b00acdafa80",
+  "classes": {
+    "screen_mixed_real": 2,
+    "screen_remix_real": 2,
+    "vertical_remaster_real": 2
+  },
+  "samples": [
+    {
+      "sample_id": "screen-mixed-real-1",
+      "class_label": "screen_mixed_real",
+      "source_path": "C:\\Users\\chara\\OneDrive\\Videos\\การบันทึกหน้าจอ\\การบันทึกหน้าจอ 2026-09-27 091454.mp4",
+      "source_sha256": "59070bfd7195f40a17532d67d7bb1c82473ee0c4ddbf73f815db6dee6dc37ef7",
+      "evidence_path": "evidence\\media-pipeline-adaptive-v4\\screen-mixed-real-1.json",
+      "candidate_count": 1,
+      "notes": ""
+    },
+    {
+      "sample_id": "screen-mixed-real-2",
+      "class_label": "screen_mixed_real",
+      "source_path": "C:\\Users\\chara\\OneDrive\\Videos\\การบันทึกหน้าจอ\\การบันทึกหน้าจอ 2026-09-27 091454.mp4",
+      "source_sha256": "59070bfd7195f40a17532d67d7bb1c82473ee0c4ddbf73f815db6dee6dc37ef7",
+      "evidence_path": "evidence\\media-pipeline-adaptive-v4\\screen-mixed-real-2.json",
+      "candidate_count": 1,
+      "notes": ""
+    },
+    {
+      "sample_id": "screen-remix-13",
+      "class_label": "screen_remix_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\Download_single_screen_remix.mp4",
+      "source_sha256": "5a3c5e03a3716d1debcc02c20019007c8e801788eac266b5e97fa5391a2c8d75",
+      "evidence_path": "evidence\\media-pipeline-adaptive-v4\\screen-remix-13.json",
+      "candidate_count": 1,
+      "notes": ""
+    },
+    {
+      "sample_id": "screen-remix-14",
+      "class_label": "screen_remix_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\Download_single_screen_remix.mp4",
+      "source_sha256": "5a3c5e03a3716d1debcc02c20019007c8e801788eac266b5e97fa5391a2c8d75",
+      "evidence_path": "evidence\\media-pipeline-adaptive-v4\\screen-remix-14.json",
+      "candidate_count": 1,
+      "notes": ""
+    },
+    {
+      "sample_id": "vertical-remaster-13",
+      "class_label": "vertical_remaster_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\Download_single_screen_remix_REMASTERED_1080x1920.mp4",
+      "source_sha256": "e9f005c0976692bb6c10c43212599b774ba052a320d83f0f4c99c33b4f47342d",
+      "evidence_path": "evidence\\media-pipeline-adaptive-v4\\vertical-remaster-13.json",
+      "candidate_count": 1,
+      "notes": ""
+    },
+    {
+      "sample_id": "vertical-remaster-14",
+      "class_label": "vertical_remaster_real",
+      "source_path": "C:\\Users\\chara\\Downloads\\Download_single_screen_remix_REMASTERED_1080x1920.mp4",
+      "source_sha256": "e9f005c0976692bb6c10c43212599b774ba052a320d83f0f4c99c33b4f47342d",
+      "evidence_path": "evidence\\media-pipeline-adaptive-v4\\vertical-remaster-14.json",
+      "candidate_count": 1,
+      "notes": ""
+    }
+  ]
+}

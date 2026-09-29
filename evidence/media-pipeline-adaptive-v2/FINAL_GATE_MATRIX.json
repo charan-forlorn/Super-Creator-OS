@@ -1,0 +1,26 @@
+{
+  "overall_status": "PASS_WITH_LIMITS",
+  "promotion_status": "REVIEW",
+  "automatic_promotion": false,
+  "gates": {
+    "repository_reconcile": {"status":"PASS","note":"Existing unrelated dirty worktree preserved; no reset/clean performed."},
+    "source_verification": {"status":"PASS","fps":30.0,"cfr":true},
+    "dynamic_fps": {"status":"PASS","probe_test_25fps":true},
+    "correctness_fixes": {"status":"PASS","fixed":["hard-coded RIFE 30fps","non-segment-aware audio mux","missing adaptive routing","missing CFR60/mixed-cadence QA"]},
+    "micro_window_analysis": {"status":"PASS","window_s":1.0,"bounds_s":[0.5,2.0]},
+    "deterministic_routing": {"status":"PASS","counts":{"PRESERVE":22,"SMOOTH+":7,"REVIEW":2}},
+    "scene_cut_safety": {"status":"PASS","selected_spans_cross_cut":false},
+    "selective_rife": {"status":"PASS","selected_seconds":7.0,"keep_seconds":31.982146,"workload_reduction_fraction":0.7811278830382427},
+    "audio_timeline": {"status":"PASS","synthetic_gap_test":"2s output from [0,1]+[3,4] with audio present"},
+    "cfr60_composition": {"status":"PASS","fps":60.0,"frames":1920},
+    "temporal_qa": {"status":"PASS","pts_monotonic":true,"av_delta_s":0.018,"normalized_duplicate_drift":0.0331601231716705},
+    "benchmark": {"status":"PASS","full_seconds":202.7015568,"adaptive_seconds":58.95447239999339,"speedup":3.438272764527746,"adaptive_ssim":0.99693,"full_ssim":0.995184,"adaptive_vmaf":96.91249,"full_vmaf":95.518445,"artifact_proxy_adaptive":0.44525547445255476,"artifact_proxy_full":0.3168058455114823},
+    "visual_spotcheck": {"status":"PASS","artifacts":["ADAPTIVE_V2_VISUAL_SPOTCHECK.png","ADAPTIVE_V2_SELECTED_WINDOWS_SPOTCHECK.png"]},
+    "capcut": {"status":"PASS","errors":0,"warnings":0,"captions":7,"canonical_srt_modified":false},
+    "media_pipeline_tests": {"status":"PASS","tests":29},
+    "broader_scripts_regression": {"status":"FAIL","passed":115,"failed":13,"note":"Failures are in existing CI-parity/security-baseline tests outside the media capability: stale scoop FFmpeg preflight path, CI/local gate-order drift, and repo-wide scanner findings."},
+    "hermes": {"status":"PASS","gateway":"RUNNING","project_trusted":true,"read_only_skill_smoke":"PASS"},
+    "typesafe_jev": {"status":"PASS_AS_UNAVAILABLE","api_key_present":false,"execution_authority":false},
+    "promotion": {"status":"REVIEW","reason":"deterministic benchmark still shows higher artifact-spike proxy and lower motion-continuity proxy than full SMOOTH+; broader footage calibration remains pending"}
+  }
+}

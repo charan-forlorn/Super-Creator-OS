@@ -1,0 +1,30 @@
+/goal /x10
+Continue the BrightBean + Hermes Social Automation project from the verified local state.
+
+Current facts:
+- BrightBean pinned SHA 6c56e1f9190fb3e2571ee3f0c1d99b2d818aa9f8.
+- BrightBean app is healthy at http://127.0.0.1:18100.
+- brightbean-edge is healthy on docker network woodpecker-net and returns /health/ HTTP 200.
+- Woodpecker remains healthy and is localhost-only at 127.0.0.1:8000.
+- Existing named Cloudflare tunnel 08a4e3a2-48fa-4464-8688-a79dac8a6773 is healthy and remote-managed.
+- Cloudflare MCP account has 0 zones visible, so there is no verified custom domain available in this account.
+- Existing old public hostname linux-calling-taught-watson.trycloudflare.com was a Quick Tunnel hostname and is not a stable custom domain.
+- Tailscale, ngrok, zrok, pinggy are not installed.
+
+Goal:
+Make BrightBean reachable through a stable public HTTPS hostname without buying a domain, if the Cloudflare account supports an account-provided workers.dev or other stable hostname.
+
+Do this end-to-end using the authenticated Cloudflare MCP:
+1. Read-only investigate Workers subdomain / workers.dev support for this account, including whether the account has an active workers.dev subdomain and what APIs are available.
+2. If a stable account-provided hostname is available, design the lowest-complexity architecture. Preferred:
+   stable workers.dev hostname -> minimal Cloudflare Worker -> current BrightBean public origin.
+3. Before changing anything, record rollback state in C:\Workspace\super-creator-os\evidence\social-automation\phase5.
+4. If a Worker proxy is possible, deploy a minimal hardened reverse proxy. Prefer the existing BrightBean Quick Tunnel only as an origin if no better stable tunnel-origin is available. Do not expose secrets.
+5. Verify public HTTPS /health, /accounts/login/, MCP metadata endpoint, and callback route reachability.
+6. Update BrightBean APP_URL, ALLOWED_HOSTS, MCP_PUBLIC_BASE_URL, MCP_OAUTH_ISSUER_URL only after the public hostname is verified.
+7. Keep PostgreSQL private and Woodpecker local-only.
+8. Audit Woodpecker Quick Tunnel dependencies. Remove the Quick Tunnel only if no active Woodpecker webhook depends on it. Otherwise keep it and document why.
+9. Run targeted regression tests.
+10. Update the SSOT Roadmap and Phase 5 evidence with actual hostname, Cloudflare resource IDs, tests, rollback point, and remaining risk.
+11. Only mark Phase 5 PASS when public HTTPS is independently verified end-to-end.
+12. Do not fabricate any hostname. Do not expose tokens. Do not delete unrelated Cloudflare routes.
