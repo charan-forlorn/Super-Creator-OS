@@ -264,6 +264,10 @@ _CONTROL_CENTER_SUBPROCESS_ALLOWLIST = {
     # _append_control_center_findings is NOT allowlist-gated, so regressions
     # to those constructs remain flagged for this exact path.
     "scos/control_center/video_studio_process_supervisor.py",
+        # Reviewed exact-path allowlist: CapCut adapter invokes a fixed Node entrypoint with argv arrays only; no shell interpolation or caller-selected executable.
+    "scos/control_center/capcut_adapter.py",
+    # Reviewed exact-path allowlist: production-loop invokes git/ffprobe through fixed argv lists, shell=False, bounded timeouts, and repository-local paths.
+    "scos/control_center/production_loop_capability.py",
     "scripts/security_scan_baseline.py",
 }
 _FRONTEND_FORBIDDEN_TOKENS = (
