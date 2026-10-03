@@ -3,6 +3,7 @@ import subprocess,time
 from pathlib import Path
 from scos.media_binaries import resolve_ffmpeg
 from scos.media_analysis.source_probe import probe_source
+from scos.render.hardware import choose_encoder
 
 PROFILES={
  "nvenc_p1_fast":("h264_nvenc",("-preset","p1","-cq","19")),
@@ -18,6 +19,12 @@ def render_source_edits(source: str|Path, keep_ranges: list[tuple[float,float]],
     probe=probe_source(src); ffmpeg=resolve_ffmpeg()
     if not probe.has_audio: raise ValueError("source_edit requires an audio stream")
     enc,args=PROFILES[profile]
+    if enc == "h264_nvenc":
+        policy = choose_encoder(ffmpeg_bin=ffmpeg)
+        if policy.ffmpeg_encoder != enc:
+            raise RuntimeError(
+                f"encoder policy rejected {profile}: selected {policy.ffmpeg_encoder}"
+            )
     parts=[]; labels=[]
     for i,(start,end) in enumerate(keep_ranges):
         dur=max(0.001,end-start)
