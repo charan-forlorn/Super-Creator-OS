@@ -163,7 +163,10 @@ def _seed_new_delivery_record(repo_root: Path, delivery_record_id: str) -> str:
         artifact.write_bytes((f"STAGE8D-REVISED-ARTIFACT-{delivery_record_id}").encode("ascii") * 5)
         artifact_sha256 = hashlib.sha256(artifact.read_bytes()).hexdigest()
     approval_request_id = _stable_approval_request_id(
-        packet_id=packet_id, validation_id=validation_id, artifact_sha256=artifact_sha256
+        packet_id=packet_id,
+        validation_id=validation_id,
+        artifact_sha256=artifact_sha256,
+        artifact_path=str(artifact),
     )
     package_id = stable_package_id(
         approval_request_id=approval_request_id,
