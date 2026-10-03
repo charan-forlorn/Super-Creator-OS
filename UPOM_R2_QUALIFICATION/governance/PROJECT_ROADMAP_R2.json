@@ -1,0 +1,42 @@
+{
+    "schema_version":  "UPOM-PROJECT-ROADMAP-R2",
+    "stages":  [
+                   {
+                       "status":  "PASS",
+                       "evidence":  "evidence/CURRENT_TRUTH.json",
+                       "name":  "RECONCILE",
+                       "id":  "R2-A"
+                   },
+                   {
+                       "status":  "PASS",
+                       "evidence":  "evidence/EXECUTION_EVIDENCE.json",
+                       "name":  "REPAIR",
+                       "id":  "R2-B"
+                   },
+                   {
+                       "status":  "PASS",
+                       "evidence":  "evidence/NEGATIVE_TESTS.json",
+                       "name":  "VERIFY",
+                       "id":  "R2-C"
+                   },
+                   {
+                       "status":  "PASS",
+                       "evidence":  "evidence/QUALIFICATION_R2.json",
+                       "name":  "QUALIFY",
+                       "id":  "R2-D"
+                   },
+                   {
+                       "status":  "PASS",
+                       "evidence":  "evidence/FINAL_CLOSURE_GATE.json",
+                       "name":  "CLOSE",
+                       "id":  "R2-E"
+                   }
+               ],
+    "blocked_boundaries":  [
+                               "Provider activation",
+                               "Credential activation",
+                               "External publish",
+                               "Production promotion"
+                           ],
+    "project_id":  "AI_BUSINESS_PRODUCTION_R1_UPOM_R2"
+}

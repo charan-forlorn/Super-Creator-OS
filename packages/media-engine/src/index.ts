@@ -184,3 +184,4 @@ export {
   type CacheEntry,
   type CacheRecord,
 } from "./cache.js";
+export { compareRuntimeIdentity, type RuntimeIdentity, type RuntimeIdentityComparison, type RuntimeResolution, type RuntimeToolIdentity, type RuntimeToolKind } from "./runtimeIdentity.js";

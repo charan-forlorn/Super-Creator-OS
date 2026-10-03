@@ -1,0 +1,103 @@
+{
+    "schema_version":  "UPOM-DEPENDENCY-MANIFEST-R2",
+    "invalidation_rule":  "Changed source, build metadata or lock state invalidates reachable package qualification until re-verified.",
+    "nodes":  [
+                  {
+                      "path":  "tsconfig.base.json",
+                      "sha256":  "6E31F62033C035A37EA3DAC8836B32F03846AA75873031F7C8BE9A6A76808AFA",
+                      "size_bytes":  357
+                  },
+                  {
+                      "path":  "pnpm-workspace.yaml",
+                      "sha256":  "0FB360452B0231D114D0B0AD6CC76BB48FE528382F55827CF93739BF64EC79E1",
+                      "size_bytes":  27
+                  },
+                  {
+                      "path":  "pnpm-lock.yaml",
+                      "sha256":  "B46723C7CFC43900E88BD0818E75A15B461C0E4C0CD7BD97ECA7C0B7C8176BC3",
+                      "size_bytes":  29701
+                  },
+                  {
+                      "path":  "packages/ai-providers/package.json",
+                      "sha256":  "12B183B41A19256E45BB6275C98A1E7110BA5FE952D1AAE8320785D625EF6F9D",
+                      "size_bytes":  642
+                  },
+                  {
+                      "path":  "packages/ai-providers/tsconfig.json",
+                      "sha256":  "DA58CF094BB15298457084CF7BDD45165F7B9068EB3EAE353EF38619FDC10CCA",
+                      "size_bytes":  189
+                  },
+                  {
+                      "path":  "packages/ai-providers/src/index.ts",
+                      "sha256":  "20A393474529A6978DCDEEEDC07B84DE269BC7A05A286163F128A93C01706DA3",
+                      "size_bytes":  165
+                  },
+                  {
+                      "path":  "packages/ai-providers/src/capabilities.ts",
+                      "sha256":  "E5AD42C4147CC96D26EB088D9C031AB1BF7C225C09ECC8E89BF54CC2E7CDA2EA",
+                      "size_bytes":  4431
+                  },
+                  {
+                      "path":  "packages/ai-providers/src/routing.ts",
+                      "sha256":  "E484AF6C1BF0797A21FFF1892FAFA38A910547BB4D6225AF2F32CF7F2231C2EC",
+                      "size_bytes":  5739
+                  },
+                  {
+                      "path":  "packages/ai-providers/src/machineEvidence.ts",
+                      "sha256":  "371444A0D769E1DF7768C99DFC70A42231D1EC7194AD97843065BF21E7912C33",
+                      "size_bytes":  2305
+                  },
+                  {
+                      "path":  "packages/ai-providers/src/providers.ts",
+                      "sha256":  "C6A9C74A28A4A47BC1EADC241091C7AB394824DB7439D409B653B247A65CF45C",
+                      "size_bytes":  7320
+                  },
+                  {
+                      "path":  "packages/ai-providers/src/types.ts",
+                      "sha256":  "70D09A6B14A6D578000955DD428A6DE284C64F98BBC8316958E5019C38995A41",
+                      "size_bytes":  2374
+                  },
+                  {
+                      "path":  "packages/ai-providers/tests/routing.test.ts",
+                      "sha256":  "FB009D3A9C0DCBF180C32695BF8CE013CC726903B1E29B9D4689AF40204A0CAA",
+                      "size_bytes":  1461
+                  },
+                  {
+                      "path":  "packages/ai-providers/tests/adaptive-routing.test.ts",
+                      "sha256":  "66DB359B323CF36E49DA5F68C8495FE0CD02276B9B40EF2AF0EBB370F62E65F4",
+                      "size_bytes":  5386
+                  },
+                  {
+                      "path":  "packages/ai-providers/tests/machine-evidence.test.ts",
+                      "sha256":  "613E0AB2354386FFD5420ABB1B2B87BFF62A9E40E692EB0072E17490DA79A1FB",
+                      "size_bytes":  1563
+                  },
+                  {
+                      "path":  "packages/ai-providers/tests/capabilities.test.ts",
+                      "sha256":  "779CA9BB9B7AE2A87F810FB16E0F227824B059DBE6A8DD3706E16B7702D17DBC",
+                      "size_bytes":  2114
+                  },
+                  {
+                      "path":  "packages/ai-providers/tests/providers.test.ts",
+                      "sha256":  "A1CE47952A2FF00DD9C8E6F903665AB4E18E78BC542EA8A1EC27EBAAC2C7B2FF",
+                      "size_bytes":  3738
+                  },
+                  {
+                      "path":  "docs/architecture/AI_BUSINESS_PRODUCTION_ADAPTIVE_ROUTER_R1.md",
+                      "sha256":  "C719FFE5FF9CB5D9E91DFF398A45362C7619916DCFEB8E8DFA10CAB2CB28D1E4",
+                      "size_bytes":  3823
+                  },
+                  {
+                      "path":  "production_readiness_audit.md",
+                      "sha256":  "177A1FB8B197150007218919B1034ACB93BE3B81CDDEC53195289D28B415B1EA",
+                      "size_bytes":  14441
+                  }
+              ],
+    "authorization_effects":  [
+                                  "No provider authority",
+                                  "No credential authority",
+                                  "No external publish authority",
+                                  "No production promotion"
+                              ],
+    "project_id":  "AI_BUSINESS_PRODUCTION_R1_UPOM_R2"
+}

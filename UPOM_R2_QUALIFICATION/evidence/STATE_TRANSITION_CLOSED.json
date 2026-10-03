@@ -1,0 +1,11 @@
+{
+    "human_decision_required":  "NONE_FOR_BOUNDED_CLOSURE",
+    "schema_version":  "UPOM-R2-AI-BUSINESS-STATE-TRANSITION-1",
+    "from_state":  "CLOSING",
+    "transition":  "PASS",
+    "external_effect":  "NONE",
+    "project_id":  "AI_BUSINESS_PRODUCTION_R1_UPOM_R2",
+    "final_closure_gate_sha256":  "2B01526AD52CC1F81E738525FA11001FB2A00CEFABD685700209D1C4FE0EC9B1",
+    "closed_at":  "2026-10-03T04:45:13.0017790Z",
+    "to_state":  "CLOSED"
+}

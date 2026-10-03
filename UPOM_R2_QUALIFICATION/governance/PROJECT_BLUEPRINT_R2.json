@@ -1,0 +1,58 @@
+{
+    "closure":  {
+                    "fresh_reconciliation":  true,
+                    "consequential_actions_human_controlled":  true,
+                    "external_handoff":  false
+                },
+    "project_id":  "AI_BUSINESS_PRODUCTION_R1_UPOM_R2",
+    "schema_version":  "UPOM-PROJECT-BLUEPRINT-R2",
+    "architecture":  {
+                         "evidence_plane":  "UPOM_R2_QUALIFICATION/evidence",
+                         "execution_plane":  "AI provider capability routing package",
+                         "operations_plane":  "Local qualification only; provider execution authority remains outside scope",
+                         "data_authority":  "Current repository bytes plus fresh read-only machine observation",
+                         "verification_plane":  "TypeScript build, Vitest, frozen pnpm install, runtime export check, git diff check",
+                         "control_plane":  "UPOM-R2 governance and Action Admission",
+                         "external_boundaries":  [
+                                                     "Ollama execution",
+                                                     "Cloud providers",
+                                                     "Credentials",
+                                                     "Publish",
+                                                     "Production"
+                                                 ]
+                     },
+    "reliability":  {
+                        "unknown_handling":  "BLOCK_AND_RECONCILE",
+                        "recovery":  "Rebuild and re-run package qualification",
+                        "restart":  "RECONCILE before resume",
+                        "rollback":  "Revert only this branch commit set"
+                    },
+    "qualification":  {
+                          "required_evidence":  [
+                                                    "Current truth",
+                                                    "Machine observation",
+                                                    "Dependency state",
+                                                    "Execution evidence",
+                                                    "Negative tests",
+                                                    "Qualification record",
+                                                    "Final reconciliation",
+                                                    "Post-close review",
+                                                    "Closure gate"
+                                                ],
+                          "assurance_tier":  "A1",
+                          "invalidation_triggers":  [
+                                                        "source routing change",
+                                                        "package manifest/lock change",
+                                                        "machine evidence age beyond bounded window",
+                                                        "governance evidence change"
+                                                    ]
+                      },
+    "invariants":  [
+                       "Capability does not grant authority",
+                       "Machine presence is not qualification",
+                       "Historical evidence is not current without fresh verification",
+                       "UNKNOWN is not PASS",
+                       "No silent fallback to unverified providers",
+                       "Human approval is never inferred"
+                   ]
+}

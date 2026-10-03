@@ -1,0 +1,35 @@
+{
+    "results":  {
+                    "build":  "PASS",
+                    "negative_adversarial":  "7/7 PASS",
+                    "runtime_export_surface":  "PASS",
+                    "frozen_install":  "PASS",
+                    "git_diff_check":  "PASS",
+                    "provider_tests":  "26/26 PASS",
+                    "live_machine_observation":  "PASS"
+                },
+    "schema_version":  "UPOM-R2-AI-BUSINESS-QUALIFICATION-1",
+    "assurance_tier":  "A1",
+    "qualification_id":  "QUAL-AI-BUSINESS-PRODUCTION-R1-R2",
+    "authority_boundary":  "QUALIFIED ROUTE DECISION IS NOT EXECUTION AUTHORITY",
+    "scope":  [
+                  "Adaptive capability contract",
+                  "Deterministic routing",
+                  "Machine evidence binding",
+                  "Provider package reproducibility",
+                  "Evidence closure"
+              ],
+    "project_id":  "AI_BUSINESS_PRODUCTION_R1_UPOM_R2",
+    "evidence_refs":  [
+                          "evidence/CURRENT_TRUTH.json",
+                          "evidence/MACHINE_EVIDENCE_OLLAMA.json",
+                          "evidence/EXECUTION_EVIDENCE.json",
+                          "evidence/NEGATIVE_TESTS.json"
+                      ],
+    "limitations":  [
+                        "Live model presence does not establish HAIOS qualification",
+                        "Public deployment readiness audit remains outside this bounded R1 closure",
+                        "No external provider or publish action was executed"
+                    ],
+    "status":  "QUALIFIED"
+}

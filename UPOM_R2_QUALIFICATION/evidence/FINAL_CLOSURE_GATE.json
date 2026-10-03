@@ -1,0 +1,15 @@
+{
+    "final_closure_package_sha256":  "ECA4AB6B31CDC970687086852365289D1450E15DB8F29A6290B63C90B8FFE8B6",
+    "project_id":  "AI_BUSINESS_PRODUCTION_R1_UPOM_R2",
+    "gate":  "PASS",
+    "schema_version":  "UPOM-R2-AI-BUSINESS-FINAL-CLOSURE-GATE-1",
+    "conditions":  {
+                       "final_reconciliation":  "PASS",
+                       "post_close_review":  "PASS",
+                       "evidence_integrity":  "PASS",
+                       "external_effect":  "NONE",
+                       "qualification":  "PASS",
+                       "authority_change":  "NONE"
+                   },
+    "sealed_at":  "2026-10-03T04:45:12.9946834Z"
+}
