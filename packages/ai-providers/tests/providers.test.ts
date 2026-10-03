@@ -39,6 +39,22 @@ describe("ai-providers", () => {
     expect(() => modelTextToPlan("I will now edit your video by moving things around.", "ollama")).toThrow();
   });
 
+  it("Ollama provider disables model thinking so the authoritative plan is in response", async () => {
+    let requestBody: any;
+    const fakeFetch = async (_url: string, init: any) => {
+      requestBody = JSON.parse(init.body);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ response: '{"version":1,"target":{"kind":"clip","clipId":"c1"},"operations":[{"tool":"split_clip","params":{"t":4}}]}' }),
+      } as Response;
+    };
+    const p = new OllamaProvider({ baseUrl: "http://localhost:11434", model: "qwen3:4b", fetchImpl: fakeFetch as any });
+    await p.generate({ instruction: "split at 4", context: { clipIds: ["c1"], selectedClipId: "c1" } });
+    expect(requestBody.think).toBe(false);
+    expect(requestBody.format).toBe("json");
+  });
+
   it("Ollama provider throws ProviderUnavailableError when the endpoint fails", async () => {
     const fakeFetch = async () => ({ ok: false, status: 500, json: async () => ({}) }) as Response;
     const p = new OllamaProvider({ baseUrl: "http://localhost:11434", model: "llama3", fetchImpl: fakeFetch as any });

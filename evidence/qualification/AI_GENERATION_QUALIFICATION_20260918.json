@@ -1,0 +1,80 @@
+﻿{
+  "schema_version": "HAIOS_STAGE3_AI_GENERATION_QUALIFICATION_R1",
+  "status": "TECHNICAL_CLOSURE",
+  "source_commit": "c0c13654065c42376c6e598d5ce399eb175d3eb2",
+  "observed_on": "2026-09-18",
+  "workspace_bootstrap": {
+    "root_package": true,
+    "pnpm_workspace": true,
+    "shared_tsconfig_base": true,
+    "install": "PASS",
+    "pnpm_version": "11.25.0"
+  },
+  "package_regression": {
+    "scope": 6,
+    "tests": {
+      "project_model": 29,
+      "timeline": 14,
+      "media_engine": 17,
+      "command_system": 79,
+      "ai_core": 9,
+      "ai_providers": 27,
+      "total": 175,
+      "failed": 0
+    },
+    "typecheck_exit": 0,
+    "build_exit": 0
+  },
+  "local_generation": {
+    "provider": "ollama",
+    "provider_reachable": true,
+    "health": "HEALTHY",
+    "models": [
+      {
+        "model": "qwen3:4b",
+        "digest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+        "status": "PASS",
+        "capability": "generate_text",
+        "route": "ROUTED",
+        "plan_hash": "18b345d13534bfda764adc8fe9929284b73a7bd117c32266428415fc0fa4d5f1",
+        "evidence_refs": [
+          "governance:stage3:ollama-qwen3-4b:20260918",
+          "machine:ollama:tags:stage3-final-20260918"
+        ]
+      },
+      {
+        "model": "qwen3:14b",
+        "digest": "bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8",
+        "status": "PASS",
+        "capability": "generate_text",
+        "route": "ROUTED",
+        "plan_hash": "3e239cec06bde47c645d669e4328908b8a328aacaa5d9a489525b9555ca4a337",
+        "evidence_refs": [
+          "governance:stage3:ollama-qwen3-14b:20260918",
+          "machine:ollama:tags:stage3-qwen14-final-20260918"
+        ]
+      }
+    ],
+    "provider_contract_fix": "Ollama requests set think=false so the authoritative structured plan is emitted in response rather than the non-authoritative thinking field.",
+    "source_qualification": "Structured output parsed by @haios/ai-core and admitted only when current, healthy, qualified, licensed, hardware-fit, evidence-complete machine/governance records all agree."
+  },
+  "other_generation_paths": {
+    "offline_hermes": {
+      "status": "PASS_UNIT",
+      "evidence": "packages/ai-providers/tests/providers.test.ts"
+    },
+    "openai_compatible": {
+      "status": "BLOCKED_NO_CREDENTIALS_FOR_LIVE_QUALIFICATION",
+      "unit_adapter": "PASS",
+      "credential_presence": false
+    },
+    "unimplemented_media_generation_capabilities": {
+      "status": "NOT_CURRENT_PROVIDER_PATH",
+      "note": "Capability vocabulary exists, but no live image/video/audio provider adapter is present in the current ai-providers package; no false PASS is asserted."
+    }
+  },
+  "technical_gate": "CLOSED",
+  "independent_freebuff_review": "PENDING_CAPACITY_REVIEW",
+  "human_merge": "NOT_INFERRED",
+  "origin_publish": "NOT_AUTHORIZED"
+}
