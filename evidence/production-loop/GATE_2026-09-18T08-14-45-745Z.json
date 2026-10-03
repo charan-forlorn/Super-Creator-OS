@@ -1,0 +1,12 @@
+{
+  "schema_version": "SCOS_PRODUCTION_LOOP_GATE_R1",
+  "observed_at": "2026-09-18T08:14:45.745Z",
+  "status": "OPEN",
+  "gate": "OPEN_STALE_QUALIFICATION",
+  "details": {
+    "reason": "qualification source bytes changed",
+    "expected": "C7C17D1B50D36A6769C7B904B35F3742B1B9B99D54D6CA9DEC5F999257C12A3C",
+    "observed": "c7c17d1b50d36a6769c7b904b35f3742b1b9b99d54d6ca9dec5f999257c12a3c",
+    "sourcePath": "IMPLEMENTATION_BLUEPRINT.md"
+  }
+}

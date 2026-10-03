@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "SCOS_GOVERNED_PRODUCTION_LOOP_R1",
+  "loopRunId": "abadc93c-b793-498b-87ea-cd72a11e4eef",
+  "routeDecisionId": "dd5dbdbb-2a4d-4f9b-98ac-540cfe3f0bc8",
+  "observedAt": "2026-09-18T12:40:57.398Z",
+  "routeDecision": {
+    "kind": "ROUTED",
+    "capability": "generate_text",
+    "candidate": {
+      "capability": "generate_text",
+      "providerId": "ollama",
+      "modelId": "qwen3:14b",
+      "modelVersion": "bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8",
+      "capabilityId": "scos.ai.generate_text.ollama.qwen3-14b",
+      "capabilityVersion": "r1",
+      "capabilityKind": "ai_generation",
+      "authorityScope": "plan_generation_only",
+      "costClass": "local_zero_inference_cost",
+      "availability": "READY",
+      "currentness": "CURRENT",
+      "health": "HEALTHY",
+      "qualification": "QUALIFIED",
+      "licence": "ALLOWED",
+      "hardware": "FIT",
+      "evidenceComplete": true,
+      "priority": 0,
+      "observedSuccessRate": 1,
+      "observedLatencyMs": 23531
+    },
+    "routeDecisionId": "dd5dbdbb-2a4d-4f9b-98ac-540cfe3f0bc8",
+    "loopRunId": "abadc93c-b793-498b-87ea-cd72a11e4eef",
+    "evidenceRefs": [
+      "C:\\Workspace\\hermes-ai-operating-system",
+      "491e22a0c04f8837e94ac388bdd06c077a3b0d6d",
+      "IMPLEMENTATION_BLUEPRINT.md",
+      "C7C17D1B50D36A6769C7B904B35F3742B1B9B99D54D6CA9DEC5F999257C12A3C",
+      "ollama-machine-probe:abadc93c-b793-498b-87ea-cd72a11e4eef",
+      "ollama-machine-probe:abadc93c-b793-498b-87ea-cd72a11e4eef"
+    ]
+  },
+  "qualification": {
+    "sourceRepo": "C:\\Workspace\\hermes-ai-operating-system",
+    "sourceCommit": "491e22a0c04f8837e94ac388bdd06c077a3b0d6d",
+    "sourcePath": "IMPLEMENTATION_BLUEPRINT.md",
+    "sourceSha256": "C7C17D1B50D36A6769C7B904B35F3742B1B9B99D54D6CA9DEC5F999257C12A3C",
+    "modelDigest": "bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8"
+  },
+  "telemetry": {
+    "schemaVersion": "SCOS_PRODUCTION_EXECUTION_TELEMETRY_R1",
+    "loopRunId": "abadc93c-b793-498b-87ea-cd72a11e4eef",
+    "routeDecisionId": "dd5dbdbb-2a4d-4f9b-98ac-540cfe3f0bc8",
+    "observedAt": "2026-09-18T12:40:57.398Z",
+    "startedAt": "2026-09-18T12:40:57.428Z",
+    "completedAt": "2026-09-18T12:41:54.203Z",
+    "durationMs": 56775,
+    "capabilityId": "scos.ai.generate_text.ollama.qwen3-14b",
+    "providerId": "ollama",
+    "modelId": "qwen3:14b",
+    "modelVersion": "bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8",
+    "status": "FAILED",
+    "generationStatus": "FAILED",
+    "executionStatus": "NOT_RUN",
+    "contractRevision": "21600d46ee33e5bd1505fc3be97f2ff57ac9ce2ad6dcabc3fdf213984a2829f3",
+    "requestSha256": "307d99ae0695bee3b6b5afa0377cb98bcff78de1d90d280e1e3465143ee30378",
+    "fallbackUsed": false,
+    "error": "malformed AI plan: [\n  {\n    \"code\": \"invalid_union\",\n    \"unionErrors\": [\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"string\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              0,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected string, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      },\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"number\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              0,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected number, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      },\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"boolean\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              0,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected boolean, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      }\n    ],\n    \"path\": [\n      \"operations\",\n      0,\n      \"params\",\n      \"place\"\n    ],\n    \"message\": \"Invalid input\"\n  },\n  {\n    \"code\": \"invalid_union\",\n    \"unionErrors\": [\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"string\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              1,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected string, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      },\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"number\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              1,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected number, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      },\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"boolean\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              1,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected boolean, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      }\n    ],\n    \"path\": [\n      \"operations\",\n      1,\n      \"params\",\n      \"place\"\n    ],\n    \"message\": \"Invalid input\"\n  },\n  {\n    \"code\": \"invalid_union\",\n    \"unionErrors\": [\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"string\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              2,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected string, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      },\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"number\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              2,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected number, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      },\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"boolean\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              2,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected boolean, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      }\n    ],\n    \"path\": [\n      \"operations\",\n      2,\n      \"params\",\n      \"place\"\n    ],\n    \"message\": \"Invalid input\"\n  }\n]",
+    "evidenceRefs": [
+      "C:\\Workspace\\hermes-ai-operating-system",
+      "491e22a0c04f8837e94ac388bdd06c077a3b0d6d",
+      "IMPLEMENTATION_BLUEPRINT.md",
+      "C7C17D1B50D36A6769C7B904B35F3742B1B9B99D54D6CA9DEC5F999257C12A3C",
+      "ollama-machine-probe:abadc93c-b793-498b-87ea-cd72a11e4eef",
+      "ollama-machine-probe:abadc93c-b793-498b-87ea-cd72a11e4eef"
+    ]
+  },
+  "verification": {
+    "status": "FAIL",
+    "planSchemaValidated": false,
+    "reason": "malformed AI plan: [\n  {\n    \"code\": \"invalid_union\",\n    \"unionErrors\": [\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"string\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              0,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected string, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      },\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"number\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              0,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected number, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      },\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"boolean\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              0,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected boolean, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      }\n    ],\n    \"path\": [\n      \"operations\",\n      0,\n      \"params\",\n      \"place\"\n    ],\n    \"message\": \"Invalid input\"\n  },\n  {\n    \"code\": \"invalid_union\",\n    \"unionErrors\": [\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"string\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              1,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected string, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      },\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"number\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              1,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected number, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      },\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"boolean\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              1,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected boolean, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      }\n    ],\n    \"path\": [\n      \"operations\",\n      1,\n      \"params\",\n      \"place\"\n    ],\n    \"message\": \"Invalid input\"\n  },\n  {\n    \"code\": \"invalid_union\",\n    \"unionErrors\": [\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"string\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              2,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected string, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      },\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"number\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              2,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected number, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      },\n      {\n        \"issues\": [\n          {\n            \"code\": \"invalid_type\",\n            \"expected\": \"boolean\",\n            \"received\": \"object\",\n            \"path\": [\n              \"operations\",\n              2,\n              \"params\",\n              \"place\"\n            ],\n            \"message\": \"Expected boolean, received object\"\n          }\n        ],\n        \"name\": \"ZodError\"\n      }\n    ],\n    \"path\": [\n      \"operations\",\n      2,\n      \"params\",\n      \"place\"\n    ],\n    \"message\": \"Invalid input\"\n  }\n]"
+  },
+  "evidenceSha256": "42fe134fc2d5ac5926746523af83f197803bb9a8ffed66d58632db2ddca5b219"
+}

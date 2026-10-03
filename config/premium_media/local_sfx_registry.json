@@ -1,0 +1,45 @@
+{
+  "schema_version": "SCOS_PREMIUM_SFX_REGISTRY_R1",
+  "assets": [
+    {
+      "asset_id": "remotion_whoosh",
+      "path": "work/production/remotion-wireframe-v4/public/sfx/whoosh.wav",
+      "source_url": "https://remotion.media/whoosh.wav",
+      "evidence_url": "https://www.remotion.dev/docs/sfx",
+      "license_name": "Remotion SFX individual asset license",
+      "rights_class": "commercial_cleared",
+      "commercial_ok": true,
+      "sha256": "D98F010FA5F03FD3F4F77418F8BA6A962D36E63357265772771C4AC69C1A63A7"
+    },
+    {
+      "asset_id": "remotion_ui_switch",
+      "path": "work/production/remotion-wireframe-v4/public/sfx/uiSwitch.wav",
+      "source_url": "https://remotion.media/switch.wav",
+      "evidence_url": "https://www.remotion.dev/docs/sfx",
+      "license_name": "Remotion SFX individual asset license",
+      "rights_class": "commercial_cleared",
+      "commercial_ok": true,
+      "sha256": "0D07C6DAAC595425C820D92966BBC35CBD6590F4BDE8A59199743B9BF45DA77E"
+    },
+    {
+      "asset_id": "remotion_mouse_click",
+      "path": "work/production/remotion-wireframe-v4/public/sfx/mouseClick.wav",
+      "source_url": "https://remotion.media/mouse-click.wav",
+      "evidence_url": "https://www.remotion.dev/docs/sfx",
+      "license_name": "Remotion SFX individual asset license",
+      "rights_class": "commercial_cleared",
+      "commercial_ok": true,
+      "sha256": "887A9259203CAFA24AD90274029D574BA29438BCDC87E6F384E4472F85736348"
+    },
+    {
+      "asset_id": "remotion_ding",
+      "path": "work/production/remotion-wireframe-v4/public/sfx/ding.wav",
+      "source_url": "https://remotion.media/ding.wav",
+      "evidence_url": "https://www.remotion.dev/docs/sfx",
+      "license_name": "Remotion SFX individual asset license",
+      "rights_class": "commercial_cleared",
+      "commercial_ok": true,
+      "sha256": "97C823DC8EF1FB6DAB5599F5B8B8AEE5EC2DFA4C9D987151E64D6C5A5F87ADBE"
+    }
+  ]
+}

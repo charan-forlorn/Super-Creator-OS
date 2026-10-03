@@ -4,6 +4,11 @@ export interface RouteCandidate {
     providerId: string;
     modelId: string;
     modelVersion?: string;
+    /** Stable capability identity used by governed production routing. */
+    capabilityId?: string;
+    capabilityVersion?: string;
+    capabilityKind?: string;
+    authorityScope?: string;
     costClass: CostClass;
     availability: "READY" | "PARTIAL" | "ADAPTER_ONLY" | "EXTERNAL" | "LOCAL_NO_MODEL" | "PLANNED" | "BLOCKED" | "UNKNOWN";
     currentness: CurrentnessState;
@@ -13,6 +18,9 @@ export interface RouteCandidate {
     hardware: HardwareFit;
     evidenceComplete: boolean;
     priority?: number;
+    /** Observed production-loop history; omitted when no real telemetry exists. */
+    observedSuccessRate?: number;
+    observedLatencyMs?: number;
 }
 export interface GovernanceEvidence {
     currentness: CurrentnessState;
@@ -39,14 +47,20 @@ export type RouteDecision = {
     readonly capability: CapabilityName;
     readonly candidate: RouteCandidate;
     readonly evidenceRefs: readonly string[];
+    readonly routeDecisionId?: string;
+    readonly loopRunId?: string;
 } | {
     readonly kind: "DENIED";
     readonly reason: "no_eligible_route";
     readonly rejections: readonly RouteRejection[];
+    readonly routeDecisionId?: string;
+    readonly loopRunId?: string;
 };
 export interface RouteRequest {
     readonly capability: CapabilityName;
     readonly candidates: readonly RouteCandidate[];
+    readonly routeDecisionId?: string;
+    readonly loopRunId?: string;
     readonly machineEvidence: readonly MachineCapabilityEvidence[];
     readonly governanceEvidence: Readonly<Record<string, GovernanceEvidence>>;
 }

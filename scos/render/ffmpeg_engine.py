@@ -25,6 +25,7 @@ from scos.render.base import (
 )
 from scos.render.generative_video_backend import GenerativeVideoBackend
 from scos.render.video_use_backend import VideoUseBackend
+from scos.premium_media.canonical_backend import PremiumRenderBackend
 
 log = logging.getLogger("scos.render.ffmpeg_engine")
 
@@ -89,14 +90,34 @@ def render(input_data: dict, backend: RenderBackend | None = None) -> dict:
     Raises RenderError on any unrecoverable failure.
     """
     run_id = input_data["run_id"]
-    edit_timeline = input_data["edit_timeline"]
-    request = _request_from_timeline(run_id, edit_timeline)
+    edit_timeline = input_data.get("edit_timeline", {})
+    backend_mode = str(input_data.get("backend") or input_data.get("renderer") or "").lower()
     if backend is None:
-        needs_generation = any(
-            clip.generation_backend != "deterministic" for clip in request.clips
+        if backend_mode == "premium":
+            backend = PremiumRenderBackend()
+        else:
+            request_probe = _request_from_timeline(run_id, edit_timeline)
+            needs_generation = any(
+                clip.generation_backend != "deterministic" for clip in request_probe.clips
+            )
+            backend = GenerativeVideoBackend() if needs_generation else VideoUseBackend()
+    if backend_mode == "premium" and isinstance(backend, PremiumRenderBackend):
+        premium = input_data.get("premium")
+        if not isinstance(premium, dict):
+            raise RenderError("premium backend selected but input_data['premium'] is missing")
+        from scos.premium_media.models import PremiumRenderProfile
+        profile = PremiumRenderProfile(**premium["profile"])
+        request = RenderRequest(
+            run_id=run_id,
+            clips=[],
+            output_path=_resolve(str(premium.get("output_path") or f"scos/work/video/{run_id}.mp4")),
+            work_dir=_WORK_DIR / run_id,
+            profile=RenderProfile(width=profile.width, height=profile.height, fps=profile.fps),
+            metadata={"premium": premium},
         )
-        backend = GenerativeVideoBackend() if needs_generation else VideoUseBackend()
-    if not request.clips:
+    else:
+        request = _request_from_timeline(run_id, edit_timeline)
+    if not request.clips and not (backend_mode == "premium" and isinstance(backend, PremiumRenderBackend)):
         raise RenderError(f"run {run_id}: edit_timeline has no clips to render")
 
     result = backend.render(request)

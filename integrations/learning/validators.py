@@ -118,7 +118,18 @@ TELEMETRY_PLATFORMS = {"tiktok", "youtube_shorts", "instagram_reels"}
 TELEMETRY_PCT_FIELDS = ("avg_watch_pct", "completion_rate", "rewatch_rate_pct", "ctr_pct")
 # fields that are non-negative counts/seconds when present
 TELEMETRY_NONNEG_FIELDS = ("views", "likes", "comments", "shares", "saves",
-                           "avg_watch_time_s", "output_duration_s")
+                           "avg_watch_time_s", "output_duration_s", "reach",
+                           "followers_gained")
+TELEMETRY_EVIDENCE_REQUIRED_FOR_API = (
+    "provider", "platform_content_id", "graph_fingerprint", "artifact_sha256",
+    "query_sha256",
+)
+
+
+def _valid_sha256(value) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(
+        c in "0123456789abcdefABCDEF" for c in value
+    )
 
 
 def validate_telemetry(entry) -> list[str]:
@@ -133,6 +144,27 @@ def validate_telemetry(entry) -> list[str]:
     plat = entry.get("platform")
     if plat is not None and plat not in TELEMETRY_PLATFORMS:
         errs.append(f"telemetry.platform invalid: {plat} (allowed: {sorted(TELEMETRY_PLATFORMS)})")
+
+    evidence = entry.get("observation_evidence")
+    if evidence is not None and not isinstance(evidence, dict):
+        errs.append("telemetry.observation_evidence must be an object")
+        evidence = None
+    if entry.get("source") == "api":
+        if evidence is None:
+            errs.append("telemetry api rows require observation_evidence")
+        else:
+            for field in TELEMETRY_EVIDENCE_REQUIRED_FOR_API:
+                if not evidence.get(field):
+                    errs.append(f"telemetry api evidence missing: {field}")
+            for field in ("graph_fingerprint", "artifact_sha256", "query_sha256", "response_sha256"):
+                if field in evidence and not _valid_sha256(evidence[field]):
+                    errs.append(f"telemetry api evidence {field} must be SHA-256 hex")
+
+    if entry.get("source") != "api" and evidence is not None:
+        for field in ("graph_fingerprint", "artifact_sha256", "query_sha256", "response_sha256"):
+            if field in evidence and not _valid_sha256(evidence[field]):
+                errs.append(f"telemetry evidence {field} must be SHA-256 hex")
+
     for f in TELEMETRY_PCT_FIELDS:
         v = entry.get(f)
         if v is not None and not (isinstance(v, (int, float)) and 0 <= v <= 100):

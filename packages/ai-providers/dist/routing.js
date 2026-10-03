@@ -54,15 +54,39 @@ export function routeCapability(request) {
         eligible.push({ candidate: governanceBoundCandidate, machine });
     }
     if (eligible.length === 0) {
-        return { kind: "DENIED", reason: "no_eligible_route", rejections };
+        return {
+            kind: "DENIED",
+            reason: "no_eligible_route",
+            rejections,
+            routeDecisionId: request.routeDecisionId,
+            loopRunId: request.loopRunId,
+        };
     }
-    eligible.sort((a, b) => (b.candidate.priority ?? 0) - (a.candidate.priority ?? 0) ||
-        `${a.candidate.providerId}:${a.candidate.modelId}`.localeCompare(`${b.candidate.providerId}:${b.candidate.modelId}`));
+    eligible.sort((a, b) => {
+        const priorityDelta = (b.candidate.priority ?? 0) - (a.candidate.priority ?? 0);
+        if (priorityDelta !== 0)
+            return priorityDelta;
+        const aSuccess = a.candidate.observedSuccessRate;
+        const bSuccess = b.candidate.observedSuccessRate;
+        if (aSuccess !== undefined && bSuccess !== undefined && aSuccess !== bSuccess) {
+            return bSuccess - aSuccess;
+        }
+        const aLatency = a.candidate.observedLatencyMs;
+        const bLatency = b.candidate.observedLatencyMs;
+        if (aLatency !== undefined && bLatency !== undefined && aLatency !== bLatency) {
+            return aLatency - bLatency;
+        }
+        const aKey = a.candidate.providerId + ":" + a.candidate.modelId;
+        const bKey = b.candidate.providerId + ":" + b.candidate.modelId;
+        return aKey.localeCompare(bKey);
+    });
     const selected = eligible[0];
     return {
         kind: "ROUTED",
         capability: request.capability,
         candidate: selected.candidate,
+        routeDecisionId: request.routeDecisionId,
+        loopRunId: request.loopRunId,
         evidenceRefs: [
             ...governanceFor(selected.candidate, request.governanceEvidence).evidenceRefs,
             ...selected.machine.evidenceRefs,

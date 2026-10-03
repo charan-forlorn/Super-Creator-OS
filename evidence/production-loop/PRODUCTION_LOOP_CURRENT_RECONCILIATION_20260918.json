@@ -1,0 +1,49 @@
+{
+  "schema_version": "SCOS_AI_BUSINESS_PRODUCTION_CURRENT_RECONCILIATION_R1",
+  "observed_at": "2026-09-18T15:40:44.969Z",
+  "status": "READY_HUMAN_PUBLISH_GATE",
+  "scope": "AI Business Production -> Adaptive Capability Routing -> Real Telemetry -> Governed Production Loop",
+  "scos_source_commit": "3380d05f7389cff91214e1e4ac77a110ddc1959a",
+  "haios_source_commit": "2a4847c573d41616d2b54ea6805dff573c3722de",
+  "haios_source_path": "IMPLEMENTATION_BLUEPRINT.md",
+  "haios_source_sha256": "C7C17D1B50D36A6769C7B904B35F3742B1B9B99D54D6CA9DEC5F999257C12A3C",
+  "current_governed_loop": {
+    "loop_run_id": "c16454cd-b7e1-4a5b-b534-65e766e4e470",
+    "route_decision_id": "591da214-16e4-4198-9dc6-3abcb5b90a35",
+    "status": "COMPLETED",
+    "selected_model": "qwen3:4b",
+    "model_digest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+    "evidence_sha256": "c2189aa09f5a6a929134992373dd8a944385f0c2f3bdc0fae9df5815c7dfd801",
+    "verification_status": "PASS",
+    "fallback_used": false
+  },
+  "artifact_lineage": {
+    "artifact_id": "scos-qual-artifact-aca02029eac3532c",
+    "artifact_path": "evidence/production-loop/artifacts/ai-automation-short-v1/ai-automation-short-v1.mp4",
+    "artifact_sha256": "aca02029eac3532c3e81c396e25fefd9ed6407bb42a43f775d46fa14817a0683",
+    "registered_loop_run_id": "7cac80d7-1624-4715-b8a0-e829a505c96c",
+    "registered_generation_evidence": "evidence/production-loop/runs/7cac80d7-1624-4715-b8a0-e829a505c96c.json",
+    "registered_generation_evidence_sha256": "bb6e7a6a072e1af2fd1519e4f495a45d2d07b2543ff792742dd93811e8279a77",
+    "current_run_is_not_claimed_as_artifact_generator": true,
+    "artifact_hash_matches_registration": true
+  },
+  "human_publish_gate": {
+    "status": "OPEN",
+    "external_publish": "NOT_PERFORMED",
+    "platform": "tiktok",
+    "operator_action": "Human must explicitly review and publish the prepared artifact in TikTok",
+    "after_publish_required": "Record TikTok video/post ID and published_at, then ingest real observed telemetry; do not fabricate"
+  },
+  "telemetry_gate": {
+    "status": "OPEN_DATA_GATE",
+    "reason": "No real external observation is allowed to be fabricated; after Human Publish, record the external post ID and ingest observed 24h/72h/7d metrics joined by the registered artifact loop_run_id.",
+    "join_key": "loop_run_id",
+    "synthetic_data_allowed": false
+  },
+  "governance": {
+    "human_authority_inferred": false,
+    "external_publish_performed": false,
+    "new_orchestration_created": false,
+    "reuse_existing_governed_loop": true
+  }
+}

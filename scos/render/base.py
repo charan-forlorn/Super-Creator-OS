@@ -17,6 +17,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 CAMERA_MOTIONS = {
     "static",
@@ -145,6 +146,10 @@ class RenderRequest:
     output_path: Path
     work_dir: Path
     profile: RenderProfile = field(default_factory=RenderProfile)
+    # Optional backend-specific metadata keeps the canonical interface stable while
+    # allowing richer engines (for example Remotion + FFmpeg Premium Media) to carry
+    # typed-in-practice execution context without creating a second render contract.
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

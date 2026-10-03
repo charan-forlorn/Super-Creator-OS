@@ -1,5 +1,5 @@
 import { type AiEditPlan } from "@haios/ai-core";
-import { AIProvider, ProviderRequest, ProviderResponse, ProviderKind } from "./types.js";
+import { type AIProvider, type ProviderRequest, type ProviderResponse, type ProviderKind } from "./types.js";
 /** Extract the first balanced JSON object from arbitrary model text. */
 export declare function extractJsonObject(text: string): string;
 /** Shared: parse the model text into a strict AIEditPlan (never returns raw text as action). */

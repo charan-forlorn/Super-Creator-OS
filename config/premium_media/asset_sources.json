@@ -1,0 +1,69 @@
+{
+  "schema_version": "SCOS_PREMIUM_ASSET_SOURCES_R1",
+  "policy": {
+    "default_rights_class": "unknown",
+    "fail_closed": true,
+    "auto_rip_popular_songs": false,
+    "auto_publish": false,
+    "commercial_ad_requires_explicit_license": true
+  },
+  "sources": [
+    {
+      "id": "mixkit_sfx",
+      "kind": "sfx",
+      "url": "https://mixkit.co/free-sound-effects/",
+      "rights_class": "commercial_cleared",
+      "commercial_ok": true,
+      "scope_note": "Mixkit Free Sound Effects license permits use in online marketing/advertising; standalone redistribution is not allowed."
+    },
+    {
+      "id": "mixkit_music",
+      "kind": "music",
+      "url": "https://mixkit.co/free-stock-music/",
+      "rights_class": "commercial_cleared",
+      "commercial_ok": true,
+      "scope_note": "Mixkit Free Stock Music license covers social media and online marketing; other media scopes must be checked before use."
+    },
+    {
+      "id": "pixabay_content",
+      "kind": "music_sfx",
+      "url": "https://pixabay.com/service/license-summary/",
+      "rights_class": "commercial_cleared",
+      "commercial_ok": true,
+      "scope_note": "Pixabay content is broadly usable in creative works, but third-party rights and item-specific restrictions still need review."
+    },
+    {
+      "id": "freesound_cc0",
+      "kind": "sfx",
+      "url": "https://freesound.org/help/faq/",
+      "rights_class": "cc0",
+      "commercial_ok": true,
+      "scope_note": "CC0 items are suitable for commercial use; record the item page and checksum."
+    },
+    {
+      "id": "freesound_cc_by",
+      "kind": "sfx",
+      "url": "https://freesound.org/help/faq/",
+      "rights_class": "cc_by",
+      "commercial_ok": true,
+      "scope_note": "CC-BY requires attribution; attribution text is stored with the asset."
+    },
+    {
+      "id": "youtube_audio_library",
+      "kind": "music_sfx",
+      "url": "https://support.google.com/youtube/answer/3376882",
+      "rights_class": "platform_scoped",
+      "commercial_ok": true,
+      "allowed_platforms": ["youtube"],
+      "scope_note": "Treat YouTube Audio Library as YouTube-scoped unless the specific track license explicitly grants broader rights."
+    },
+    {
+      "id": "user_licensed_song",
+      "kind": "commercial_song",
+      "url": "local-license-record",
+      "rights_class": "commercial_cleared",
+      "commercial_ok": true,
+      "scope_note": "Real international/Thai songs can enter the pipeline only with explicit license evidence covering the intended platform, territory, term, and advertising use."
+    }
+  ]
+}

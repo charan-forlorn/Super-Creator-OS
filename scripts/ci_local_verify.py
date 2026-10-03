@@ -1,4 +1,4 @@
-﻿"""SCOS local CI-parity verifier (Cohort 8C).
+"""SCOS local CI-parity verifier (Cohort 8C).
 
 Deterministic local reproduction of the committed GitHub Actions quality gates
 in ``.github/workflows/ci.yml``. The verifier runs the SAME verification gates,
@@ -110,6 +110,7 @@ except Exception:
     _MEDIA_FFMPEG = Path("")
     _MEDIA_FFPROBE = Path("")
     _MEDIA_SHIM_DIR = Path("")
+
 
 # Required warning-as-error guards (Cohort 8C Â§7). Never blanket ``-W error``.
 WARNING_GUARDS: tuple[str, str] = (

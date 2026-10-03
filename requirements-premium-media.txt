@@ -1,0 +1,4 @@
+# Optional Premium TTS dependencies (installed selectively on the development machine)
+google-cloud-texttospeech==2.37.0
+# Piper / Chatterbox intentionally not pinned here yet because voice-model licensing and
+# GPU/runtime constraints differ per project. Add explicit versions once qualified.

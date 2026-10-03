@@ -113,3 +113,17 @@ scos/work/
 evidence/**/*.mp4
 evidence/**/*.mov
 evidence/**/_synthetic_*.mp4
+
+# --- Premium Media generated evidence / render scratch ---
+deliverables/premium-media-r1/
+work/production/remotion-wireframe-v4/renders/
+work/production/remotion-wireframe-v4/qc/
+work/production/remotion-wireframe-v4/public/audio/
+work/production/remotion-wireframe-v4/*.log
+work/production/remotion-wireframe-v4/tmp_marker.txt
+work/production/ai-automation-tiktok-v2/
+work/production/premium-smoke/
+work/production/pytest-premium/
+work/production/reference/
+deliverables/
+
