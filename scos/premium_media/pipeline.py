@@ -14,6 +14,7 @@ from .qc import QCError, QCReport, analyze_loudness, validate_render
 from .render_cache import RenderCache, cache_key, sha256_file
 from .rights import validate_manifest_for_publish
 from .subtitles import write_ass
+from .lookdev import LookProfile
 
 
 class PremiumPipelineError(RuntimeError):
@@ -77,6 +78,7 @@ def _final_cache_key(
     subtitles: Sequence[SubtitleCue],
     subtitle_style: SubtitleStyle | None,
     production_metadata: dict | None,
+    look_profile: LookProfile | None = None,
 ) -> str:
     payload = {
         "schema": "SCOS_FINAL_MASTER_CACHE_R1",
@@ -85,6 +87,10 @@ def _final_cache_key(
         "audio_stems": [_stem_identity(stem) for stem in audio_stems],
         "subtitles": [cue.__dict__ for cue in subtitles],
         "subtitle_style": subtitle_style.__dict__ if subtitle_style else None,
+        "look_profile": {
+            "profile_id": look_profile.profile_id,
+            "fingerprint": look_profile.fingerprint(),
+        } if look_profile else None,
         # Volatile learning identity is provenance-only; input bytes/profile already
         # establish the rendered content identity for incremental reuse.
         "ffmpeg_version": _ffmpeg_version(),
@@ -187,6 +193,7 @@ def finalize_video(
     subtitles: Sequence[SubtitleCue] = (),
     subtitle_style: SubtitleStyle | None = None,
     production_metadata: dict | None = None,
+    look_profile: LookProfile | None = None,
 ) -> QCReport:
     source = Path(input_video).resolve()
     output = Path(output_path).resolve()
@@ -204,6 +211,7 @@ def finalize_video(
         subtitles=subtitles,
         subtitle_style=subtitle_style,
         production_metadata=production_metadata,
+        look_profile=look_profile,
     )
     cached = cache.lookup("final", final_key)
     if cached is not None:
@@ -238,11 +246,17 @@ def finalize_video(
     work_dir.mkdir(parents=True, exist_ok=True)
 
     ass_path: Path | None = None
-    video_filter = "null"
+    video_filters: list[str] = []
+    if look_profile is not None:
+        look_errors = look_profile.validate()
+        if look_errors:
+            raise PremiumPipelineError("look profile invalid: " + "; ".join(look_errors))
+        video_filters.append(look_profile.ffmpeg_filter())
     if subtitles and profile.burn_in_subtitles:
         ass_path = work_dir / (output.stem + ".ass")
         write_ass(list(subtitles), ass_path, style=subtitle_style)
-        video_filter = f"subtitles=filename='{_ass_filter_path(ass_path)}'"
+        video_filters.append(f"subtitles=filename='{_ass_filter_path(ass_path)}'")
+    video_filter = ",".join(video_filters) if video_filters else "null"
 
     # Master the audio in a separate, deterministic two-pass chain.
     if audio_stems:

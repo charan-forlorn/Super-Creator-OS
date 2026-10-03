@@ -79,21 +79,55 @@ META_REELS_ADS = DeliveryProfile(
 )
 
 YOUTUBE_UPLOAD_1080P = DeliveryProfile(
-    profile_id="youtube_upload_1080p", platform="youtube", purpose="upload",
-    width=1080, height=1920, fps=30, require_audio=True, require_916=False,
+    profile_id="youtube_upload_1080p", platform="youtube", purpose="shorts-upload",
+    width=1080, height=1920, fps=30, require_audio=True, require_916=True,
     safe_zone_required=True,
     recommended_video_bitrate_kbps=8000,
     source_urls=("https://support.google.com/youtube/answer/1722171?hl=en",),
-    evidence_note="YouTube upload guidance accepts vertical video; 1080p SDR reference bitrate is 8 Mbps at standard frame rate, 12 Mbps at high frame rate, with MP4/H.264/AAC-LC-or-Opus and 48 kHz audio guidance.",
+    evidence_note="Vertical 1080p YouTube delivery profile for short-form output. Live destination requirements remain authoritative at delivery time.",
+)
+
+YOUTUBE_UPLOAD_1080P_LANDSCAPE = DeliveryProfile(
+    profile_id="youtube_upload_1080p_landscape", platform="youtube", purpose="upload",
+    width=1920, height=1080, fps=30, require_audio=True, require_916=False,
+    safe_zone_required=True,
+    recommended_video_bitrate_kbps=12000,
+    source_urls=("https://support.google.com/youtube/answer/1722171?hl=en",),
+    evidence_note="Horizontal 1920x1080 YouTube delivery profile. Live destination requirements remain authoritative at delivery time.",
+)
+
+MASTER_HORIZONTAL_1080 = DeliveryProfile(
+    profile_id="master_horizontal_1080", platform="master", purpose="master",
+    width=1920, height=1080, fps=30, require_audio=True, safe_zone_required=True,
+    render_acceleration="cpu",
+    evidence_note="Platform-neutral 16:9 production master for horizontal delivery.",
+)
+
+MASTER_SQUARE_1080 = DeliveryProfile(
+    profile_id="master_square_1080", platform="master", purpose="master",
+    width=1080, height=1080, fps=30, require_audio=True, safe_zone_required=True,
+    render_acceleration="cpu",
+    evidence_note="Platform-neutral 1:1 production master for square feeds.",
+)
+
+MASTER_PORTRAIT_4X5 = DeliveryProfile(
+    profile_id="master_portrait_4x5_1080", platform="master", purpose="master",
+    width=1080, height=1350, fps=30, require_audio=True, safe_zone_required=True,
+    render_acceleration="cpu",
+    evidence_note="Platform-neutral 4:5 production master for portrait feeds.",
 )
 
 DELIVERY_PROFILES: dict[str, DeliveryProfile] = {
     p.profile_id: p for p in (
         MASTER_VERTICAL,
         MASTER_ARCHIVE_VERTICAL,
+        MASTER_HORIZONTAL_1080,
+        MASTER_SQUARE_1080,
+        MASTER_PORTRAIT_4X5,
         TIKTOK_ADS_GLOBAL,
         META_REELS_ADS,
         YOUTUBE_UPLOAD_1080P,
+        YOUTUBE_UPLOAD_1080P_LANDSCAPE,
     )
 }
 

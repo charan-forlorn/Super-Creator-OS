@@ -13,7 +13,13 @@ export const RemotionRoot = () => (
       fps={30}
       width={1080}
       height={1920}
-      defaultProps={{states: undefined, captions: [], musicSrc: undefined, sfx: []}}
+      calculateMetadata={({props}) => ({
+        durationInFrames: Math.max(1, Math.ceil(Number(props?.duration_s || 30) * Number(props?.fps || 30))),
+        fps: Number(props?.fps || 30),
+        width: Number(props?.width || 1080),
+        height: Number(props?.height || 1920),
+      })}
+      defaultProps={{states: undefined, captions: [], musicSrc: undefined, sfx: [], production_graph: undefined, fps: 30, width: 1080, height: 1920}}
     />
   </>
 );

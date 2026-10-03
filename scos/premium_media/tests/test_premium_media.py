@@ -12,6 +12,7 @@ from scos.premium_media.models import (
     MediaAsset,
     PremiumRenderProfile,
     SubtitleCue,
+    SubtitleStyle,
     RightsClass,
 )
 from scos.premium_media.rights import RightsError, validate_asset_for_publish
@@ -53,6 +54,9 @@ def test_srt_round_trip_and_wrap():
     assert cues[0].language == "th"
     assert "\n" in wrap_caption("This is a subtitle line that should wrap cleanly", max_chars=20)
     assert "Dialogue:" in to_ass(cues)
+    assert ",8,80,80," in to_ass(cues, style=SubtitleStyle(position="top_center"))
+    with pytest.raises(SubtitleError):
+        to_ass(cues, style=SubtitleStyle(position="invalid"))
 
 
 def test_srt_overlap_fails():
