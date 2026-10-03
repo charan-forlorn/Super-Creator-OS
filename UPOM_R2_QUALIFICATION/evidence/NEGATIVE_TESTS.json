@@ -1,0 +1,50 @@
+{
+    "schema_version":  "UPOM-R2-AI-BUSINESS-NEGATIVE-TESTS-1",
+    "fail_closed":  true,
+    "adversarial_summary":  "7/7 PASS",
+    "results":  [
+                    {
+                        "expected":  "DENIED / missing_governance_evidence",
+                        "case":  "Missing HAIOS governance evidence",
+                        "covered_by":  "adaptive-routing.test.ts",
+                        "result":  "PASS"
+                    },
+                    {
+                        "expected":  "DENIED / machine_model_not_observed",
+                        "case":  "Observed model absent on machine",
+                        "covered_by":  "adaptive-routing.test.ts",
+                        "result":  "PASS"
+                    },
+                    {
+                        "expected":  "DENIED / machine_model_version_mismatch",
+                        "case":  "Observed model digest mismatch",
+                        "covered_by":  "adaptive-routing.test.ts",
+                        "result":  "PASS"
+                    },
+                    {
+                        "expected":  "DENIED / unknown_currentness",
+                        "case":  "Governance currentness unknown despite candidate claiming CURRENT",
+                        "covered_by":  "adaptive-routing.test.ts",
+                        "result":  "PASS"
+                    },
+                    {
+                        "expected":  "DENIED / unknown_health",
+                        "case":  "Unknown provider health",
+                        "covered_by":  "adaptive-routing.test.ts",
+                        "result":  "PASS"
+                    },
+                    {
+                        "expected":  "DENIED / unknown_cost",
+                        "case":  "Unknown cost class",
+                        "covered_by":  "capabilities.test.ts",
+                        "result":  "PASS"
+                    },
+                    {
+                        "expected":  "DENIED",
+                        "case":  "No silent fallback when all candidates rejected",
+                        "covered_by":  "adaptive-routing.test.ts",
+                        "result":  "PASS"
+                    }
+                ],
+    "project_id":  "AI_BUSINESS_PRODUCTION_R1_UPOM_R2"
+}

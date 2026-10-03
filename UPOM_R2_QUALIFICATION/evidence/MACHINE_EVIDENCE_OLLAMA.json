@@ -1,0 +1,45 @@
+{
+    "schema_version":  "AI-BUSINESS-R1-MACHINE-EVIDENCE-1",
+    "authority_granted":  false,
+    "notes":  [
+                  "Presence/reachability is not qualification",
+                  "No inference was executed by this observation",
+                  "No provider activation or routing authority was granted"
+              ],
+    "providerReachable":  true,
+    "observed_at":  "2026-10-03T04:43:40.7085602Z",
+    "evidence_type":  "READ_ONLY_API_OBSERVATION",
+    "health":  "HEALTHY",
+    "models":  [
+                   {
+                       "digest":  "bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8",
+                       "modelId":  "qwen3:14b"
+                   },
+                   {
+                       "digest":  "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+                       "modelId":  "qwen3:4b"
+                   },
+                   {
+                       "digest":  "0635d9d857d497aeadba3d7d27485746c50554446f9f6ec01ef39788221adbe8",
+                       "modelId":  "qwen3-vl:2b"
+                   },
+                   {
+                       "digest":  "ee4b975b58c17ce268cd19d40db35d5edc64603035d2ffc1fee1968eb0947f7b",
+                       "modelId":  "qwen3-vl:4b-instruct"
+                   },
+                   {
+                       "digest":  "901cae73216286ea8c5aba8b46d307ff7188f737285ec500c795a12f05225d28",
+                       "modelId":  "qwen3-vl:8b"
+                   },
+                   {
+                       "digest":  "5ef62147a88bafe31144b459031ac07e68decc83068eb2978a9a818239c1f10e",
+                       "modelId":  "rfsousa/qwen2.5vl:tools"
+                   },
+                   {
+                       "digest":  "5ced39dfa4bac325dc183dd1e4febaa1c46b3ea28bce48896c8e69c1e79611cc",
+                       "modelId":  "qwen2.5vl:7b"
+                   }
+               ],
+    "endpoint":  "http://localhost:11434/api/tags",
+    "providerId":  "ollama"
+}

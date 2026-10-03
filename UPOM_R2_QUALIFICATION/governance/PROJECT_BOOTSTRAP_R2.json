@@ -1,0 +1,54 @@
+{
+    "project_id":  "AI_BUSINESS_PRODUCTION_R1_UPOM_R2",
+    "project_contract":  {
+                             "owner":  "Human Owner",
+                             "success_criteria":  [
+                                                      "Build passes",
+                                                      "26 provider tests pass",
+                                                      "Frozen dependency install passes",
+                                                      "Runtime exports match type surface",
+                                                      "Negative routing behavior fails closed",
+                                                      "Fresh reconciliation and post-close review pass"
+                                                  ],
+                             "outcomes":  [
+                                              "Current repo truth reconciled",
+                                              "Adaptive router and machine-evidence path verified",
+                                              "Workspace dependency state reproducible",
+                                              "Closure evidence sealed"
+                                          ],
+                             "non_goals":  [
+                                               "Provider activation",
+                                               "Credential activation",
+                                               "Paid execution",
+                                               "External publish",
+                                               "Production promotion",
+                                               "Authority expansion",
+                                               "Automatic provider fallback"
+                                           ],
+                             "goal":  "Qualify and close AI Business Production R1 under ACTIVE UPOM-R2 using current truth, reproducible build, deterministic routing, machine evidence, fail-closed verification and sealed closure.",
+                             "constraints":  [
+                                                 "Fail closed",
+                                                 "Source bytes over prose",
+                                                 "Read-only machine observation",
+                                                 "No external consequential effect",
+                                                 "No Human approval inference",
+                                                 "Preserve historical evidence"
+                                             ]
+                         },
+    "schema_version":  "UPOM-PROJECT-BOOTSTRAP-R2",
+    "current_truth":  {
+                          "git_repository":  true,
+                          "branch":  "feat/ai-business-production-r1",
+                          "project_root":  "C:\\Workspace\\super-creator-os\\.worktrees\\ai-business-production-r1",
+                          "head":  "dc7036d5ad1ab6f493522e46126093353d2b9320",
+                          "captured_at":  "2026-10-03T04:44:50.5676090Z",
+                          "pre_closure_status":  "CLEAN"
+                      },
+    "state":  "CLOSED",
+    "governance":  {
+                       "human_authority_ref":  "ACTIVE-MHAE",
+                       "provider_authority":  "NOT_GRANTED",
+                       "normative_model":  "UPOM-R2",
+                       "external_effect_policy":  "NONE_IN_THIS_PACKAGE"
+                   }
+}

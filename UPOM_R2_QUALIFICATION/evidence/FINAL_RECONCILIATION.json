@@ -1,0 +1,23 @@
+{
+    "schema_version":  "UPOM-R2-AI-BUSINESS-FINAL-RECONCILIATION-1",
+    "git_status_before_closure":  "CLEAN",
+    "reconciled_at":  "2026-10-03T04:45:12.9554222Z",
+    "external_effect":  "NONE",
+    "invalidation_rule":  "Any mutation to protected source or governance bytes invalidates closure until requalified.",
+    "qualification_status":  "QUALIFIED",
+    "project_id":  "AI_BUSINESS_PRODUCTION_R1_UPOM_R2",
+    "authority_state":  "NO_PROVIDER_OR_PRODUCTION_AUTHORITY",
+    "head":  "dc7036d5ad1ab6f493522e46126093353d2b9320",
+    "artifact_hashes":  {
+                            "evidence/NEGATIVE_TESTS.json":  "380548EFF95B134EB59BBFFF414B879DC7D06C14EF041D057B6931232ED05CFC",
+                            "governance/PROJECT_BOOTSTRAP_R2.json":  "D402A483A31B1BBA915D0A5ACF72B1C91EB6C779519230FD97DFBD423DEFC4EB",
+                            "evidence/QUALIFICATION_R2.json":  "32102CD4ACFB484B17AEF994DF2949284578C88A88A783C4185D5E3AC9ED76B6",
+                            "governance/PROJECT_BLUEPRINT_R2.json":  "8DC1D4A2E465D2B459013325A82171170EB9B8DE852C9244D8A499F2B33A1C70",
+                            "evidence/CURRENT_TRUTH.json":  "AF97415681ABDD9D5E4A691FB9C0729E88ABE0D1A2F1303CDD1C47F6285734D3",
+                            "evidence/MACHINE_EVIDENCE_OLLAMA.json":  "7A4FB1FC765793D767EF84309366BDD3FCA8BE24D7C392FE06C267905FE75C1B",
+                            "governance/PROJECT_ROADMAP_R2.json":  "922BB79CF8472159E1977F9BC754798F04AAD4E001B7397B4FA855251748286A",
+                            "evidence/EXECUTION_EVIDENCE.json":  "DD6DD895B36901EABA0D20A3AA4EF49ED67D15829E638CD4ED102FC96D5F90D1",
+                            "governance/DEPENDENCY_MANIFEST_R2.json":  "37371B80FC578902B065BB18F061DBF171D90918BAC25659E88F3C7546B97780",
+                            "governance/ACTION_ADMISSION_R2.json":  "5F8F3DBC23D0DC6E81D41782F5D14E4473BD854355B32C77D6A75296781BD3DD"
+                        }
+}
