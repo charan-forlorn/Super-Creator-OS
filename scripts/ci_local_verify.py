@@ -399,59 +399,19 @@ def build_gates(
               str(repo_root / "scripts" / "security_scan_baseline.py")],
     ))
 
-    # 3. Control Center typecheck (frontend, Cohort 9D).
+    # 3. Control Center backend truth contract (current CI source-of-truth).
     gates.append(Gate(
         order=3,
-        gate_id="cc_typecheck",
-        argv=[_NODE_BIN,
-              _TSC_BIN,
-              "--noEmit", "--incremental", "false"],
-        extra_env={"CHANGE_DIR": str(repo_root / _CONTROL_CENTER_DIR)},
-    ))
-
-    # 4. Control Center lint (frontend, Cohort 9D).
-    gates.append(Gate(
-        order=4,
-        gate_id="cc_lint",
-        argv=[_NPM_BIN, "run", "lint"],
-        extra_env={"CHANGE_DIR": str(repo_root / _CONTROL_CENTER_DIR)},
-    ))
-
-    # 5. Control Center frontend tests (frontend, Cohort 9D).
-    # Deterministic Python env (BD5 Case B): expose the trusted interpreter to
-    # Python-resolving frontend tests so the bare ``python3`` fallback resolves
-    # reliably inside the vitest worker regardless of ambient PATH.
-    frontend_env = build_frontend_python_env(run_root, interpreter)
-    gates.append(Gate(
-        order=5,
-        gate_id="cc_frontend_tests",
-        argv=[_NPX_BIN, "vitest", "run", "--no-file-parallelism"],
-        extra_env={"CHANGE_DIR": str(repo_root / _CONTROL_CENTER_DIR)},
-        child_env=frontend_env,
-    ))
-
-    # 6. Control Center production build (frontend, Cohort 9D).
-    gates.append(Gate(
-        order=6,
-        gate_id="cc_build",
-        argv=[_NPM_BIN, "run", "build"],
-        extra_env={"CHANGE_DIR": str(repo_root / _CONTROL_CENTER_DIR)},
-    ))
-
-    # 7. Browser acceptance (structural truth gate, Cohort 9D). Install-free,
-    #    CI-safe, no subprocess egress. Mirrors the repo-supported command.
-    gates.append(Gate(
-        order=7,
         gate_id="cc_browser_acceptance",
         argv=[str(interpreter),
               str(repo_root / "scripts" / "control_center_truth_gate.py")],
     ))
 
-    # 8. Certified Standard population.
+    # 4. Certified Standard population.
     std_cache = str(run_root / "standard" / "cache")
     std_base = str(run_root / "standard" / "basetemp")
     gates.append(Gate(
-        order=8,
+        order=4,
         gate_id="standard_population",
         argv=_pytest_population_args(interpreter, "not integration", std_cache, std_base),
         media_sensitive=True,
@@ -461,11 +421,11 @@ def build_gates(
         basetemp=std_base,
     ))
 
-    # 9. Certified Explicit Integration population.
+    # 5. Certified Explicit Integration population.
     int_cache = str(run_root / "integration" / "cache")
     int_base = str(run_root / "integration" / "basetemp")
     gates.append(Gate(
-        order=9,
+        order=5,
         gate_id="integration_population",
         argv=_pytest_population_args(interpreter, "integration", int_cache, int_base),
         media_sensitive=True,

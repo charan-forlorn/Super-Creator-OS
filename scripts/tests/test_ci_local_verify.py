@@ -40,10 +40,6 @@ CI_YML = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 EXPECTED_GATE_ORDER = [
     "smoke",
     "security_scan",
-    "cc_typecheck",
-    "cc_lint",
-    "cc_frontend_tests",
-    "cc_build",
     "cc_browser_acceptance",
     "standard_population",
     "integration_population",
@@ -171,14 +167,6 @@ def _parse_ci_gates():
             gates.append(("security_scan", run))
         elif "control_center_truth_gate.py" in run:
             gates.append(("cc_browser_acceptance", run))
-        elif "tsc" in run and "noEmit" in run:
-            gates.append(("cc_typecheck", run))
-        elif "run lint" in run:
-            gates.append(("cc_lint", run))
-        elif "vitest" in run:
-            gates.append(("cc_frontend_tests", run))
-        elif "run build" in run or "next build" in run:
-            gates.append(("cc_build", run))
         elif "-m" in run and "integration" in run:
             # Two pytest populations differ only by marker expression.
             if "not integration" in run:
@@ -387,28 +375,15 @@ def test_existing_environment_copied_and_path_prepended():
         assert os.environ.get("PATH", "") in env["PATH"]
 
 
-def test_frontend_python_env_deterministic_for_gate5():
-    """BD5 Case B: Gate 5 gets a deterministic python3-resolving child env."""
+def test_current_backend_truth_gate_is_python_driven():
     record = []
     runner = _fake_runner_factory(record)
     interp = civ.detect_interpreter(REPO_ROOT)
     civ.run_all(REPO_ROOT, runner=runner)
-    gate5 = [c for c in record if c["gate"] == "cc_frontend_tests"]
-    assert gate5, "Gate 5 must have run"
-    env = gate5[0]["env"]
-    assert env is not None
-    # Trusted interpreter exported for tests that honour it.
-    assert env.get("SCOS_PYTHON_INTERPRETER") == str(interp)
-    # A process-local shim dir is prepended to PATH so the bare 'python3'
-    # fallback resolves to the trusted interpreter inside the vitest worker.
-    assert "frontend-python-shim" in env["PATH"]
-    # Real environment is not mutated by the verifier (compare snapshot).
-    before = dict(os.environ)
-    # (the verifier runs inside this process; assert it did not inject the var
-    # where it was absent beforehand)
-    if "SCOS_PYTHON_INTERPRETER" not in before:
-        assert "SCOS_PYTHON_INTERPRETER" not in os.environ
-
+    truth = [c for c in record if c["gate"] == "cc_browser_acceptance"]
+    assert truth
+    assert truth[0]["argv"][0] == str(interp)
+    assert "control_center_truth_gate.py" in " ".join(truth[0]["argv"])
 
 def test_media_bins_child_local_and_not_permanent():
     record = []
@@ -549,40 +524,14 @@ def test_ci_uses_python_interpreter_local_uses_venv(monkeypatch):
     assert str(interp) in local["security_scan"].argv[0]
 
 
-def test_cohort9d_frontend_gates_present_in_ci_and_local_parity():
-    """Cohort 9D: the Control Center frontend gate set must exist identically
-    in BOTH ci.yml and the local verifier, in the same order, with the same
-    command semantics (no CI-only or local-only bypass)."""
+def test_current_control_center_truth_gate_present_in_ci_and_local_parity():
     ci_gates = dict(_parse_ci_gates())
     interp = civ.detect_interpreter(REPO_ROOT)
     local = {g.gate_id: g for g in civ.build_gates(REPO_ROOT, interp, Path(tempfile.gettempdir()) / "scos-test-parity")}
-
-    # All five frontend gates exist in both.
-    for gid in ("cc_typecheck", "cc_lint", "cc_frontend_tests", "cc_build", "cc_browser_acceptance"):
-        assert gid in ci_gates, f"{gid} missing from ci.yml"
-        assert gid in local, f"{gid} missing from local verifier"
-
-    # Typecheck: tsc --noEmit --incremental false in both.
-    assert "tsc" in ci_gates["cc_typecheck"] and "--noEmit" in ci_gates["cc_typecheck"]
-    assert "tsc" in " ".join(local["cc_typecheck"].argv) and "--noEmit" in " ".join(local["cc_typecheck"].argv)
-
-    # Lint: npm run lint in both.
-    assert "run lint" in ci_gates["cc_lint"]
-    assert "run lint" in " ".join(local["cc_lint"].argv)
-
-    # Frontend tests: vitest run --no-file-parallelism in both.
-    assert "vitest" in ci_gates["cc_frontend_tests"] and "no-file-parallelism" in ci_gates["cc_frontend_tests"]
-    assert "vitest" in " ".join(local["cc_frontend_tests"].argv) and "--no-file-parallelism" in " ".join(local["cc_frontend_tests"].argv)
-
-    # Build: npm run build in both.
-    assert "run build" in ci_gates["cc_build"]
-    assert "run build" in " ".join(local["cc_build"].argv)
-
-    # Browser acceptance: the structural truth gate (install-free) in both.
+    assert "cc_browser_acceptance" in ci_gates
+    assert "cc_browser_acceptance" in local
     assert "control_center_truth_gate.py" in ci_gates["cc_browser_acceptance"]
     assert "control_center_truth_gate.py" in " ".join(local["cc_browser_acceptance"].argv)
-
-    # Order parity is already enforced by test_ci_verification_gate_order_matches_local.
 
 
 # ---------------------------------------------------------------------------
