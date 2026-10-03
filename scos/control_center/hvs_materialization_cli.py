@@ -176,7 +176,7 @@ def _build_stage2_contract(project_id: str) -> dict[str, Any]:
     # its own Stage 2 semantic hash, NOT a plain timeline hash. Use the exact
     # HVS implementation so the contract is accepted.
     try:
-        sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "hermes-video-studio"))
+        sys.path.insert(0, _resolve_hvs_repo_path())
         from hvs.core.project_initializer import _stage2_semantic_hash  # type: ignore
 
         timeline["deterministic_hash"] = _stage2_semantic_hash(timeline)
@@ -444,10 +444,8 @@ def cmd_execute(args: dict[str, Any]) -> dict[str, Any]:
     operator_id = str(args.get("operator_id") or "local-solo-operator")
     now_iso = _now_iso()
     projects_root = args.get("projects_root")
-    hvs_repo_path = args.get("hvs_repo_path")
-    if hvs_repo_path is None:
-        candidate = Path(__file__).resolve().parents[3] / "hermes-video-studio"
-        hvs_repo_path = str(candidate) if candidate.is_dir() else None
+    hvs_repo_path = _resolve_hvs_repo_path(args.get("hvs_repo_path"))
+
     python_executable = args.get("python_executable") or sys.executable
 
     authorization = store.get_authorization(authorization_id)
@@ -492,10 +490,8 @@ def cmd_reconcile(args: dict[str, Any]) -> dict[str, Any]:
     store = _store(args.get("store_path"))
     attempt_id = str(args.get("attempt_id") or "")
     projects_root = args.get("projects_root")
-    hvs_repo_path = args.get("hvs_repo_path")
-    if hvs_repo_path is None:
-        candidate = Path(__file__).resolve().parents[3] / "hermes-video-studio"
-        hvs_repo_path = str(candidate) if candidate.is_dir() else None
+    hvs_repo_path = _resolve_hvs_repo_path(args.get("hvs_repo_path"))
+
     python_executable = args.get("python_executable") or sys.executable
     inspector = (_hyperframes_inspector_factory(projects_root)
                  if _use_hyperframes_backend(hvs_repo_path)

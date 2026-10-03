@@ -344,7 +344,7 @@ def test_no_external_side_effects(repo_root):
 
 # --- 11) CLI JSON and exit-code contracts ------------------------------------
 @pytest.mark.skipif(not LEGACY_HVS_AVAILABLE, reason="legacy HVS checkout absent; covered by HyperFrames replacement route")
-def test_cli_create_approve_exit_codes(tmp_path, repo_root, monkeypatch):
+def test_cli_create_approve_exit_codes(tmp_path, repo_root, monkeypatch, capsys):
     import json
 
     from scos.control_center import cli as cli_mod
@@ -401,7 +401,7 @@ def test_cli_create_approve_exit_codes(tmp_path, repo_root, monkeypatch):
 
 
 @pytest.mark.skipif(not LEGACY_HVS_AVAILABLE, reason="legacy HVS checkout absent; covered by HyperFrames replacement route")
-def test_cli_reject_missing_reason_exit1(tmp_path, repo_root, monkeypatch):
+def test_cli_reject_missing_reason_exit1(tmp_path, repo_root, monkeypatch, capsys):
     from scos.control_center import cli as cli_mod
 
     evidence = (
@@ -432,7 +432,7 @@ def test_cli_reject_missing_reason_exit1(tmp_path, repo_root, monkeypatch):
 
 # --- 12) directly affected Stage 3 / 3.1 intake regression stays usable ------
 @pytest.mark.skipif(not LEGACY_HVS_AVAILABLE, reason="legacy HVS checkout absent; covered by HyperFrames replacement route")
-def test_stage3_intake_still_verifies_root_relative():
+def test_stage3_intake_still_verifies_root_relative(tmp_path):
     import json
 
     from scos.control_center.hvs_evidence_intake import intake_hvs_render_evidence

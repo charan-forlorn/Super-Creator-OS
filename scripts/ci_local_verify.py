@@ -1,4 +1,4 @@
-"""SCOS local CI-parity verifier (Cohort 8C).
+﻿"""SCOS local CI-parity verifier (Cohort 8C).
 
 Deterministic local reproduction of the committed GitHub Actions quality gates
 in ``.github/workflows/ci.yml``. The verifier runs the SAME verification gates,
@@ -39,7 +39,7 @@ certifying agent and is not a subprocess here (no new browser driver, no egress)
 Design contract (Cohort 8C):
 - Repository root is located deterministically (this file lives in ``scripts/``).
 - Refuses to run from/against the wrong repository.
-- Uses ``.venv/Scripts/python.exe`` (Windows) — canonical interpreter.
+- Uses ``.venv/Scripts/python.exe`` (Windows) â€” canonical interpreter.
 - Builds every child command as an argv list; never ``shell=True``.
 - Creates a unique OS-temp run root; per-pytest-gate unique cache_dir and basetemp.
 - cacheprovider stays enabled (NO ``-p no:cacheprovider``).
@@ -69,8 +69,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence
 
+# Keep standalone execution and package/module execution on the same import
+# surface so the canonical SCOS media resolver is available before constants
+# are initialized.
+_EARLY_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_EARLY_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_EARLY_REPO_ROOT))
+
 # ---------------------------------------------------------------------------
-# Canonical constants (the shared SCOS/HVS contract, Cohort 8C §6)
+# Canonical constants (the shared SCOS/HVS contract, Cohort 8C Â§6)
 # ---------------------------------------------------------------------------
 
 # Canonical interpreter relative form resolved against the detected repo root.
@@ -92,12 +99,19 @@ if os.name == "nt":
 else:
     _TSC_BIN = "node_modules/.bin/tsc"
 
-# Process-local media contract (Cohort 8C §6).
-_MEDIA_SHIM_DIR = Path("C:/Users/chara/scoop/shims")
-_MEDIA_FFMPEG = _MEDIA_SHIM_DIR / "ffmpeg.exe"
-_MEDIA_FFPROBE = _MEDIA_SHIM_DIR / "ffprobe.exe"
+# Process-local media contract. Resolve through SCOS canonical media-binary resolver; never bake a user-specific path.
+try:
+    from scos.media_binaries import resolve_ffmpeg as _resolve_ffmpeg
+    from scos.media_binaries import resolve_ffprobe as _resolve_ffprobe
+    _MEDIA_FFMPEG = Path(_resolve_ffmpeg())
+    _MEDIA_FFPROBE = Path(_resolve_ffprobe())
+    _MEDIA_SHIM_DIR = _MEDIA_FFMPEG.parent
+except Exception:
+    _MEDIA_FFMPEG = Path("")
+    _MEDIA_FFPROBE = Path("")
+    _MEDIA_SHIM_DIR = Path("")
 
-# Required warning-as-error guards (Cohort 8C §7). Never blanket ``-W error``.
+# Required warning-as-error guards (Cohort 8C Â§7). Never blanket ``-W error``.
 WARNING_GUARDS: tuple[str, str] = (
     "error::pytest.PytestConfigWarning",
     "error::pytest.PytestUnhandledThreadExceptionWarning",
@@ -185,7 +199,7 @@ def detect_interpreter(
 ) -> Path:
     """Resolve the canonical SCOS interpreter with strict precedence.
 
-    Precedence (operator §2):
+    Precedence (operator Â§2):
       1. repository-local canonical ``.venv`` interpreter, when present and valid;
       2. current-process ``sys.executable``, when it passes all trusted-identity
          checks;
@@ -280,7 +294,7 @@ def build_frontend_python_env(
     themselves (e.g. ``resolvePython()`` falls back to the bare ``python3``
     command when no repository-local ``.venv`` is present). In a detached
     certification worktree there is no local ``.venv``, so that fallback
-    depends on ambient ``PATH`` reaching a ``python3`` executable — which is
+    depends on ambient ``PATH`` reaching a ``python3`` executable â€” which is
     nondeterministic inside the vitest worker process and intermittently fails
     CI-parity (BD3/BD4/BD5: the single ``req 1`` argv-transport failure).
 
@@ -508,7 +522,7 @@ def run_gate(
 
     # Ensure unique OS-temp cache/basetemp paths exist before launching pytest.
     # On Windows pytest creates only the basetemp LEAF (mkdir without parents),
-    # so the parent chain must already exist — mirroring the GitHub Actions
+    # so the parent chain must already exist â€” mirroring the GitHub Actions
     # ``mkdir`` setup step that provisions ``${{ runner.temp }}/...``.
     if gate.is_pytest:
         for p in (gate.cache_dir, gate.basetemp):
@@ -632,7 +646,7 @@ def run_all(
 
 
 # ---------------------------------------------------------------------------
-# Read-only inspection (Cohort 8C §20)
+# Read-only inspection (Cohort 8C Â§20)
 # ---------------------------------------------------------------------------
 
 def plan(repo_root: Path, interpreter: Optional[Path] = None) -> int:
@@ -648,7 +662,7 @@ def plan(repo_root: Path, interpreter: Optional[Path] = None) -> int:
     run_root = Path(tempfile.gettempdir()) / f"scos-ci-local-{stamp}-{os.getpid()}"
     gates = build_gates(repo_root, interpreter, run_root)
 
-    print(f"\n{_VERIFIER_NAME} — PLAN (read-only, no execution)")
+    print(f"\n{_VERIFIER_NAME} â€” PLAN (read-only, no execution)")
     print(f"repo root : {repo_root}")
     print(f"interp    : {interpreter}")
     print(f"run root  : {run_root}  (unique OS-temp; not created in --plan)")
@@ -663,7 +677,7 @@ def plan(repo_root: Path, interpreter: Optional[Path] = None) -> int:
         if gate.is_pytest:
             print(f"       marker={gate.marker} cache_dir={gate.cache_dir} "
                   f"basetemp={gate.basetemp}")
-    print(f"\nPLAN OK — {len(gates)} gates; CI parity order preserved")
+    print(f"\nPLAN OK â€” {len(gates)} gates; CI parity order preserved")
     return 0
 
 

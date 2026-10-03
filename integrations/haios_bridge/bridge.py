@@ -69,7 +69,7 @@ def _artifact_record(path: Path, root: Path, job_id: str, run_id: str) -> dict[s
         return None
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     return {
-        "kind": path.suffix.lower().lstrip("."),
+        "kind": path.suffix.lower().lstrip(".") or "file",
         "role": "primary_output",
         "path": str(path.resolve()),
         "job_id": job_id,
