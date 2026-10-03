@@ -637,6 +637,11 @@ def register_source_asset(
     if "\x00" in raw or "\n" in raw or "\r" in raw:
         return None, _failed_validation(project_id, requirement_id, asset_role, scene_id, raw, "", "null/newline in path"), ProductionAssetError("UNSAFE_SOURCE_PATH", "null or newline in path rejected")
     try:
+        if path.is_symlink():
+            return None, _failed_validation(project_id, requirement_id, asset_role, scene_id, raw, "", "symlink rejected"), ProductionAssetError("SYMLINK_REJECTED", "symlink source rejected")
+        for parent in (path, *path.parents):
+            if parent.is_symlink():
+                return None, _failed_validation(project_id, requirement_id, asset_role, scene_id, raw, "", "symlink rejected"), ProductionAssetError("SYMLINK_REJECTED", "symlink source rejected")
         resolved = path.resolve()
     except OSError as exc:
         return None, _failed_validation(project_id, requirement_id, asset_role, scene_id, raw, "", "unresolvable path"), ProductionAssetError("UNSAFE_SOURCE_PATH", str(exc))

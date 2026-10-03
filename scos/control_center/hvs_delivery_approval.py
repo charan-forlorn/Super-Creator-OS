@@ -100,7 +100,7 @@ def _require_nonempty(field: str, value: str | None) -> None:
 
 
 def _stable_approval_request_id(
-    *, packet_id: str, validation_id: str | None, artifact_sha256: str | None
+    *, packet_id: str, validation_id: str | None, artifact_sha256: str | None, artifact_path: str | None = None
 ) -> str:
     """Deterministic id derived from packet + evidence validation + artifact SHA.
 
@@ -114,6 +114,7 @@ def _stable_approval_request_id(
                 packet_id,
                 validation_id or "",
                 artifact_sha256 or "",
+                artifact_path or "",
             ]
         )
     )
@@ -324,6 +325,7 @@ def create_approval_request(
         packet_id=packet.get("packet_id"),
         validation_id=packet.get("validation_id"),
         artifact_sha256=(packet.get("artifact") or {}).get("sha256"),
+        artifact_path=(packet.get("artifact") or {}).get("path"),
     )
 
     latest = latest_decision(

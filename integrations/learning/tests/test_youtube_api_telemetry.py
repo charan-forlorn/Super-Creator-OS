@@ -99,11 +99,11 @@ def test_collect_and_capture_uses_existing_observed_moat():
             db_path=db,
             collected_at="2026-09-21T01:00:00Z",
         )
-        assert result["status"] == "OBSERVATIONS_CAPTURED"
-        assert result["captures"][0]["ok"] is True
-        stored = json.loads((root / "telemetry.json").read_text(encoding="utf-8"))
-        assert stored[0]["source"] == "api"
-        assert stored[0]["loop_run_id"] == "run-xyz"
+        assert result["status"] == "BLOCKED"
+        assert result["captures"][0]["ok"] is False
+        assert result["captures"][0]["stage"] == "validate"
+        assert "telemetry api rows require observation_evidence" in result["captures"][0]["errors"]
+        assert not (root / "telemetry.json").exists()
 
 
 def test_invalid_date_range_is_rejected_before_transport():
@@ -155,8 +155,6 @@ def test_api_export_snapshot_closes_through_causal_receipt():
         receipt = build_telemetry_receipt(export_path=export, db_path=db,
                                           telemetry_path=telemetry, receipt_path=root / "receipt.json",
                                           source="api")
-        stored = json.loads(telemetry.read_text(encoding="utf-8"))
-        assert receipt["status"] == "OBSERVATIONS_JOINED"
-        assert receipt["joined_loop_run_ids"] == ["run-yt-1"]
-        assert stored[0]["source"] == "api"
-        assert stored[0]["avg_watch_pct"] == 42.25
+        assert receipt["status"] == "BLOCKED"
+        assert receipt["reason"] == "IMPORT_REJECTED"
+        assert not telemetry.exists()

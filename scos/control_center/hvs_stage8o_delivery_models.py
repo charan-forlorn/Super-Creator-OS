@@ -806,9 +806,16 @@ def resolve_artifact_source(artifact_path: str) -> Any:
     _assert_not_network_or_device(artifact_path, "stage8o-artifact")
     if "\x00" in artifact_path:
         raise ValueError("null byte in artifact path")
-    resolved = Path(artifact_path).resolve()
-    if resolved.is_symlink():
+    raw=Path(artifact_path)
+    if raw.is_symlink():
         raise ValueError("artifact is a symlink (escape risk)")
+    for parent in (raw, *raw.parents):
+        try:
+            if parent.is_symlink():
+                raise ValueError("artifact is a symlink (escape risk)")
+        except OSError:
+            raise ValueError("artifact is a symlink (escape risk)")
+    resolved = raw.resolve()
     if not resolved.is_file():
         raise ValueError("artifact is not a regular file")
     return resolved

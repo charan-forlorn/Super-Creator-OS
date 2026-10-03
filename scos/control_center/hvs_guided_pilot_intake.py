@@ -55,13 +55,19 @@ def relto(child,parent):
     try: Path(child).resolve().relative_to(Path(parent).resolve()); return True
     except Exception: return False
 def has_link_or_reparse(p:Path):
-    parts=Path(p).resolve().parts
+    raw=Path(p)
+    try:
+        raw=raw.absolute()
+    except OSError:
+        return True
+    parts=raw.parts
     for i in range(1,len(parts)+1):
         q=Path(*parts[:i])
         try:
-            if q.exists() and q.is_symlink(): return True
+            if q.is_symlink(): return True
             if os.name=='nt' and q.exists() and (q.stat().st_file_attributes & getattr(__import__('stat'),'FILE_ATTRIBUTE_REPARSE_POINT',0)): return True
-        except OSError: return True
+        except OSError:
+            return True
     return False
 def inside_git(p:Path):
     p=Path(p).resolve()
@@ -166,8 +172,9 @@ def with_updates(d, **updates):
 def attach_consent_evidence(d, *, safe_reference, evidence_bytes, explicit_consent_confirmed):
     return with_updates(d, consent_evidence_reference=Path(str(safe_reference)).name, consent_evidence_sha256=sha(evidence_bytes) if evidence_bytes else '', explicit_consent_confirmed=bool(explicit_consent_confirmed), consent_state='CONSENT_CONFIRMED' if explicit_consent_confirmed and evidence_bytes else 'CONSENT_NOT_CONFIRMED')
 def add_asset_from_path(d, *, approved_input_root, file_path):
-    root=Path(approved_input_root).resolve(); p=Path(file_path).resolve()
-    if has_link_or_reparse(root) or has_link_or_reparse(p): raise ValueError('REPARSE_POINT_REJECTED')
+    root_raw=Path(approved_input_root); path_raw=Path(file_path)
+    if has_link_or_reparse(root_raw) or has_link_or_reparse(path_raw): raise ValueError('REPARSE_POINT_REJECTED')
+    root=root_raw.resolve(); p=path_raw.resolve()
     if not relto(p,root): raise ValueError('ASSET_OUTSIDE_APPROVED_FOLDER')
     if not p.is_file(): raise ValueError('ASSET_NOT_FILE')
     status='Unsupported file' if p.suffix.lower() not in ALLOWED_SUFFIX else ('File appears damaged' if p.stat().st_size<=0 else 'Ready')
