@@ -12,6 +12,16 @@
     "human_approval": "JARAN granted explicit push authority in kanban task thread t_82b74652 on 2026-10-09",
     "approval_channel": "clarify response: 'อนุมัติ push ตอนนี้ — unblock A2 ให้ worker ทำ'"
   },
+  "followup_push": {
+    "commit": "501b7c953ac1403672a0ba2fa9a96d6782ce6ec2",
+    "kind": "evidence-commit push (this file + closure-doc correction)",
+    "gate": "D3",
+    "human_approval": "JARAN granted explicit push authority for the evidence commit in the operator chat thread on 2026-10-09",
+    "approval_channel": "clarify response to 'อนุมัติ push commit 501b7c9 (Track A evidence commit) ไป origin/main ไหม?': 'ใช่ — push 501b7c9 ไป origin/main'",
+    "pushed_range": "c046c22..501b7c9",
+    "force_used": false,
+    "post_push_remote_sha": "501b7c953ac1403672a0ba2fa9a96d6782ce6ec2"
+  },
   "execution": {
     "pre_push_head": "c046c22924e07c003ab9d8fdd663e2e5b845c763",
     "pre_push_ahead": 46,

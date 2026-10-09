@@ -115,3 +115,18 @@ Evidence:
 
 - `evidence/production-loop/scos-push-precheck-20261009.json` (read-only pre-push verification, 4/4 PASS)
 - `evidence/production-loop/scos-push-execution-20261009.json` (push execution + post-push verification, 3/3 PASS)
+
+### Follow-up — 2026-10-09 (evidence-commit push)
+
+After the closure-doc correction was committed as `501b7c9` (evidence-only commit: closure-doc correction block + `scos-push-execution-20261009.json`), the Human (JARAN) granted explicit push authority for that evidence commit in the operator chat thread (2026-10-09, response to the direct push-authorization question: *"อนุมัติ push commit 501b7c9 (Track A evidence commit) ไป origin/main ไหม?" → "ใช่ — push 501b7c9 ไป origin/main"*). The commit was pushed fast-forward:
+
+- pushed range: `c046c22..501b7c9` (evidence commit only)
+- force: **not used**
+- post-push remote sha: `501b7c953ac1403672a0ba2fa9a96d6782ce6ec2` (== local HEAD, ahead/behind 0/0)
+
+Two pushes therefore occurred on 2026-10-09, both fast-forward, neither forced:
+
+1. `2d6a3ea..c046c22` — the 46-commit baseline push (approval recorded in `scos-push-execution-20261009.json`, kanban thread t_82b74652)
+2. `c046c22..501b7c9` — the evidence-commit push (approval granted in operator chat thread, recorded here and in this record's `human_approval` block)
+
+The pre-push verification file `evidence/production-loop/scos-push-precheck-20261009.json` cited above was untracked at the time of the first closure-doc correction; it is committed together with this record so the citation resolves in a fresh clone.
