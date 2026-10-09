@@ -3,5 +3,5 @@ packages:
   - "apps/desktop"
 allowBuilds:
   edgedriver: set this to true or false
-  esbuild: set this to true or false
+  esbuild: true
   geckodriver: set this to true or false
