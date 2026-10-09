@@ -1,0 +1,339 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Workspace/scos-track-b/packages/ai-core[39m
+
+ [31m❯[39m tests/zz-repro-probe.test.ts [2m([22m[2m0 test[22m[2m)[22m
+ [32m✓[39m tests/caption-compile.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m tests/plan.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+ [31m❯[39m tests/payload-contract.test.ts [2m([22m[2m8 tests[22m[2m | [22m[31m5 failed[39m[2m)[22m[90m 19[2mms[22m[39m
+[31m   [31m×[31m AI payload contract regression (production-loop defects)[2m > [22mcoerces numeric-string caption params into the caption.place payload[90m 10[2mms[22m[31m[39m
+[31m     → expected [ { …(2) } ] to deeply equal [ { …(2) } ][39m
+[31m   [31m×[31m AI payload contract regression (production-loop defects)[2m > [22maccepts an aspect param aliased as 'place' and resolves the ratio[90m 4[2mms[22m[31m[39m
+[31m     → [
+  {
+    "code": "invalid_union",
+    "unionErrors": [
+      {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "string",
+            "received": "object",
+            "path": [
+              "operations",
+              0,
+              "params",
+              "place"
+            ],
+            "message": "Expected string, received object"
+          }
+        ],
+        "name": "ZodError"
+      },
+      {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "number",
+            "received": "object",
+            "path": [
+              "operations",
+              0,
+              "params",
+              "place"
+            ],
+            "message": "Expected number, received object"
+          }
+        ],
+        "name": "ZodError"
+      },
+      {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "boolean",
+            "received": "object",
+            "path": [
+              "operations",
+              0,
+              "params",
+              "place"
+            ],
+            "message": "Expected boolean, received object"
+          }
+        ],
+        "name": "ZodError"
+      }
+    ],
+    "path": [
+      "operations",
+      0,
+      "params",
+      "place"
+    ],
+    "message": "Invalid input"
+  }
+][39m
+[31m   [31m×[31m AI payload contract regression (production-loop defects)[2m > [22maccepts a scalar alias for the aspect ratio and still coerces the value[90m 1[2mms[22m[31m[39m
+[31m     → expected { …(2) } to deeply equal { …(2) }[39m
+[31m   [31m×[31m AI payload contract regression (production-loop defects)[2m > [22madmits a nested object tool param without collapsing to invalid_union[90m 2[2mms[22m[31m[39m
+[31m     → expected [Function] to not throw an error but '[\n  {\n    "code": "invalid_union",\…' was thrown[39m
+[31m   [31m×[31m AI payload contract regression (production-loop defects)[2m > [22mfails closed on a non-numeric caption duration[90m 0[2mms[22m[31m[39m
+[31m     → expected [Function] to throw an error[39m
+
+[31m⎯⎯⎯⎯⎯⎯[1m[7m Failed Suites 1 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/zz-repro-probe.test.ts[2m [ tests/zz-repro-probe.test.ts ][22m
+[31m[1mError[22m: Transform failed with 1 error:
+C:/Workspace/scos-track-b/packages/ai-core/tests/zz-repro-probe.test.ts:28:37: ERROR: "await" can only be used inside an "async" function[39m
+  Plugin: [35mvite:esbuild[39m
+  File: [36mC:/Workspace/scos-track-b/packages/ai-core/tests/zz-repro-probe.test.ts[39m:28:37
+[33m
+  [33m"await" can only be used inside an "async" function[33m
+  26 |          // Reproduce the FULL runtime path: the governor then does
+  27 |          // bus.execute(commandType, payload) — which is where f6ff926d failed.
+  28 |          const { createCommandBus } = await import("@haios/command-system");
+     |                                       ^
+  29 |          const bus = createCommandBus(project);
+  30 |          for (const c of cmds) {
+  [39m
+[90m [2m❯[22m failureErrorWithLog ../../node_modules/.pnpm/esbuild@0.21.5/node_modules/esbuild/lib/main.js:[2m1472:15[22m[39m
+[90m [2m❯[22m ../../node_modules/.pnpm/esbuild@0.21.5/node_modules/esbuild/lib/main.js:[2m755:50[22m[39m
+[90m [2m❯[22m responseCallbacks.<computed> ../../node_modules/.pnpm/esbuild@0.21.5/node_modules/esbuild/lib/main.js:[2m622:9[22m[39m
+[90m [2m❯[22m handleIncomingPacket ../../node_modules/.pnpm/esbuild@0.21.5/node_modules/esbuild/lib/main.js:[2m677:12[22m[39m
+[90m [2m❯[22m Socket.readFromStdout ../../node_modules/.pnpm/esbuild@0.21.5/node_modules/esbuild/lib/main.js:[2m600:7[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 5 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/payload-contract.test.ts[2m > [22mAI payload contract regression (production-loop defects)[2m > [22mcoerces numeric-string caption params into the caption.place payload
+[31m[1mAssertionError[22m: expected [ { …(2) } ] to deeply equal [ { …(2) } ][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  Array [[22m
+[2m    Object {[22m
+[2m      "commandType": "caption.place",[22m
+[2m      "payload": Object {[22m
+[32m-       "duration": 3.5,[39m
+[32m-       "start": 2,[39m
+[31m+       "duration": "3.5",[39m
+[31m+       "start": "2",[39m
+[2m        "text": "Hi",[22m
+[2m      },[22m
+[2m    },[22m
+[2m  ][22m
+
+[36m [2m❯[22m tests/payload-contract.test.ts:[2m41:22[22m[39m
+    [90m 39| [39m    )[33m;[39m
+    [90m 40| [39m
+    [90m 41| [39m    [34mexpect[39m(commands)[33m.[39m[34mtoEqual[39m([
+    [90m   | [39m                     [31m^[39m
+    [90m 42| [39m      { commandType[33m:[39m [32m"caption.place"[39m[33m,[39m payload[33m:[39m { text[33m:[39m [32m"Hi"[39m[33m,[39m start[33m:[39m [34m2[39m[33m,[39m…
+    [90m 43| [39m    ])[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/payload-contract.test.ts[2m > [22mAI payload contract regression (production-loop defects)[2m > [22maccepts an aspect param aliased as 'place' and resolves the ratio
+[31m[1mZodError[22m: [
+  {
+    "code": "invalid_union",
+    "unionErrors": [
+      {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "string",
+            "received": "object",
+            "path": [
+              "operations",
+              0,
+              "params",
+              "place"
+            ],
+            "message": "Expected string, received object"
+          }
+        ],
+        "name": "ZodError"
+      },
+      {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "number",
+            "received": "object",
+            "path": [
+              "operations",
+              0,
+              "params",
+              "place"
+            ],
+            "message": "Expected number, received object"
+          }
+        ],
+        "name": "ZodError"
+      },
+      {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "boolean",
+            "received": "object",
+            "path": [
+              "operations",
+              0,
+              "params",
+              "place"
+            ],
+            "message": "Expected boolean, received object"
+          }
+        ],
+        "name": "ZodError"
+      }
+    ],
+    "path": [
+      "operations",
+      0,
+      "params",
+      "place"
+    ],
+    "message": "Invalid input"
+  }
+][39m
+[90m [2m❯[22m Object.get error [as error] ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js:[2m39:31[22m[39m
+[90m [2m❯[22m ZodObject.parse ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js:[2m114:22[22m[39m
+[36m [2m❯[22m Module.planToCommands src/compiler.ts:[2m109:33[22m[39m
+    [90m107| [39m  registry[33m:[39m [33mCommandRegistry[39m[33m,[39m
+    [90m108| [39m)[33m:[39m [33mCompiledCommand[39m[] {
+    [90m109| [39m  [35mconst[39m plan [33m=[39m aiEditPlanSchema[33m.[39m[34mparse[39m(raw)[33m;[39m [90m// structural[39m
+    [90m   | [39m                                [31m^[39m
+    [90m110| [39m  [34mvalidatePlanSemantics[39m(plan[33m,[39m project)[33m;[39m [90m// semantic[39m
+    [90m111| [39m  [35mreturn[39m [34mcompilePlanToCommands[39m(plan[33m,[39m registry)[33m;[39m
+[90m [2m❯[22m tests/payload-contract.test.ts:[2m76:22[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/payload-contract.test.ts[2m > [22mAI payload contract regression (production-loop defects)[2m > [22maccepts a scalar alias for the aspect ratio and still coerces the value
+[31m[1mAssertionError[22m: expected { …(2) } to deeply equal { …(2) }[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  Object {[22m
+[2m    "commandType": "project.changeAspect",[22m
+[2m    "payload": Object {[22m
+[32m-     "ratio": "1080x1920",[39m
+[31m+     "aspectRatio": "vertical",[39m
+[2m    },[22m
+[2m  }[22m
+
+[36m [2m❯[22m tests/payload-contract.test.ts:[2m108:25[22m[39m
+    [90m106| [39m      [34mcreateStudioRegistry[39m()[33m,[39m
+    [90m107| [39m    )[33m;[39m
+    [90m108| [39m    [34mexpect[39m(commands[[34m0[39m])[33m.[39m[34mtoEqual[39m({
+    [90m   | [39m                        [31m^[39m
+    [90m109| [39m      commandType[33m:[39m [32m"project.changeAspect"[39m[33m,[39m
+    [90m110| [39m      payload[33m:[39m { ratio[33m:[39m [32m"1080x1920"[39m }[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/payload-contract.test.ts[2m > [22mAI payload contract regression (production-loop defects)[2m > [22madmits a nested object tool param without collapsing to invalid_union
+[31m[1mAssertionError[22m: expected [Function] to not throw an error but '[\n  {\n    "code": "invalid_union",\…' was thrown[39m
+
+[32m- Expected:[39m
+undefined
+
+[31m+ Received:[39m
+"[
+  {
+    \"code\": \"invalid_union\",
+    \"unionErrors\": [
+      {
+        \"issues\": [
+          {
+            \"code\": \"invalid_type\",
+            \"expected\": \"string\",
+            \"received\": \"object\",
+            \"path\": [
+              \"operations\",
+              0,
+              \"params\",
+              \"place\"
+            ],
+            \"message\": \"Expected string, received object\"
+          }
+        ],
+        \"name\": \"ZodError\"
+      },
+      {
+        \"issues\": [
+          {
+            \"code\": \"invalid_type\",
+            \"expected\": \"number\",
+            \"received\": \"object\",
+            \"path\": [
+              \"operations\",
+              0,
+              \"params\",
+              \"place\"
+            ],
+            \"message\": \"Expected number, received object\"
+          }
+        ],
+        \"name\": \"ZodError\"
+      },
+      {
+        \"issues\": [
+          {
+            \"code\": \"invalid_type\",
+            \"expected\": \"boolean\",
+            \"received\": \"object\",
+            \"path\": [
+              \"operations\",
+              0,
+              \"params\",
+              \"place\"
+            ],
+            \"message\": \"Expected boolean, received object\"
+          }
+        ],
+        \"name\": \"ZodError\"
+      }
+    ],
+    \"path\": [
+      \"operations\",
+      0,
+      \"params\",
+      \"place\"
+    ],
+    \"message\": \"Invalid input\"
+  }
+]"
+
+[36m [2m❯[22m tests/payload-contract.test.ts:[2m144:11[22m[39m
+    [90m142| [39m        [34mcreateStudioRegistry[39m()[33m,[39m
+    [90m143| [39m      )[33m,[39m
+    [90m144| [39m    )[33m.[39mnot[33m.[39m[34mtoThrow[39m()[33m;[39m
+    [90m   | [39m          [31m^[39m
+    [90m145| [39m  })[33m;[39m
+    [90m146| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m tests/payload-contract.test.ts[2m > [22mAI payload contract regression (production-loop defects)[2m > [22mfails closed on a non-numeric caption duration
+[31m[1mAssertionError[22m: expected [Function] to throw an error[39m
+[36m [2m❯[22m tests/payload-contract.test.ts:[2m174:7[22m[39m
+    [90m172| [39m        [34mcreateStudioRegistry[39m()[33m,[39m
+    [90m173| [39m      )[33m,[39m
+    [90m174| [39m    )[33m.[39m[34mtoThrow[39m()[33m;[39m
+    [90m   | [39m      [31m^[39m
+    [90m175| [39m  })[33m;[39m
+    [90m176| [39m})[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[31m5 failed[39m[22m[2m | [22m[1m[32m12 passed[39m[22m[90m (17)[39m
+[2m   Start at [22m 21:59:14
+[2m   Duration [22m 713ms[2m (transform 206ms, setup 0ms, collect 966ms, tests 30ms, environment 1ms, prepare 526ms)[22m

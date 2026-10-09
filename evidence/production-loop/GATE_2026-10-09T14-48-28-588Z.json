@@ -1,0 +1,11 @@
+{
+  "schema_version": "SCOS_PRODUCTION_LOOP_GATE_R1",
+  "observed_at": "2026-10-09T14:48:28.588Z",
+  "status": "OPEN",
+  "gate": "OPEN_STALE_QUALIFICATION",
+  "details": {
+    "reason": "HAIOS source commit drifted from qualification binding",
+    "expected": "2a4847c573d41616d2b54ea6805dff573c3722de",
+    "observed": "f629aaa9c2db57c2684146f796de4e117cee533a"
+  }
+}

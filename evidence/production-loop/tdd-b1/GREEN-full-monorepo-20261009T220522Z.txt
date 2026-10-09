@@ -1,0 +1,278 @@
+Scope: 7 of 8 workspace projects
+packages/project-model test$ vitest run
+packages/project-model test: [1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Workspace/scos-track-b/packages/project-model[39m
+packages/project-model test:  [32m✓[39m tests/clip-math.test.ts [2m([22m[2m9 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+packages/project-model test:  [32m✓[39m tests/transition.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 2[2mms[22m[39m
+packages/project-model test:  [32m✓[39m tests/audio.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 2[2mms[22m[39m
+packages/project-model test:  [32m✓[39m tests/effects.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 2[2mms[22m[39m
+packages/project-model test:  [32m✓[39m tests/migration.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+packages/project-model test:  [32m✓[39m tests/speed.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+packages/project-model test:  [32m✓[39m tests/composition-plan.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+packages/project-model test:  [32m✓[39m tests/schema.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+packages/project-model test:  [32m✓[39m tests/phase4-project-v2.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+packages/project-model test: [2m Test Files [22m [1m[32m9 passed[39m[22m[90m (9)[39m
+packages/project-model test: [2m      Tests [22m [1m[32m29 passed[39m[22m[90m (29)[39m
+packages/project-model test: [2m   Start at [22m 22:04:53
+packages/project-model test: [2m   Duration [22m 463ms[2m (transform 345ms, setup 0ms, collect 1.01s, tests 29ms, environment 2ms, prepare 1.21s)[22m
+packages/project-model test: Done
+packages/command-system test$ vitest run
+packages/timeline test$ vitest run
+packages/media-engine test$ vitest run
+packages/media-engine test: [1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Workspace/scos-track-b/packages/media-engine[39m
+packages/timeline test: [1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Workspace/scos-track-b/packages/timeline[39m
+packages/command-system test: [1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Workspace/scos-track-b/packages/command-system[39m
+packages/timeline test:  [32m✓[39m tests/geometry.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+packages/timeline test:  [32m✓[39m tests/magnetic-snap.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+packages/media-engine test:  [32m✓[39m tests/runtime-identity.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+packages/media-engine test:  [32m✓[39m tests/cache.test.ts [2m([22m[2m10 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+packages/media-engine test:  [32m✓[39m tests/preview-proxy.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+packages/timeline test: [2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+packages/timeline test: [2m      Tests [22m [1m[32m14 passed[39m[22m[90m (14)[39m
+packages/timeline test: [2m   Start at [22m 22:04:54
+packages/timeline test: [2m   Duration [22m 955ms[2m (transform 89ms, setup 0ms, collect 238ms, tests 9ms, environment 0ms, prepare 305ms)[22m
+packages/media-engine test: [2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+packages/media-engine test: [2m      Tests [22m [1m[32m17 passed[39m[22m[90m (17)[39m
+packages/media-engine test: [2m   Start at [22m 22:04:54
+packages/media-engine test: [2m   Duration [22m 1.05s[2m (transform 431ms, setup 0ms, collect 696ms, tests 8ms, environment 0ms, prepare 845ms)[22m
+packages/command-system test:  [32m✓[39m tests/relink-media.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+packages/command-system test:  [32m✓[39m tests/clip-speed.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+packages/command-system test:  [32m✓[39m tests/clip-audio.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+packages/command-system test:  [32m✓[39m tests/clip-transform.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 8[2mms[22m[39m
+packages/command-system test:  [32m✓[39m tests/clip-effects.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 12[2mms[22m[39m
+packages/command-system test:  [32m✓[39m tests/multiselect.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 11[2mms[22m[39m
+packages/command-system test:  [32m✓[39m tests/ripple-edit.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 13[2mms[22m[39m
+packages/command-system test:  [32m✓[39m tests/clip-transition.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 14[2mms[22m[39m
+packages/command-system test:  [32m✓[39m tests/timeline-edit.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 14[2mms[22m[39m
+packages/timeline test: Done
+packages/command-system test:  [32m✓[39m tests/phase5-cross-track-mobility.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 14[2mms[22m[39m
+packages/command-system test:  [32m✓[39m tests/place-caption.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 14[2mms[22m[39m
+packages/command-system test:  [32m✓[39m tests/bus.test.ts [2m([22m[2m10 tests[22m[2m)[22m[90m 18[2mms[22m[39m
+packages/command-system test:  [32m✓[39m tests/batch.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 19[2mms[22m[39m
+packages/command-system test:  [32m✓[39m tests/phase4-multitrack-authority.test.ts [2m([22m[2m12 tests[22m[2m)[22m[90m 22[2mms[22m[39m
+packages/media-engine test: Done
+packages/command-system test:  [32m✓[39m tests/import-place.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+packages/command-system test: [2m Test Files [22m [1m[32m15 passed[39m[22m[90m (15)[39m
+packages/command-system test: [2m      Tests [22m [1m[32m79 passed[39m[22m[90m (79)[39m
+packages/command-system test: [2m   Start at [22m 22:04:54
+packages/command-system test: [2m   Duration [22m 1.18s[2m (transform 1.95s, setup 0ms, collect 4.20s, tests 187ms, environment 3ms, prepare 2.72s)[22m
+packages/command-system test: Done
+packages/ai-core test$ vitest run
+packages/ai-core test: [1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Workspace/scos-track-b/packages/ai-core[39m
+packages/ai-core test:  [32m✓[39m tests/caption-compile.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 3[2mms[22m[39m
+packages/ai-core test: [90mstdout[2m | tests/zz-repro-probe.test.ts[2m > [22m[2mrepro probe[2m > [22m[2mprints current failures
+packages/ai-core test: [22m[39m
+packages/ai-core test: [DEFECT1 caption.place duration-as-string (run f6ff926d)]
+packages/ai-core test:   => COMPILED: [{"commandType":"caption.place","payload":{"text":"Hi","start":2,"duration":3.5}}]
+packages/ai-core test:   => BUS EXECUTED OK
+packages/ai-core test: [DEFECT2 changeAspect params.place (run abadc93c / f54fbced)]
+packages/ai-core test:   => COMPILED: [{"commandType":"project.changeAspect","payload":{"ratio":"1080x1920"}}]
+packages/ai-core test:   => BUS EXECUTED OK
+packages/ai-core test:  [32m✓[39m tests/zz-repro-probe.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 5[2mms[22m[39m
+packages/ai-core test:  [32m✓[39m tests/plan.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+packages/ai-core test:  [32m✓[39m tests/payload-contract.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 8[2mms[22m[39m
+packages/ai-core test: [2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+packages/ai-core test: [2m      Tests [22m [1m[32m18 passed[39m[22m[90m (18)[39m
+packages/ai-core test: [2m   Start at [22m 22:04:56
+packages/ai-core test: [2m   Duration [22m 542ms[2m (transform 140ms, setup 0ms, collect 793ms, tests 23ms, environment 1ms, prepare 523ms)[22m
+packages/ai-core test: Done
+packages/ai-providers test$ vitest run
+packages/ai-providers test: [1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Workspace/scos-track-b/packages/ai-providers[39m
+packages/ai-providers test:  [32m✓[39m tests/routing.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+packages/ai-providers test:  [32m✓[39m tests/capabilities.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+packages/ai-providers test:  [32m✓[39m tests/machine-evidence.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+packages/ai-providers test:  [32m✓[39m tests/adaptive-routing.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+packages/ai-providers test:  [32m✓[39m tests/providers.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+packages/ai-providers test:  [32m✓[39m tests/production-loop.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 102[2mms[22m[39m
+packages/ai-providers test: [2m Test Files [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+packages/ai-providers test: [2m      Tests [22m [1m[32m32 passed[39m[22m[90m (32)[39m
+packages/ai-providers test: [2m   Start at [22m 22:04:57
+packages/ai-providers test: [2m   Duration [22m 813ms[2m (transform 175ms, setup 0ms, collect 1.94s, tests 122ms, environment 1ms, prepare 741ms)[22m
+packages/ai-providers test: Done
+apps/desktop test$ vitest run
+apps/desktop test: [1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Workspace/scos-track-b/apps/desktop[39m
+apps/desktop test:  [32m✓[39m tests/render-lifecycle.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/playback-diagnostics.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/preview-url.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/media-analysis.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 82[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/cross-track-mobility.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/preview-composition.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 8[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/project-lifecycle.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/transition-workspace.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 6[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/marquee-selection.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/store-relink.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/transport-navigation.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/ripple-workflow.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 8[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/timeline-edit-workflow.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 10[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/track-operations-ui.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 12[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/preview-composition-render.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 9[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/cross-track-store.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 13[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/studio.e2e.test.ts [2m([22m[2m17 tests[22m[2m)[22m[90m 19[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/track-operations-render.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 5[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/effects-workspace.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 5[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/caption-workspace.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/transform-workspace.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 4[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/speed-workspace.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 4[2mms[22m[39m
+apps/desktop test: ffmpeg version n9.0.1-11-ge47273f4d9-20260831 Copyright (c) 2000-2026 the FFmpeg developers
+apps/desktop test:   built with gcc 15.2.0 (crosstool-NG 1.28.0.23_185f348)
+apps/desktop test:   configuration: --prefix=/ffbuild/prefix --pkg-config-flags=--static --pkg-config=pkg-config --cross-prefix=x86_64-w64-mingw32- --arch=x86_64 --target-os=mingw32 --enable-gpl --enable-version3 --disable-debug --disable-w32threads --enable-pthreads --enable-iconv --enable-zlib --enable-libxml2 --enable-libvmaf --enable-fontconfig --enable-libharfbuzz --enable-libfreetype --enable-libfribidi --enable-vulkan --enable-libvorbis --disable-libxcb --disable-xlib --disable-libpulse --enable-gmp --enable-lzma --enable-liblcevc-dec --enable-opencl --enable-amf --enable-libaom --enable-libaribb24 --enable-avisynth --enable-chromaprint --enable-libdav1d --enable-libdavs2 --enable-libdvdread --enable-libdvdnav --disable-libfdk-aac --enable-ffnvcodec --enable-cuda-llvm --enable-frei0r --enable-libgme --enable-libkvazaar --enable-libaribcaption --enable-libass --enable-libbluray --enable-libjxl --enable-libmp3lame --enable-libopus --enable-libplacebo --enable-librist --enable-libssh --enable-libtheora --enable-libvpx --enable-libwebp --enable-libzmq --enable-lv2 --enable-libvpl --enable-openal --enable-liboapv --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libopenh264 --enable-libopenjpeg --enable-libopenmpt --enable-librav1e --enable-librubberband --enable-schannel --enable-sdl2 --enable-libsnappy --enable-libsoxr --enable-libsrt --enable-libsvtav1 --enable-libtwolame --enable-libuavs3d --disable-libdrm --enable-vaapi --enable-libvidstab --enable-libvvenc --disable-whisper --enable-libx264 --enable-libx265 --enable-libxavs2 --enable-libxvid --enable-libzimg --enable-libzvbi --extra-cflags=-DLIBTWOLAME_STATIC --extra-cxxflags= --extra-libs=-lgomp --extra-ldflags=-pthread --extra-ldexeflags= --cc=x86_64-w64-mingw32-gcc --cxx=x86_64-w64-mingw32-g++ --ar=x86_64-w64-mingw32-gcc-ar --ranlib=x86_64-w64-mingw32-gcc-ranlib --nm=x86_64-w64-mingw32-gcc-nm --extra-version=20260831
+apps/desktop test:   libavutil      61.  1.101 / 61.  1.101
+apps/desktop test:   libavcodec     63.  1.101 / 63.  1.101
+apps/desktop test:   libavformat    63.  1.101 / 63.  1.101
+apps/desktop test:   libavdevice    63.  1.101 / 63.  1.101
+apps/desktop test:   libavfilter    12.  1.101 / 12.  1.101
+apps/desktop test:   libswscale     10.  1.101 / 10.  1.101
+apps/desktop test:   libswresample   7.  1.101 /  7.  1.101
+apps/desktop test: Input #0, lavfi, from 'testsrc=size=640x360:rate=30:duration=10':
+apps/desktop test:   Duration: N/A, start: 0.000000, bitrate: N/A
+apps/desktop test:   Stream #0:0: Video: wrapped_avframe, rgb24, 640x360 [SAR 1:1 DAR 16:9], 30 fps, 30 tbr, 30 tbn
+apps/desktop test: Input #1, lavfi, from 'sine=frequency=440:duration=10':
+apps/desktop test:   Duration: N/A, start: 0.000000, bitrate: 705 kb/s
+apps/desktop test:   Stream #1:0: Audio: pcm_s16le, 44100 Hz, mono, s16, 705 kb/s
+apps/desktop test: Stream mapping:
+apps/desktop test:   Stream #0:0 -> #0:0 (wrapped_avframe (native) -> h264 (libx264))
+apps/desktop test:   Stream #1:0 -> #0:1 (pcm_s16le (native) -> aac (native))
+apps/desktop test: Press [q] to stop, [?] for help
+apps/desktop test: [libx264 @ 000001891a0b0d80] using SAR=1/1
+apps/desktop test: [libx264 @ 000001891a0b0d80] using cpu capabilities: MMX2 SSE2Fast SSSE3 SSE4.2 AVX FMA3 BMI2 AVX2
+apps/desktop test: [libx264 @ 000001891a0b0d80] profile Constrained Baseline, level 3.0, 4:2:0, 8-bit
+apps/desktop test: [libx264 @ 000001891a0b0d80] 264 - core 165 - H.264/MPEG-4 AVC codec - Copyleft 2003-2025 - http://www.videolan.org/x264.html - options: cabac=0 ref=1 deblock=0:0:0 analyse=0:0 me=dia subme=0 psy=1 psy_rd=1.00:0.00 mixed_ref=0 me_range=16 chroma_me=1 trellis=0 8x8dct=0 cqm=0 deadzone=21,11 fast_pskip=1 chroma_qp_offset=0 threads=11 lookahead_threads=1 sliced_threads=0 nr=0 decimate=1 interlaced=0 bluray_compat=0 constrained_intra=0 bframes=0 weightp=0 keyint=250 keyint_min=25 scenecut=0 intra_refresh=0 rc=crf mbtree=0 crf=23.0 qcomp=0.60 qpmin=0 qpmax=69 qpstep=4 ip_ratio=1.40 aq=0
+apps/desktop test: Output #0, mp4, to 'C:\Workspace\scos-track-b\apps\desktop\tests\fixtures\e2e01-src.mp4':
+apps/desktop test:   Metadata:
+apps/desktop test:     encoder         : Lavf63.1.101
+apps/desktop test:   Stream #0:0: Video: h264 (avc1 / 0x31637661), yuv420p(tv, progressive), 640x360 [SAR 1:1 DAR 16:9], q=2-31, 30 fps, 15360 tbn
+apps/desktop test:     Metadata:
+apps/desktop test:       encoder         : Lavc63.1.101 libx264
+apps/desktop test:     Side data:
+apps/desktop test:       CPB properties: bitrate max/min/avg: 0/0/0 buffer size: 0 vbv_delay: N/A
+apps/desktop test:   Stream #0:1: Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, mono, fltp, 128 kb/s
+apps/desktop test:     Metadata:
+apps/desktop test:       encoder         : Lavc63.1.101 aac
+apps/desktop test: [out#0/mp4 @ 000001891a01a100] video:212KiB audio:155KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: 2.633715%
+apps/desktop test: frame=  300 fps=0.0 q=-1.0 Lsize=     377KiB time=00:00:10.00 bitrate= 308.4kbits/s speed=55.5x elapsed=0:00:00.18
+apps/desktop test: [libx264 @ 000001891a0b0d80] frame I:2     Avg QP:16.50  size:  9769
+apps/desktop test: [libx264 @ 000001891a0b0d80] frame P:298   Avg QP:16.06  size:   660
+apps/desktop test: [libx264 @ 000001891a0b0d80] mb I  I16..4: 100.0%  0.0%  0.0%
+apps/desktop test: [libx264 @ 000001891a0b0d80] mb P  I16..4:  1.2%  0.0%  0.0%  P16..4: 10.4%  0.0%  0.0%  0.0%  0.0%    skip:88.4%
+apps/desktop test: [libx264 @ 000001891a0b0d80] coded y,uvDC,uvAC intra: 11.5% 53.9% 28.1% inter: 1.7% 5.2% 2.4%
+apps/desktop test: [libx264 @ 000001891a0b0d80] i16 v,h,dc,p: 68%  9%  2% 21%
+apps/desktop test: [libx264 @ 000001891a0b0d80] i8c dc,h,v,p: 22% 12% 34% 32%
+apps/desktop test: [libx264 @ 000001891a0b0d80] kb/s:172.86
+apps/desktop test: [aac @ 000001891a0b5080] Qavg: 1947.538
+apps/desktop test:  [32m✓[39m tests/audio-workspace.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 5[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/cross-track-timeline.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/recent-projects.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+apps/desktop test:  [32m✓[39m tests/preview-speed.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+apps/desktop test: ffmpeg version n9.0.1-11-ge47273f4d9-20260831 Copyright (c) 2000-2026 the FFmpeg developers
+apps/desktop test:   built with gcc 15.2.0 (crosstool-NG 1.28.0.23_185f348)
+apps/desktop test:   configuration: --prefix=/ffbuild/prefix --pkg-config-flags=--static --pkg-config=pkg-config --cross-prefix=x86_64-w64-mingw32- --arch=x86_64 --target-os=mingw32 --enable-gpl --enable-version3 --disable-debug --disable-w32threads --enable-pthreads --enable-iconv --enable-zlib --enable-libxml2 --enable-libvmaf --enable-fontconfig --enable-libharfbuzz --enable-libfreetype --enable-libfribidi --enable-vulkan --enable-libvorbis --disable-libxcb --disable-xlib --disable-libpulse --enable-gmp --enable-lzma --enable-liblcevc-dec --enable-opencl --enable-amf --enable-libaom --enable-libaribb24 --enable-avisynth --enable-chromaprint --enable-libdav1d --enable-libdavs2 --enable-libdvdread --enable-libdvdnav --disable-libfdk-aac --enable-ffnvcodec --enable-cuda-llvm --enable-frei0r --enable-libgme --enable-libkvazaar --enable-libaribcaption --enable-libass --enable-libbluray --enable-libjxl --enable-libmp3lame --enable-libopus --enable-libplacebo --enable-librist --enable-libssh --enable-libtheora --enable-libvpx --enable-libwebp --enable-libzmq --enable-lv2 --enable-libvpl --enable-openal --enable-liboapv --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libopenh264 --enable-libopenjpeg --enable-libopenmpt --enable-librav1e --enable-librubberband --enable-schannel --enable-sdl2 --enable-libsnappy --enable-libsoxr --enable-libsrt --enable-libsvtav1 --enable-libtwolame --enable-libuavs3d --disable-libdrm --enable-vaapi --enable-libvidstab --enable-libvvenc --disable-whisper --enable-libx264 --enable-libx265 --enable-libxavs2 --enable-libxvid --enable-libzimg --enable-libzvbi --extra-cflags=-DLIBTWOLAME_STATIC --extra-cxxflags= --extra-libs=-lgomp --extra-ldflags=-pthread --extra-ldexeflags= --cc=x86_64-w64-mingw32-gcc --cxx=x86_64-w64-mingw32-g++ --ar=x86_64-w64-mingw32-gcc-ar --ranlib=x86_64-w64-mingw32-gcc-ranlib --nm=x86_64-w64-mingw32-gcc-nm --extra-version=20260831
+apps/desktop test:   libavutil      61.  1.101 / 61.  1.101
+apps/desktop test:   libavcodec     63.  1.101 / 63.  1.101
+apps/desktop test:   libavformat    63.  1.101 / 63.  1.101
+apps/desktop test:   libavdevice    63.  1.101 / 63.  1.101
+apps/desktop test:   libavfilter    12.  1.101 / 12.  1.101
+apps/desktop test:   libswscale     10.  1.101 / 10.  1.101
+apps/desktop test:   libswresample   7.  1.101 /  7.  1.101
+apps/desktop test: Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'C:\Workspace\scos-track-b\apps\desktop\tests\fixtures\e2e01-src.mp4':
+apps/desktop test:   Metadata:
+apps/desktop test:     major_brand     : isom
+apps/desktop test:     minor_version   : 512
+apps/desktop test:     compatible_brands: isomiso2avc1mp41
+apps/desktop test:     encoder         : Lavf63.1.101
+apps/desktop test:   Duration: 00:00:10.00, start: 0.000000, bitrate: 308 kb/s
+apps/desktop test:   Stream #0:0[0x1](und): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(progressive), 640x360 [SAR 1:1 DAR 16:9], 173 kb/s, 30 fps, 30 tbr, 15360 tbn (default)
+apps/desktop test:     Metadata:
+apps/desktop test:       handler_name    : VideoHandler
+apps/desktop test:       encoder         : Lavc63.1.101 libx264
+apps/desktop test:   Stream #0:1[0x2](und): Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, mono, fltp, 126 kb/s (default)
+apps/desktop test:     Metadata:
+apps/desktop test:       handler_name    : SoundHandler
+apps/desktop test: Input #1, mov,mp4,m4a,3gp,3g2,mj2, from 'C:\Workspace\scos-track-b\apps\desktop\tests\fixtures\e2e01-src.mp4':
+apps/desktop test:   Metadata:
+apps/desktop test:     major_brand     : isom
+apps/desktop test:     minor_version   : 512
+apps/desktop test:     compatible_brands: isomiso2avc1mp41
+apps/desktop test:     encoder         : Lavf63.1.101
+apps/desktop test:   Duration: 00:00:10.00, start: 0.000000, bitrate: 308 kb/s
+apps/desktop test:   Stream #1:0[0x1](und): Video: h264 (Constrained Baseline) (avc1 / 0x31637661), yuv420p(progressive), 640x360 [SAR 1:1 DAR 16:9], 173 kb/s, 30 fps, 30 tbr, 15360 tbn (default)
+apps/desktop test:     Metadata:
+apps/desktop test:       handler_name    : VideoHandler
+apps/desktop test:       encoder         : Lavc63.1.101 libx264
+apps/desktop test:   Stream #1:1[0x2](und): Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, mono, fltp, 126 kb/s (default)
+apps/desktop test:     Metadata:
+apps/desktop test:       handler_name    : SoundHandler
+apps/desktop test: Stream mapping:
+apps/desktop test:   Stream #0:0 (h264) -> trim:default
+apps/desktop test:   Stream #0:1 (aac) -> atrim:default
+apps/desktop test:   Stream #1:0 (h264) -> trim:default
+apps/desktop test:   Stream #1:1 (aac) -> atrim:default
+apps/desktop test:   concat:out:v0 -> Stream #0:0 (libx264)
+apps/desktop test:   concat:out:a0 -> Stream #0:1 (aac)
+apps/desktop test: Press [q] to stop, [?] for help
+apps/desktop test: [libx264 @ 000002343e75a7c0] using SAR=1/1
+apps/desktop test: [libx264 @ 000002343e75a7c0] using cpu capabilities: MMX2 SSE2Fast SSSE3 SSE4.2 AVX FMA3 BMI2 AVX2
+apps/desktop test: [libx264 @ 000002343e75a7c0] profile High, level 4.0, 4:2:0, 8-bit
+apps/desktop test: [libx264 @ 000002343e75a7c0] 264 - core 165 - H.264/MPEG-4 AVC codec - Copyleft 2003-2025 - http://www.videolan.org/x264.html - options: cabac=1 ref=1 deblock=1:0:0 analyse=0x3:0x113 me=hex subme=2 psy=1 psy_rd=1.00:0.00 mixed_ref=0 me_range=16 chroma_me=1 trellis=0 8x8dct=1 cqm=0 deadzone=21,11 fast_pskip=1 chroma_qp_offset=0 threads=30 lookahead_threads=8 sliced_threads=0 nr=0 decimate=1 interlaced=0 bluray_compat=0 constrained_intra=0 bframes=3 b_pyramid=2 b_adapt=1 b_bias=0 direct=1 weightb=1 open_gop=0 weightp=1 keyint=250 keyint_min=25 scenecut=40 intra_refresh=0 rc_lookahead=10 rc=crf mbtree=1 crf=23.0 qcomp=0.60 qpmin=0 qpmax=69 qpstep=4 ip_ratio=1.40 aq=1:1.00
+apps/desktop test: Output #0, mp4, to 'C:\Users\chara\AppData\Local\Temp\e2e01-S83FV5\render_out.mp4':
+apps/desktop test:   Metadata:
+apps/desktop test:     major_brand     : isom
+apps/desktop test:     minor_version   : 512
+apps/desktop test:     compatible_brands: isomiso2avc1mp41
+apps/desktop test:     encoder         : Lavf63.1.101
+apps/desktop test:   Stream #0:0: Video: h264 (avc1 / 0x31637661), yuv420p(tv, progressive), 1920x1080 [SAR 1:1 DAR 16:9], q=2-31, 30 fps, 15360 tbn
+apps/desktop test:     Metadata:
+apps/desktop test:       encoder         : Lavc63.1.101 libx264
+apps/desktop test:     Side data:
+apps/desktop test:       CPB properties: bitrate max/min/avg: 0/0/0 buffer size: 0 vbv_delay: N/A
+apps/desktop test:   Stream #0:1: Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, mono, fltp, 192 kb/s
+apps/desktop test:     Metadata:
+apps/desktop test:       encoder         : Lavc63.1.101 aac
+apps/desktop test: [mp4 @ 000002343e78bd40] Starting second pass: moving the moov atom to the beginning of the file
+apps/desktop test: [out#0/mp4 @ 000002343e6ebb40] video:213KiB audio:95KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: 2.519857%
+apps/desktop test: frame=  180 fps=0.0 q=-1.0 Lsize=     316KiB time=00:00:06.00 bitrate= 430.9kbits/s speed=11.5x elapsed=0:00:00.52
+apps/desktop test: [libx264 @ 000002343e75a7c0] frame I:1     Avg QP:13.20  size: 12822
+apps/desktop test: [libx264 @ 000002343e75a7c0] frame P:45    Avg QP:17.75  size:  2333
+apps/desktop test: [libx264 @ 000002343e75a7c0] frame B:134   Avg QP:17.96  size:   745
+apps/desktop test: [libx264 @ 000002343e75a7c0] consecutive B-frames:  0.6%  0.0%  1.7% 97.8%
+apps/desktop test: [libx264 @ 000002343e75a7c0] mb I  I16..4: 91.1%  6.7%  2.2%
+apps/desktop test: [libx264 @ 000002343e75a7c0] mb P  I16..4:  5.0%  1.5%  0.0%  P16..4:  2.9%  0.7%  0.1%  0.0%  0.0%    skip:89.7%
+apps/desktop test: [libx264 @ 000002343e75a7c0] mb B  I16..4:  1.0%  0.1%  0.0%  B16..8:  1.6%  0.1%  0.0%  direct: 1.2%  skip:95.9%  L0:53.3% L1:46.3% BI: 0.4%
+apps/desktop test: [libx264 @ 000002343e75a7c0] 8x8 transform intra:16.6% inter:41.4%
+apps/desktop test: [libx264 @ 000002343e75a7c0] coded y,uvDC,uvAC intra: 4.9% 45.9% 10.3% inter: 0.0% 2.0% 0.1%
+apps/desktop test: [libx264 @ 000002343e75a7c0] i16 v,h,dc,p: 84% 12%  1%  4%
+apps/desktop test: [libx264 @ 000002343e75a7c0] i8 v,h,dc,ddl,ddr,vr,hd,vl,hu: 55% 24% 20%  0%  0%  0%  0%  0%  1%
+apps/desktop test: [libx264 @ 000002343e75a7c0] i4 v,h,dc,ddl,ddr,vr,hd,vl,hu: 41% 25% 22%  3%  4%  2%  1%  2%  1%
+apps/desktop test: [libx264 @ 000002343e75a7c0] i8c dc,h,v,p: 20% 15% 44% 21%
+apps/desktop test: [libx264 @ 000002343e75a7c0] Weighted P-Frames: Y:0.0% UV:0.0%
+apps/desktop test: [libx264 @ 000002343e75a7c0] kb/s:290.09
+apps/desktop test: [aac @ 000002343e786a00] Qavg: 64179.707
+apps/desktop test: [90mstdout[2m | tests/e2e-01.import-edit-export.test.ts[2m > [22m[2mE2E-01 — single narrative import -> edit -> save -> reopen -> render -> ffprobe[2m > [22m[2mproves the complete user journey as one deterministic execution chain
+apps/desktop test: [22m[39mE2E-01 ASSERTIONS {
+apps/desktop test:   "MEDIA_IMPORTED": true,
+apps/desktop test:   "PROJECT_HAS_ASSET": true,
+apps/desktop test:   "CLIP_ADDED": true,
+apps/desktop test:   "TRIM_APPLIED": true,
+apps/desktop test:   "SPLIT_APPLIED": true,
+apps/desktop test:   "MOVE_APPLIED": true,
+apps/desktop test:   "UNDO_RESTORED_EXPECTED_STATE": true,
+apps/desktop test:   "REDO_REAPPLIED_EXPECTED_STATE": true,
+apps/desktop test:   "PROJECT_SAVED": true,
+apps/desktop test:   "PROJECT_REOPENED": true,
+apps/desktop test:   "REOPENED_STATE_MATCHES": true,
+apps/desktop test:   "RENDER_EXIT_SUCCESS": true,
+apps/desktop test:   "OUTPUT_EXISTS": true,
+apps/desktop test:   "OUTPUT_SIZE_GT_ZERO": true,
+apps/desktop test:   "OUTPUT_CONTAINER": true,
+apps/desktop test:   "OUTPUT_VIDEO_CODEC": true,
+apps/desktop test:   "OUTPUT_AUDIO_CODEC": true,
+apps/desktop test:   "OUTPUT_AUDIO_NON_SILENT": true,
+apps/desktop test:   "OUTPUT_RESOLUTION_EXPECTED": true,
+apps/desktop test:   "OUTPUT_DURATION_WITHIN_TOLERANCE": true
+apps/desktop test: }
+apps/desktop test: E2E-01 PASS 20/20
+apps/desktop test:  [32m✓[39m tests/e2e-01.import-edit-export.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1130[2mms[22m[39m
+apps/desktop test:    [33m[2m✓[22m[39m E2E-01 — single narrative import -> edit -> save -> reopen -> render -> ffprobe[2m > [22mproves the complete user journey as one deterministic execution chain [33m1129[2mms[22m[39m
+apps/desktop test: [2m Test Files [22m [1m[32m27 passed[39m[22m[90m (27)[39m
+apps/desktop test: [2m      Tests [22m [1m[32m86 passed[39m[22m[90m (86)[39m
+apps/desktop test: [2m   Start at [22m 22:04:58
+apps/desktop test: [2m   Duration [22m 1.85s[2m (transform 1.19s, setup 0ms, collect 6.77s, tests 1.37s, environment 4ms, prepare 3.06s)[22m
+apps/desktop test: Done

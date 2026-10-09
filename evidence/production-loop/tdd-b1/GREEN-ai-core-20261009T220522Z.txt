@@ -1,0 +1,22 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Workspace/scos-track-b/packages/ai-core[39m
+
+ [32m✓[39m tests/caption-compile.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m tests/plan.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m tests/zz-repro-probe.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 6[2mms[22m[39m
+[90mstdout[2m | tests/zz-repro-probe.test.ts[2m > [22m[2mrepro probe[2m > [22m[2mprints current failures
+[22m[39m
+[DEFECT1 caption.place duration-as-string (run f6ff926d)]
+  => COMPILED: [{"commandType":"caption.place","payload":{"text":"Hi","start":2,"duration":3.5}}]
+  => BUS EXECUTED OK
+
+[DEFECT2 changeAspect params.place (run abadc93c / f54fbced)]
+  => COMPILED: [{"commandType":"project.changeAspect","payload":{"ratio":"1080x1920"}}]
+  => BUS EXECUTED OK
+
+ [32m✓[39m tests/payload-contract.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 8[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[32m18 passed[39m[22m[90m (18)[39m
+[2m   Start at [22m 22:04:18
+[2m   Duration [22m 549ms[2m (transform 152ms, setup 0ms, collect 795ms, tests 23ms, environment 1ms, prepare 526ms)[22m

@@ -1,7 +1,10 @@
 {
   "schema_version": "SCOS_AI_BUSINESS_PRODUCTION_CURRENT_RECONCILIATION_R1",
   "observed_at": "2026-09-18T15:40:44.969Z",
-  "status": "READY_HUMAN_PUBLISH_GATE",
+  "superseded_by_current": "evidence/production-loop/PRODUCTION_LOOP_CURRENT_RECONCILIATION_20261009.json",
+  "superseded_at": "2026-10-09T15:36:24Z",
+  "supersession_policy": "Per haios-repository-reconciliation Step 9, this record is a DATED MILESTONE and is preserved untouched as an audit-trail snapshot. Its state was current as of 2026-09-18 and is now historically superseded. This pointer was added so no reader mistakes this file for live current state.",
+  "historical_status": "READY_HUMAN_PUBLISH_GATE",
   "scope": "AI Business Production -> Adaptive Capability Routing -> Real Telemetry -> Governed Production Loop",
   "scos_source_commit": "3380d05f7389cff91214e1e4ac77a110ddc1959a",
   "haios_source_commit": "2a4847c573d41616d2b54ea6805dff573c3722de",

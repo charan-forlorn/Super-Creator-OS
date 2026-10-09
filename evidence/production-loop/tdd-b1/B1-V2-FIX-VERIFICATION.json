@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "SCOS_B1_V2_PAYLOAD_CONTRACT_FIX_R1",
+  "taskId": "t_89f701a2",
+  "recordedAt": "2026-10-09T22:05:22Z",
+  "repo": "C:/Workspace/scos-track-b",
+  "headBeforeFix": "501b7c9",
+  "method": "TDD: RED evidence captured from a live run BEFORE any source mutation; fix applied; GREEN captured after; full monorepo regression; dist build-artifact noise reverted so the committed diff is source-only.",
+  "defects": {
+    "D1_caption_place": {
+      "productionRuns": ["f6ff926d-2824-4d21-90c1-dd6c198274fe.json"],
+      "symptom": "caption.place -> payload validation failed: invalid_type, expected number, received string, path [\"duration\"]",
+      "rootCause": "plan.ts paramSchema admitted numeric strings as scalars, so {start:\"2\",duration:\"3.5\"} parsed structurally; compiler.ts then forwarded op.params verbatim, so placeCaptionSchema (start/duration are z.number()) rejected the payload at the CommandBus seam.",
+      "fix": "compiler.ts coerceNumericParam() converts a numeric string to a real Number for add_caption start/duration before emitting the payload. A present-but-non-numeric value (e.g. \"three\") throws AiSemanticError instead of being forwarded (fail-closed)."
+    },
+    "D2_changeAspect": {
+      "productionRuns": [
+        "f54fbced-d680-47f8-aa88-1c57b56dd899.json",
+        "abadc93c-b793-498b-87ea-cd72a11e4eef.json"
+      ],
+      "symptom": "project.changeAspect -> expected \"'1920x1080' | '1080x1920' | '1080x1080'\", received undefined, path [\"ratio\"]; producer-side invalid_union at [\"operations\",N,\"params\",\"place\"]",
+      "rootCause": "Two seams. (a) plan.ts paramSchema was a scalar-only union (string|number|boolean), so a nested object param {place:{ratio:...}} was rejected at invalid_union before the compiler could ever resolve it. (b) The compiler forwarded op.params verbatim under whatever alias key the model chose (aspectRatio, place), so the canonical 'ratio' key the command schema requires was absent -> undefined.",
+      "fix": "plan.ts paramSchema widened to a recursive AiParamValue (string|number|boolean|array|record) so nested params are structurally admissible. compiler.ts resolveAspectRatio() resolves the canonical ratio from the known alias keys (ratio, aspectRatio, aspect_ratio, aspect, resolution, nested place.*) and emits a canonical payload {ratio: <canonical>} — alias keys are never forwarded. Unresolvable values throw AiSemanticError (fail-closed), never invented."
+    }
+  },
+  "redEvidence": {
+    "capturedBeforeAnySourceMutation": true,
+    "command": "cd packages/ai-core && npx vitest run",
+    "file": "evidence/production-loop/tdd-b1/RED-live-run-20261009T215925Z.txt",
+    "cleanCopy": "evidence/production-loop/tdd-b1/RED-pre-fix-clean-20261009T220522Z.txt",
+    "preconditions": "pnpm install --frozen-lockfile (503 packages) + pnpm rebuild esbuild were required first: the clone had no node_modules, so vitest could not run at all before the fix was even testable.",
+    "result": {
+      "testFiles": "2 failed | 2 passed (4)",
+      "tests": "5 failed | 12 passed (17)",
+      "failingTests": [
+        "coerces numeric-string caption params into the caption.place payload",
+        "accepts an aspect param aliased as 'place' and resolves the ratio",
+        "accepts a scalar alias for the aspect ratio and still coerces the value",
+        "admits a nested object tool param without collapsing to invalid_union",
+        "fails closed on a non-numeric caption duration"
+      ],
+      "note": "The repro probe suite also failed to transform: 'await' used in a non-async function (zz-repro-probe.test.ts:28). Fixed by marking the test async — this is test infrastructure, not a product defect."
+    }
+  },
+  "greenEvidence": {
+    "aiCore": {
+      "file": "evidence/production-loop/tdd-b1/GREEN-ai-core-20261009T220522Z.txt",
+      "result": "Test Files 4 passed (4); Tests 18 passed (18)"
+    },
+    "reproProbeLiveOutput": {
+      "DEFECT1": "COMPILED [{\"commandType\":\"caption.place\",\"payload\":{\"text\":\"Hi\",\"start\":2,\"duration\":3.5}}] => BUS EXECUTED OK",
+      "DEFECT2": "COMPILED [{\"commandType\":\"project.changeAspect\",\"payload\":{\"ratio\":\"1080x1920\"}}] => BUS EXECUTED OK",
+      "significance": "Both defects now complete the FULL runtime path: planToCommands -> CommandBus.execute. Not just compilation — actual mutation against the real bus."
+    }
+  },
+  "fullRegression": {
+    "file": "evidence/production-loop/tdd-b1/GREEN-full-monorepo-20261009T220522Z.txt",
+    "finalVerification": {
+      "note": "After reverting dist noise, rebuilt from the final on-disk source and re-ran everything. This is the authoritative final state of the committed source.",
+      "perPackage": {
+        "packages/project-model": "9 files / 29 tests passed",
+        "packages/timeline": "2 files / 14 tests passed",
+        "packages/media-engine": "3 files / 17 tests passed",
+        "packages/command-system": "15 files / 79 tests passed",
+        "packages/ai-core": "4 files / 18 tests passed",
+        "packages/ai-providers": "6 files / 32 tests passed",
+        "apps/desktop": "27 files / 86 tests passed"
+      },
+      "totals": "66 test files / 275 tests, 0 failed, 0 skipped, 0 todo",
+      "build": "pnpm -r build exit 0, 0 TypeScript errors across all 8 workspace projects",
+      "typecheck": "pnpm -r typecheck exit 0, 0 errors"
+    }
+  },
+  "scope": {
+    "sourceFilesChanged": [
+      "packages/ai-core/src/plan.ts (+25)",
+      "packages/ai-core/src/compiler.ts (+92)"
+    ],
+    "diffstat": "2 files changed, 115 insertions(+), 2 deletions(-)",
+    "untrackedAdded": [
+      "packages/ai-core/tests/payload-contract.test.ts",
+      "packages/ai-core/tests/zz-repro-probe.test.ts",
+      "evidence/production-loop/tdd-b1/",
+      "evidence/production-loop/GATE_2026-10-09T14-48-28-588Z.json"
+    ],
+    "distNoiseReverted": "pnpm -r build regenerated dist/ across packages that were never edited (dropped sourceMappingURL trailers, declaration key reordering). All dist/ churn was reverted; the committed diff is source-only.",
+    "commandsNotRun": [
+      "git commit / git push — not requested by this card; left for the Human Gate."
+    ]
+  },
+  "simulatedOutput": "NONE. Every result above is from a live vitest run, a live pnpm build, and a live pnpm typecheck on this machine."
+}
