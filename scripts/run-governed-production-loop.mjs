@@ -6,12 +6,14 @@ import { dirname, join, resolve } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "..");
-const bindingPath = join(
-  repoRoot,
-  "evidence",
-  "qualification-bindings",
-  "HAIOS_AI_GENERATION_20260918.json",
-);
+const bindingPath = process.env.SCOS_QUALIFICATION_BINDING
+  ? resolve(process.env.SCOS_QUALIFICATION_BINDING)
+  : join(
+      repoRoot,
+      "evidence",
+      "qualification-bindings",
+      "HAIOS_AI_GENERATION_20260918.json",
+    );
 const evidenceDir = join(repoRoot, "evidence", "production-loop");
 const aiProviders = await import(
   pathToFileURL(

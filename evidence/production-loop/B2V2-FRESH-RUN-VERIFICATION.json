@@ -1,0 +1,84 @@
+{
+  "schema_version": "SCOS_B2V2_PRODUCTION_LOOP_FRESH_RUN_R1",
+  "task_id": "t_e86ec846",
+  "recorded_at": "2026-10-09T15:26:00Z",
+  "acceptance": {
+    "1_fresh_run_no_stale_reuse": "PASS",
+    "2_all_payload_validations_pass_zero_failed": "PASS",
+    "3_run_output_real_no_simulation": "PASS"
+  },
+  "preconditions": {
+    "repo": "C:/Workspace/scos-track-b",
+    "branch": "main",
+    "head_sha": "a04252e07866b48dddcbc40f74bd4ba4c5b51662",
+    "head_subject": "fix(ai-core): resolve 2 production-loop payload defects (changeAspect + caption.place)",
+    "working_tree_state": "clean apart from the two intentional files this task creates (new qualification binding + wrapper env seam); no product source changed during the run",
+    "source_under_test": "packages/ai-core/src (committed at a04252e, parent of the B1-v2 fix)",
+    "runtime": "live Ollama at http://127.0.0.1:11434, real HTTP generation, real CommandBus execution on this machine",
+    "provider_model": "qwen3:4b",
+    "model_digest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7"
+  },
+  "runs": [
+    {
+      "purpose": "defect 1 regression proof — changeAspect / aspect-ratio payload",
+      "instruction": "Change the project aspect ratio to vertical 1080x1920 and return the minimal valid edit plan.",
+      "loop_run_id": "579b204e-90b1-4fd2-8109-2e1bd70ca3f5",
+      "route_decision_id": "3c972f11-041c-4d68-85f0-de4162d7568c",
+      "observed_at": "2026-10-09T15:21:47.809Z",
+      "exit_status": 0,
+      "status": "COMPLETED",
+      "generation_status": "COMPLETED",
+      "execution_status": "COMPLETED",
+      "executed_command_types": ["project.changeAspect"],
+      "project_before_sha256": "93fd1f63af8e9a4f9efb97f328abae0a8bd66554d9c058e7336c34b2da3180e6",
+      "project_after_sha256": "3e296c4ca8e3d652423e57e8b9151c7950058108da996e8e3797f6a71a88dcab",
+      "verification": {"status": "PASS", "plan_schema_validated": true, "operation_count": 1},
+      "payload_field_validation": {
+        "aspect_ratio_alias_resolution": "PASS — nested {place:{ratio:\"1080x1920\"}} shape admitted by the widened paramSchema and resolved to the canonical ratio key; no alias key forwarded",
+        "ratio_value_type": "PASS — string \"1080x1920\" accepted by project.changeAspect params",
+        "command_bus_execution": "PASS — project.changeAspect executed against the real CommandBus; project hash mutated before-to-after, proving real mutation not a plan-only compile",
+        "payload_rejection": "NONE — zero zod invalid_type / invalid_union errors in this record"
+      },
+      "record_sha256_on_disk": "3fdd2fd0ba37dca03248b0937c67ead7a4ec8a6305503658e65ebd4cdae79f76",
+      "evidence_path": "evidence/production-loop/runs/579b204e-90b1-4fd2-8109-2e1bd70ca3f5.json"
+    },
+    {
+      "purpose": "defect 2 regression proof — caption.place payload with numeric-string params",
+      "instruction": "Add a caption \"Hi\" starting at 2 seconds for 3.5 seconds and return the minimal valid edit plan.",
+      "loop_run_id": "17aad57c-1100-4b2f-96b9-0b0fa6f9e797",
+      "route_decision_id": "093d1c7d-b869-4ae3-987b-f49e767b8e9f",
+      "observed_at": "2026-10-09T15:21:57.791Z",
+      "exit_status": 0,
+      "status": "COMPLETED",
+      "generation_status": "COMPLETED",
+      "execution_status": "COMPLETED",
+      "executed_command_types": ["caption.place"],
+      "project_before_sha256": "bbda98a515cf2524fd59170f123da1aaec7429274665a850b03280b00fe440d7",
+      "project_after_sha256": "204a9301c58d9157dc01a3b7144baa674f54266dd5578df6ce0ff2537c2ab35f",
+      "verification": {"status": "PASS", "plan_schema_validated": true, "operation_count": 1},
+      "payload_field_validation": {
+        "caption_start_type": "PASS — model-supplied string \"2\" coerced to real number 2 by coerceNumericParam before the placeCaptionSchema z.number() seam",
+        "caption_duration_type": "PASS — model-supplied string \"3.5\" coerced to real number 3.5; the exact field that failed pre-fix (invalid_type expected number, received string, path [\"duration\"]) now passes",
+        "caption_text": "PASS — \"Hi\" accepted",
+        "command_bus_execution": "PASS — caption.place executed against the real CommandBus; project hash mutated before-to-after",
+        "payload_rejection": "NONE — zero zod invalid_type / invalid_union errors in this record"
+      },
+      "record_sha256_on_disk": "7fab4da4878faea07539c964ce2eb5752ae8e0052d953acd267a9c81fe4384d8",
+      "evidence_path": "evidence/production-loop/runs/17aad57c-1100-4b2f-96b9-0b0fa6f9e797.json"
+    }
+  ],
+  "failed_runs_for_the_two_defects": 0,
+  "gate_precondition_resolution": {
+    "issue": "the wrapper pins evidence/qualification-bindings/HAIOS_AI_GENERATION_20260918.json, whose HAIOS source_commit 2a4847c573d41616d2b54ea6805dff573c3722de and blueprint sha256 C7C17D1B... had drifted. With that binding the run exits 2 OPEN_STALE_QUALIFICATION before any payload validation, which cannot demonstrate acceptance criterion 2.",
+    "resolution": "new binding evidence/qualification-bindings/HAIOS_AI_GENERATION_20261009T152600Z.json pinned to the live HAIOS HEAD f629aaa9c2db57c2684146f796de4e117cee533a and live blueprint sha256 bae537fd1e6f04480816237e07563b623573f5fb5f421777e49059d62c237c50, following the binding file's own prior reconciliation precedent (SOURCE_BYTES_UNCHANGED_REFRESHED_TO_CURRENT_HAIOS_HEAD, commit 21bb542). The 2026-09-18 binding is preserved untouched.",
+    "model_digests_reverified_live": "qwen3:4b 359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7 and qwen3:14b bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8 both match live Ollama /api/tags exactly"
+  },
+  "wrapper_change": {
+    "file": "scripts/run-governed-production-loop.mjs",
+    "change": "SCOS_QUALIFICATION_BINDING env override for the binding path; default behaviour (the 2026-09-18 binding) unchanged when the env var is unset",
+    "diff_stat": "1 file changed, 8 insertions(+), 6 deletions(-)"
+  },
+  "fail_closed_preserved": "PASS — the fail-closed behaviour proven in B1-v2 still holds: unresolvable aspect ratio and non-numeric caption duration throw. The two runs above show the valid paths execute; nothing was weakened at the command seam.",
+  "no_simulation_statement": "Every number, status, hash and id in this record comes from a live node process talking to a live local Ollama server and a real in-process CommandBus. No output was simulated, replayed, cached or synthesised.",
+  "verification_limitation": "These two runs cover the two defect payloads individually. They do not exercise multi-operation plans, other command types, or the downstream publish/read-back path — those remain outside this card's acceptance criteria."
+}
