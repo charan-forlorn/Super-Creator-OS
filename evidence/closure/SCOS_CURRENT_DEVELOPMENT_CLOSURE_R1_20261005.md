@@ -98,3 +98,20 @@ Capability contract:
 Evidence manifest:
 
 `evidence/closure/SCOS_CURRENT_DEVELOPMENT_CLOSURE_R1_20261005.json`
+
+## Correction — 2026-10-09 (Track A push closure)
+
+On 2026-10-09 the Human (JARAN) granted explicit push authority (D3 gate) for this sealed baseline, and the 46 local commits ahead of `origin/main` were pushed fast-forward to remote `main`:
+
+- pre-push remote sha: `2d6a3eae7bd71de82af6c399149d0228cd294060`
+- pushed range: `2d6a3ea..c046c22` (46 commits, fast-forward)
+- post-push remote sha: `c046c22924e07c003ab9d8fdd663e2e5b845c763` (== local HEAD)
+- force: **not used**
+- ahead/behind after push: **0 / 0**
+
+This supersedes the `Remote push: **NOT PERFORMED**` line in the dated 2026-10-05 record above; that line is kept intact as the historical milestone record. `External deployment/publishing/credential mutation: **NOT PERFORMED**` remains accurate and unchanged — no publish, deployment, or credential mutation occurred.
+
+Evidence:
+
+- `evidence/production-loop/scos-push-precheck-20261009.json` (read-only pre-push verification, 4/4 PASS)
+- `evidence/production-loop/scos-push-execution-20261009.json` (push execution + post-push verification, 3/3 PASS)
