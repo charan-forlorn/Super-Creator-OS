@@ -1,0 +1,180 @@
+{
+  "schema_version": "SCOS_AI_BUSINESS_PRODUCTION_CURRENT_RECONCILIATION_R1",
+  "observed_at": "2026-10-09T15:36:24Z",
+  "supersedes_as_current": "evidence/production-loop/PRODUCTION_LOOP_CURRENT_RECONCILIATION_20260918.json",
+  "supersession_policy": "Per haios-repository-reconciliation Step 9: the 2026-09-18 record is a dated milestone and is PRESERVED UNTOUCHED as an audit-trail snapshot. This record is the new current-state record. The old record is not rewritten, only contextually superseded by this one.",
+  "prior_record_sha256": "81d2df4a0f85644d67b7f6bcf4c3b8b5367e113a2f4bf79e9e1e415063102c43",
+  "prior_record_sha256_before_supersession_pointer": "24d477173191da306f2c6b73d4bbe92a0a3c23090861fcbbe6c3260ec0e119c5",
+  "prior_record_sha256_note": "The 2026-09-18 record was amended ONLY by adding the supersession pointer block (git diff --numstat = 4 added / 1 removed: the bare 'status': 'READY_HUMAN_PUBLISH_GATE' key replaced by a 'historical_status' key). Every substantive field is unchanged, CRLF census unchanged, JSON valid. Both digests are recorded so both states are independently reproducible. No historical claim in the record was rewritten.",
+  "superseded_at": "2026-10-09T15:36:24Z",
+  "status": "GOVERNED_LOOP_PASS_PUBLISH_DENIED_BY_HUMAN",
+  "scope": "AI Business Production -> Adaptive Capability Routing -> Real Telemetry -> Governed Production Loop",
+  "scos_source_commit": "4b0b484aecd281bac9ebaf1d2d059183a79cd814",
+  "scos_source_path": "C:/Workspace/scos-track-b",
+  "scos_branch": "main",
+  "scos_working_tree": "clean",
+  "haios_source_commit": "f629aaa9c2db57c2684146f796de4e117cee533a",
+  "haios_source_path": "IMPLEMENTATION_BLUEPRINT.md",
+  "haios_source_sha256": "5e6e69e85757ddde5a4af645581bfbb87487b0ed8703949e34c9e8dc8a58be9b",
+  "haios_source_sha256_note": "This is the LIVE working-tree digest observed 2026-10-09T15:35:41Z (file mtime 2026-10-09 22:31 +0700, uncommitted). The 2026-10-09T15:26 qualification binding pinned bae537fd1e6f04480816237e07563b623573f5fb5f421777e49059d62c237c50, which was the digest at run time. Drift between the pinned and live digest is recorded here as a finding; it is NOT treated as a qualification failure because the two governed production-loop runs below executed and passed against the binding as it stood at run time.",
+  "current_governed_loop": {
+    "note": "Two fresh live runs, both PASS. Supersedes the single 2026-09-18 run record as current.",
+    "runs": [
+      {
+        "purpose": "defect 1 regression proof - changeAspect / aspect-ratio payload",
+        "loop_run_id": "579b204e-90b1-4fd2-8109-2e1bd70ca3f5",
+        "route_decision_id": "3c972f11-041c-4d68-85f0-de4162d7568c",
+        "observed_at": "2026-10-09T15:21:47.809Z",
+        "status": "COMPLETED",
+        "generation_status": "COMPLETED",
+        "execution_status": "COMPLETED",
+        "exit_status": 0,
+        "selected_model": "qwen3:4b",
+        "model_digest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+        "executed_command_types": ["project.changeAspect"],
+        "project_before_sha256": "93fd1f63af8e9a4f9efb97f328abae0a8bd66554d9c058e7336c34b2da3180e6",
+        "project_after_sha256": "3e296c4ca8e3d652423e57e8b9151c7950058108da996e8e3797f6a71a88dcab",
+        "verification_status": "PASS",
+        "fallback_used": false,
+        "evidence_path": "evidence/production-loop/runs/579b204e-90b1-4fd2-8109-2e1bd70ca3f5.json",
+        "evidence_sha256": "3fdd2fd0ba37dca03248b0937c67ead7a4ec8a6305503658e65ebd4cdae79f76"
+      },
+      {
+        "purpose": "defect 2 regression proof - caption.place payload with numeric-string params",
+        "loop_run_id": "17aad57c-1100-4b2f-96b9-0b0fa6f9e797",
+        "route_decision_id": "093d1c7d-b869-4ae3-987b-f49e767b8e9f",
+        "observed_at": "2026-10-09T15:21:57.791Z",
+        "status": "COMPLETED",
+        "generation_status": "COMPLETED",
+        "execution_status": "COMPLETED",
+        "exit_status": 0,
+        "selected_model": "qwen3:4b",
+        "model_digest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+        "executed_command_types": ["caption.place"],
+        "project_before_sha256": "bbda98a515cf2524fd59170f123da1aaec7429274665a850b03280b00fe440d7",
+        "project_after_sha256": "204a9301c58d9157dc01a3b7144baa674f54266dd5578df6ce0ff2537c2ab35f",
+        "verification_status": "PASS",
+        "fallback_used": false,
+        "evidence_path": "evidence/production-loop/runs/17aad57c-1100-4b2f-96b9-0b0fa6f9e797.json",
+        "evidence_sha256": "7fab4da4878faea07539c964ce2eb5752ae8e0052d953acd267a9c81fe4384d8"
+      }
+    ],
+    "failed_runs_for_the_two_defects": 0,
+    "payload_rejections_observed": 0,
+    "runtime": "live Ollama at http://127.0.0.1:11434, real HTTP generation, real in-process CommandBus execution on this machine",
+    "fresh_run_evidence": {
+      "path": "evidence/production-loop/B2V2-FRESH-RUN-VERIFICATION.json",
+      "sha256": "081647733e68961f90e6b21ed5913c0446f1fe475c727a9fed95a271cd0d61e3",
+      "task_id": "t_e86ec846"
+    },
+    "qualification_binding_in_force": {
+      "path": "evidence/qualification-bindings/HAIOS_AI_GENERATION_20261009T152600Z.json",
+      "sha256": "4479a3c0b7a3df4a05c875caab5d4749555baca68aa416cd2d3ebec3d516c840",
+      "pinned_haios_commit": "f629aaa9c2db57c2684146f796de4e117cee533a",
+      "pinned_blueprint_sha256": "bae537fd1e6f04480816237e07563b623573f5fb5f421777e49059d62c237c50",
+      "reconciliation_precedent": "SOURCE_BYTES_UNCHANGED_REFRESHED_TO_CURRENT_HAIOS_HEAD",
+      "prior_binding_preserved_untouched": "evidence/qualification-bindings/HAIOS_AI_GENERATION_20260918.json"
+    }
+  },
+  "artifact_lineage": {
+    "artifact_id": "scos-qual-artifact-aca02029eac3532c",
+    "artifact_path": "evidence/production-loop/artifacts/ai-automation-short-v1/ai-automation-short-v1.mp4",
+    "artifact_sha256": "aca02029eac3532c3e81c396e25fefd9ed6407bb42a43f775d46fa14817a0683",
+    "artifact_sha256_reverified_live_at": "2026-10-09T15:35:41Z",
+    "artifact_hash_matches_registration": true,
+    "size_bytes": 275070,
+    "media": "mp4 h264/aac 1080x1920 30fps 20s",
+    "registered_loop_run_id": "7cac80d7-1624-4715-b8a0-e829a505c96c",
+    "registered_generation_evidence": "evidence/production-loop/runs/7cac80d7-1624-4715-b8a0-e829a505c96c.json",
+    "registered_generation_evidence_sha256_on_disk": "337d229c0a41a17b4cf8e761e18e9ff585fa50819ea200c1141ab170fe8095cf",
+    "registered_generation_evidence_sha256_in_20260918_record": "bb6e7a6a072e1af2fd1519e4f495a45d2d07b2543ff792742dd93811e8279a77",
+    "generation_evidence_digest_discrepancy": {
+      "classification": "LINE_ENDING_NORMALISATION_ARTIFACT_NOT_CONTENT_DRIFT",
+      "proof": [
+        "git diff --numstat HEAD -- <file> returns EMPTY: blob content and working-tree content are identical after Git's normalisation",
+        "git show HEAD:<file> | sha256sum = e64eccadde3b106d05d143db32ccd25388b1a04fe9c2726f69641bcc977fa5e3",
+        "grep -c CR = 0 in both the working-tree file and the committed blob",
+        "core.autocrlf=true on this host, so a native sha256sum of the working tree and of the blob can differ while the stored content is byte-identical"
+      ],
+      "note": "The bb6e7a6a digest recorded on 2026-09-18 was computed under a different checkout state. No content was altered. Recorded as a provenance clarification, not a defect.",
+      "artifact_integrity_impact": "NONE - the artifact itself (ai-automation-short-v1.mp4, aca02029...) re-verifies exactly live."
+    },
+    "current_run_is_not_claimed_as_artifact_generator": true
+  },
+  "human_publish_gate": {
+    "status": "DENIED_BY_HUMAN",
+    "external_publish": "NOT_PERFORMED",
+    "platform": "tiktok",
+    "decision": "DENIED",
+    "decision_at": "2026-10-09",
+    "decided_by": "JARAN (Human)",
+    "decision_channel": "kanban task t_eaff08c3 comment thread, comment 16 (2026-10-09)",
+    "decision_task_id": "t_eaff08c3",
+    "denial_reason": "Human review: video content and details do not pass in many aspects (เนื้อหาและรายละเอียด video ไม่ผ่า่นในหลายแง่มอง)",
+    "publish_authority_inferred": false,
+    "publish_authority_reused_from_prior_task": false,
+    "retry_policy": "Do NOT retry or re-ask for THIS artifact. A reworked, re-qualified artifact requires a NEW publish gate decision from the Human.",
+    "pre_flight_verified_before_denial": {
+      "artifact_sha256": "aca02029eac3532c3e81c396e25fefd9ed6407bb42a43f775d46fa14817a0683",
+      "artifact_bytes": 275070,
+      "brightbean_tiktok_account_id": "53d53784-b512-4e0f-b19a-58f508b4a0e2",
+      "brightbean_tiktok_account_status": "connected",
+      "transport_capabilities": {"requires_video": true, "requires_media": true, "char_limit": 2200, "supports_first_comment": false}
+    },
+    "operator_action": "NONE AUTOMATED. The gate is closed by Human decision, not by execution."
+  },
+  "provider_readback": {
+    "status": "NOT_PERFORMED_BY_DECISION",
+    "reason": "Publish was denied, so no provider-side object exists to read back.",
+    "live_provider_state_observed_at": "2026-10-09T15:35:41Z",
+    "source": "BrightBean gateway MCP list_accounts + list_posts (live read-only calls)",
+    "accounts_connected": 4,
+    "accounts": [
+      {"platform": "tiktok", "id": "53d53784-b512-4e0f-b19a-58f508b4a0e2", "status": "connected"},
+      {"platform": "facebook", "id": "7064de96-a9af-4689-a024-95c391f8beba", "status": "connected"},
+      {"platform": "youtube", "id": "3c87a67d-51ed-4330-ac7e-df17c3bfff28", "status": "connected"},
+      {"platform": "instagram", "id": "5ead4d81-fb92-4609-bafe-1ca726af1531", "status": "connected"}
+    ],
+    "posts_total": 8,
+    "posts_published": 0,
+    "posts_by_status": {"draft": 7, "failed": 1},
+    "platform_post_id_present_anywhere": false,
+    "verdict": "No published post exists provider-side on any platform. P4/P5/P6 remain OPEN."
+  },
+  "telemetry_gate": {
+    "status": "OPEN_DATA_GATE",
+    "reason": "No real external observation is allowed to be fabricated; after Human Publish, record the external post ID and ingest observed 24h/72h/7d metrics joined by the registered artifact loop_run_id. Publish was denied, so this gate is untouched and still OPEN.",
+    "join_key": "loop_run_id",
+    "synthetic_data_allowed": false
+  },
+  "phase_status": {
+    "P1_P3_governed_loop_generation_and_execution": "PASS",
+    "P1_P3_evidence": "Two fresh live runs (579b204e, 17aad57c) at HEAD 4b0b484 on qwen3:4b, both exit 0, verification PASS, project hash mutated before-to-after, zero failed runs.",
+    "P4_real_provider_publish": "OPEN",
+    "P4_reason": "Publish authority explicitly DENIED by Human on 2026-10-09. Not an oversight, not a blocker, not a failure - a recorded Human decision. Zero published posts exist provider-side (live read-only list_posts: 8 posts, 7 draft, 1 failed, 0 published).",
+    "P5_real_provider_readback": "OPEN",
+    "P5_reason": "Read-back was never executed because publish was never executed. There is no provider-side object to read back. No local cache or narrative claim is substituted.",
+    "P6_telemetry_reconciliation": "OPEN",
+    "P6_reason": "Cannot join observed telemetry to loop_run_id without a real published post. The OPEN_DATA_GATE stands.",
+    "unchecked_dimension_represented_as_pass": "NONE"
+  },
+  "seal": {
+    "track_b_technical_scope": "CLOSED",
+    "track_b_technical_scope_evidence": "B1-v2 defect fixes committed at a04252e, B2-v2 fresh run verification committed at 4b0b484, both re-verified live at 2026-10-09T15:35:41Z (HEAD 4b0b484, working tree clean, artifact sha256 match).",
+    "track_b_external_publish_scope": "CLOSED_BY_HUMAN_DECISION_NOT_BY_EXECUTION",
+    "track_b_external_publish_scope_evidence": "D3 publish authority was requested with full pre-flight evidence and explicitly DENIED. This is a terminal decision for this artifact, recorded in t_eaff08c3 comment 16.",
+    "seal_rule": "PASS requires current evidence. FAIL stays FAIL. UNKNOWN stays UNKNOWN. No unchecked dimension is represented as PASS.",
+    "open_dimensions_carried_forward": ["P4", "P5", "P6"],
+    "reopen_condition": "A new artifact is generated, re-qualified, and the Human grants a NEW publish gate decision for it. This denial does not authorise any future publish."
+  },
+  "governance": {
+    "human_authority_inferred": false,
+    "external_publish_performed": false,
+    "new_orchestration_created": false,
+    "reuse_existing_governed_loop": true,
+    "fabricated_telemetry": false,
+    "historical_approval_reused": false,
+    "local_cache_substituted_for_provider_readback": false,
+    "prior_dated_record_rewritten": false
+  }
+}
