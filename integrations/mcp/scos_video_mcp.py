@@ -24,15 +24,31 @@ from mcp.server.fastmcp import FastMCP
 # hardcoded path. Resolution is lazy (module import) and fails closed.
 import sys  # noqa: E402
 
+_MCP_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
+if str(_MCP_DIR) not in sys.path:
+    sys.path.insert(0, str(_MCP_DIR))
 from scos.media_binaries import resolve_ffmpeg, resolve_ffprobe  # noqa: E402
+from mcp_allow_root import guard_path, guard_paths, AllowRootViolation  # noqa: E402
 
 FFMPEG = resolve_ffmpeg()
 FFPROBE = resolve_ffprobe()
 
 mcp = FastMCP("scos-video")
+
+
+def _g(path: str):
+    """Guard one host path: resolve it inside the allow-root or fail closed."""
+    return str(guard_path(path))
+
+
+def _g_csv(paths: str):
+    """Guard a comma-separated path list; every component must be inside."""
+    items = [p.strip() for p in paths.split(",") if p.strip()]
+    return [str(p) for p in guard_paths(items)]
+
 
 def _run(cmd: list[str]) -> tuple[int, str, str]:
     p = subprocess.run(cmd, capture_output=True, text=True)
@@ -41,6 +57,7 @@ def _run(cmd: list[str]) -> tuple[int, str, str]:
 @mcp.tool()
 def probe(path: str) -> str:
     """Return video metadata as JSON: width, height, fps, duration, codecs, audio info."""
+    path = _g(path)
     rc, out, err = _run([FFPROBE, "-v", "error", "-print_format", "json",
         "-show_entries","stream=codec_type,codec_name,width,height,r_frame_rate,channels,sample_rate",
         "-show_entries","format=duration,size,bit_rate", path])
@@ -65,6 +82,7 @@ def probe(path: str) -> str:
 @mcp.tool()
 def volume_stats(path: str) -> str:
     """Return mean/max loudness (dB) of the audio track via ffmpeg volumedetect."""
+    path = _g(path)
     rc, out, err = _run([FFMPEG,"-hide_banner","-nostats","-i",path,"-af","volumedetect","-f","null","-"])
     mean = next((l.split("mean_volume:")[1].strip() for l in err.splitlines() if "mean_volume:" in l), "n/a")
     mx   = next((l.split("max_volume:")[1].strip() for l in err.splitlines() if "max_volume:" in l), "n/a")
@@ -73,6 +91,7 @@ def volume_stats(path: str) -> str:
 @mcp.tool()
 def scene_cuts(path: str, threshold: float = 0.4) -> str:
     """List scene-change timestamps (seconds) above `threshold` (0-1). Lower = more sensitive."""
+    path = _g(path)
     rc, out, err = _run([FFMPEG,"-hide_banner","-nostats","-i",path,
         "-vf",f"select='gt(scene,{threshold})',metadata=print","-an","-f","null","-"])
     ts = [l.split("pts_time:")[1].split()[0] for l in err.splitlines() if "pts_time:" in l]
@@ -81,6 +100,7 @@ def scene_cuts(path: str, threshold: float = 0.4) -> str:
 @mcp.tool()
 def extract_frames(path: str, times: str, out_dir: str, height: int = 760) -> str:
     """Extract still frames at comma-separated `times` (sec) to out_dir as JPGs. Returns written paths."""
+    path = _g(path); out_dir = _g(out_dir)
     od = Path(out_dir); od.mkdir(parents=True, exist_ok=True); written=[]
     for t in [x.strip() for x in times.split(",") if x.strip()]:
         dest = od / f"frame_{t.replace('.','_')}.jpg"
@@ -92,6 +112,7 @@ def extract_frames(path: str, times: str, out_dir: str, height: int = 760) -> st
 @mcp.tool()
 def extract_audio(path: str, out_path: str, start: float = 0.0, duration: float | None = None) -> str:
     """Extract an audio segment to WAV (44.1k stereo). duration=None -> to end."""
+    path = _g(path); out_path = _g(out_path)
     cmd = [FFMPEG,"-hide_banner","-nostats","-y","-ss",str(start),"-i",path]
     if duration is not None: cmd += ["-t",str(duration)]
     cmd += ["-ar","44100","-ac","2",out_path]
@@ -101,6 +122,7 @@ def extract_audio(path: str, out_path: str, start: float = 0.0, duration: float 
 @mcp.tool()
 def trim(path: str, out_path: str, start: float, duration: float) -> str:
     """Trim a clip [start, start+duration] (re-encoded h264/aac) to out_path."""
+    path = _g(path); out_path = _g(out_path)
     rc,_,err = _run([FFMPEG,"-hide_banner","-nostats","-y","-ss",str(start),"-i",path,
         "-t",str(duration),"-c:v","libx264","-crf","19","-pix_fmt","yuv420p","-c:a","aac","-b:a","192k",out_path])
     return "OK -> "+out_path if rc==0 else f"ERROR: {err.strip()[-300:]}"
@@ -108,6 +130,7 @@ def trim(path: str, out_path: str, start: float, duration: float) -> str:
 @mcp.tool()
 def mux_audio(video_path: str, audio_path: str, out_path: str) -> str:
     """Replace/attach an audio track onto a video (copies video, encodes aac, -shortest)."""
+    video_path = _g(video_path); audio_path = _g(audio_path); out_path = _g(out_path)
     rc,_,err = _run([FFMPEG,"-hide_banner","-nostats","-y","-i",video_path,"-i",audio_path,
         "-map","0:v:0","-map","1:a:0","-c:v","copy","-c:a","aac","-b:a","192k","-shortest",out_path])
     return "OK -> "+out_path if rc==0 else f"ERROR: {err.strip()[-300:]}"
@@ -124,6 +147,7 @@ _GRADES = {
 @mcp.tool()
 def grade(path: str, out_path: str, preset: str = "punch") -> str:
     """Apply a color-grade preset to a video. presets: punch, vibrant, warm, cold, cine, bw."""
+    path = _g(path); out_path = _g(out_path)
     vf = _GRADES.get(preset)
     if not vf:
         return f"ERROR: unknown preset '{preset}'. Choose from {list(_GRADES)}"
@@ -134,6 +158,7 @@ def grade(path: str, out_path: str, preset: str = "punch") -> str:
 @mcp.tool()
 def burn_subtitles(path: str, srt_path: str, out_path: str, font_size: int = 18, margin_v: int = 60) -> str:
     """Burn an .srt onto the video (centered, outlined, semi-transparent box). Hard-coded captions."""
+    path = _g(path); srt_path = _g(srt_path); out_path = _g(out_path)
     esc = srt_path.replace("\\", "/").replace(":", "\\:")
     style = (f"Fontname=Arial,FontSize={font_size},PrimaryColour=&H00FFFFFF,"
              f"BorderStyle=3,Outline=1,Shadow=0,Alignment=2,MarginV={margin_v}")
@@ -145,7 +170,7 @@ def burn_subtitles(path: str, srt_path: str, out_path: str, font_size: int = 18,
 @mcp.tool()
 def concat_list(paths: str, out_path: str, width: int = 1080, height: int = 1920) -> str:
     """Concatenate comma-separated video paths (re-encoded, scaled to width x height, video-only)."""
-    items = [p.strip() for p in paths.split(",") if p.strip()]
+    items = _g_csv(paths); out_path = _g(out_path)
     if len(items) < 2:
         return "ERROR: provide at least 2 comma-separated paths"
     cmd = [FFMPEG,"-hide_banner","-nostats","-y"]
@@ -176,6 +201,7 @@ def analyze_virality(path: str) -> str:
     Scores hook, pacing, energy, format & length. Pacing/hook use real MOTION ENERGY
     (frame-diff), so smooth-animation edits are scored fairly (not just hard cuts).
     Returns JSON with a 0-100 score, letter grade, breakdown, metrics, and tips."""
+    path = _g(path)
     meta = json.loads(probe(path))
     vol = json.loads(volume_stats(path))
     dur = meta.get("duration_s",0) or 0.001
