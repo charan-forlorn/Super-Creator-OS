@@ -1,0 +1,312 @@
+
+ RUN  v2.1.9 C:/Workspace/super-creator-os/packages/ai-core
+
+ ❯ tests/payload-contract.test.ts (8 tests | 5 failed) 18ms
+   × AI payload contract regression (production-loop defects) > coerces numeric-string caption params into the caption.place payload 9ms
+     → expected [ { …(2) } ] to deeply equal [ { …(2) } ]
+   × AI payload contract regression (production-loop defects) > accepts an aspect param aliased as 'place' and resolves the ratio 3ms
+     → [
+  {
+    "code": "invalid_union",
+    "unionErrors": [
+      {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "string",
+            "received": "object",
+            "path": [
+              "operations",
+              0,
+              "params",
+              "place"
+            ],
+            "message": "Expected string, received object"
+          }
+        ],
+        "name": "ZodError"
+      },
+      {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "number",
+            "received": "object",
+            "path": [
+              "operations",
+              0,
+              "params",
+              "place"
+            ],
+            "message": "Expected number, received object"
+          }
+        ],
+        "name": "ZodError"
+      },
+      {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "boolean",
+            "received": "object",
+            "path": [
+              "operations",
+              0,
+              "params",
+              "place"
+            ],
+            "message": "Expected boolean, received object"
+          }
+        ],
+        "name": "ZodError"
+      }
+    ],
+    "path": [
+      "operations",
+      0,
+      "params",
+      "place"
+    ],
+    "message": "Invalid input"
+  }
+]
+   × AI payload contract regression (production-loop defects) > accepts a scalar alias for the aspect ratio and still coerces the value 1ms
+     → expected { …(2) } to deeply equal { …(2) }
+   × AI payload contract regression (production-loop defects) > admits a nested object tool param without collapsing to invalid_union 3ms
+     → expected [Function] to not throw an error but '[\n  {\n    "code": "invalid_union",\…' was thrown
+   × AI payload contract regression (production-loop defects) > fails closed on a non-numeric caption duration 1ms
+     → expected [Function] to throw an error
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/payload-contract.test.ts > AI payload contract regression (production-loop defects) > coerces numeric-string caption params into the caption.place payload
+AssertionError: expected [ { …(2) } ] to deeply equal [ { …(2) } ]
+
+- Expected
++ Received
+
+  Array [
+    Object {
+      "commandType": "caption.place",
+      "payload": Object {
+-       "duration": 3.5,
+-       "start": 2,
++       "duration": "3.5",
++       "start": "2",
+        "text": "Hi",
+      },
+    },
+  ]
+
+ ❯ tests/payload-contract.test.ts:41:22
+     39|     );
+     40|
+     41|     expect(commands).toEqual([
+       |                      ^
+     42|       { commandType: "caption.place", payload: { text: "Hi", start: 2,…
+     43|     ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  tests/payload-contract.test.ts > AI payload contract regression (production-loop defects) > accepts an aspect param aliased as 'place' and resolves the ratio
+ZodError: [
+  {
+    "code": "invalid_union",
+    "unionErrors": [
+      {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "string",
+            "received": "object",
+            "path": [
+              "operations",
+              0,
+              "params",
+              "place"
+            ],
+            "message": "Expected string, received object"
+          }
+        ],
+        "name": "ZodError"
+      },
+      {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "number",
+            "received": "object",
+            "path": [
+              "operations",
+              0,
+              "params",
+              "place"
+            ],
+            "message": "Expected number, received object"
+          }
+        ],
+        "name": "ZodError"
+      },
+      {
+        "issues": [
+          {
+            "code": "invalid_type",
+            "expected": "boolean",
+            "received": "object",
+            "path": [
+              "operations",
+              0,
+              "params",
+              "place"
+            ],
+            "message": "Expected boolean, received object"
+          }
+        ],
+        "name": "ZodError"
+      }
+    ],
+    "path": [
+      "operations",
+      0,
+      "params",
+      "place"
+    ],
+    "message": "Invalid input"
+  }
+]
+ ❯ Object.get error [as error] ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js:39:31
+ ❯ ZodObject.parse ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js:114:22
+ ❯ Module.planToCommands src/compiler.ts:109:33
+    107|   registry: CommandRegistry,
+    108| ): CompiledCommand[] {
+    109|   const plan = aiEditPlanSchema.parse(raw); // structural
+       |                                 ^
+    110|   validatePlanSemantics(plan, project); // semantic
+    111|   return compilePlanToCommands(plan, registry);
+ ❯ tests/payload-contract.test.ts:76:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  tests/payload-contract.test.ts > AI payload contract regression (production-loop defects) > accepts a scalar alias for the aspect ratio and still coerces the value
+AssertionError: expected { …(2) } to deeply equal { …(2) }
+
+- Expected
++ Received
+
+  Object {
+    "commandType": "project.changeAspect",
+    "payload": Object {
+-     "ratio": "1080x1920",
++     "aspectRatio": "vertical",
+    },
+  }
+
+ ❯ tests/payload-contract.test.ts:108:25
+    106|       createStudioRegistry(),
+    107|     );
+    108|     expect(commands[0]).toEqual({
+       |                         ^
+    109|       commandType: "project.changeAspect",
+    110|       payload: { ratio: "1080x1920" },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  tests/payload-contract.test.ts > AI payload contract regression (production-loop defects) > admits a nested object tool param without collapsing to invalid_union
+AssertionError: expected [Function] to not throw an error but '[\n  {\n    "code": "invalid_union",\…' was thrown
+
+- Expected:
+undefined
+
++ Received:
+"[
+  {
+    \"code\": \"invalid_union\",
+    \"unionErrors\": [
+      {
+        \"issues\": [
+          {
+            \"code\": \"invalid_type\",
+            \"expected\": \"string\",
+            \"received\": \"object\",
+            \"path\": [
+              \"operations\",
+              0,
+              \"params\",
+              \"place\"
+            ],
+            \"message\": \"Expected string, received object\"
+          }
+        ],
+        \"name\": \"ZodError\"
+      },
+      {
+        \"issues\": [
+          {
+            \"code\": \"invalid_type\",
+            \"expected\": \"number\",
+            \"received\": \"object\",
+            \"path\": [
+              \"operations\",
+              0,
+              \"params\",
+              \"place\"
+            ],
+            \"message\": \"Expected number, received object\"
+          }
+        ],
+        \"name\": \"ZodError\"
+      },
+      {
+        \"issues\": [
+          {
+            \"code\": \"invalid_type\",
+            \"expected\": \"boolean\",
+            \"received\": \"object\",
+            \"path\": [
+              \"operations\",
+              0,
+              \"params\",
+              \"place\"
+            ],
+            \"message\": \"Expected boolean, received object\"
+          }
+        ],
+        \"name\": \"ZodError\"
+      }
+    ],
+    \"path\": [
+      \"operations\",
+      0,
+      \"params\",
+      \"place\"
+    ],
+    \"message\": \"Invalid input\"
+  }
+]"
+
+ ❯ tests/payload-contract.test.ts:144:11
+    142|         createStudioRegistry(),
+    143|       ),
+    144|     ).not.toThrow();
+       |           ^
+    145|   });
+    146|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  tests/payload-contract.test.ts > AI payload contract regression (production-loop defects) > fails closed on a non-numeric caption duration
+AssertionError: expected [Function] to throw an error
+ ❯ tests/payload-contract.test.ts:174:7
+    172|         createStudioRegistry(),
+    173|       ),
+    174|     ).toThrow();
+       |       ^
+    175|   });
+    176| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 3 passed (8)
+   Start at  21:48:35
+   Duration  583ms (transform 113ms, setup 0ms, collect 254ms, tests 18ms, environment 0ms, prepare 129ms)

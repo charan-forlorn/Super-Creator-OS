@@ -1,0 +1,15 @@
+Scope: 7 of 8 workspace projects
+packages/project-model typecheck$ tsc -p tsconfig.json --noEmit
+packages/project-model typecheck: Done
+packages/media-engine typecheck$ tsc -p tsconfig.json --noEmit
+packages/command-system typecheck$ tsc -p tsconfig.json --noEmit
+packages/timeline typecheck$ tsc -p tsconfig.json --noEmit
+packages/timeline typecheck: Done
+packages/media-engine typecheck: Done
+packages/command-system typecheck: Done
+packages/ai-core typecheck$ tsc -p tsconfig.json --noEmit
+packages/ai-core typecheck: Done
+packages/ai-providers typecheck$ tsc -p tsconfig.json --noEmit
+packages/ai-providers typecheck: Done
+apps/desktop typecheck$ tsc -b --noEmit
+apps/desktop typecheck: Done

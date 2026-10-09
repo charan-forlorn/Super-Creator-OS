@@ -15,7 +15,30 @@ export const AI_TOOL_NAMES = [
 ] as const;
 export type AiToolName = (typeof AI_TOOL_NAMES)[number];
 
-const paramSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]));
+/**
+ * Producer-side param contract.
+ *
+ * A real model does not reliably emit typed scalars: it emits numeric strings
+ * ("2", "3.5") and occasionally nests an object under an alias
+ * (`{ place: { ratio: "1080x1920" } }`). The previous scalar-only union
+ * rejected both shapes outright, and the numeric-string case produced a
+ * payload the CommandBus then rejected with `invalid_type`.
+ *
+ * Structural admission is deliberately permissive here — values are still
+ * constrained at the command seam by the registered command schema, and the
+ * compiler fails closed on anything it cannot resolve (see compiler.ts).
+ */
+export const aiParamValueSchema: z.ZodType<AiParamValue> = z.lazy(() =>
+  z.union([z.string(), z.number(), z.boolean(), z.array(aiParamValueSchema), z.record(z.string(), aiParamValueSchema)]),
+);
+export type AiParamValue =
+  | string
+  | number
+  | boolean
+  | AiParamValue[]
+  | { [key: string]: AiParamValue };
+
+const paramSchema = z.record(z.string(), aiParamValueSchema);
 
 export const aiOperationSchema = z.object({
   tool: z.enum(AI_TOOL_NAMES),
