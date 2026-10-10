@@ -1,0 +1,27 @@
+{
+  "schema_version": "SCOS-CERTIFICATION-STAGE8.5-CLOSURE-R1",
+  "artifact_type": "CERTIFICATION_CLOSURE_EVIDENCE",
+  "created_at_local": "2026-10-10T20:25:46.838553+07:00",
+  "prepared_by": "Hermes Primary Operator",
+  "authority": "Bounded local verification of current bytes; no mutation of source.",
+  "head": "bc2d37ceba8144cb5e68418e3f3122ddb6dddff6",
+  "tree": "d3ad1561757df65dddfd34c18546f4e4f09cd300",
+  "branch": "main",
+  "dirty_count": 0,
+  "stage": "8.5 (final stage in docs/certification; highest version 8.5 of 54 plans)",
+  "exit_criteria_result": {
+    "full_control_center_tests": "2429 passed, 21 skipped, 21 deselected, 0 failed (273.08s)",
+    "security_scan_baseline": "PASS \u2014 472 files scanned, 0 findings",
+    "smoke": "PASS \u2014 16 passed, 0 failed",
+    "release_check": "PASS \u2014 10 passed, 0 warned, 0 failed",
+    "focused_stage85_tests": "17 passed (adapter_activation_authorization models/validation/gate)"
+  },
+  "disposition": "STAGE_8.5_EXIT_CRITERIA_MET",
+  "note": "Stage 8.5 is the explicit operator adapter-activation authorization gate. Its acceptance criteria require valid authorization -> AUTHORIZED_IN_PRINCIPLE, denial -> DENIED, invalid -> BLOCKED, expired -> EXPIRED, with can_activate_now/activation_executed/credentials_materialized/external_calls_made/runtime_mutated always false. This closure verifies the implementation and gates; it does NOT activate any adapter.",
+  "non_mutation_boundary": {
+    "files_staged": false,
+    "commit_performed": false,
+    "push_performed": false,
+    "adapter_activated": false
+  }
+}
